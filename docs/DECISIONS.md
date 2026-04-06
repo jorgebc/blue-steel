@@ -37,6 +37,22 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-024 | Multiple campaigns, admin-only creation | ✅ Active | Definition |
 | D-025 | Admin is a singleton platform-level super-user | ✅ Active | Definition |
 | D-026 | Onboarding flow: admin creates campaign and assigns GM | ✅ Active | Definition |
+| D-027 | Backend stack: Java 25 + Spring Boot 4.0.3 | ✅ Active | Definition |
+| D-028 | Build tool: Maven | ✅ Active | Definition |
+| D-029 | Database migration tool: Liquibase | ✅ Active | Definition |
+| D-030 | Frontend stack: React + Vite + TypeScript | ✅ Active | Definition |
+| D-031 | Database: PostgreSQL + pgvector (single instance) | ✅ Active | Definition |
+| D-032 | LLM provider: Anthropic via Spring AI, provider-agnostic boundary | ✅ Active | Definition |
+| D-033 | OQ-2 resolved — Conflict handling: non-blocking surface (Option C) | ✅ Active | Definition |
+| D-034 | LLM cost governance: bounded pipeline + provider-level spend cap | ✅ Active | Definition |
+| D-035 | OQ-3 resolved — World state versioning: per-entity version history | ✅ Active | Definition |
+| D-036 | Mutation testing: PITest via Maven plugin | ✅ Active | Definition |
+| D-037 | Architecture boundary tests: ArchUnit | ✅ Active | Definition |
+| D-038 | Package structure: domain / application / adapters / config | ✅ Active | Definition |
+| D-039 | Configuration classes co-located with their adapter | ✅ Active | Definition |
+| D-040 | OQ-C resolved — Embedding model: OpenAI text-embedding-3-small | ✅ Active | Definition |
+| D-041 | OQ-A resolved — Entity resolution: two-stage pgvector + LLM | ✅ Active | Definition |
+| D-042 | OQ-E resolved — Uncertain entity card: resolution required before commit | ✅ Active | Definition |
 
 ---
 
@@ -362,12 +378,11 @@ blue-steel/
 ├── apps/
 │   ├── web/     ← frontend
 │   └── api/     ← backend
-├── packages/    ← shared types and utilities (if needed)
 └── README.md
 ```
 
 **Reason:**  
-Solo development with tightly coupled frontend and backend. A monorepo eliminates cross-repo coordination overhead, keeps docs co-located with the code they describe, and presents a cleaner portfolio artifact — one repo tells the full story. The  boundary keeps frontend and backend clearly separated without the overhead of separate repositories.
+Solo development with tightly coupled frontend and backend. A monorepo eliminates cross-repo coordination overhead, keeps docs co-located with the code they describe, and presents a cleaner portfolio artifact — one repo tells the full story. The `apps/` boundary keeps frontend and backend clearly separated without the overhead of separate repositories. There is no shared code layer between `apps/web` and `apps/api` — the contract between them is the HTTP API.
 
 **Alternatives considered:**  
 - Two repos (frontend + backend) — rejected; no independent deployment or team boundary justifies the split at this stage
@@ -448,6 +463,296 @@ Keeps admin responsibility minimal and well-defined. Admin is a gate, not a mana
 
 **Alternatives considered:**  
 - Admin manages all memberships — rejected; creates a bottleneck and makes admin a permanent dependency for campaign operation
+
+---
+
+### D-027 — Backend stack: Java 25 + Spring Boot 4.0.3
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+The backend is built with Java 25 (LTS) and Spring Boot 4.0.3 (GA, February 2026).
+
+**Reason:**  
+Developer has 10+ years of professional Java and Spring ecosystem experience. Fluency with the stack eliminates unnecessary learning overhead on a solo project. Java 25 provides stable virtual threads, mature records, and complete pattern matching. Spring Boot 4.x aligns with Spring Framework 7 and Spring AI. Spring Boot's production-grade ecosystem (security, data, transaction management) maps directly to project requirements. Hexagonal architecture maps naturally onto Spring idioms.
+
+**Alternatives considered:**  
+- TypeScript / Node.js — rejected; developer fluency with Java is the decisive factor
+- Python — rejected; stronger AI ecosystem but introduces split-language monorepo with separate toolchains and no offsetting benefit given Spring AI availability
+
+---
+
+### D-028 — Build tool: Maven
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+Maven (pom.xml) is the build tool for `apps/api`.
+
+**Reason:**  
+Developer knows Maven and does not know Gradle. For a solo project, fluency with the build tool is not optional — dependency resolution and plugin configuration issues will arise and must be debugged without friction. Gradle offers no technical advantage for a project of this size that justifies the learning cost.
+
+**Alternatives considered:**  
+- Gradle (Kotlin DSL) — rejected; no justification for learning cost on a solo project where developer knows Maven. Incremental build performance advantages apply to large multi-module monorepos, not this project.
+
+---
+
+### D-029 — Database migration tool: Liquibase
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+Liquibase is the database migration tool.
+
+**Reason:**  
+Developer knows Liquibase. Built-in rollback support is a genuine advantage during active v1 schema development. Spring Boot integration is first-class and equivalent to the alternative.
+
+**Alternatives considered:**  
+- Flyway — rejected; developer knows Liquibase, Flyway's simpler mental model ("just SQL files") offers no benefit to someone already fluent with Liquibase. Flyway rollback requires manually written down scripts; Liquibase rollback is built in.
+
+---
+
+### D-030 — Frontend stack: React + Vite + TypeScript
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+The frontend is built with React 18, Vite, TypeScript, shadcn/ui, TanStack Query (v5), Zustand (v5), React Router (v6), and React Flow (v12).
+
+**Reason:**  
+Blue Steel is an auth-gated SPA with no SEO or SSR requirements. A pure SPA is the right architectural fit. The hard frontend problems (diff review UI, graph visualization, timeline view) are component-level — they are not solved by a more opinionated framework. React Flow is named explicitly because the Relations view (D-009) is a graph visualization problem that requires a dedicated library. Zustand handles client state with minimal boilerplate. TanStack Query handles server state without Redux complexity.
+
+**Alternatives considered:**  
+- Next.js — rejected; SSR and RSC add framework-level complexity that solves no stated requirement. Hard problems live at the component level, not the framework level.
+- Vue 3 + Vite — rejected; smaller ecosystem, less portfolio visibility, no technical advantage for this use case.
+
+---
+
+### D-031 — Database: PostgreSQL + pgvector
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+A single PostgreSQL instance with the pgvector extension handles both the relational world state and the vector/semantic layer for Query Mode.
+
+**Reason:**  
+Polyglot persistence (dedicated vector database + relational database) introduces synchronisation complexity, a second operational concern, and a second backup strategy — none of which is justified at this scale. pgvector is production-grade and Spring AI integrates with it natively. One database, one connection pool, one failure domain.
+
+**Alternatives considered:**  
+- PostgreSQL + dedicated vector DB (Pinecone, Qdrant, Weaviate) — rejected; synchronisation complexity between two stores is real and ongoing. Dedicated vector DB would be justified at scale or with advanced retrieval requirements not present in v1. Follows Fowler's principle: don't introduce architectural complexity without a concrete, present justification.
+
+---
+
+### D-032 — LLM provider: Anthropic (Claude), provider-agnostic by design
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+Anthropic (Claude) is the default LLM provider. Integration is provider-agnostic via Spring AI's abstraction layer. The LLM is an external actor behind a driven port. Additional providers (OpenAI, Google Gemini) are not implemented in v1.
+
+**Reason:**  
+Developer holds an active Anthropic subscription. Claude is well-suited to long-context narrative understanding and structured extraction tasks. Spring AI provides a model-agnostic abstraction (`ChatClient`, `EmbeddingModel`, `VectorStore`) — swapping providers means replacing the adapter, not touching domain or application code. This is Cockburn's hexagonal pattern applied directly: the LLM is an external actor behind a port.
+
+**Alternatives considered:**  
+- OpenAI as default — rejected in favour of existing Anthropic subscription.
+- Multi-provider free-tier rotation (Anthropic + OpenAI + Google) — rejected. Free tier rate limits are aggressive and unsuitable for production use. Rotation logic (detect exhaustion, switch provider, retry, handle partial failures) is non-trivial infrastructure that delivers zero user value. Different providers produce inconsistent structured outputs requiring per-provider prompt tuning. The real cost of running Blue Steel for a small group on Claude is negligible; the development cost of the rotation strategy is not. Follows Fowler's Speculative Generality principle — don't build for problems you don't have.
+- Additional providers in v1 — rejected; deferred to v2 on concrete justification only.
+
+---
+
+### D-033 — OQ-2 resolved: Conflict handling — non-blocking surface (Option C)
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+When a new session extraction contradicts existing world state, the system detects the conflict and surfaces it as a warning card inside the diff review screen. The commit is not blocked. The user decides whether to accept, edit, or delete the conflicting item.
+
+Three conflict types are distinguished:
+- **Hard contradiction** — directly negates an established fact (triggers a warning)
+- **Soft evolution** — updates a fact narratively (treated as a normal delta, no warning)
+- **Ambiguity** — possible entity resolution issue (handled by the entity resolution step, not conflict detection)
+
+**Reason:**  
+Tabletop RPGs contain retcons, resurrections, and deliberate continuity breaks. Blocking commit (Option B) is paternalistic — the GM may intentionally contradict previous state. Passive detection (Option A) abandons the system's core value proposition. Non-blocking warnings (Option C) inform without obstructing and respect user authority, consistent with D-002.
+
+**Alternatives considered:**  
+- Option A (no conflict detection) — rejected; users reviewing 20 diff cards will not reliably cross-reference against accumulated world state. Silent contradictions degrade query quality over time.
+- Option B (blocking resolution) — rejected; creates friction on legitimate retcons, high false positive risk on soft evolutions, undermines GM authority.
+
+---
+
+### D-034 — LLM cost governance: bounded pipeline + provider-level spend cap
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+LLM cost is controlled at four levels: (1) a hard monthly spend cap in the Anthropic console, set before the first production call; (2) token estimation before every LLM call, rejecting calls that exceed a configurable envelope; (3) pgvector similarity search scoping LLM context to relevant chunks only, preventing context growth with campaign size; (4) usage logging of every LLM call with tokens in, tokens out, estimated cost, session, user, and pipeline stage.
+
+Each session ingestion makes exactly two bounded LLM calls: knowledge extraction and conflict detection. Conflict detection context is bounded by the pgvector retrieval step.
+
+**Reason:**  
+Cost per session is predictable and small (estimated 3–5k tokens combined for a typical summary). The provider-level spend cap is the safety net that catches anything the application-level controls miss. Usage logging makes cost observable per campaign, per session, and per pipeline stage from day one — cost surprises are detectable before they compound.
+
+**Alternatives considered:**  
+- No cost controls — rejected; LLM API costs can compound unexpectedly without visibility or limits.
+- Heuristic-only conflict detection (no LLM) — considered; rejected because semantic comparison against world state facts cannot be done reliably without LLM reasoning. The pgvector bounding makes the LLM call affordable.
+
+---
+
+### D-035 — OQ-3 resolved: World state versioning — per-entity version history
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+World state is versioned at the entity level. Each domain entity (Actor, Space, Event, Relation) carries an append-only version history table. Every change references the session that produced it. Current state is the latest version per entity. Point-in-time state is the latest version at or before a given session.
+
+Each version row stores both `changed_fields` (delta only, satisfying D-006) and `full_snapshot` (complete state at that version, enabling efficient point-in-time reads).
+
+**Reason:**  
+The versioning model mirrors the diff model exactly — a session commit is a set of entity version increments. History is structurally preserved at the entity level, satisfying D-001 and D-003. Current state is a straightforward read. The approach is storage-efficient (only changed entities accumulate history) and schema-simple (no event sourcing infrastructure required).
+
+**Alternatives considered:**  
+- Snapshot-per-session (full world state copy on every commit) — rejected; storage grows quadratically, snapshots are largely redundant, gives nothing that entity versioning doesn't.
+- Event sourcing (append-only delta log, state derived by replay) — rejected; intellectually sound but architecturally heavy for this domain. The use case does not require audit logs at event granularity or CQRS. Fowler cautions against event sourcing unless the use case genuinely requires it.
+
+---
+
+### D-036 — Mutation testing: PITest via Maven plugin
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+Mutation testing is performed with PITest (PIT) via the Maven plugin. A minimum mutation score threshold is configured from day one and fails the build if not met. The threshold is set at an achievable baseline and raised deliberately — never aspirationally.
+
+Mutation testing is scoped by build phase: domain core on every build, application layer pre-merge, full codebase nightly or on-demand.
+
+**Reason:**  
+Line coverage measures which lines were executed, not whether tests verify anything meaningful. PITest modifies bytecode and runs the test suite against each mutant — a surviving mutant is a real gap. Domain core is the highest-value target: business logic and invariants must be verified, not merely executed. Scoping by build phase keeps CI feedback fast.
+
+**Alternatives considered:**  
+- Line/branch coverage only — rejected; insufficient signal. A test that calls a method without asserting its output passes coverage without catching mutations.
+- Full codebase on every build — rejected; PITest is slow at scale. Adapter and config code is lower-value for mutation testing.
+
+---
+
+### D-037 — Architecture boundary tests: ArchUnit
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+Hexagonal architecture layer boundaries are enforced as executable tests using ArchUnit. Rules are defined once in a dedicated `ArchitectureTest` class and run on every build. The following rules are enforced: domain has no Spring or JPA imports; driving adapters only call application ports; driven adapters are never imported by domain or application; all ports are interfaces; no Spring annotations appear on domain classes.
+
+**Reason:**  
+The most common way hexagonal architecture degrades is through small, invisible violations — a JPA annotation leaking into a domain class, a controller calling a repository directly. Code review does not catch these reliably at scale. ArchUnit makes violations impossible to merge. It is fast (bytecode analysis, no Spring context), co-located with the test suite, and runs on every build.
+
+**Alternatives considered:**  
+- Convention-only enforcement (code review) — rejected; conventions drift under deadline pressure. The boundary is too important to depend on human vigilance alone.
+
+---
+
+### D-038 — Package structure: domain / application / adapters / config
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+The backend uses four top-level packages: `domain`, `application`, `adapters`, and `config`. Adapters are subdivided into `adapters.in` (driving) and `adapters.out` (driven), mirroring the port naming in `application.port.in` and `application.port.out`. The previous `infrastructure` and `api` split is replaced by this structure.
+
+**Reason:**  
+`adapters.in` and `adapters.out` are hexagonal architecture terms — they name what things are, not what framework they use. REST controllers and JPA repositories are both adapters; separating them into `api` and `infrastructure` leaks Spring Boot convention into the package structure. The `in`/`out` naming is consistent end to end: ports and adapters share the same directional vocabulary. Domain stays top-level (not nested inside application) to signal its primacy and to keep ArchUnit rules clean and unambiguous.
+
+**Alternatives considered:**  
+- `infrastructure` + `api` split (Spring Boot convention) — rejected; framework naming leaking into package structure, inconsistent with hexagonal vocabulary.
+- `domain` nested inside `application` — rejected; domain is the most important and most isolated layer. Top-level placement signals this. Nesting complicates ArchUnit rule expression.
+
+---
+
+### D-039 — Configuration classes co-located with their adapter
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+Spring `@Configuration` classes live in the package of the adapter they configure. A top-level `config/` package exists exclusively for cross-cutting configuration with no adapter home. All configuration classes are suffixed `Config`.
+
+| Config class | Package |
+|---|---|
+| `WebConfig` | `adapters.in.web` |
+| `PersistenceConfig` | `adapters.out.persistence` |
+| `AiConfig` | `adapters.out.ai` |
+| `SecurityConfig` | `adapters.out.security` |
+| `ApplicationConfig` | `config` |
+
+**Reason:**  
+Configuration that belongs to an adapter should travel with that adapter. A shared `config/` package implies cohesion between unrelated concerns and obscures which config belongs to which part of the system. Co-location makes it clear: removing the JPA adapter takes `PersistenceConfig` with it. The `Config` suffix makes all configuration classes findable by name search regardless of their package location.
+
+**Alternatives considered:**  
+- Flat `config/` package for all configuration — rejected; mixes unrelated concerns, implies false cohesion, works against the hexagonal structure by obscuring adapter ownership.
+
+---
+
+### D-040 — OQ-C resolved: Embedding model — OpenAI text-embedding-3-small
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+The embedding model is OpenAI `text-embedding-3-small` at 1536 dimensions. Embedding calls are routed through the `EmbeddingPort` abstraction via Spring AI — the application layer is unaware of the provider.
+
+**Reason:**  
+Anthropic does not provide an embedding API; Claude models are generative only. A separate embedding provider is not a compromise — it is a structural requirement. OpenAI `text-embedding-3-small` is the industry standard for semantic retrieval: excellent quality for narrative text, negligible cost (fractions of a cent per campaign), first-class Spring AI support, and no local service dependency. The 1536-dimension schema entry in `entity_embeddings` is confirmed correct for this model.
+
+**Alternatives considered:**  
+- OpenAI `text-embedding-3-large` (3072 dimensions) — rejected; marginally better quality, 6x more expensive, 2x larger vectors with slower similarity search. Quality delta does not justify cost and storage overhead for this domain.
+- Ollama local models (`nomic-embed-text`, `mxbai-embed-large`) — rejected; requires a running local service as an operational dependency, complicating deployment and making the project harder to run for others. Appropriate for experimentation, not for a portfolio project.
+
+---
+
+### D-041 — OQ-A resolved: Entity resolution — two-stage pgvector + LLM
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+Entity resolution uses a two-stage pipeline. Stage 1: pgvector similarity search per extracted mention — mentions scoring below a minimum similarity floor are classified as NEW immediately with no LLM call. Stage 2: mentions scoring above the floor are passed to the LLM alongside their top candidates for final classification. The LLM returns one of three outcomes per mention: MATCH (attach to existing entity), NEW (create new entity record), or UNCERTAIN (surface as a dedicated diff card for mandatory user resolution).
+
+**Reason:**  
+Entity resolution spans three problem layers: name variants (string-level), semantic identity (`"the old wizard"` = Aldric), and genuine ambiguity. Embedding similarity handles the first layer efficiently and eliminates the clear-NEW cases before the LLM is involved. The LLM handles the second layer where semantic reasoning is required. Genuine ambiguity (third layer) is surfaced as UNCERTAIN rather than forced to a confident wrong answer — the user is the trust boundary (D-002). The two-stage approach bounds LLM cost: a session where most entities are clearly new makes at most a handful of LLM resolution calls, not one per extracted mention.
+
+**Alternatives considered:**  
+- Embedding similarity only (no LLM) — rejected; fails on semantic identity. `"the old wizard"` does not embed close enough to `"Aldric"` without contextual reasoning.
+- LLM-only resolution — rejected; one LLM call per extracted mention is unbounded and expensive at scale.
+- Forced binary match/new (no UNCERTAIN) — rejected; forces a confident wrong answer on genuinely ambiguous cases. Wrong decisions on entity identity are hard to correct once history is committed against them.
+
+---
+
+### D-042 — OQ-E resolved: Uncertain entity card — resolution required before commit
+
+**Date:** 2026-04-06  
+**Status:** Active
+
+**Decision:**  
+All UNCERTAIN entity resolution cards must be resolved to MATCH or NEW before the session commit is permitted. There is no defer option. The Commit button is disabled until zero UNCERTAIN cards remain. A progress indicator surfaces the count of unresolved items. The backend validates the commit payload and rejects with `422` if any UNCERTAIN entities are present.
+
+When a user is genuinely uncertain, the correct choice is **different entity** (NEW). An incorrect split can be corrected through the proposal system in v2 (D-016).
+
+**Reason:**  
+An unresolved entity left out of a session commit creates an orphaned, unanchored record. Reconciling it later against session history that was committed without it introduces data model complexity that outweighs the UX cost of forcing a decision. A wrong but committed decision is recoverable — the proposal system exists for exactly this correction. An orphaned entity is structurally problematic. The backend 422 validation provides defence in depth against UI bypass.
+
+**Alternatives considered:**  
+- Allow defer (exclude uncertain entity from commit, resolve later) — rejected; creates orphaned records with no clean reconciliation path against already-committed session history. The complexity cost is higher than forcing a resolvable wrong decision.
+- Blocking commit on all uncertain items without guidance — rejected; users need to understand why commit is blocked. Progress indicator and explicit guidance ("choose different entity if unsure") are required.
 
 ---
 
