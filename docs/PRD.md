@@ -138,6 +138,8 @@ Entities already present in the world state show **only what changed this sessio
 
 Before generating the diff, the system must reliably determine whether an extracted entity maps to an existing world state entity or is genuinely new. This is a non-trivial AI step (alias matching, name variation, contextual identity) — architectural implications deferred to ARCHITECTURE.md.
 
+**Oversized input:** If a submitted summary exceeds the system token limit, the submission is rejected before any processing occurs. The user is shown the configured limit and a suggestion to split the summary across multiple session records.
+
 ### 6.2 Query Mode
 **Purpose:** Ask natural language questions about the campaign.
 

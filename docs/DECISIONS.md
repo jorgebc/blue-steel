@@ -53,6 +53,7 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-040 | OQ-C resolved — Embedding model: OpenAI text-embedding-3-small | ✅ Active | Definition |
 | D-041 | OQ-A resolved — Entity resolution: two-stage pgvector + LLM | ✅ Active | Definition |
 | D-042 | OQ-E resolved — Uncertain entity card: resolution required before commit | ✅ Active | Definition |
+| D-043 | Authentication mechanism: stateless JWT | ✅ Active | Definition |
 
 ---
 
@@ -359,6 +360,8 @@ The proposal co-signing rule (D-017) requires at least two players to function m
 **Decision:**  
 Every domain entity (Campaign, Session, Actor, Space, Event, Relation, Proposal) carries an `owner_id` field in the data model from initial implementation, even in v1 where a single GM owns the campaign.
 
+**Semantic definition:** `owner_id` refers to the `user_id` of the campaign member who created or committed the entity — the GM or editor whose session ingestion introduced it to world state. For the `Campaign` entity, `owner_id` is the GM assigned by the admin at campaign creation. `owner_id` is set at creation and does not transfer.
+
 **Reason:**  
 Avoids a costly future migration when multi-user and multi-campaign features are introduced. Follows the principle of designing for tomorrow's constraints today without over-engineering the current feature set.
 
@@ -596,7 +599,7 @@ Tabletop RPGs contain retcons, resurrections, and deliberate continuity breaks. 
 **Decision:**  
 LLM cost is controlled at four levels: (1) a hard monthly spend cap in the Anthropic console, set before the first production call; (2) token estimation before every LLM call, rejecting calls that exceed a configurable envelope; (3) pgvector similarity search scoping LLM context to relevant chunks only, preventing context growth with campaign size; (4) usage logging of every LLM call with tokens in, tokens out, estimated cost, session, user, and pipeline stage.
 
-Each session ingestion makes exactly two bounded LLM calls: knowledge extraction and conflict detection. Conflict detection context is bounded by the pgvector retrieval step.
+Each session ingestion makes at most three bounded LLM calls: (1) knowledge extraction, (2) entity resolution Stage 2 (conditional — only when extracted mentions score above the similarity floor; see D-041), and (3) conflict detection. Conflict detection context is bounded by the pgvector retrieval step. Sessions where all extracted mentions score below the resolution floor require only two LLM calls.
 
 **Reason:**  
 Cost per session is predictable and small (estimated 3–5k tokens combined for a typical summary). The provider-level spend cap is the safety net that catches anything the application-level controls miss. Usage logging makes cost observable per campaign, per session, and per pipeline stage from day one — cost surprises are detectable before they compound.
@@ -753,6 +756,26 @@ An unresolved entity left out of a session commit creates an orphaned, unanchore
 **Alternatives considered:**  
 - Allow defer (exclude uncertain entity from commit, resolve later) — rejected; creates orphaned records with no clean reconciliation path against already-committed session history. The complexity cost is higher than forcing a resolvable wrong decision.
 - Blocking commit on all uncertain items without guidance — rejected; users need to understand why commit is blocked. Progress indicator and explicit guidance ("choose different entity if unsure") are required.
+
+---
+
+### D-043 — Authentication mechanism: stateless JWT
+
+**Date:** 2026-04-07
+**Status:** Active
+
+**Decision:**
+Authentication uses stateless JWTs (JSON Web Tokens). Tokens are issued on login, included in the `Authorization: Bearer` header on every request, and validated by Spring Security on the server without a session store.
+
+Token expiry and refresh token strategy are deferred to OQ-B. A token blocklist is not implemented in v1 — revocation (e.g., on player removal from campaign) relies on short token TTL combined with role re-validation on each request against the current campaign membership state.
+
+**Reason:**
+Stateless authentication fits the hexagonal model cleanly — the security adapter validates the token without a shared stateful session. Spring Security's JWT support is mature and Spring Boot 4.x compatible. For a controlled-usage platform with a small number of active users, the absence of server-side session state is an operational advantage.
+
+**Alternatives considered:**
+- Server-side sessions — rejected; requires session store (Redis or DB), adds an operational dependency, complicates horizontal scaling if ever needed.
+- OAuth/OIDC (external provider) — rejected; adds external dependency for a controlled-usage platform. May be revisited if the admin wants to delegate identity management.
+- Opaque tokens with DB lookup — rejected; introduces a DB round-trip on every request and the complexity of a token store, with no offsetting benefit at this scale.
 
 ---
 

@@ -117,6 +117,7 @@ apps/api/src/main/java/com/bluesteel/
 │   │   ├── space/
 │   │   ├── event/
 │   │   └── relation/
+│   ├── annotation/
 │   └── proposal/
 ├── application/
 │   ├── port/
@@ -243,7 +244,27 @@ There is no code generation in v1 — types are hand-written and kept in sync ma
 
 A single PostgreSQL instance handles both relational world state and the vector/semantic layer for Query Mode. Polyglot persistence is not justified at this scale.
 
-### 5.2 World State Versioning
+### 5.2 Sessions and Narrative Blocks
+
+```
+sessions
+  id UUID PK
+  campaign_id UUID FK
+  owner_id UUID FK          ← user who submitted the session
+  sequence_number INTEGER   ← ordinal position within the campaign
+  status TEXT               ← 'pending' | 'processing' | 'draft' | 'committed'
+  committed_at TIMESTAMP
+  created_at TIMESTAMP
+
+narrative_blocks
+  id UUID PK
+  session_id UUID FK → sessions.id
+  raw_summary_text TEXT     ← the original submitted text, immutable after storage
+  token_count INTEGER       ← estimated at intake, used for budget check
+  created_at TIMESTAMP
+```
+
+### 5.3 World State Versioning
 
 World state is versioned at the entity level. Each domain entity carries an append-only version history. This is the direct implementation of D-001, D-003, and OQ-3.
 
@@ -273,7 +294,7 @@ actor_versions
 - `changed_fields` stores the delta — what changed in this session
 - `full_snapshot` stores the complete entity state at this version for efficient point-in-time reads without reconstruction
 
-### 5.3 Vector Layer
+### 5.4 Vector Layer
 
 Embeddings are stored in PostgreSQL via pgvector. Each versioned entity snapshot generates an embedding at commit time, stored alongside the entity version.
 
@@ -291,7 +312,26 @@ entity_embeddings
 
 Similarity search via pgvector retrieves semantically relevant context before any LLM call — this is the primary cost control mechanism.
 
-### 5.4 Schema Conventions
+**Dual use:** `entity_embeddings` serves two retrieval purposes: (1) entity resolution during ingestion (Stage 1 similarity search, §6.3), and (2) world state context retrieval for Query Mode (§6.4). In both cases, the retrieval unit is an entity version snapshot. Session-level retrieval (e.g., finding which sessions are relevant to a question about a location) is done by joining through `entity_versions → sessions`.
+
+A separate `session_chunk_embeddings` table is not required in v1. Session summaries are stored in `narrative_blocks` for reference but are not chunked and embedded independently — entity version snapshots are the retrieval unit for both pipelines. This may be revisited if query precision degrades on complex multi-session questions.
+
+### 5.5 Annotations
+
+```
+annotations
+  id UUID PK
+  campaign_id UUID FK
+  entity_type TEXT          ← 'actor' | 'space' | 'relation' | 'event'
+  entity_id UUID            ← references the annotated entity (polymorphic)
+  author_id UUID FK         ← user who wrote the annotation
+  content TEXT
+  is_pinned BOOLEAN         ← GM-only action, defaults false
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+```
+
+### 5.6 Schema Conventions
 
 - All primary keys are UUIDs — no auto-increment integers
 - All tables carry `created_at` and, where mutable, `updated_at` timestamps
@@ -358,7 +398,8 @@ Session Summary (raw text)
        │
        ▼
  Knowledge Extraction ── LLM call 1  (Anthropic)
- (actors, spaces, events, relations identified as raw mentions)
+ (actors, spaces, events, relations identified as raw mentions;
+  narrative summary header generated as co-output — D-005)
        │
        ▼
  Entity Resolution ────── two-stage
@@ -388,6 +429,8 @@ Session Summary (raw text)
 
 **Three bounded LLM calls maximum per session ingestion.** LLM call 2 (entity resolution) is bounded by the pgvector similarity floor — mentions that score below the floor are classified without an LLM call. The pipeline never passes unbounded world state to the LLM.
 
+**Oversized input:** If the token budget check rejects the summary, the API returns `400` with error code `SUMMARY_TOO_LARGE` and a `max_tokens` field indicating the configured limit. No partial processing occurs. The client surfaces a user-facing message with the token count and the limit, and suggests splitting the summary into multiple sessions.
+
 **Entity resolution outcomes in the diff:**
 - `MATCH` — entity card shows delta only against the matched existing entity (D-006)
 - `NEW` — entity card shows full extracted profile (D-007)
@@ -397,7 +440,42 @@ Session Summary (raw text)
 
 If the user is genuinely uncertain, the correct choice is **different entity** (create new). An incorrect split can be corrected through the proposal system in v2 (D-016). An unresolved entity creates an orphaned record that degrades the world state more than a recoverable wrong decision does.
 
-### 6.4 Cost Governance
+### 6.4 Query Pipeline
+
+Each natural language query runs the following pipeline:
+
+```
+Query (user question, free text)
+       │
+       ▼
+ Embed question ─────────── EmbeddingPort (OpenAI)
+       │
+       ▼
+ pgvector similarity search ─ retrieve top-N relevant entity versions
+                                and session events from entity_embeddings
+       │
+       ▼
+ Context assembly ─────────── collect matched entity snapshots + session
+                                references; enforce context token budget
+       │
+       ▼
+ QueryAnsweringPort ─────────  LLM call (Anthropic)
+                                system: world state context + citation rule
+                                user: original question
+       │
+       ▼
+ Response + citations ──────── structured response: answer text +
+                                list of session_ids that support each claim
+       │
+       ▼
+ Returned to client
+```
+
+**Citation grounding:** The LLM is instructed to attribute each factual claim to a specific `session_id` from the provided context. Claims it cannot attribute to provided context are suppressed — consistent with D-003. The response envelope carries a `citations` field mapping claim spans to session references.
+
+**Cost note:** Query Mode makes exactly one LLM call per query. Context is bounded by the pgvector retrieval result set (top-N chunks, configurable) and a token envelope applied before the call.
+
+### 6.5 Cost Governance
 
 Cost is controlled at four levels:
 
@@ -483,6 +561,32 @@ Error codes are machine-readable constants. Messages are human-readable. Field i
 ### 7.5 Versioning
 
 API versioning is path-based (`/api/v1/`). Version increments are reserved for breaking changes. Non-breaking additions (new fields, new optional parameters) are made without version increment.
+
+### 7.6 Session Ingestion API
+
+The session ingestion flow uses a staged endpoint sequence:
+
+| Step | Method + Path | Description |
+|---|---|---|
+| 1. Submit summary | `POST /api/v1/campaigns/{id}/sessions` | Accepts raw summary text; triggers async ingestion pipeline; returns `session_id` and initial status `processing` |
+| 2. Poll status | `GET /api/v1/campaigns/{id}/sessions/{sid}/status` | Returns current pipeline status: `processing` \| `draft` \| `committed` \| `failed` |
+| 3. Retrieve draft diff | `GET /api/v1/campaigns/{id}/sessions/{sid}/diff` | Returns the full structured diff payload when status is `draft` |
+| 4. Commit | `POST /api/v1/campaigns/{id}/sessions/{sid}/commit` | Submits the reviewed diff payload. Backend validates: zero UNCERTAIN entities, caller is GM or editor. Returns `422` with specific error codes on violation. |
+
+**Commit payload shape (outline):**
+```json
+{
+  "actors":    [ { "id": "...", "action": "accept|edit|delete", "data": { } } ],
+  "spaces":    [ { "id": "...", "action": "accept|edit|delete", "data": { } } ],
+  "events":    [ { "id": "...", "action": "accept|edit|delete", "data": { } } ],
+  "relations": [ { "id": "...", "action": "accept|edit|delete", "data": { } } ],
+  "resolved_entities": [
+    { "mention_id": "...", "resolution": "match|new", "matched_entity_id": "..." }
+  ]
+}
+```
+
+**Draft state persistence:** The draft diff is stored server-side against the session record (status `draft`). This enables failure recovery — if the user closes the browser mid-review, the diff is retrievable on return. Client-side edits to diff cards are submitted as part of the final commit payload, not persisted incrementally.
 
 ---
 
