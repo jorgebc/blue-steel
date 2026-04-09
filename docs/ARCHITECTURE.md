@@ -849,15 +849,146 @@ These tests are the executable specification of the hexagonal architecture. A la
 
 ## 11. Deployment & Infrastructure
 
-> **⚠️ To be defined.** Hosting target, containerization strategy, CI/CD pipeline, and environment model (dev / staging / prod) have not been decided. These decisions are required before Phase 1 of the roadmap can begin — infrastructure setup is a Phase 0 prerequisite.
+All decisions in this section are captured in DECISIONS.md as D-044 through D-050.
 
-The following questions are open and must be resolved before the roadmap Phase 0 milestone:
+---
 
-| Question | Why it matters |
+### 11.1 Environment Model
+
+Two environments only: **local** and **prod** (D-044).
+
+| Environment | Purpose | Infrastructure |
+|---|---|---|
+| `local` | Development and manual testing | Docker Compose on developer machine |
+| `prod` | Live deployment | Oracle Cloud + Vercel + Neon |
+
+No staging environment. The project scope and team size do not justify consuming free-tier quota on a third environment. Local development is the pre-production validation layer.
+
+---
+
+### 11.2 Hosting
+
+| Component | Platform | Tier | Notes |
+|---|---|---|---|
+| **Frontend** | Vercel | Free (Hobby) | Auto-deploy on push to `main`; branch preview URLs per PR |
+| **Backend** | Oracle Cloud Always Free | Free (always) | ARM VM — 4 OCPUs / 24GB RAM, configurable allocation; Docker + Compose managed by VM owner |
+| **Database** | Neon | Free (always) | Serverless PostgreSQL + pgvector; never pauses; DB branching available for migration testing |
+
+**Oracle Cloud ARM note:** The Oracle VM uses an ARM (`linux/arm64`) architecture. All Docker images for the backend must be built for `linux/arm64`. GitHub Actions runners are `x86_64` — multi-arch builds use `docker buildx` with cross-compilation. Spring Boot on ARM is fully supported and performs well (D-046).
+
+**Docker image registry:** Images are pushed to **GitHub Container Registry (ghcr.io)**, which is free for public repositories and included in GitHub free plan allowances for private repositories. The deploy step pulls from `ghcr.io` to the Oracle VM.
+
+---
+
+### 11.3 Local Development Setup
+
+Local development follows a clear separation: infrastructure in Docker, application code running natively.
+
+```
+docker-compose.yml  (repo root)
+  └── postgres:latest with pgvector extension
+        port 5432 exposed to localhost
+```
+
+The Spring Boot backend and Vite dev server run natively — not in Docker. This preserves hot reload, debugger attachment, and fast test feedback loops.
+
+**Spring profiles for local dev:**
+
+| Profile | Behaviour |
 |---|---|
-| Hosting target (VPS, cloud provider, managed services?) | Determines Docker Compose layout, DB connection config, and secret management strategy |
-| Containerization (Docker Compose for local dev? Kubernetes for prod?) | Affects local dev setup, CI environment, and deployment artifacts |
-| CI/CD pipeline (GitHub Actions, other?) | Required to define the build → test → deploy chain |
-| Environment model (how many envs, how are they provisioned?) | Affects Liquibase migration targeting and Spring profile strategy |
+| `local` (default) | All LLM ports use in-memory mock implementations. Zero API cost. Canned responses for extraction, resolution, and query pipelines. |
+| `llm-real` | LLM ports use real Anthropic and OpenAI API calls. Activate when testing the extraction or query pipelines end-to-end. |
 
-These decisions will be captured as DECISIONS.md entries when made and the relevant CLAUDE.md operational section will be completed at that time.
+Activation: `--spring.profiles.active=local,llm-real`
+
+Mock implementations live in `adapters.out.ai` alongside their real counterparts. They implement the same ports — no domain changes required to switch (D-049).
+
+---
+
+### 11.4 CI/CD Pipeline
+
+GitHub Actions. Two independent workflow files with `paths` filters — each workflow triggers only when its project changes (D-048).
+
+#### Backend pipeline (`.github/workflows/backend.yml`)
+
+Triggered on push/PR when `apps/api/**` changes.
+
+```
+1. Compile (Maven)
+2. Unit tests + ArchUnit architecture tests  ← fast, no containers
+3. Integration tests (Testcontainers — real Postgres)
+4. PIT mutation tests — domain core only
+5. Build JAR
+6. Build Docker image (linux/arm64 via docker buildx)
+7. Push image to ghcr.io
+8. Deploy: SSH into Oracle VM → docker pull → docker compose up -d
+```
+
+Steps 6–8 run only on push to `main`, not on PRs.
+
+#### Frontend pipeline (`.github/workflows/frontend.yml`)
+
+Triggered on push/PR when `apps/web/**` changes.
+
+```
+1. Type check (tsc --noEmit)
+2. Lint (ESLint)
+3. Unit tests (Vitest)
+4. Build (vite build)
+```
+
+Deployment to Vercel is handled natively by Vercel's GitHub integration — a push to `main` triggers production deployment automatically. PR pushes generate preview URLs automatically. No deploy step is needed in the workflow.
+
+---
+
+### 11.5 Secret Management
+
+Production secrets live in a `.env` file on the Oracle VM — never committed to the repository (D-050).
+
+Secrets required at runtime:
+
+| Secret | Consumer |
+|---|---|
+| `DATABASE_URL` | Spring Boot (Neon connection string) |
+| `ANTHROPIC_API_KEY` | Spring AI adapter |
+| `OPENAI_API_KEY` | Spring AI embedding adapter |
+| `JWT_SECRET` | Spring Security |
+
+The `.env` file is read by Docker Compose at container start via the `env_file` directive. Rotating a secret requires SSH access to the VM and a container restart.
+
+Vercel secrets (frontend environment variables) are managed through the Vercel dashboard and are not stored in the repository.
+
+---
+
+### 11.6 Deployment Flow (end to end)
+
+```
+Developer pushes to main
+        │
+        ├── apps/api/** changed?
+        │       │
+        │       ▼
+        │   GitHub Actions backend pipeline
+        │   compile → test → mutation test → build JAR
+        │   → build arm64 Docker image
+        │   → push to ghcr.io
+        │   → SSH into Oracle VM
+        │   → docker pull + docker compose up -d
+        │   → Liquibase migrations run on startup (auto)
+        │
+        └── apps/web/** changed?
+                │
+                ▼
+            Vercel detects push
+            → vite build
+            → deploy to Vercel CDN
+            → production URL live
+```
+
+Liquibase migrations run automatically at Spring Boot startup. The migration changelog lives in `apps/api/src/main/resources/db/changelog/`. This means a backend deploy that includes schema changes applies them on startup — no separate migration step required.
+
+---
+
+### 11.7 Open Infrastructure Questions
+
+All four original open questions from the §11 placeholder have been resolved. No open questions remain in this section.

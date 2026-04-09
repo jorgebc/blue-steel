@@ -54,6 +54,13 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-041 | OQ-A resolved — Entity resolution: two-stage pgvector + LLM | ✅ Active | Definition |
 | D-042 | OQ-E resolved — Uncertain entity card: resolution required before commit | ✅ Active | Definition |
 | D-043 | Authentication mechanism: stateless JWT | ✅ Active | Definition |
+| D-044 | Environment model: local + prod only | ✅ Active | Definition |
+| D-045 | Frontend hosting: Vercel free tier | ✅ Active | Definition |
+| D-046 | Backend hosting: Oracle Cloud Always Free ARM VM | ✅ Active | Definition |
+| D-047 | Database hosting: Neon free tier (PostgreSQL + pgvector) | ✅ Active | Definition |
+| D-048 | CI/CD: GitHub Actions with path-filtered workflows | ✅ Active | Definition |
+| D-049 | Local dev LLM strategy: mock ports by default, real APIs via profile flag | ✅ Active | Definition |
+| D-050 | Secret management: .env file on Oracle VM, never committed | ✅ Active | Definition |
 
 ---
 
@@ -780,6 +787,140 @@ Stateless authentication fits the hexagonal model cleanly — the security adapt
 - Server-side sessions — rejected; requires session store (Redis or DB), adds an operational dependency, complicates horizontal scaling if ever needed.
 - OAuth/OIDC (external provider) — rejected; adds external dependency for a controlled-usage platform. May be revisited if the admin wants to delegate identity management.
 - Opaque tokens with DB lookup — rejected; introduces a DB round-trip on every request and the complexity of a token store, with no offsetting benefit at this scale.
+
+---
+
+### D-044 — Environment model: local + prod only
+
+**Date:** 2026-04-09
+**Status:** Active
+
+**Decision:**
+Two environments only: `local` (Docker Compose on developer machine) and `prod` (Oracle Cloud + Vercel + Neon). No staging environment.
+
+**Reason:**
+The project scope and team size do not justify consuming free-tier quota on a third environment. Local development is the pre-production validation layer. The testing strategy (unit, integration with Testcontainers, ArchUnit, PITest) provides sufficient confidence before pushing to main.
+
+**Alternatives considered:**
+- Local + Staging + Prod — rejected; doubles free-tier resource consumption for a solo/small-team project with no offsetting benefit.
+- Local + Prod + branch previews — considered; Vercel provides PR preview URLs for the frontend natively at no cost. These are available but do not constitute a persistent staging environment.
+
+---
+
+### D-045 — Frontend hosting: Vercel free tier
+
+**Date:** 2026-04-09
+**Status:** Active
+
+**Decision:**
+The React / Vite / TypeScript frontend is deployed to Vercel on the free Hobby tier. Deployment is triggered automatically by Vercel's GitHub integration on push to `main`. PR pushes generate ephemeral preview URLs automatically.
+
+**Reason:**
+Vercel is the natural fit for Vite/React static builds. Zero configuration required. Global CDN, automatic HTTPS, branch preview URLs, and automatic production deploys are all included in the free tier. No CI deploy step is needed for the frontend — Vercel's GitHub integration handles it natively.
+
+**Alternatives considered:**
+- Netlify — rejected in favour of Vercel; both are equivalent for this use case. Vercel's DX for Vite is marginally better documented.
+- GitHub Pages — rejected; no automatic deploy integration, no CDN, no PR preview URLs.
+
+---
+
+### D-046 — Backend hosting: Oracle Cloud Always Free ARM VM
+
+**Date:** 2026-04-09
+**Status:** Active
+
+**Decision:**
+The Spring Boot backend runs on an Oracle Cloud Always Free ARM VM (Ampere A1 Compute). The VM runs Docker. The backend container is managed via Docker Compose on the VM. Images are built for `linux/arm64` using `docker buildx` in GitHub Actions and pushed to GitHub Container Registry (ghcr.io). Deployment is: SSH into VM → `docker pull` → `docker compose up -d`.
+
+**Reason:**
+Oracle Cloud's Always Free tier is the only hosting option offering sufficient RAM (up to 24GB configurable on ARM) for a Spring Boot 4.x application at zero cost with no expiry. Spring Boot on ARM is fully supported. The self-managed Docker approach is simple and gives full control over the runtime environment.
+
+A credit card is required at Oracle signup, but Always Free resources are never charged as long as no paid resources are provisioned. This risk is accepted.
+
+**Alternatives considered:**
+- Render free tier — rejected; 512MB RAM is marginal for Spring Boot, and the 15-minute inactivity sleep-down creates unacceptable cold-start latency for a weekly-use RPG app.
+- Fly.io free tier — rejected; 256MB per VM is insufficient for Spring Boot without aggressive JVM tuning that would complicate the development setup.
+- Railway — rejected; no longer has a genuine free tier (only monthly credit that expires).
+- Paid tier (~$5/mo) — rejected in favour of Oracle free tier. The ops overhead of managing a VM is acceptable given the zero cost.
+
+---
+
+### D-047 — Database hosting: Neon free tier (PostgreSQL + pgvector)
+
+**Date:** 2026-04-09
+**Status:** Active
+
+**Decision:**
+The production PostgreSQL database runs on Neon's free tier. Neon supports the pgvector extension, which is required for the embedding and similarity search pipeline (D-041). The free tier provides 0.5GB storage and never pauses or auto-deletes.
+
+Neon's database branching feature is available for migration testing: a branch of the prod database can be used to validate Liquibase changelogs before applying to main.
+
+**Reason:**
+Neon is the strongest free PostgreSQL option for this use case: pgvector supported, always-on (no inactivity pause), no data deletion, and database branching for safe migration testing. The 0.5GB storage limit is sufficient for v1 with a small number of campaigns and sessions; vector storage (1536-dimension embeddings) is the primary growth factor to monitor.
+
+**Alternatives considered:**
+- Supabase — rejected; free tier pauses the database after 7 days of inactivity. For a weekly RPG campaign this creates cold-start risk on session night.
+- Render PostgreSQL (free) — rejected; auto-deletes the database after 90 days of inactivity. Not viable for production.
+- Self-hosted PostgreSQL on Oracle VM — considered; eliminates the external dependency and storage limits. Rejected in favour of Neon for v1 because: (a) Neon separates compute and storage concerns, (b) branching enables safe migration testing, (c) the free tier is sufficient. May be revisited if storage limits are reached or Neon's free tier changes.
+
+---
+
+### D-048 — CI/CD: GitHub Actions with path-filtered workflows
+
+**Date:** 2026-04-09
+**Status:** Active
+
+**Decision:**
+CI/CD uses GitHub Actions with two independent workflow files, each filtered to its project path:
+- `backend.yml` — triggers on `apps/api/**` changes: compile → unit + ArchUnit tests → integration tests (Testcontainers) → PIT mutation tests (domain core) → build JAR → build arm64 Docker image → push to ghcr.io → SSH deploy to Oracle VM. Steps 5–7 run on push to `main` only.
+- `frontend.yml` — triggers on `apps/web/**` changes: type check → lint → Vitest unit tests → vite build. Deployment is handled natively by Vercel's GitHub integration.
+
+Docker images are pushed to GitHub Container Registry (ghcr.io), which is included in the GitHub free plan.
+
+**Reason:**
+Path-filtered workflows avoid wasting CI minutes on unrelated changes. The two projects have independent toolchains and independent deployment targets — they should have independent pipelines. GitHub Actions free plan (2,000 min/month for private repos) is well within budget for this workload.
+
+**Alternatives considered:**
+- Single workflow for both projects — rejected; every push triggers both pipelines regardless of what changed. Wasteful and slower.
+- Turborepo / Nx monorepo tooling — rejected; overkill for two independent projects with no shared code layer. Fowler's Speculative Generality — don't build for problems you don't have.
+
+---
+
+### D-049 — Local dev LLM strategy: mock ports by default, real APIs via profile flag
+
+**Date:** 2026-04-09
+**Status:** Active
+
+**Decision:**
+In local development, all LLM-backed ports (`NarrativeExtractionPort`, `EntityResolutionPort`, `ConflictDetectionPort`, `QueryAnsweringPort`, `EmbeddingPort`) are implemented by in-memory mock adapters that return canned responses. The `local` Spring profile activates mocks by default.
+
+A separate `llm-real` Spring profile swaps in the real Anthropic and OpenAI adapters. Activated via `--spring.profiles.active=local,llm-real` when real pipeline testing is needed. Mock and real implementations coexist in `adapters.out.ai`.
+
+**Reason:**
+Day-to-day development work (UI, domain logic, API endpoints, test writing) does not require real LLM calls. Mock adapters provide deterministic, fast, zero-cost feedback. The hexagonal port design makes this swap transparent — no domain code changes needed. Real APIs are available when the extraction or query pipelines need to be tested end-to-end, but this is the exception rather than the default.
+
+**Alternatives considered:**
+- Always use real APIs in dev — rejected; introduces API cost for every local run and makes the feedback loop dependent on network and provider availability.
+- Always mock in dev — rejected; there must be a path to test the real pipeline locally before it reaches production. The profile flag provides this escape hatch.
+
+---
+
+### D-050 — Secret management: .env file on Oracle VM, never committed
+
+**Date:** 2026-04-09
+**Status:** Active
+
+**Decision:**
+Production secrets (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `JWT_SECRET`) are stored in a `.env` file on the Oracle VM. The file is read by Docker Compose via the `env_file` directive. The `.env` file is never committed to the repository; it is listed in `.gitignore`. Rotating a secret requires SSH access to the VM and a container restart.
+
+Vercel environment variables (API base URL, public config) are managed through the Vercel dashboard.
+
+**Reason:**
+A `.env` file on the VM is the simplest secret management approach for a self-hosted single-VM deployment. No external secret manager dependency is required at this scale. The security model is equivalent to the VM's SSH access control — the same person who can SSH into the server can read the secrets, which is acceptable for a personal/small-team project.
+
+**Alternatives considered:**
+- GitHub Actions secrets injected at deploy time — considered; more auditable (secrets never persist as files on disk), but adds complexity to the deploy script and requires the deploy workflow to reconstruct the full environment on each run. Overkill for a single-VM personal project.
+- External secrets manager (HashiCorp Vault, AWS SSM) — rejected; introduces an external operational dependency and complexity that is not justified at this scale.
 
 ---
 
