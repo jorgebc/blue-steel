@@ -221,14 +221,15 @@ Keeping mutation in one place eliminates a second surface to maintain, a second 
 **Status:** Active
 
 **Decision:**  
-Any campaign member can attach a free-text annotation to any entity, space, or relation. Annotations are explicitly non-canonical (player commentary, not world state), visible to all campaign members. GMs can pin or dismiss annotations.
+Any campaign member can attach a free-text annotation to any entity, space, or relation. Annotations work as a comment section — non-canonical and clearly marked as player commentary, not world state. Visible to all campaign members.
 
 **Reason:**  
-Players need a way to voice observations, hypotheses, and reminders without those notes being mistaken for established world facts. Annotations provide this without touching the world state model.
+Players need a way to voice observations, hypotheses, and reminders without those notes being mistaken for established world facts. A comment section provides this without touching the world state model and without requiring any GM moderation role.
 
 **Alternatives considered:**  
 - GM-only annotations — rejected; players are witnesses to the story and their observations have value
 - No annotations — rejected; without them Exploration Mode is purely passive and offers no collaborative layer
+- Pin/dismiss moderation by GM — rejected; unnecessary friction. A simple comment section serves the use case without additional moderation mechanics.
 
 ---
 
@@ -483,6 +484,9 @@ Developer has 10+ years of professional Java and Spring ecosystem experience. Fl
 **Alternatives considered:**  
 - TypeScript / Node.js — rejected; developer fluency with Java is the decisive factor
 - Python — rejected; stronger AI ecosystem but introduces split-language monorepo with separate toolchains and no offsetting benefit given Spring AI availability
+
+**Risk note:**  
+Spring Boot 4.x is a recent major release. Before Phase 1 development begins, verify compatibility for the following dependencies: Spring AI (ChatClient, EmbeddingModel, VectorStore), Testcontainers Spring Boot integration, Liquibase Spring Boot starter, and Spring Security 7. Any dependency lagging on Boot 4.x support should be flagged before the roadmap's Phase 1 start gate.
 
 ---
 

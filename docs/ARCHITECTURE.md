@@ -233,7 +233,37 @@ There is no code generation in v1 — types are hand-written and kept in sync ma
 
 ## 5. Database Architecture
 
-### 5.1 Stack
+### 5.1 Core Tables
+
+These tables are the structural foundation. Every other domain table references `campaign_id` and/or `owner_id` — those FKs resolve here.
+
+```
+users
+  id UUID PK
+  email TEXT UNIQUE NOT NULL
+  password_hash TEXT NOT NULL
+  created_at TIMESTAMP
+
+campaigns
+  id UUID PK
+  name TEXT NOT NULL
+  created_by UUID FK → users.id   ← admin user who created the campaign
+  created_at TIMESTAMP
+
+campaign_members
+  id UUID PK
+  campaign_id UUID FK → campaigns.id
+  user_id UUID FK → users.id
+  role TEXT                        ← 'gm' | 'editor' | 'player'
+  joined_at TIMESTAMP
+  UNIQUE (campaign_id, user_id)
+```
+
+The `admin` role is platform-level and is not stored in `campaign_members`. Admin identity is resolved at the application layer via a platform flag on the `users` record (implementation detail — deferred to §8).
+
+---
+
+### 5.2 Stack
 
 | Component | Choice |
 |---|---|
@@ -244,15 +274,17 @@ There is no code generation in v1 — types are hand-written and kept in sync ma
 
 A single PostgreSQL instance handles both relational world state and the vector/semantic layer for Query Mode. Polyglot persistence is not justified at this scale.
 
-### 5.2 Sessions and Narrative Blocks
+### 5.3 Sessions and Narrative Blocks
 
 ```
 sessions
   id UUID PK
-  campaign_id UUID FK
-  owner_id UUID FK          ← user who submitted the session
-  sequence_number INTEGER   ← ordinal position within the campaign
-  status TEXT               ← 'pending' | 'processing' | 'draft' | 'committed'
+  campaign_id UUID FK → campaigns.id
+  owner_id UUID FK → users.id   ← user who submitted the session
+  sequence_number INTEGER        ← ordinal position within the campaign
+  status TEXT                    ← 'pending' | 'processing' | 'draft' | 'committed' | 'failed'
+  diff_payload JSONB             ← nullable; populated when status = 'draft'; cleared on commit
+  failure_reason TEXT            ← nullable; populated when status = 'failed'
   committed_at TIMESTAMP
   created_at TIMESTAMP
 
@@ -264,7 +296,7 @@ narrative_blocks
   created_at TIMESTAMP
 ```
 
-### 5.3 World State Versioning
+### 5.4 World State Versioning
 
 World state is versioned at the entity level. Each domain entity carries an append-only version history. This is the direct implementation of D-001, D-003, and OQ-3.
 
@@ -294,7 +326,7 @@ actor_versions
 - `changed_fields` stores the delta — what changed in this session
 - `full_snapshot` stores the complete entity state at this version for efficient point-in-time reads without reconstruction
 
-### 5.4 Vector Layer
+### 5.5 Vector Layer
 
 Embeddings are stored in PostgreSQL via pgvector. Each versioned entity snapshot generates an embedding at commit time, stored alongside the entity version.
 
@@ -316,7 +348,9 @@ Similarity search via pgvector retrieves semantically relevant context before an
 
 A separate `session_chunk_embeddings` table is not required in v1. Session summaries are stored in `narrative_blocks` for reference but are not chunked and embedded independently — entity version snapshots are the retrieval unit for both pipelines. This may be revisited if query precision degrades on complex multi-session questions.
 
-### 5.5 Annotations
+### 5.6 Annotations
+
+Annotations work as a comment section — non-canonical, clearly marked as player commentary, not world state. Any campaign member can post; all members can read (D-011).
 
 ```
 annotations
@@ -324,14 +358,13 @@ annotations
   campaign_id UUID FK
   entity_type TEXT          ← 'actor' | 'space' | 'relation' | 'event'
   entity_id UUID            ← references the annotated entity (polymorphic)
-  author_id UUID FK         ← user who wrote the annotation
+  author_id UUID FK → users.id
   content TEXT
-  is_pinned BOOLEAN         ← GM-only action, defaults false
   created_at TIMESTAMP
   updated_at TIMESTAMP
 ```
 
-### 5.6 Schema Conventions
+### 5.7 Schema Conventions
 
 - All primary keys are UUIDs — no auto-increment integers
 - All tables carry `created_at` and, where mutable, `updated_at` timestamps
@@ -339,6 +372,33 @@ annotations
 - Foreign keys are always explicitly declared
 - No nullable columns without deliberate justification
 - All migrations are in `apps/api/src/main/resources/db/changelog/` using Liquibase changelog conventions
+
+---
+
+### 5.8 Proposals
+
+Data model defined in v1; UI and approval logic ship in v2 (D-016). The schema is present from day one to avoid a future breaking migration.
+
+```
+proposals
+  id UUID PK
+  campaign_id UUID FK → campaigns.id
+  target_entity_type TEXT   ← 'actor' | 'space' | 'event' | 'relation'
+  target_entity_id UUID     ← references the entity being proposed against (polymorphic)
+  author_id UUID FK → users.id
+  proposed_delta JSONB      ← the change being proposed (field diffs)
+  status TEXT               ← 'open' | 'cosigned' | 'approved' | 'rejected' | 'expired'
+  created_at TIMESTAMP
+  expires_at TIMESTAMP      ← TTL enforced in v2 (D-019); nullable in v1
+
+proposal_votes
+  id UUID PK
+  proposal_id UUID FK → proposals.id
+  voter_id UUID FK → users.id
+  vote TEXT                 ← 'cosign' (player) | 'approve' | 'reject' (GM)
+  created_at TIMESTAMP
+  UNIQUE (proposal_id, voter_id)
+```
 
 ---
 
@@ -582,11 +642,100 @@ The session ingestion flow uses a staged endpoint sequence:
   "relations": [ { "id": "...", "action": "accept|edit|delete", "data": { } } ],
   "resolved_entities": [
     { "mention_id": "...", "resolution": "match|new", "matched_entity_id": "..." }
+  ],
+  "acknowledged_conflicts": [
+    { "conflict_id": "...", "accepted": true }
   ]
 }
 ```
 
-**Draft state persistence:** The draft diff is stored server-side against the session record (status `draft`). This enables failure recovery — if the user closes the browser mid-review, the diff is retrievable on return. Client-side edits to diff cards are submitted as part of the final commit payload, not persisted incrementally.
+`acknowledged_conflicts` is required when the diff contains conflict warnings. The backend rejects with `422` if conflicts were detected but the commit payload contains no acknowledgments — consistent with D-002 (user must confirm before commit) and D-033 (non-blocking warnings). An empty array is valid only when no conflicts were detected.
+
+**Draft state persistence:** The draft diff is stored server-side in `sessions.diff_payload` (status `draft`). This enables failure recovery — if the user closes the browser mid-review, the diff is retrievable on return. Client-side edits to diff cards are submitted as part of the final commit payload, not persisted incrementally.
+
+**Failed status:** If the async pipeline fails (LLM error, token budget exceeded at extraction time, or unrecoverable processing error), the session status transitions to `failed` and `sessions.failure_reason` is populated. The status polling endpoint (Step 2) returns:
+
+```json
+{
+  "data": {
+    "session_id": "...",
+    "status": "failed",
+    "failure_reason": "EXTRACTION_FAILED | BUDGET_EXCEEDED | INTERNAL_ERROR",
+    "message": "Human-readable description for display"
+  }
+}
+```
+
+Failed sessions are not retried automatically. The user must submit a new session (or re-submit the same summary). The original `narrative_blocks` record is preserved for reference.
+
+### 7.7 Authentication Endpoints
+
+| Method + Path | Description |
+|---|---|
+| `POST /api/v1/auth/login` | Accepts email + password; returns JWT access token and refresh token |
+| `POST /api/v1/auth/refresh` | Accepts refresh token; returns new access token |
+| `POST /api/v1/auth/logout` | Invalidates refresh token server-side |
+
+Token format, algorithm, expiry, and refresh strategy are deferred to implementation (OQ-B).
+
+---
+
+### 7.8 Campaign & Membership Endpoints
+
+| Method + Path | Description | Required role |
+|---|---|---|
+| `POST /api/v1/campaigns` | Create campaign | admin |
+| `GET /api/v1/campaigns` | List campaigns (admin: all; members: own only) | authenticated |
+| `GET /api/v1/campaigns/{id}` | Get campaign detail | campaign member |
+| `POST /api/v1/campaigns/{id}/members` | Add a user to the campaign with a role | gm |
+| `PATCH /api/v1/campaigns/{id}/members/{uid}` | Change a member's role | gm |
+| `DELETE /api/v1/campaigns/{id}/members/{uid}` | Remove a member | gm |
+
+---
+
+### 7.9 Exploration Mode Endpoints
+
+All endpoints are read-only. All require campaign membership. Pagination follows the strategy defined in OQ-D.
+
+| Method + Path | Description |
+|---|---|
+| `GET /api/v1/campaigns/{id}/actors` | List all actors (filterable by name, status; paginated) |
+| `GET /api/v1/campaigns/{id}/actors/{aid}` | Get actor with full version history |
+| `GET /api/v1/campaigns/{id}/spaces` | List all spaces (paginated) |
+| `GET /api/v1/campaigns/{id}/spaces/{sid}` | Get space with full version history |
+| `GET /api/v1/campaigns/{id}/events` | List events (filterable by actor, space, session; paginated) |
+| `GET /api/v1/campaigns/{id}/relations` | List relations (filterable by actor; paginated) |
+| `GET /api/v1/campaigns/{id}/timeline` | Ordered event feed across all sessions (filterable) |
+| `POST /api/v1/campaigns/{id}/annotations` | Create annotation on an entity |
+| `GET /api/v1/campaigns/{id}/annotations` | List annotations (filterable by entity_type + entity_id) |
+| `DELETE /api/v1/campaigns/{id}/annotations/{aid}` | Delete own annotation (author) or any annotation (gm) |
+
+---
+
+### 7.10 Query Mode Endpoint
+
+| Method + Path | Description |
+|---|---|
+| `POST /api/v1/campaigns/{id}/queries` | Submit a natural language question; returns answer text and session citations |
+
+**Request shape (outline):**
+```json
+{ "question": "What does Seraphine know about the cursed artifact?" }
+```
+
+**Response shape (outline):**
+```json
+{
+  "data": {
+    "answer": "...",
+    "citations": [
+      { "session_id": "...", "session_number": 4, "claim": "..." }
+    ]
+  }
+}
+```
+
+Queries are stateless — each call is independent. No conversation history is maintained between queries.
 
 ---
 
@@ -698,4 +847,17 @@ These tests are the executable specification of the hexagonal architecture. A la
 
 ---
 
-*Next document to produce: ROADMAP.md*
+## 11. Deployment & Infrastructure
+
+> **⚠️ To be defined.** Hosting target, containerization strategy, CI/CD pipeline, and environment model (dev / staging / prod) have not been decided. These decisions are required before Phase 1 of the roadmap can begin — infrastructure setup is a Phase 0 prerequisite.
+
+The following questions are open and must be resolved before the roadmap Phase 0 milestone:
+
+| Question | Why it matters |
+|---|---|
+| Hosting target (VPS, cloud provider, managed services?) | Determines Docker Compose layout, DB connection config, and secret management strategy |
+| Containerization (Docker Compose for local dev? Kubernetes for prod?) | Affects local dev setup, CI environment, and deployment artifacts |
+| CI/CD pipeline (GitHub Actions, other?) | Required to define the build → test → deploy chain |
+| Environment model (how many envs, how are they provisioned?) | Affects Liquibase migration targeting and Spring profile strategy |
+
+These decisions will be captured as DECISIONS.md entries when made and the relevant CLAUDE.md operational section will be completed at that time.

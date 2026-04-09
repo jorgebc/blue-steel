@@ -164,9 +164,8 @@ Exploration mode is a set of interconnected views, not a single screen:
 
 **Annotations:**
 - Any campaign member can attach a free-text annotation to any entity, space, or relation
-- Annotations are non-canonical — clearly marked as player commentary, not world state
+- Annotations work as a comment section — non-canonical and clearly marked as player commentary, not world state
 - Visible to all campaign members
-- GMs can pin or dismiss annotations
 
 **Propose a change:**
 - A *"Propose a change"* affordance is present on every entity, space, and relation in v1
@@ -205,7 +204,7 @@ Exploration mode is a set of interconnected views, not a single screen:
 
 | Attribute | Requirement |
 |---|---|
-| **Latency** | Knowledge extraction and query responses must feel responsive; target < 10s for standard summaries |
+| **Latency** | Knowledge extraction: target < 10s for summaries up to 2,000 tokens (~1,500 words). Query responses: target < 5s. Summaries approaching the token limit may exceed the 10s target; this is acceptable. |
 | **Accuracy** | Extractions must be reviewable and correctable — the system never commits without user confirmation |
 | **Traceability** | Every piece of world state must be traceable to the session that produced it |
 | **Consistency** | World state must never contain contradictory facts without surfacing a conflict to the user |
@@ -218,7 +217,7 @@ Exploration mode is a set of interconnected views, not a single screen:
 | # | Question | Priority |
 |---|---|---|
 | ~~OQ-1~~ | ~~What is the correction/annotation UX in Input Mode?~~ | ✅ Resolved — see §6.1 |
-| OQ-2 | How are conflicts handled when a new session contradicts existing world state? | High |
+| ~~OQ-2~~ | ~~How are conflicts handled when a new session contradicts existing world state?~~ | ✅ Resolved — see DECISIONS.md D-033 |
 | OQ-3 | What is the granularity of world state versioning — per session commit, or finer? | Medium |
 | ~~OQ-4~~ | ~~Single-user vs multi-user per campaign in v1?~~ | ✅ Resolved — see §3 and §7 |
 | ~~OQ-5~~ | ~~Is Exploration Mode read-only, or can users annotate / manually add information?~~ | ✅ Resolved — see §6.3 |
@@ -236,4 +235,3 @@ The system is successful if:
 
 ---
 
-*Next document to produce: ARCHITECTURE.md*
