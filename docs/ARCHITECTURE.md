@@ -1,9 +1,5 @@
 # ARCHITECTURE — Blue Steel
 
-**Status:** Draft v0.1  
-**Phase:** Definition & Analysis  
-**Last updated:** 2026-04-06
-
 ---
 
 ## 1. Philosophy
@@ -258,6 +254,15 @@ campaign_members
   role TEXT                        ← 'gm' | 'editor' | 'player'
   joined_at TIMESTAMP
   UNIQUE (campaign_id, user_id)
+
+refresh_tokens
+  id UUID PK
+  user_id UUID FK → users.id
+  token_hash TEXT NOT NULL         ← SHA-256 of the raw token; raw token never stored
+  family_id UUID NOT NULL          ← groups a login session's rotation chain
+  expires_at TIMESTAMP NOT NULL
+  used_at TIMESTAMP                ← nullable; set when exchanged for a new token
+  created_at TIMESTAMP
 ```
 
 The `admin` role is platform-level and is not stored in `campaign_members`. Admin identity is resolved via the `is_admin` flag on the `users` record. Only one user may have `is_admin = TRUE` — this singleton invariant is enforced at the application layer.
@@ -442,6 +447,13 @@ interface EmbeddingPort {
 
 interface QueryAnsweringPort {
     QueryResponse answer(String question, List<EntityContext> relevantContext);
+}
+
+interface EmailPort {
+    void send(EmailMessage message);
+    // EmailMessage carries: to, subject, body (plain text + HTML)
+    // Adapter: transactional email provider (Resend / Brevo) via HTTP API
+    // D-060: email delivery is the one infrastructure concern deliberately outsourced
 }
 ```
 
@@ -694,7 +706,7 @@ Failed sessions are not retried automatically. The user must submit a new sessio
 | `POST /api/v1/auth/refresh` | Accepts refresh token; returns new access token |
 | `POST /api/v1/auth/logout` | Invalidates refresh token server-side |
 
-Token format, algorithm, expiry, and refresh strategy are deferred to implementation (OQ-B).
+Token details: HS256, 15-minute access token, 30-day rotating refresh token. See D-059.
 
 **User management (D-051 — invitation model):**
 
@@ -768,7 +780,7 @@ All endpoints are read-only. All require campaign membership. Pagination follows
 
 Queries are stateless — each call is independent. No conversation history is maintained between queries.
 
-**Q&A persistence:** Whether submitted queries and their answers are persisted for a campaign Q&A log view is an open product question — see PRD.md OQ-6.
+**Q&A persistence:** Queries are stateless in v1 — no query history is stored. A campaign Q&A log with a history panel inside Query Mode is deferred to v2 (D-058).
 
 ---
 
@@ -776,7 +788,17 @@ Queries are stateless — each call is independent. No conversation history is m
 
 ### 8.1 Authentication
 
-Spring Security handles authentication. JWT tokens are issued on login and validated on each request. Token details (algorithm, expiry, refresh strategy) are defined in v1 implementation.
+Spring Security handles authentication. JWT tokens are issued on login and validated on each request (D-059).
+
+| Property | Value |
+|---|---|
+| Algorithm | HS256 — symmetric, single secret stored in `.env` |
+| Access token TTL | 15 minutes |
+| Refresh token TTL | 30 days |
+| Rotation | Rotating — each refresh call issues a new token and invalidates the previous |
+| Reuse detection | If an already-used token from a family is presented, the entire family is revoked |
+
+Access token validation is stateless — Spring Security validates the JWT signature and expiry on each request with no DB call. Refresh token validation requires a DB lookup against the `refresh_tokens` table (§5.1).
 
 ### 8.2 Role Model
 
@@ -886,12 +908,12 @@ Frontend tests run in the `frontend.yml` GitHub Actions workflow as part of the 
 | # | Question | Priority | Status |
 |---|---|---|---|
 | OQ-A | Entity resolution strategy | High | ✅ Resolved — see §6.3 |
-| OQ-B | JWT token details — algorithm, expiry, refresh token strategy | Medium | ⏳ Deferred to implementation |
+| OQ-B | JWT token details — algorithm, expiry, refresh token strategy | Medium | ✅ Resolved — see DECISIONS.md D-059 |
 | OQ-C | Embedding model selection — dimension, provider, cost profile | Medium | ✅ Resolved — see §6.1 |
 | OQ-D | Pagination strategy for Exploration views — cursor-based vs offset | Low | ✅ Resolved — see DECISIONS.md D-055 |
 | OQ-E | Uncertain entity card: behaviour of defer action | Medium | ✅ Resolved — see §6.3 |
 
-**OQ-B** is an implementation detail with no upstream architectural dependency. It will be resolved as a DECISIONS.md entry when the auth functional block is built.
+All open architecture questions are resolved. OQ-B is documented in D-059.
 
 **Pre-Phase 1 gate (D-057):** Before writing any production code, verify Spring Boot 4.0.3 compatibility for: Spring AI (`ChatClient`, `EmbeddingModel`, `VectorStore`), Testcontainers Spring Boot integration, Liquibase Spring Boot starter, and Spring Security 7. Log the verification result in DECISIONS.md. Any incompatible dependency must be resolved before Phase 1 begins.
 

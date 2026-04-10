@@ -1,8 +1,5 @@
 # CLAUDE.md — Blue Steel
 
-**Status:** Principles section complete. Operational section to be completed before development starts.
-**Last updated:** 2026-04-10
-
 > ⚠️ The **Operational** section of this document (build commands, paths, test commands) must be filled in before Phase 1 begins. The Principles section is stable.
 
 ---

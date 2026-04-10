@@ -1,9 +1,5 @@
 # PRD — Narrative Memory System for Tabletop RPG Campaigns
 
-**Status:** Draft v0.4  
-**Phase:** Definition & Analysis  
-**Last updated:** 2026-04-05
-
 ---
 
 ## 1. Problem Statement
@@ -191,6 +187,7 @@ Exploration mode is a set of interconnected views, not a single screen:
 - Player proposal and approval workflow (UI + approval logic)
 - Proposal expiry / TTL enforcement
 - Conflict resolution between concurrent proposals
+- Q&A log — campaign history of queries and answers, with a history panel inside Query Mode (D-058)
 
 ### Out of scope entirely (post-v2)
 - Real-time collaborative editing
@@ -221,7 +218,7 @@ Exploration mode is a set of interconnected views, not a single screen:
 | ~~OQ-3~~ | ~~What is the granularity of world state versioning — per session commit, or finer?~~ | ✅ Resolved — see DECISIONS.md D-035 |
 | ~~OQ-4~~ | ~~Single-user vs multi-user per campaign in v1?~~ | ✅ Resolved — see §3 and §7 |
 | ~~OQ-5~~ | ~~Is Exploration Mode read-only, or can users annotate / manually add information?~~ | ✅ Resolved — see §6.3 |
-| OQ-6 | Should submitted queries and their answers be persisted and viewable as a Q&A log (campaign history of questions asked)? Determine v1 vs v2 scope. | Medium |
+| ~~OQ-6~~ | ~~Should submitted queries and their answers be persisted and viewable as a Q&A log?~~ | ✅ Resolved — deferred to v2, see DECISIONS.md D-058 |
 
 ---
 

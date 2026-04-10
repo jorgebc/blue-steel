@@ -68,6 +68,9 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-055 | OQ-D resolved — Pagination: offset for entity lists, keyset for Timeline | ✅ Active | Definition |
 | D-056 | No E2E tests; backend top level is integration with external services mocked | ✅ Active | Definition |
 | D-057 | Pre-Phase 1 gate: Spring Boot 4.x compatibility must be verified before development | ✅ Active | Definition |
+| D-058 | OQ-6 resolved — Q&A log deferred to v2; queries are stateless in v1 | ✅ Active | Definition |
+| D-059 | OQ-B resolved — JWT: HS256, 15-min access token, rotating refresh tokens (30-day TTL) | ✅ Active | Definition |
+| D-060 | Auth implementation: self-implemented on Spring Security; email delivery outsourced via EmailPort | ✅ Active | Definition |
 
 ---
 
@@ -1058,6 +1061,91 @@ Spring Boot 4.x is a recent major release. Spring AI in particular is an activel
 
 **Alternatives considered:**
 - Verify as-you-go during Phase 1 — rejected; discovering a Spring AI incompatibility after building the extraction pipeline requires either downgrading Boot (breaking other dependencies) or rewriting the adapter layer. Front-loaded verification costs almost nothing.
+
+---
+
+---
+
+### D-058 — OQ-6 resolved: Q&A log deferred to v2
+
+**Date:** 2026-04-10
+**Status:** Active
+
+**Decision:**
+Queries are stateless in v1 — no query history is persisted. A campaign Q&A log (history of questions asked and answers received) is a v2 feature. When shipped in v2, it will live as a history panel inside Query Mode, not as a standalone Exploration view.
+
+**Reason:**
+The core value of Query Mode in v1 is the ability to ask questions and get grounded answers. Persisting that history adds a `queries` table, a list endpoint, and a UI history component — none of which is necessary to validate the core loop. Deferring keeps v1 scope tight. The UI placement decision (history panel inside Query Mode, not a 5th Exploration view) is recorded now so the v2 design starts with a resolved anchor.
+
+**Alternatives considered:**
+- Ship Q&A log in v1 — rejected; adds schema and UI scope without changing the core value proposition. The marginal UX benefit does not justify the added complexity in v1.
+- 5th Exploration view — considered for v2 design; rejected in favour of a history panel inside Query Mode. Query history is contextually tied to the act of querying, not to browsing world state.
+
+---
+
+### D-059 — OQ-B resolved: JWT — HS256, 15-minute access token, rotating refresh tokens
+
+**Date:** 2026-04-10
+**Status:** Active
+
+**Decision:**
+- **Algorithm:** HS256 (HMAC-SHA256, symmetric). The signing secret is stored in `.env` alongside the other production secrets (D-050).
+- **Access token TTL:** 15 minutes. Short-lived; limits blast radius if a token is intercepted.
+- **Refresh token TTL:** 30 days. Aligns with the weekly play cadence — users should not be forced to re-login between sessions.
+- **Rotation strategy:** Rotating refresh tokens with family-based reuse detection. Each refresh call issues a new token and invalidates the previous one. If an already-used token from a family is presented, the entire family is revoked (indicates token theft). Refresh tokens are stored server-side as a hash in a `refresh_tokens` table.
+
+**Refresh token schema:**
+```
+refresh_tokens
+  id UUID PK
+  user_id UUID FK → users.id
+  token_hash TEXT NOT NULL     ← SHA-256 of the raw token; raw token never stored
+  family_id UUID NOT NULL      ← groups a login session's rotation chain
+  expires_at TIMESTAMP NOT NULL
+  used_at TIMESTAMP            ← nullable; set when this token is exchanged for a new one
+  created_at TIMESTAMP
+```
+
+Reuse detection: if a token with `used_at IS NOT NULL` is presented, all tokens sharing the same `family_id` are immediately revoked and the user must re-authenticate.
+
+Logout (`POST /api/v1/auth/logout`) marks the current refresh token's family as fully revoked.
+
+**Reason:**
+HS256 is the natural fit for a single-server deployment — no key infrastructure, no key rotation ceremony, secret lives in `.env` with everything else. 15-minute access tokens are the industry standard for short-lived credentials; they limit exposure without user-visible impact because the refresh flow is transparent. 30-day refresh TTL matches the use case: a group playing weekly should stay logged in between sessions without friction. Rotating refresh tokens with reuse detection provide meaningful theft detection at low implementation cost — a compromised token is detectable and self-healing on next legitimate use.
+
+**Alternatives considered:**
+- RS256 — rejected; asymmetric signing is justified when multiple independent services verify tokens. A single Spring Boot monolith has no such requirement.
+- 1-hour or 24-hour access tokens — considered; rejected in favour of 15 minutes because the refresh rotation is transparent and the shorter TTL costs nothing in UX.
+- Static (non-rotating) refresh tokens — rejected; a stolen refresh token would be valid for 30 days with no detection mechanism. Rotation adds minimal complexity and catches theft.
+- No refresh tokens — rejected; a 15-minute TTL without refresh would force re-login mid-session, which is unacceptable UX during an active RPG session night.
+
+---
+
+### D-060 — Auth implementation: self-implemented on Spring Security; email outsourced
+
+**Date:** 2026-04-10
+**Status:** Active
+
+**Decision:**
+Authentication and user management are self-implemented on top of Spring Security and a JWT library (`nimbus-jose-jwt`, already a Spring Security transitive dependency). No external auth service (Clerk, Auth0) is used.
+
+Email delivery (invitation emails, future password reset) is outsourced to an external transactional email provider (Resend or Brevo, both with generous free tiers) behind a dedicated `EmailPort` in the application layer. The provider is an adapter detail — the domain never references it.
+
+**Reason:**
+The "don't roll your own auth" principle applies to cryptographic primitives, not to wiring established components together. Spring Security handles the filter chain and JWT validation. The token signing uses `nimbus-jose-jwt` (same library Spring uses internally). Our code contributes the refresh token rotation logic (~100–150 lines) and the invitation flow — neither involves custom cryptography.
+
+External auth services (Clerk, Auth0) were evaluated and rejected for this project:
+- This is a controlled-usage platform with a handful of users, not a self-serve SaaS. The primary value these services deliver (scaling user management to thousands of signups) is irrelevant here.
+- Self-implementing auth behind a port is a more meaningful portfolio demonstration than delegating to a third-party SDK.
+- The `EmailPort` abstraction isolates the one genuinely painful self-hosting concern (SMTP delivery) without adding vendor lock-in at the auth layer.
+
+Email delivery is the one concern deliberately outsourced — running a reliable SMTP server is operationally non-trivial and offers no learning or portfolio value. A transactional email API behind a port is the correct boundary.
+
+**Alternatives considered:**
+- Clerk — rejected; designed for self-serve SaaS, adds hard vendor dependency, obscures auth implementation in a portfolio context.
+- Auth0 — rejected; same reasons. Free tier limits (7,500 MAU) are irrelevant at this scale but the integration complexity is not.
+- Spring Authorization Server — rejected; OAuth2/OIDC infrastructure is designed for multi-service token delegation scenarios. A single Spring Boot monolith serving one SPA has no such requirement.
+- Self-hosted SMTP — rejected; operational overhead with no offsetting benefit. `EmailPort` keeps the option open without forcing it.
 
 ---
 

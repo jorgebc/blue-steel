@@ -1,9 +1,5 @@
 # ROADMAP — Blue Steel
 
-**Status:** Draft v0.1 — skeleton, to be completed before development starts
-**Phase:** Definition & Analysis
-**Last updated:** 2026-04-10
-
 > ⚠️ This document must be completed before any Phase 1 work begins. The functional blocks and their sequencing are the primary output still required to close the Definition & Analysis phase.
 
 ---
@@ -78,7 +74,7 @@
 
 ---
 
-### v2 — Proposal & Approval Pipeline
+### v2 — Proposal & Approval Pipeline + Enhancements
 
 > To be defined after v1 ships. Key items:
 >
@@ -86,8 +82,9 @@
 > - Co-sign flow (D-017)
 > - GM approval / veto (D-018)
 > - Proposal expiry TTL enforcement (D-019)
-> - Commit payload "add" action (D-053)
-> - Query streaming / SSE (D-052)
+> - Commit payload "add" action — manually introduce missed entities (D-053)
+> - Q&A log — campaign history of queries and answers, history panel in Query Mode (D-058)
+> - Query streaming / SSE if synchronous model cannot meet latency target (D-052)
 
 ---
 
