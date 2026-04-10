@@ -207,7 +207,7 @@ Exploration mode is a set of interconnected views, not a single screen:
 | **Latency** | Knowledge extraction: target < 10s for summaries up to 2,000 tokens (~1,500 words). Query responses: target < 5s. Summaries approaching the token limit may exceed the 10s target; this is acceptable. |
 | **Accuracy** | Extractions must be reviewable and correctable — the system never commits without user confirmation |
 | **Traceability** | Every piece of world state must be traceable to the session that produced it |
-| **Consistency** | World state must never contain contradictory facts without surfacing a conflict to the user |
+| **Consistency** | When a session introduces facts that contradict existing world state, the system must surface the contradiction to the user before commit. The user retains authority to accept the contradiction (e.g., narrative retcon). The system never silently admits contradictions. |
 | **Simplicity** | The interface must be usable by non-technical users with no onboarding |
 
 ---
@@ -218,9 +218,10 @@ Exploration mode is a set of interconnected views, not a single screen:
 |---|---|---|
 | ~~OQ-1~~ | ~~What is the correction/annotation UX in Input Mode?~~ | ✅ Resolved — see §6.1 |
 | ~~OQ-2~~ | ~~How are conflicts handled when a new session contradicts existing world state?~~ | ✅ Resolved — see DECISIONS.md D-033 |
-| OQ-3 | What is the granularity of world state versioning — per session commit, or finer? | Medium |
+| ~~OQ-3~~ | ~~What is the granularity of world state versioning — per session commit, or finer?~~ | ✅ Resolved — see DECISIONS.md D-035 |
 | ~~OQ-4~~ | ~~Single-user vs multi-user per campaign in v1?~~ | ✅ Resolved — see §3 and §7 |
 | ~~OQ-5~~ | ~~Is Exploration Mode read-only, or can users annotate / manually add information?~~ | ✅ Resolved — see §6.3 |
+| OQ-6 | Should submitted queries and their answers be persisted and viewable as a Q&A log (campaign history of questions asked)? Determine v1 vs v2 scope. | Medium |
 
 ---
 

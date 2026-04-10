@@ -242,6 +242,7 @@ users
   id UUID PK
   email TEXT UNIQUE NOT NULL
   password_hash TEXT NOT NULL
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE
   created_at TIMESTAMP
 
 campaigns
@@ -259,7 +260,7 @@ campaign_members
   UNIQUE (campaign_id, user_id)
 ```
 
-The `admin` role is platform-level and is not stored in `campaign_members`. Admin identity is resolved at the application layer via a platform flag on the `users` record (implementation detail — deferred to §8).
+The `admin` role is platform-level and is not stored in `campaign_members`. Admin identity is resolved via the `is_admin` flag on the `users` record. Only one user may have `is_admin = TRUE` — this singleton invariant is enforced at the application layer.
 
 ---
 
@@ -626,14 +627,27 @@ API versioning is path-based (`/api/v1/`). Version increments are reserved for b
 
 The session ingestion flow uses a staged endpoint sequence:
 
+**Session management:**
+
+| Method + Path | Description | Required role |
+|---|---|---|
+| `GET /api/v1/campaigns/{id}/sessions` | List all sessions ordered by `sequence_number`. Returns id, status, sequence_number, committed_at. Paginated. | campaign member |
+| `GET /api/v1/campaigns/{id}/sessions/{sid}` | Session detail including `sequence_number`, `status`, `committed_at`, and narrative block reference. | campaign member |
+| `DELETE /api/v1/campaigns/{id}/sessions/{sid}` | Discard a draft session. Only valid when status is `draft`. Preserves the `narrative_blocks` record. | gm |
+
+**Ingestion flow:**
+
 | Step | Method + Path | Description |
 |---|---|---|
-| 1. Submit summary | `POST /api/v1/campaigns/{id}/sessions` | Accepts raw summary text; triggers async ingestion pipeline; returns `session_id` and initial status `processing` |
+| 1. Submit summary | `POST /api/v1/campaigns/{id}/sessions` | Accepts raw summary text; triggers async ingestion pipeline; returns `session_id` and initial status `processing`. Rejected with `409` if another session is in `processing` or `draft` state. |
 | 2. Poll status | `GET /api/v1/campaigns/{id}/sessions/{sid}/status` | Returns current pipeline status: `processing` \| `draft` \| `committed` \| `failed` |
 | 3. Retrieve draft diff | `GET /api/v1/campaigns/{id}/sessions/{sid}/diff` | Returns the full structured diff payload when status is `draft` |
 | 4. Commit | `POST /api/v1/campaigns/{id}/sessions/{sid}/commit` | Submits the reviewed diff payload. Backend validates: zero UNCERTAIN entities, caller is GM or editor. Returns `422` with specific error codes on violation. |
 
 **Commit payload shape (outline):**
+
+Supported actions per item: `accept` (no change), `edit` (user-modified data), `delete` (remove AI-extracted item). A `v1` scope note: manually adding entities the AI missed ("add" action) is deferred to v2 (D-053).
+
 ```json
 {
   "actors":    [ { "id": "...", "action": "accept|edit|delete", "data": { } } ],
@@ -653,6 +667,8 @@ The session ingestion flow uses a staged endpoint sequence:
 
 **Draft state persistence:** The draft diff is stored server-side in `sessions.diff_payload` (status `draft`). This enables failure recovery — if the user closes the browser mid-review, the diff is retrievable on return. Client-side edits to diff cards are submitted as part of the final commit payload, not persisted incrementally.
 
+**Draft session policy (D-054):** At most one session per campaign may be in `draft` or `processing` state simultaneously. A new session submission is rejected with `409` if another session is already in one of those states. The GM may explicitly discard a draft session via `DELETE /api/v1/campaigns/{id}/sessions/{sid}` (GM role required; only valid when status is `draft`). The `narrative_blocks` record is preserved on deletion; only the diff payload and session record are removed.
+
 **Failed status:** If the async pipeline fails (LLM error, token budget exceeded at extraction time, or unrecoverable processing error), the session status transitions to `failed` and `sessions.failure_reason` is populated. The status polling endpoint (Step 2) returns:
 
 ```json
@@ -668,7 +684,9 @@ The session ingestion flow uses a staged endpoint sequence:
 
 Failed sessions are not retried automatically. The user must submit a new session (or re-submit the same summary). The original `narrative_blocks` record is preserved for reference.
 
-### 7.7 Authentication Endpoints
+### 7.7 Authentication & User Management Endpoints
+
+**Authentication:**
 
 | Method + Path | Description |
 |---|---|
@@ -677,6 +695,17 @@ Failed sessions are not retried automatically. The user must submit a new sessio
 | `POST /api/v1/auth/logout` | Invalidates refresh token server-side |
 
 Token format, algorithm, expiry, and refresh strategy are deferred to implementation (OQ-B).
+
+**User management (D-051 — invitation model):**
+
+There is no self-registration endpoint. User accounts are created exclusively via invitation. Admin can invite any user; GMs can invite users to their campaign. An invitation sends an email containing a system-generated temporary password. The recipient logs in with that password and must change it on first login.
+
+| Method + Path | Description | Required role |
+|---|---|---|
+| `POST /api/v1/invitations` | Send an invitation email to an email address; creates a pending user account with a temporary password | admin, gm |
+| `GET /api/v1/users/me` | Get the current authenticated user's profile | authenticated |
+| `GET /api/v1/users` | Search users by email (used by GM to find existing users to add to campaign) | admin, gm |
+| `PATCH /api/v1/users/me/password` | Change own password (required flow after first login with temporary password) | authenticated |
 
 ---
 
@@ -735,7 +764,11 @@ All endpoints are read-only. All require campaign membership. Pagination follows
 }
 ```
 
+**Execution model:** Query requests are handled synchronously. The server holds the connection open and returns the complete response when the answer is assembled. Target P95 latency is <5s (NFR). If the LLM call exceeds a configurable server-side timeout, the server returns `504` with error code `QUERY_TIMEOUT`. Streaming (SSE) is not implemented in v1 and may be revisited in v2 if the synchronous model cannot reliably meet the latency target.
+
 Queries are stateless — each call is independent. No conversation history is maintained between queries.
+
+**Q&A persistence:** Whether submitted queries and their answers are persisted for a campaign Q&A log view is an open product question — see PRD.md OQ-6.
 
 ---
 
@@ -773,23 +806,24 @@ Role checks are enforced at the application layer (use case level), not only at 
 
 TDD from day one (Kent Beck). No production code is written without a failing test first. Tests are the first users of every API.
 
-### 9.2 Test Pyramid
+### 9.2 Backend Test Pyramid
 
 ```
-        ┌──────────────┐
-        │     E2E      │  ← few, slow, high confidence on critical paths
-        ├──────────────┤
-        │  Integration │  ← Spring Boot Test + Testcontainers (real Postgres)
-        ├──────────────┤
-        │     Unit     │  ← domain logic, use cases (no Spring context, fast)
-        └──────────────┘
+        ┌──────────────────────────────────────────────────┐
+        │  Integration (top level)                         │
+        │  Spring Boot Test + Testcontainers (real Postgres)│
+        │  External services (LLM) mocked at port boundary │
+        ├──────────────────────────────────────────────────┤
+        │  Unit                                            │
+        │  domain logic, use cases — no Spring context     │
+        └──────────────────────────────────────────────────┘
 ```
+
+There is no E2E test layer (D-056). The backend test pyramid's highest confidence tier is integration tests — real PostgreSQL via Testcontainers, full Spring Boot context, all LLM-backed ports mocked. This gives high confidence on the full request path without the operational overhead of maintaining a full-stack E2E environment.
 
 **Unit tests** — the majority. Domain entities, use cases, and domain services are tested with plain JUnit 5 and Mockito. No Spring context loaded. Fast feedback loop.
 
-**Integration tests** — Spring Boot Test with Testcontainers. A real PostgreSQL container runs for every integration test suite. JPA adapters, migration scripts, and Spring AI adapters are tested here. LLM calls are mocked at the port boundary — no real API calls in CI.
-
-**E2E tests** — thin layer covering the most critical user paths: session ingestion, diff review, commit, and query. Run against a full stack.
+**Integration tests** — Spring Boot Test with Testcontainers. A real PostgreSQL container runs for every integration test suite. JPA adapters, migration scripts, Spring AI adapter wiring, and controller behavior are tested here. LLM ports are always mocked — no real API calls in CI.
 
 ### 9.3 Mutation Testing
 
@@ -831,6 +865,20 @@ These tests are the executable specification of the hexagonal architecture. A la
 - Testcontainers instances are shared at the suite level for performance — not started per test
 - LLM ports are always mocked in tests — cost governance applies to tests too
 
+### 9.6 Frontend Testing
+
+| Layer | Tool | Scope |
+|---|---|---|
+| Unit | Vitest | Hooks, Zustand store logic, utility functions, typed API client |
+| Component | Vitest + React Testing Library | Individual components and multi-component feature flows |
+| Accessibility | axe-core (`vitest-axe`) | All critical UI components — diff review cards, entity profiles, relation graph |
+
+No E2E layer on the frontend (consistent with D-056). The highest frontend confidence tier is component-level tests covering the feature flows (diff review, query submission, exploration navigation).
+
+**Accessibility rationale:** The target audience includes non-technical users. The diff review and exploration views are complex, interactive surfaces. Axe-core runs inline with Vitest — zero additional CI tooling overhead.
+
+Frontend tests run in the `frontend.yml` GitHub Actions workflow as part of the pre-build step (type check → lint → Vitest → vite build).
+
 ---
 
 ## 10. Open Architecture Questions
@@ -840,10 +888,12 @@ These tests are the executable specification of the hexagonal architecture. A la
 | OQ-A | Entity resolution strategy | High | ✅ Resolved — see §6.3 |
 | OQ-B | JWT token details — algorithm, expiry, refresh token strategy | Medium | ⏳ Deferred to implementation |
 | OQ-C | Embedding model selection — dimension, provider, cost profile | Medium | ✅ Resolved — see §6.1 |
-| OQ-D | Pagination strategy for Exploration views — cursor-based vs offset | Low | ⏳ Deferred to implementation |
+| OQ-D | Pagination strategy for Exploration views — cursor-based vs offset | Low | ✅ Resolved — see DECISIONS.md D-055 |
 | OQ-E | Uncertain entity card: behaviour of defer action | Medium | ✅ Resolved — see §6.3 |
 
-**OQ-B and OQ-D** are implementation details with no upstream architectural dependencies. They will be resolved as DECISIONS.md entries when the relevant functional blocks are built.
+**OQ-B** is an implementation detail with no upstream architectural dependency. It will be resolved as a DECISIONS.md entry when the auth functional block is built.
+
+**Pre-Phase 1 gate (D-057):** Before writing any production code, verify Spring Boot 4.0.3 compatibility for: Spring AI (`ChatClient`, `EmbeddingModel`, `VectorStore`), Testcontainers Spring Boot integration, Liquibase Spring Boot starter, and Spring Security 7. Log the verification result in DECISIONS.md. Any incompatible dependency must be resolved before Phase 1 begins.
 
 ---
 

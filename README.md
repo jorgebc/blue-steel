@@ -38,9 +38,9 @@ All project decisions and specifications live in `/docs`:
 |---|---|
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements — what and why |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Stack, structure, patterns, conventions |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases, functional blocks, status |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases, functional blocks, status *(in progress — complete before development starts)* |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decision log — every significant technical and product choice |
-| [`docs/CLAUDE.md`](docs/CLAUDE.md) | Principles and conventions for AI-assisted development |
+| [`docs/CLAUDE.md`](docs/CLAUDE.md) | Principles and conventions for AI-assisted development *(in progress — complete before development starts)* |
 
 ---
 

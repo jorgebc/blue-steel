@@ -61,6 +61,13 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-048 | CI/CD: GitHub Actions with path-filtered workflows | ✅ Active | Definition |
 | D-049 | Local dev LLM strategy: mock ports by default, real APIs via profile flag | ✅ Active | Definition |
 | D-050 | Secret management: .env file on Oracle VM, never committed | ✅ Active | Definition |
+| D-051 | User onboarding: invitation-only, email with temporary password | ✅ Active | Definition |
+| D-052 | Query execution model: synchronous, single LLM call, 504 on timeout | ✅ Active | Definition |
+| D-053 | Commit payload: "add" action (manually introduce missed entities) deferred to v2 | ✅ Active | Definition |
+| D-054 | Draft session policy: single active draft per campaign; GM-deletable | ✅ Active | Definition |
+| D-055 | OQ-D resolved — Pagination: offset for entity lists, keyset for Timeline | ✅ Active | Definition |
+| D-056 | No E2E tests; backend top level is integration with external services mocked | ✅ Active | Definition |
+| D-057 | Pre-Phase 1 gate: Spring Boot 4.x compatibility must be verified before development | ✅ Active | Definition |
 
 ---
 
@@ -921,6 +928,136 @@ A `.env` file on the VM is the simplest secret management approach for a self-ho
 **Alternatives considered:**
 - GitHub Actions secrets injected at deploy time — considered; more auditable (secrets never persist as files on disk), but adds complexity to the deploy script and requires the deploy workflow to reconstruct the full environment on each run. Overkill for a single-VM personal project.
 - External secrets manager (HashiCorp Vault, AWS SSM) — rejected; introduces an external operational dependency and complexity that is not justified at this scale.
+
+---
+
+---
+
+### D-051 — User onboarding: invitation-only model
+
+**Date:** 2026-04-10
+**Status:** Active
+
+**Decision:**
+There is no self-registration endpoint. User accounts are created exclusively via invitation. Both Admin and GM can send invitations. An invitation email is sent to the provided address containing a system-generated temporary password. The recipient logs in with that password and is required to change it on first login.
+
+Admin invitations create a platform-level user account. GM invitations create a platform-level user account AND add the user to the GM's campaign in one flow.
+
+**Reason:**
+Blue Steel is a controlled-usage platform, not a public SaaS. Open registration would bypass the admin usage gate (D-024, D-025). The invitation model keeps the admin as the hard gate while giving GMs a practical path to bring players in without involving admin in every membership change.
+
+**Alternatives considered:**
+- Admin creates users manually (no email) — rejected; requires an out-of-band password delivery step for every new user, which is worse UX with no security benefit.
+- Open registration with admin approval — rejected; adds an approval queue UI that over-engineers the use case. An invitation IS the approval.
+
+---
+
+### D-052 — Query execution model: synchronous
+
+**Date:** 2026-04-10
+**Status:** Active
+
+**Decision:**
+Query requests (`POST /api/v1/campaigns/{id}/queries`) are handled synchronously. The server holds the HTTP connection open while it runs the full pipeline (embed → pgvector retrieval → context assembly → LLM call) and returns the complete response. Target P95 latency is <5s. A configurable server-side timeout causes the server to return `504 QUERY_TIMEOUT` if the pipeline exceeds it. Streaming (SSE) is not implemented in v1.
+
+**Reason:**
+Synchronous handling is the simplest model that satisfies the stated NFR (<5s). The query pipeline makes exactly one LLM call on a bounded context — latency is predictable and unlikely to exceed the threshold for typical campaigns. Streaming adds frontend complexity (incremental rendering, partial state handling) that is not justified until the synchronous model demonstrably fails the latency target. A server-side timeout prevents connection starvation on pathological queries.
+
+**Alternatives considered:**
+- Async with polling (same model as ingestion) — rejected; adds unnecessary polling infrastructure and client-side polling logic for a fast, single-call operation.
+- SSE streaming — considered and deferred to v2. Streaming delivers better perceived UX for borderline-latency responses but adds state management complexity on both ends. Start synchronous; move to streaming if needed.
+
+---
+
+### D-053 — Commit payload: "add" action deferred to v2
+
+**Date:** 2026-04-10
+**Status:** Active
+
+**Decision:**
+The commit payload in v1 supports three actions per extracted item: `accept`, `edit`, `delete`. The ability for users to manually introduce entities the AI missed ("add" action) is deferred to v2.
+
+**Reason:**
+The "add" action requires a distinct frontend flow (a creation form embedded in the diff review screen), a new payload shape (client-generated temporary ID, full entity body), and backend handling to distinguish user-created entities from AI-extracted ones in the same commit. The core value proposition of v1 is AI extraction + user review and correction of extracted items. Manual addition is an enhancement, not a blocker. Shipping v1 without it keeps the commit contract simple and the review UX focused.
+
+**Alternatives considered:**
+- Include "add" in v1 — considered; deprioritized after scoping review. Users who need to add missed entities in v1 can submit a corrected session summary or use the proposal system in v2.
+
+---
+
+### D-054 — Draft session policy: single active draft per campaign, GM-deletable
+
+**Date:** 2026-04-10
+**Status:** Active
+
+**Decision:**
+At most one session per campaign may be in `processing` or `draft` state at any time. A new session submission is rejected with `409 DRAFT_IN_PROGRESS` if another session is currently in one of those states. The GM may explicitly delete a draft session (`DELETE /api/v1/campaigns/{id}/sessions/{sid}`, GM role required, only valid when status is `draft`). The `narrative_blocks` record is preserved on deletion — only the session record and diff payload are removed.
+
+**Reason:**
+Allowing concurrent drafts would require conflict resolution between two uncommitted world state modifications touching the same entities. The session pipeline is designed around a linear, sequential ingestion model (D-001 — world state is cumulative). Preventing concurrent drafts enforces this linearity at the API boundary. GMs need a clean path to abandon a draft that was submitted in error without having to commit incorrect data.
+
+**Alternatives considered:**
+- Allow multiple concurrent drafts — rejected; would require ordering guarantees, concurrent entity resolution conflicts, and a merge step that adds significant complexity for no clear benefit.
+- No delete, force commit — rejected; forces GMs to commit a session they want to discard, permanently polluting the world state.
+
+---
+
+### D-055 — OQ-D resolved: Pagination strategy
+
+**Date:** 2026-04-10
+**Status:** Active
+
+**Decision:**
+Two pagination strategies are used, selected by the nature of the data:
+
+- **Offset-based pagination** (`?page=N&size=N`) for entity list endpoints (actors, spaces, events, relations, sessions). These collections are filterable, randomly accessible, and not ordered by insertion sequence in user-facing queries.
+- **Keyset/cursor pagination** (`?after=<sequence_number>`) for the Timeline endpoint. The Timeline is ordered by `sequence_number` (append-only), and keyset pagination avoids page-skip anomalies as new sessions are committed between page loads.
+
+**Reason:**
+Offset pagination is simple, frontend-friendly, and correct for filterable entity lists where users jump to pages by filter criteria, not by sequential scroll. Keyset pagination is the right model for the Timeline — a strictly ordered, append-only feed where offset instability would cause events to appear or disappear between page loads as sessions are committed.
+
+**Alternatives considered:**
+- Cursor-based for everything — rejected; cursor pagination is harder to implement for filterable, randomly-accessible entity lists and offers no benefit there.
+- Offset for everything — rejected; the Timeline's append-only ordered nature makes keyset pagination clearly superior. Offset skips and duplicates are especially jarring on a chronological feed.
+
+---
+
+### D-056 — No E2E tests; backend test pyramid top level is integration tests
+
+**Date:** 2026-04-10
+**Status:** Active
+
+**Decision:**
+There is no end-to-end test layer. The backend's highest-confidence test tier is integration tests: Spring Boot Test + Testcontainers (real PostgreSQL), full Spring context, with all LLM-backed ports mocked at the port boundary. The frontend's highest-confidence tier is component-level tests with React Testing Library.
+
+**Reason:**
+E2E tests require a full-stack environment, a test data strategy, and a reliable automation layer (Playwright or equivalent). The infrastructure and maintenance cost is not justified for a solo/small-team project where the integration test layer already exercises the full request path (HTTP → use case → domain → JPA → real DB). LLM mocking at the port boundary is consistent with the local dev strategy (D-049) and cost governance (D-034).
+
+**Alternatives considered:**
+- Playwright E2E against a test environment — rejected; requires a persistent full-stack test environment (third environment, which D-044 already rejected). Maintenance burden of E2E suites on a solo project is high relative to the confidence gain over the existing integration test layer.
+
+---
+
+### D-057 — Pre-Phase 1 gate: Spring Boot 4.x compatibility verification
+
+**Date:** 2026-04-10
+**Status:** Active
+
+**Decision:**
+Before writing any production code, the following dependencies must be verified as compatible with Spring Boot 4.0.3:
+
+1. **Spring AI** — `ChatClient`, `EmbeddingModel`, `VectorStore` (pgvector support)
+2. **Testcontainers** Spring Boot integration
+3. **Liquibase** Spring Boot starter
+4. **Spring Security 7**
+
+Verification means: a working proof-of-concept dependency resolution (not just version check) confirming no classpath conflicts and functional API availability. The result must be logged as a DECISIONS.md update before Phase 1 begins. Any dependency that lags must either have a confirmed roadmap date or trigger a stack reconsideration.
+
+**Reason:**
+Spring Boot 4.x is a recent major release. Spring AI in particular is an actively developing project whose API surface has changed significantly across releases. A silent incompatibility discovered mid-Phase 1 would cause costly rework. Thirty minutes of upfront verification eliminates that risk entirely. This is Martin Fowler's "known unknowns" principle: surface risks before they become blockers.
+
+**Alternatives considered:**
+- Verify as-you-go during Phase 1 — rejected; discovering a Spring AI incompatibility after building the extraction pipeline requires either downgrading Boot (breaking other dependencies) or rewriting the adapter layer. Front-loaded verification costs almost nothing.
 
 ---
 
