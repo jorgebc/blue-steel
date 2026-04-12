@@ -75,6 +75,8 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-062 | pgvector retrieval uses native queries; Spring AI VectorStore not used | ✅ Active | Definition |
 | D-063 | Embedding generation is async post-commit; commit endpoint returns immediately | ✅ Active | Definition |
 | D-064 | Two invitation endpoints: platform-level (admin) and campaign-scoped (GM) | ✅ Active | Definition |
+| D-065 | Commit message format: Conventional Commits | ✅ Active | Definition |
+| D-066 | Branch naming: type/short-description (kebab-case) | ✅ Active | Definition |
 
 ---
 
@@ -1245,6 +1247,48 @@ No external queue infrastructure is required. Spring's `@Async` mechanism (or an
 - Synchronous commit with blocking embedding generation — rejected; unacceptable latency for sessions with many entities, and partial failure creates a data consistency problem with no clean recovery path.
 - Async with two-phase session status (`embeddings_ready` flag) — considered; adds UI state and a polling/notification concern with marginal benefit. The brief unavailability of newly committed entities in Query Mode does not require a visible user-facing status. Deferred as a potential v2 enhancement if the lag proves noticeable in practice.
 - External queue (Redis, SQS) — rejected; introduces operational infrastructure with no benefit at this scale. Spring `@Async` is sufficient.
+
+---
+
+### D-065 — Commit message format: Conventional Commits
+
+**Date:** 2026-04-12
+**Status:** Active
+
+**Decision:**
+All commits follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. Format: `type(scope): description`.
+
+Allowed types: `feat`, `fix`, `refactor`, `test`, `chore`, `docs`, `ci`.
+
+Allowed scopes: `api` (backend), `web` (frontend), `db` (Liquibase migrations), `ci` (GitHub Actions), `docs` (documentation files).
+
+Breaking changes use a `BREAKING CHANGE:` footer. Commit body is optional and explains *why*, not *what*.
+
+**Reason:**
+Conventional Commits produces a machine-readable history that enables automated changelog generation (CHANGELOG.md will be generated from commits once Phase 1 begins). The type + scope prefix makes it immediately clear which layer a change touches without reading the diff. This is especially useful in a monorepo where `api` and `web` changes are interleaved in a single history.
+
+**Alternatives considered:**
+- Imperative sentence only (no prefix) — rejected; readable but not machine-parseable, loses the layer signal that scopes provide in a two-project monorepo.
+- GitHub-style with issue reference — rejected; this project is driven by ROADMAP.md phases, not a GitHub issue queue. Issue refs add noise without adding value in this workflow.
+
+---
+
+### D-066 — Branch naming: type/short-description
+
+**Date:** 2026-04-12
+**Status:** Active
+
+**Decision:**
+Branch names follow the pattern `type/short-description` in kebab-case, using the same type prefixes as D-065 (`feat`, `fix`, `refactor`, `test`, `chore`, `docs`, `ci`).
+
+Examples: `feat/session-ingestion`, `fix/jwt-refresh-rotation`, `chore/liquibase-baseline`.
+
+**Reason:**
+Mirrors the Conventional Commits type vocabulary (D-065), so the branch and its commits are self-consistent. GitHub's branch list groups by prefix, making all `feat/` branches visually adjacent. Kebab-case is the most portable branch naming convention across Git tooling.
+
+**Alternatives considered:**
+- Flat short-description only — rejected; loses the type signal, making the branch list harder to scan in the GitHub UI.
+- `username/short-description` — rejected; on a solo project, user prefixes add no useful signal and clutter every branch reference.
 
 ---
 

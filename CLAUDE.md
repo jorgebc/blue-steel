@@ -1,142 +1,283 @@
-# CLAUDE.md — Blue Steel
+# CLAUDE.md — Blue Steel (Repo Root)
 
-> ⚠️ The **Operational** section of this document (build commands, paths, test commands) must be filled in before Phase 1 begins. The Principles section is stable.
-
----
-
-## Part 1 — Principles & Conventions
-
-These are fixed decisions made during the Definition & Analysis phase. They govern every implementation choice.
-
-### Engineering Philosophy
-
-| Reference | Principle applied |
-|---|---|
-| **Robert C. Martin** | SOLID, clean code, single responsibility at every layer |
-| **Alistair Cockburn** | Hexagonal architecture — the domain is isolated from all infrastructure |
-| **Joshua Bloch** | API design done right — minimal surface, clear contracts, no surprises |
-| **Kent Beck** | TDD from day one — no production code without a failing test first |
-| **Martin Fowler** | Evolutionary architecture — design for change, not for today's assumptions |
-
-These are not aspirations. They are constraints.
+> This file is the entry point for any AI agent working in this repository.
+> Read it completely before touching any file. For work scoped to a single layer,
+> continue to `apps/api/CLAUDE.md` (backend) or `apps/web/CLAUDE.md` (frontend)
+> after reading this file. Those files do not exist yet — they will be created
+> before Phase 1 development begins.
 
 ---
 
-### Architecture Rules (non-negotiable)
+## 1. Project Summary
 
-- The domain core (`com.bluesteel.domain`) has zero imports from `org.springframework.*`, `jakarta.persistence.*`, or any infrastructure library — enforced by ArchUnit on every build
-- Ports are Java interfaces in `application.port.in` and `application.port.out` — the domain has no knowledge of ports
-- Adapters implement ports and are never called directly by domain code
-- JPA entities live exclusively in `adapters.out.persistence` — they are a persistence detail, not the domain model
-- Configuration classes are co-located with the adapter they configure (D-039)
+Blue Steel is an AI-assisted narrative memory system for tabletop RPG campaigns. It ingests free-text session summaries written by GMs or players, extracts structured knowledge (actors, events, locations, relationships) via LLM pipelines, and stores the result as a cumulative, versioned world state. Users can then query that world state in natural language or browse it through four visual exploration views. The project is a solo portfolio build currently in the **Definition & Analysis phase** — no production code has been written yet. All architectural decisions are finalized and documented; Phase 1 development begins once the pre-phase gate (D-057) is cleared.
 
 ---
 
-### Domain Model Conventions
-
-- Domain entities are plain Java classes — no JPA annotations, no Spring annotations
-- Value objects are Java Records — immutable by construction
-- Aggregates enforce their own invariants — no anemic domain model
-- Checked exceptions are not used in domain or application layers — domain uses unchecked domain exceptions
-- All public API methods are documented; internal implementation methods are not
-
----
-
-### Key Decisions Reference
-
-A summary of the most operationally-relevant decisions. Full rationale in DECISIONS.md.
-
-| Area | Decision | Reference |
-|---|---|---|
-| Backend stack | Java 25 + Spring Boot 4.0.3 + Maven | D-027, D-028 |
-| Frontend stack | React 18 + Vite + TypeScript + shadcn/ui | D-030 |
-| Database | PostgreSQL + pgvector on Neon (free tier) | D-031, D-047 |
-| LLM provider | Anthropic (Claude) via Spring AI | D-032 |
-| Embedding model | OpenAI `text-embedding-3-small`, 1536 dimensions | D-040 |
-| Auth | Stateless JWT | D-043 |
-| Migrations | Liquibase | D-029 |
-| Environments | `local` (Docker Compose) + `prod` only | D-044 |
-| Local LLM dev | Mock ports by default; `llm-real` profile for real APIs | D-049 |
-| Testing (backend) | JUnit 5 + Mockito + Testcontainers + PITest + ArchUnit | D-036, D-037, D-056 |
-| Testing (frontend) | Vitest + React Testing Library + axe-core | See ARCHITECTURE.md §9.6 |
-| Secrets | `.env` on Oracle VM, never committed | D-050 |
-
----
-
-## Part 2 — Operational (to be completed before Phase 1)
-
-> ⚠️ Fill in this section when the repository scaffold is in place.
-
-### Repository Layout
+## 2. Monorepo Layout
 
 ```
 blue-steel/
-├── docs/           ← all project documentation
 ├── apps/
-│   ├── api/        ← Java 25 / Spring Boot backend
-│   └── web/        ← React / Vite / TypeScript frontend
-├── CLAUDE.md       ← repo root; picked up automatically by tooling
-├── README.md
-└── .gitignore
+│   ├── api/               ← Backend: Java 25 / Spring Boot 4.0.3 (Maven)
+│   └── web/               ← Frontend: React 18 / Vite / TypeScript
+├── docs/                  ← All project documentation (PRD, ARCHITECTURE, DECISIONS, ROADMAP)
+├── docker-compose.yml     ← Local infrastructure only (PostgreSQL + pgvector)
+├── .github/
+│   └── workflows/
+│       ├── backend.yml    ← CI/CD for apps/api (path-filtered)
+│       └── frontend.yml   ← CI/CD for apps/web (path-filtered)
+├── CLAUDE.md              ← This file — repo root agent entry point
+└── README.md
 ```
 
-### Backend (`apps/api`)
+**Key facts about the layout:**
+
+- `apps/api` and `apps/web` are entirely independent projects. They share no code. The contract between them is the HTTP API.
+- `components/ui/` inside `apps/web/src/` is auto-generated by shadcn/ui — **never edit manually**.
+- `apps/api/src/main/resources/db/changelog/` contains Liquibase migration files — edit only through the Liquibase workflow, never by hand.
+- There is no shared package layer (no `packages/`, no `libs/`). If something appears to be shared, it is duplicated intentionally or belongs in the API contract.
+
+---
+
+## 3. Tech Stack Overview
+
+**Backend (`apps/api`)**
+
+- Java 25 (LTS), Spring Boot 4.0.3, Maven
+- Spring Security (stateless JWT, HS256)
+- Spring Data JPA + Hibernate, Liquibase migrations
+- PostgreSQL + pgvector (Neon free tier in prod)
+- Spring AI `ChatClient` → Anthropic (Claude) for text generation
+- Spring AI `EmbeddingModel` → OpenAI `text-embedding-3-small` (1536 dims) for embeddings
+- JUnit 5, Mockito, Testcontainers, PITest, ArchUnit
+
+**Frontend (`apps/web`)**
+
+- TypeScript, React 18, Vite
+- shadcn/ui (component library), TanStack Query v5 (server state), Zustand v5 (client state)
+- React Router v6, React Flow v12 (relations graph)
+- Vitest, React Testing Library, axe-core (`vitest-axe`)
+
+**Infrastructure / CI**
+
+- Local dev: Docker Compose (Postgres + pgvector only; app runs natively)
+- Prod hosting: Oracle Cloud Always Free ARM VM (backend), Vercel Hobby (frontend), Neon (database)
+- CI/CD: GitHub Actions with path-filtered workflows per project
+- Docker images: built for `linux/arm64` (Oracle ARM VM), pushed to `ghcr.io`
+- Secrets: `.env` on Oracle VM, `.env.local` locally — never committed
+
+---
+
+## 4. Workspace Setup
+
+> ⚠️ This project is in the **Definition & Analysis phase**. No repository scaffold exists yet.
+> All commands below will be documented once Phase 1 begins.
+
+**Install dependencies**
 
 ```bash
-# Build
-# TODO: fill in
+# Backend
+# [NOT DOCUMENTED — fill in before Phase 1]
 
-# Run tests (unit + integration)
-# TODO: fill in
-
-# Run mutation tests (domain core)
-# TODO: fill in
-
-# Run architecture tests
-# TODO: fill in (ArchUnit runs with unit tests)
-
-# Start locally (Docker Compose)
-# TODO: fill in
-
-# Start with real LLM APIs
-# TODO: fill in (llm-real Spring profile)
+# Frontend
+# [NOT DOCUMENTED — fill in before Phase 1]
 ```
 
-### Frontend (`apps/web`)
+**Environment variables**
+
+All secrets are stored in `.env` (prod, Oracle VM) or `.env.local` (local dev). Neither file is committed. Required variables across the full monorepo:
+
+```
+# Shared / Backend
+DATABASE_URL=           # Neon PostgreSQL connection string
+ANTHROPIC_API_KEY=      # Claude (text generation)
+OPENAI_API_KEY=         # text-embedding-3-small (embeddings)
+JWT_SECRET=             # HS256 symmetric secret
+
+# Email
+EMAIL_API_KEY=          # Transactional email provider (Resend or Brevo)
+```
+
+**Run locally (infrastructure only — start this first)**
 
 ```bash
-# Install dependencies
-# TODO: fill in
-
-# Type check
-# TODO: fill in
-
-# Lint
-# TODO: fill in
-
-# Run tests
-# TODO: fill in
-
-# Build
-# TODO: fill in
-
-# Start dev server
-# TODO: fill in
+docker compose up -d    # Starts PostgreSQL + pgvector on localhost:5432
 ```
 
-### Environment Variables
+**Run backend (natively, not in Docker)**
 
-Production secrets are stored in a `.env` file on the Oracle VM (D-050). Local development uses a `.env.local` file (not committed).
+```bash
+# Default profile — all LLM ports are mocked, zero API cost
+# [NOT DOCUMENTED — fill in before Phase 1]
 
-Required variables (full list to be finalized when scaffold is built):
-
+# With real LLM APIs (Anthropic + OpenAI calls will be made and billed)
+# Activate: --spring.profiles.active=local,llm-real
+# [NOT DOCUMENTED — fill in before Phase 1]
 ```
-DATABASE_URL=
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
-JWT_SECRET=
+
+**Run frontend dev server**
+
+```bash
+# [NOT DOCUMENTED — fill in before Phase 1]
+```
+
+**Run all tests**
+
+```bash
+# Backend: unit + ArchUnit + integration (Testcontainers)
+# [NOT DOCUMENTED — fill in before Phase 1]
+
+# Backend: mutation tests (domain core only — slow, run deliberately)
+# [NOT DOCUMENTED — fill in before Phase 1]
+
+# Frontend: type check + lint + Vitest
+# [NOT DOCUMENTED — fill in before Phase 1]
+```
+
+**Build for production**
+
+```bash
+# Backend: produces JAR + linux/arm64 Docker image
+# [NOT DOCUMENTED — fill in before Phase 1]
+
+# Frontend: Vite build (auto-deployed by Vercel on push to main)
+# [NOT DOCUMENTED — fill in before Phase 1]
 ```
 
 ---
 
-*Principles section is stable and final. Operational section is populated during Phase 1 scaffold setup.*
+## 5. Cross-Cutting Architecture
+
+The frontend and backend communicate exclusively over a versioned REST API (`/api/v1/`). There is no shared code, no GraphQL, no WebSocket layer in v1.
+
+**Auth handoff:** The backend issues a JWT access token (HS256, 15-minute TTL) and a rotating refresh token (30-day TTL) on login. The frontend stores the access token in memory and attaches it as `Authorization: Bearer <token>` on every request. Campaign-level role (`gm`, `editor`, `player`) is not embedded in the JWT — it is resolved server-side from `campaign_members` on every authorized request, ensuring role changes take effect within one access token TTL.
+
+**API contract:** All requests and responses are JSON. All IDs are UUIDs. All timestamps are ISO 8601 UTC. The response envelope is always `{ "data": {}, "meta": {}, "errors": [] }`. The frontend's typed HTTP client lives in `apps/web/src/api/` — one file per API resource, types hand-written as TypeScript interfaces mirroring backend DTOs. There is no OpenAPI code generation in v1.
+
+**Session ingestion spans both sides:** The frontend submits a summary via `POST /api/v1/campaigns/{id}/sessions`, then polls `GET /sessions/{id}/status` until the status leaves `processing` (resolving to `draft` or `failed`). The diff payload is stored server-side in `sessions.diff_payload`. The frontend retrieves it, renders the review UI, and submits the finalized commit payload via `POST /sessions/{id}/commit`. The commit endpoint returns `200` immediately; embedding generation completes async server-side within seconds.
+
+**Conflict and uncertainty surface on the diff:** The backend encodes conflict warnings and `UNCERTAIN` entity resolution cards into the diff payload. The frontend must render these as required interactions — the Commit button is disabled until all `UNCERTAIN` cards are resolved. The backend validates this independently and rejects with `422` if `UNCERTAIN` entities are present in a commit payload (defence in depth).
+
+---
+
+## 6. Shared Domain Concepts
+
+These concepts are used by both the frontend and the backend. When a term appears in an API field, a UI label, or a DB column, it means the same thing on both sides.
+
+**Campaign** — The top-level container for a story. Every other domain entity belongs to exactly one campaign. Created by `admin` only. A campaign always has exactly one `gm` — enforced at the DB level by a partial unique index on `campaign_members` where `role = 'gm'`. Defined in: `campaigns` table; `GET /api/v1/campaigns`.
+
+**Session** — A single play event. Carries `sequence_number` (ordinal within the campaign) and a lifecycle `status`: `pending → processing → draft → committed | failed | discarded`. At most one session per campaign may be in `processing` or `draft` state simultaneously. Once `committed`, a session is immutable. Defined in: `sessions` table; session ingestion API (§7.6 ARCHITECTURE.md).
+
+**World State** — The accumulated, structured knowledge from all committed sessions. Cumulative — sessions only extend or modify it, never replace it (D-001). Versioned at the entity level: each Actor, Space, Event, and Relation carries an append-only version history. Invariant: every world state fact is traceable to the session that produced it (D-003).
+
+**Actor** — Any entity with narrative agency: Player Characters (PCs), Non-Player Characters (NPCs), creatures. Stored in `actors` + `actor_versions`. Defined in: `GET /api/v1/campaigns/{id}/actors`.
+
+**Space** — A location in the world: city, dungeon, region. Same versioning pattern as Actor. Defined in: `GET /api/v1/campaigns/{id}/spaces`.
+
+**Event** — A significant narrative occurrence: decision, combat, revelation. The primary content of the Timeline view. Defined in: `GET /api/v1/campaigns/{id}/events`.
+
+**Relation** — A directional connection between two Actors, or between an Actor and a Space: alliance, enmity, hierarchy. The Relations graph in Exploration Mode renders these. Defined in: `GET /api/v1/campaigns/{id}/relations`.
+
+**Narrative Block** — The raw submitted text for a session, stored immutably in `narrative_blocks` after intake. It is the input to the extraction pipeline. All extraction results are traceable back to it. Invariant: `raw_summary_text` is never modified after storage.
+
+**Annotation** — A free-text, non-canonical comment any campaign member can attach to any Actor, Space, Relation, or Event. Not world state — explicitly player commentary. Immutable after creation. Defined in: `annotations` table; `POST /api/v1/campaigns/{id}/annotations`.
+
+---
+
+## 7. Cross-Cutting Conventions
+
+**Commit message format** — [Conventional Commits](https://www.conventionalcommits.org/). Format: `type(scope): description`.
+
+Allowed types: `feat`, `fix`, `refactor`, `test`, `chore`, `docs`, `ci`.
+
+Allowed scopes: `api` (backend), `web` (frontend), `db` (Liquibase migrations), `ci` (GitHub Actions workflows), `docs` (documentation files).
+
+Examples:
+```
+feat(api): add session ingestion endpoint
+fix(web): disable commit button until UNCERTAIN cards resolved
+chore(db): add baseline Liquibase changelog
+refactor(api): extract EntityResolutionPort from use case
+test(api): add integration tests for commit pipeline
+docs: update ARCHITECTURE section 7.6
+ci: add path filter for backend workflow
+```
+
+Breaking changes use a `BREAKING CHANGE:` footer. Body is optional and should explain *why*, not *what*.
+
+**Branch naming** — `type/short-description` in kebab-case, using the same type prefixes as commit messages.
+
+Examples:
+```
+feat/session-ingestion
+fix/jwt-refresh-rotation
+chore/liquibase-baseline
+refactor/actor-domain-model
+test/extraction-pipeline-it
+docs/architecture-update
+ci/backend-path-filter
+```
+
+**PR and review process** — Vercel creates branch preview URLs per PR automatically. GitHub Actions runs path-filtered CI on every PR: `backend.yml` triggers only on `apps/api/**` changes; `frontend.yml` triggers only on `apps/web/**` changes. Deploy steps run on push to `main` only.
+
+**Versioning and changelog** — `CHANGELOG.md` is a development-phase document; it does not exist yet and will be created when Phase 1 begins.
+
+**Shared linting / formatting** — Not applicable at the repo root. The two projects use entirely separate toolchains. There is no root-level linter, formatter, or pre-commit hook configuration.
+
+**API contract drift** — TypeScript types in `apps/web/src/types/` are hand-maintained mirrors of backend DTOs. No code generation in v1. When changing a backend DTO shape, update the corresponding frontend type in the same PR. TypeScript compiler errors are the first signal of drift.
+
+**Secrets discipline** — `.env` and `.env.local` are always gitignored. API keys, `JWT_SECRET`, and `DATABASE_URL` are never committed in any form, including in test fixtures or example files (D-050).
+
+---
+
+## 8. Skills Index
+
+This project has a set of skill files that give agents step-by-step workflows for common tasks. The index is at:
+
+```
+skills/SKILLS_INDEX.md
+```
+
+> ⚠️ `skills/SKILLS_INDEX.md` does not exist yet — it will be created before Phase 1 begins.
+
+Before starting any non-trivial task, read `SKILLS_INDEX.md` to find the most relevant skill. For tasks scoped to frontend or backend, also check the pointer in the relevant subdirectory `CLAUDE.md`.
+
+---
+
+## 9. Where to Go Next
+
+- **For frontend work, read:** `apps/web/CLAUDE.md`
+- **For backend work, read:** `apps/api/CLAUDE.md`
+
+> ⚠️ Neither subdirectory `CLAUDE.md` exists yet. They will be written before Phase 1 development begins and will cover layer-specific package structure, test commands, build commands, and conventions that do not apply to the full monorepo.
+
+---
+
+## 10. Out of Scope (Project-Wide)
+
+Do not implement, suggest, or design towards any of the following. They are explicitly excluded by documented decisions.
+
+**v1 → v2 deferrals (do not implement in v1):**
+- Player proposal and approval workflow — UI and approval logic (D-016, D-012)
+- Proposal expiry / TTL enforcement (D-019)
+- Conflict resolution between concurrent proposals
+- The `add` action in the commit payload — manually introducing entities the AI missed (D-053)
+- Q&A log: campaign history of queries and answers (D-058)
+- Query streaming via SSE — synchronous response only in v1 (D-052)
+
+**Permanently out of scope:**
+- Real-time collaborative editing
+- Audio or image ingestion
+- Public sharing or export of campaigns
+- Mobile-native application
+- Duo campaigns (1 GM + 1 player) — minimum group size is 3 (D-020)
+
+**Architectural hard constraints (project-wide):**
+- Spring AI `VectorStore` abstraction is never used — all pgvector queries are native SQL (D-062)
+- No E2E test layer — highest confidence tier is integration tests with Testcontainers (D-056)
+- No staging environment — local and prod only (D-044)
+- Secrets are never committed in any form (D-050)
+- Domain core (`com.bluesteel.domain`) must have zero imports from `org.springframework.*` or `jakarta.persistence.*` — enforced by ArchUnit on every build
+- The `admin` role is a singleton — exactly one admin per platform instance, enforced at DB level (partial unique index) and application layer (D-025)
+- Self-registration is not supported — all accounts are created via invitation only (D-051)
