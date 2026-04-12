@@ -239,7 +239,7 @@ This project has a set of skill files that give agents step-by-step workflows fo
 skills/SKILLS_INDEX.md
 ```
 
-> ⚠️ `skills/SKILLS_INDEX.md` does not exist yet — it will be created before Phase 1 begins.
+> ✅ `skills/SKILLS_INDEX.md` exists. Read it before starting any non-trivial task.
 
 Before starting any non-trivial task, read `SKILLS_INDEX.md` to find the most relevant skill. For tasks scoped to frontend or backend, also check the pointer in the relevant subdirectory `CLAUDE.md`.
 

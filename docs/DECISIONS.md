@@ -77,6 +77,8 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-064 | Two invitation endpoints: platform-level (admin) and campaign-scoped (GM) | ✅ Active | Definition |
 | D-065 | Commit message format: Conventional Commits | ✅ Active | Definition |
 | D-066 | Branch naming: type/short-description (kebab-case) | ✅ Active | Definition |
+| D-067 | Frontend form library: React Hook Form | ✅ Active | Definition |
+| D-068 | Frontend package manager: npm | ✅ Active | Definition |
 
 ---
 
@@ -1289,6 +1291,41 @@ Mirrors the Conventional Commits type vocabulary (D-065), so the branch and its 
 **Alternatives considered:**
 - Flat short-description only — rejected; loses the type signal, making the branch list harder to scan in the GitHub UI.
 - `username/short-description` — rejected; on a solo project, user prefixes add no useful signal and clutter every branch reference.
+
+---
+
+---
+
+### D-067 — Frontend form library: React Hook Form
+
+**Date:** 2026-04-12
+**Status:** Active
+
+**Decision:**
+React Hook Form (v7) is the standard form library for all forms in `apps/web`. Forms are built using shadcn/ui's `Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, and `FormMessage` primitives, which are designed to compose directly with React Hook Form. Client-side validation errors and API-returned validation errors (`400` responses with `field` in the error envelope) are both surfaced through `useForm`'s `setError` mechanism.
+
+**Reason:**
+shadcn/ui's `Form` component is built on top of React Hook Form — it is the path of least resistance and eliminates any impedance between the component library and the form state layer. React Hook Form's uncontrolled-by-default model minimises re-renders on large forms like the diff commit payload. Its TypeScript support is first-class.
+
+**Alternatives considered:**
+- Formik — rejected; more verbose, heavier, less idiomatic with shadcn/ui, and less popular in the current React ecosystem.
+- Native controlled components only — rejected; fine for single-field forms but becomes unmanageable for multi-field forms with validation and server error mapping.
+
+---
+
+### D-068 — Frontend package manager: npm
+
+**Date:** 2026-04-12
+**Status:** Active
+
+**Decision:**
+`npm` is the package manager for `apps/web`. `package-lock.json` is committed. No pnpm or yarn workspaces.
+
+**Reason:**
+npm ships with Node and requires zero setup. For a single-frontend project with no shared package layer (D-022), pnpm's strict dependency isolation and workspace features offer no benefit that justifies a non-default toolchain for contributors.
+
+**Alternatives considered:**
+- pnpm — rejected; faster installs and stricter hoisting are genuine advantages in large monorepos with shared packages. This project has no shared packages (D-022), so the tradeoff is all cost and no benefit.
 
 ---
 

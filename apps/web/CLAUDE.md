@@ -26,7 +26,9 @@ The frontend is a single-page application (SPA) that provides the three interact
 | HTTP client | Fetch API + hand-written typed client | — |
 | Unit / component testing | Vitest + React Testing Library | latest stable |
 | Accessibility testing | axe-core (`vitest-axe`) | latest stable |
-| Linting / formatting | [NOT DOCUMENTED — to be configured before Phase 1] | — |
+| Linting / formatting | ESLint (`@typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`) + Prettier | latest stable |
+| Form library | React Hook Form | v7 |
+| Package manager | npm | latest stable |
 
 The frontend is an auth-gated SPA. There is no SSR, no RSC, and no Next.js (D-030). Vite handles the build. Vercel handles hosting — auto-deploys on push to `main`, PR preview URLs per branch (D-045).
 
@@ -66,26 +68,30 @@ apps/web/
 
 ## 4. How to Run the Frontend
 
-> ⚠️ Commands below are [NOT DOCUMENTED] — to be filled in before Phase 1 begins.
-
 ```bash
 # Install dependencies
-# [NOT DOCUMENTED]
+npm install
 
-# Start development server (requires backend running)
-# [NOT DOCUMENTED]
+# Start development server (requires backend running or mocked)
+npm run dev
 
-# Type check
-# [NOT DOCUMENTED]
+# Type check (no emit)
+npx tsc --noEmit
 
 # Lint
-# [NOT DOCUMENTED]
+npm run lint
 
-# Run unit and component tests (Vitest)
-# [NOT DOCUMENTED]
+# Format (Prettier)
+npx prettier --write src/
 
-# Build for production (Vercel runs this automatically)
-# [NOT DOCUMENTED]
+# Run unit and component tests (Vitest, watch mode)
+npx vitest
+
+# Run tests once (CI mode)
+npx vitest run
+
+# Build for production (Vercel runs this automatically on push to main)
+npm run build
 ```
 
 **Required environment variables (local dev):**
@@ -243,8 +249,8 @@ Do not write custom CSS unless absolutely unavoidable. Use Tailwind classes. The
 ### Adding a new form with validation
 
 1. Identify which feature the form belongs to and create the component there.
-2. Use a form library consistent with existing forms — [NOT DOCUMENTED: form library not specified in source files; establish the pattern before Phase 1].
-3. Validate on the client before submission; also handle `400` validation errors from the API and map error `field` values from the response envelope to form field errors.
+2. Use **React Hook Form** with shadcn/ui's `Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, and `FormMessage` primitives. This stack is designed to compose directly — do not reach for a different form approach (D-067).
+3. Validate on the client before submission; also handle `400` validation errors from the API and map error `field` values from the response envelope to form field errors using `setError` from `useForm`.
 4. On successful mutation, invalidate the relevant TanStack Query cache key.
 5. Disable the submit button while the mutation is in-flight.
 
@@ -289,10 +295,10 @@ Do not write custom CSS unless absolutely unavoidable. Use Tailwind classes. The
 
 ## 11. Relevant Skills
 
-> Full index is at `skills/SKILLS_INDEX.md` (does not exist yet — created before Phase 1).
+> Full index is at `skills/SKILLS_INDEX.md`. ✅ Created.
 
-No domain-specific frontend skills are currently defined. When `SKILLS_INDEX.md` is created, the following workflows are candidates for skill files:
+Frontend-relevant skills:
 
-- **Diff review component** — building a new extraction category card type (UNCERTAIN, conflict, standard delta)
-- **Feature setup** — scaffolding a new feature directory with its route, container, and test stub
-- **API resource** — adding a new typed API client file with query keys, hooks, and DTO types
+- **`frontend-api-resource`** — typed API client files, TanStack Query hooks, DTO types, auth token handling.
+- **`frontend-diff-review`** — diff review screen: card types, UNCERTAIN resolution, commit button, payload assembly.
+- **`frontend-exploration`** — Timeline (keyset), Entities/Spaces (offset), Relations graph (React Flow v12), annotations.

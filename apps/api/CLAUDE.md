@@ -106,52 +106,55 @@ docker compose up -d   # Starts PostgreSQL + pgvector on localhost:5432
 **Install dependencies:**
 
 ```bash
-# [NOT DOCUMENTED — fill in before Phase 1]
 cd apps/api && mvn dependency:resolve
 ```
 
 **Run database migrations:**
 
 ```bash
-# Liquibase runs automatically on application startup via Spring Boot integration
-# To run explicitly:
-# [NOT DOCUMENTED — fill in before Phase 1]
+# Liquibase runs automatically on application startup via Spring Boot integration.
+# To run explicitly against the local database without starting the app:
+cd apps/api && mvn liquibase:update
 ```
 
 **Start development server (LLM ports mocked — zero API cost):**
 
 ```bash
-# [NOT DOCUMENTED — fill in before Phase 1]
-# Profile: local (default) — all LLM calls served by in-memory mock adapters
+cd apps/api && mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 **Start with real LLM APIs (Anthropic + OpenAI — incurs cost):**
 
 ```bash
-# [NOT DOCUMENTED — fill in before Phase 1]
-# Profile: local,llm-real
-# Requires: ANTHROPIC_API_KEY and OPENAI_API_KEY in .env.local
+# Requires ANTHROPIC_API_KEY and OPENAI_API_KEY in .env.local
+cd apps/api && mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-real
 ```
 
 **Run tests:**
 
 ```bash
-# Unit tests + ArchUnit (fast; no external services)
-# [NOT DOCUMENTED — fill in before Phase 1]
+# Unit tests + ArchUnit (fast; no Spring context, no external services)
+cd apps/api && mvn test
 
-# Integration tests (Testcontainers; spins up real PostgreSQL)
-# [NOT DOCUMENTED — fill in before Phase 1]
+# Integration tests (Testcontainers; spins up real PostgreSQL — slower)
+cd apps/api && mvn verify
 
 # Mutation tests — domain core only; slow — run deliberately, not on every save
-# [NOT DOCUMENTED — fill in before Phase 1]
+# PITest is scoped to com.bluesteel.domain.* via pom.xml plugin config (D-036)
+cd apps/api && mvn test-compile pitest:mutationCoverage
 ```
 
 **Build for production:**
 
 ```bash
-# Produces JAR + linux/arm64 Docker image
-# [NOT DOCUMENTED — fill in before Phase 1]
-# CI does this via backend.yml workflow on push to main
+# Build JAR
+cd apps/api && mvn package -DskipTests
+
+# Build linux/arm64 Docker image (matches Oracle Cloud ARM VM — D-046)
+docker buildx build --platform linux/arm64 \
+  -t ghcr.io/<org>/blue-steel-api:<tag> \
+  apps/api/
+# CI handles this via backend.yml on push to main; image is pushed to ghcr.io
 ```
 
 ---
@@ -271,7 +274,7 @@ Domain and application layers use unchecked domain exceptions (no `throws` decla
 
 ### LOG-01 — Logging
 
-Every LLM call must be logged at INFO with: tokens in, tokens out, estimated cost, `session_id`, `user_id`, pipeline stage. Failed LLM calls are logged at ERROR with full context. Do not log raw LLM response content at INFO — it can contain sensitive narrative data. Structured logging (JSON in prod) is the target format. [NOT DOCUMENTED — exact log format to be confirmed before Phase 1]
+Every LLM call must be logged at INFO with: tokens in, tokens out, estimated cost, `session_id`, `user_id`, pipeline stage. Failed LLM calls are logged at ERROR with full context. Do not log raw LLM response content at INFO — it can contain sensitive narrative data. Structured logging (JSON) is the target format in prod; the exact field names and appender configuration are [NOT DOCUMENTED — confirm before Phase 1].
 
 ### DB-01 — Database access pattern
 
@@ -412,11 +415,14 @@ Entity list endpoints (`/actors`, `/spaces`, `/events`, `/relations`) use offset
 
 ## 11. Relevant Skills
 
-> The full skill index is at `skills/SKILLS_INDEX.md` (created before Phase 1 begins).
+> The full skill index is at `skills/SKILLS_INDEX.md`. ✅ Created.
 
-At the time of writing, no backend-specific skill files exist yet. When they are created, the most relevant categories will be:
+Backend-relevant skills:
 
-- **Session ingestion pipeline skill** — step-by-step for running the extraction → resolution → diff generation flow locally against mock adapters.
-- **Liquibase migration skill** — how to create, validate, and apply a new changeset safely using Neon branching.
-- **ArchUnit rule skill** — how to add a new architecture rule and what the existing rule set covers.
+- **`session-ingestion-pipeline`** — full extraction → resolution → conflict detection → diff → commit pipeline, including mock adapter usage.
+- **`database-migration`** — Liquibase changeset creation, pgvector schema, Neon branch validation.
+- **`backend-endpoint`** — end-to-end endpoint addition (controller → port → service → adapter).
+- **`backend-domain-model`** — domain entity + world state versioning pattern.
+- **`backend-testing`** — all four test tiers: domain unit, application unit, Testcontainers, ArchUnit, PITest.
+- **`query-pipeline`** — Query Mode: embed → pgvector search → context assembly → LLM answer.
 - **PITest scope skill** — how to run mutation testing scoped to the domain core and interpret surviving mutants.
