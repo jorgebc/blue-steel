@@ -53,7 +53,7 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-040 | OQ-C resolved — Embedding model: OpenAI text-embedding-3-small | ✅ Active | Definition |
 | D-041 | OQ-A resolved — Entity resolution: two-stage pgvector + LLM | ✅ Active | Definition |
 | D-042 | OQ-E resolved — Uncertain entity card: resolution required before commit | ✅ Active | Definition |
-| D-043 | Authentication mechanism: stateless JWT | ✅ Active | Definition |
+| D-043 | Authentication: stateless JWT (auth only); campaign role via DB (authz) | ✅ Active | Definition |
 | D-044 | Environment model: local + prod only | ✅ Active | Definition |
 | D-045 | Frontend hosting: Vercel free tier | ✅ Active | Definition |
 | D-046 | Backend hosting: Oracle Cloud Always Free ARM VM | ✅ Active | Definition |
@@ -64,13 +64,17 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-051 | User onboarding: invitation-only, email with temporary password | ✅ Active | Definition |
 | D-052 | Query execution model: synchronous, single LLM call, 504 on timeout | ✅ Active | Definition |
 | D-053 | Commit payload: "add" action (manually introduce missed entities) deferred to v2 | ✅ Active | Definition |
-| D-054 | Draft session policy: single active draft per campaign; GM-deletable | ✅ Active | Definition |
+| D-054 | Draft session policy: single active draft per campaign; GM-discardable (soft delete) | ✅ Active | Definition |
 | D-055 | OQ-D resolved — Pagination: offset for entity lists, keyset for Timeline | ✅ Active | Definition |
 | D-056 | No E2E tests; backend top level is integration with external services mocked | ✅ Active | Definition |
 | D-057 | Pre-Phase 1 gate: Spring Boot 4.x compatibility must be verified before development | ✅ Active | Definition |
 | D-058 | OQ-6 resolved — Q&A log deferred to v2; queries are stateless in v1 | ✅ Active | Definition |
 | D-059 | OQ-B resolved — JWT: HS256, 15-min access token, rotating refresh tokens (30-day TTL) | ✅ Active | Definition |
 | D-060 | Auth implementation: self-implemented on Spring Security; email delivery outsourced via EmailPort | ✅ Active | Definition |
+| D-061 | Campaign creation atomically assigns the initial GM | ✅ Active | Definition |
+| D-062 | pgvector retrieval uses native queries; Spring AI VectorStore not used | ✅ Active | Definition |
+| D-063 | Embedding generation is async post-commit; commit endpoint returns immediately | ✅ Active | Definition |
+| D-064 | Two invitation endpoints: platform-level (admin) and campaign-scoped (GM) | ✅ Active | Definition |
 
 ---
 
@@ -503,7 +507,7 @@ Developer has 10+ years of professional Java and Spring ecosystem experience. Fl
 - Python — rejected; stronger AI ecosystem but introduces split-language monorepo with separate toolchains and no offsetting benefit given Spring AI availability
 
 **Risk note:**  
-Spring Boot 4.x is a recent major release. Before Phase 1 development begins, verify compatibility for the following dependencies: Spring AI (ChatClient, EmbeddingModel, VectorStore), Testcontainers Spring Boot integration, Liquibase Spring Boot starter, and Spring Security 7. Any dependency lagging on Boot 4.x support should be flagged before the roadmap's Phase 1 start gate.
+Spring Boot 4.x is a recent major release. Before Phase 1 development begins, verify compatibility for the following dependencies: Spring AI (`ChatClient`, `EmbeddingModel`), Testcontainers Spring Boot integration, Liquibase Spring Boot starter, and Spring Security 7. Any dependency lagging on Boot 4.x support should be flagged before the roadmap's Phase 1 start gate.
 
 ---
 
@@ -581,7 +585,7 @@ Polyglot persistence (dedicated vector database + relational database) introduce
 Anthropic (Claude) is the default LLM provider. Integration is provider-agnostic via Spring AI's abstraction layer. The LLM is an external actor behind a driven port. Additional providers (OpenAI, Google Gemini) are not implemented in v1.
 
 **Reason:**  
-Developer holds an active Anthropic subscription. Claude is well-suited to long-context narrative understanding and structured extraction tasks. Spring AI provides a model-agnostic abstraction (`ChatClient`, `EmbeddingModel`, `VectorStore`) — swapping providers means replacing the adapter, not touching domain or application code. This is Cockburn's hexagonal pattern applied directly: the LLM is an external actor behind a port.
+Developer holds an active Anthropic subscription. Claude is well-suited to long-context narrative understanding and structured extraction tasks. Spring AI provides model-agnostic abstractions (`ChatClient`, `EmbeddingModel`) — swapping providers means replacing the adapter, not touching domain or application code. This is Cockburn's hexagonal pattern applied directly: the LLM is an external actor behind a port. Note: Spring AI's `VectorStore` is not used — pgvector retrieval uses native queries (D-062).
 
 **Alternatives considered:**  
 - OpenAI as default — rejected in favour of existing Anthropic subscription.
@@ -780,23 +784,31 @@ An unresolved entity left out of a session commit creates an orphaned, unanchore
 
 ---
 
-### D-043 — Authentication mechanism: stateless JWT
+### D-043 — Authentication mechanism: stateless JWT; authorization via DB
 
 **Date:** 2026-04-07
+**Amended:** 2026-04-12
 **Status:** Active
 
 **Decision:**
-Authentication uses stateless JWTs (JSON Web Tokens). Tokens are issued on login, included in the `Authorization: Bearer` header on every request, and validated by Spring Security on the server without a session store.
+Authentication uses stateless JWTs. Tokens are issued on login, included in the `Authorization: Bearer` header on every request, and validated by Spring Security on the server without a session store. The access token carries only `user_id` and `is_admin`.
 
-Token expiry and refresh token strategy are deferred to OQ-B. A token blocklist is not implemented in v1 — revocation (e.g., on player removal from campaign) relies on short token TTL combined with role re-validation on each request against the current campaign membership state.
+**Authentication is stateless.** Spring Security validates JWT signature and expiry with no DB call. This is the only thing "stateless" applies to.
+
+**Authorization is not stateless.** Campaign-level role (`gm`, `editor`, `player`) is resolved at the use-case boundary via a DB read against `campaign_members` on every request that requires it. This means role changes (e.g., removing a player from a campaign) take effect on the next request — there is no stale-role window. A token blocklist is not implemented in v1; the 15-minute access token TTL limits exposure if a token is intercepted.
+
+Token expiry and refresh token strategy: see D-059.
 
 **Reason:**
-Stateless authentication fits the hexagonal model cleanly — the security adapter validates the token without a shared stateful session. Spring Security's JWT support is mature and Spring Boot 4.x compatible. For a controlled-usage platform with a small number of active users, the absence of server-side session state is an operational advantage.
+Encoding campaign roles in the JWT (to avoid the DB read) would mean role changes don't take effect until the token expires — up to 15 minutes during which a removed player retains access. For a system where the GM controls sensitive narrative content, that window is unacceptable. The DB read at the use-case boundary is the correct authorization model. It also keeps the JWT minimal (`user_id` + `is_admin` only), which avoids token bloat as a user joins more campaigns.
+
+The "stateless" claim in the original decision was imprecise — it conflated authentication (truly stateless) with authorization (necessarily stateful against live membership data). This amendment corrects that conflation explicitly.
 
 **Alternatives considered:**
+- JWT encodes all campaign roles — rejected; role changes don't take effect until token expiry. A removed player retains read access to sensitive campaign content for up to 15 minutes. Unacceptable.
 - Server-side sessions — rejected; requires session store (Redis or DB), adds an operational dependency, complicates horizontal scaling if ever needed.
 - OAuth/OIDC (external provider) — rejected; adds external dependency for a controlled-usage platform. May be revisited if the admin wants to delegate identity management.
-- Opaque tokens with DB lookup — rejected; introduces a DB round-trip on every request and the complexity of a token store, with no offsetting benefit at this scale.
+- Opaque tokens with DB lookup on every request — rejected; the JWT + targeted DB authorization read gives the same result with less infrastructure.
 
 ---
 
@@ -944,7 +956,7 @@ A `.env` file on the VM is the simplest secret management approach for a self-ho
 **Decision:**
 There is no self-registration endpoint. User accounts are created exclusively via invitation. Both Admin and GM can send invitations. An invitation email is sent to the provided address containing a system-generated temporary password. The recipient logs in with that password and is required to change it on first login.
 
-Admin invitations create a platform-level user account. GM invitations create a platform-level user account AND add the user to the GM's campaign in one flow.
+Two distinct invitation endpoints exist, one per caller context (D-064): `POST /api/v1/invitations` (admin only) creates a user account only. `POST /api/v1/campaigns/{id}/invitations` (GM only) creates a user account AND adds the user to the campaign as `player` in a single transaction.
 
 **Reason:**
 Blue Steel is a controlled-usage platform, not a public SaaS. Open registration would bypass the admin usage gate (D-024, D-025). The invitation model keeps the admin as the hard gate while giving GMs a practical path to bring players in without involving admin in every membership change.
@@ -988,20 +1000,25 @@ The "add" action requires a distinct frontend flow (a creation form embedded in 
 
 ---
 
-### D-054 — Draft session policy: single active draft per campaign, GM-deletable
+### D-054 — Draft session policy: single active draft per campaign, GM-discardable
 
 **Date:** 2026-04-10
+**Amended:** 2026-04-12
 **Status:** Active
 
 **Decision:**
-At most one session per campaign may be in `processing` or `draft` state at any time. A new session submission is rejected with `409 DRAFT_IN_PROGRESS` if another session is currently in one of those states. The GM may explicitly delete a draft session (`DELETE /api/v1/campaigns/{id}/sessions/{sid}`, GM role required, only valid when status is `draft`). The `narrative_blocks` record is preserved on deletion — only the session record and diff payload are removed.
+At most one session per campaign may be in `processing` or `draft` state at any time. A new session submission is rejected with `409 DRAFT_IN_PROGRESS` if another session is currently in one of those states. The GM may explicitly discard a draft session (`DELETE /api/v1/campaigns/{id}/sessions/{sid}`, GM role required, only valid when status is `draft`). Discarding sets `status = 'discarded'` and clears `diff_payload`. The session row and `narrative_blocks` record are both preserved — no physical deletion occurs. `discarded` is a terminal status; a discarded session cannot be reactivated.
 
 **Reason:**
 Allowing concurrent drafts would require conflict resolution between two uncommitted world state modifications touching the same entities. The session pipeline is designed around a linear, sequential ingestion model (D-001 — world state is cumulative). Preventing concurrent drafts enforces this linearity at the API boundary. GMs need a clean path to abandon a draft that was submitted in error without having to commit incorrect data.
 
+**Amendment rationale (2026-04-12):**
+Physical deletion of the session row was originally specified alongside preservation of the `narrative_blocks` record. This creates an FK violation: `narrative_blocks.session_id` is non-nullable and references `sessions.id`. Soft deletion (status = `discarded`) resolves the constraint without sacrificing the discard capability, and is consistent with the append-only principle of D-001 — even a discarded submission is part of the campaign's record.
+
 **Alternatives considered:**
 - Allow multiple concurrent drafts — rejected; would require ordering guarantees, concurrent entity resolution conflicts, and a merge step that adds significant complexity for no clear benefit.
-- No delete, force commit — rejected; forces GMs to commit a session they want to discard, permanently polluting the world state.
+- No discard, force commit — rejected; forces GMs to commit a session they want to abandon, permanently polluting the world state.
+- Physical row deletion with nullable FK (ON DELETE SET NULL) — rejected; orphaned narrative_blocks with a null session_id lose traceability and create a second class of records with no clean query path.
 
 ---
 
@@ -1049,7 +1066,7 @@ E2E tests require a full-stack environment, a test data strategy, and a reliable
 **Decision:**
 Before writing any production code, the following dependencies must be verified as compatible with Spring Boot 4.0.3:
 
-1. **Spring AI** — `ChatClient`, `EmbeddingModel`, `VectorStore` (pgvector support)
+1. **Spring AI** — `ChatClient`, `EmbeddingModel` (pgvector retrieval uses native queries per D-062, not `VectorStore`)
 2. **Testcontainers** Spring Boot integration
 3. **Liquibase** Spring Boot starter
 4. **Spring Security 7**
@@ -1146,6 +1163,88 @@ Email delivery is the one concern deliberately outsourced — running a reliable
 - Auth0 — rejected; same reasons. Free tier limits (7,500 MAU) are irrelevant at this scale but the integration complexity is not.
 - Spring Authorization Server — rejected; OAuth2/OIDC infrastructure is designed for multi-service token delegation scenarios. A single Spring Boot monolith serving one SPA has no such requirement.
 - Self-hosted SMTP — rejected; operational overhead with no offsetting benefit. `EmailPort` keeps the option open without forcing it.
+
+---
+
+### D-061 — Campaign creation atomically assigns the initial GM
+
+**Date:** 2026-04-12
+**Status:** Active
+
+**Decision:**
+`POST /api/v1/campaigns` requires a `gm_user_id` field in the request body. Campaign creation and GM assignment are a single atomic operation: the campaign row and the `campaign_members` row (`role = 'gm'`) are inserted in the same transaction. `gm_user_id` is required — the request is rejected with `422` if omitted or if the referenced user does not exist. A campaign can never exist in a GM-less state.
+
+**Reason:**
+`POST /api/v1/campaigns/{id}/members` requires `gm` role to execute. If campaign creation and GM assignment were separate steps, there would be no way for admin to assign the first GM — the campaign would exist in a GM-less state with no actor able to invoke the membership endpoint. Atomic assignment at creation time eliminates this chicken-and-egg problem and enforces the invariant that every campaign always has a GM.
+
+This is the direct implementation of D-026 (onboarding flow: admin creates campaign and assigns GM) as a single API call, which is also the more natural UX — admin thinks of campaign creation and GM assignment as one act.
+
+**Alternatives considered:**
+- Separate admin-only `PATCH /api/v1/campaigns/{id}/gm` endpoint — rejected; allows a transient GM-less state between campaign creation and GM assignment, which the system has no defined behavior for. Adds an endpoint that exists solely to work around a sequencing problem rather than solving it structurally.
+
+---
+
+### D-064 — Two invitation endpoints: platform-level (admin) and campaign-scoped (GM)
+
+**Date:** 2026-04-12
+**Status:** Active
+
+**Decision:**
+Invitation functionality is split across two endpoints with distinct scopes and behavior:
+
+- `POST /api/v1/invitations` — admin only. Creates a platform user account with a temporary password. No campaign assignment.
+- `POST /api/v1/campaigns/{id}/invitations` — GM only. Creates a platform user account AND adds the user to the campaign as `player` in a single transaction.
+
+**Reason:**
+The original single `POST /api/v1/invitations` endpoint had context-dependent behavior: admin callers created a user only; GM callers created a user and added them to a campaign. This violates Bloch's principle of minimal surface and clear contracts — a caller cannot predict the side effect from the endpoint alone. Splitting by scope makes the behavior self-evident from the URL: `/invitations` is platform-level, `/campaigns/{id}/invitations` is campaign-scoped. Each endpoint does exactly one thing with no hidden branching.
+
+**Alternatives considered:**
+- Single endpoint with bifurcated behavior inferred from caller role — rejected; violates Bloch's "no surprises" principle. Implicit behavior differences in a shared endpoint are a maintenance and documentation burden.
+- Single endpoint with an explicit `campaign_id` parameter — rejected; makes campaign assignment optional in the same endpoint, which still creates the same branching problem with a more visible seam.
+
+---
+
+### D-062 — pgvector retrieval uses native queries; Spring AI `VectorStore` not used
+
+**Date:** 2026-04-12
+**Status:** Active
+
+**Decision:**
+Spring AI is used exclusively for `ChatClient` (text generation) and `EmbeddingModel` (vector generation). Spring AI's `VectorStore` abstraction is not used. All pgvector similarity searches are implemented as native PostgreSQL queries via Spring Data JPA (`@Query` with native SQL) or `JdbcTemplate`.
+
+**Reason:**
+Spring AI's `VectorStore` interface provides a generic flat similarity search (`similaritySearch(query, topK)`). The retrieval queries in Blue Steel are domain-specific and cannot be expressed through this interface:
+
+- Entity resolution (§6.3): similarity search scoped by `campaign_id` and `entity_type`, returning entity version IDs for LLM resolution.
+- Query mode context retrieval (§6.4): similarity search joining through `entity_versions → sessions`, scoped by campaign, with version-aware point-in-time semantics.
+
+These are relational queries that happen to involve a vector similarity operator (`<=>`). Writing them as native SQL gives full control over query shape, index usage, and join conditions. Using `VectorStore` would require bypassing the abstraction for every non-trivial query, creating an inconsistent mix of abstraction and raw SQL with no benefit from the abstraction layer.
+
+The `EmbeddingPort` abstraction (application layer) still isolates embedding generation from the domain. Swapping the embedding provider (OpenAI → other) means replacing the `EmbeddingModel` adapter only — retrieval queries are unaffected because they operate on stored vectors, not on the provider.
+
+**Alternatives considered:**
+- Spring AI `VectorStore` for all retrieval — rejected; interface is too generic to express campaign-scoped, version-aware, entity-type-filtered similarity queries. Would require raw SQL fallback for every non-trivial case, defeating the purpose of the abstraction.
+- Spring AI `VectorStore` for simple cases + raw SQL for complex — rejected; two inconsistent retrieval paths with no clear boundary rule. Harder to test, harder to reason about.
+
+---
+
+### D-063 — Embedding generation is asynchronous post-commit
+
+**Date:** 2026-04-12
+**Status:** Active
+
+**Decision:**
+The commit endpoint (`POST .../commit`) writes world state synchronously and returns `200` immediately. Embedding generation for committed entity versions is triggered asynchronously after the commit transaction completes, using Spring `@Async` or an `ApplicationEvent`. Embeddings are inserted into `entity_embeddings` as they complete. Entity versions without a corresponding `entity_embeddings` row are excluded from Query Mode context retrieval until their embeddings are present.
+
+**Reason:**
+Synchronous embedding generation during commit has two problems. First, latency: a session with many new entities requires one OpenAI API call per entity version, each taking ~100ms — the commit endpoint would block for several seconds proportional to session size. Second, failure surface: if embedding generation fails partway through, world state has already been written but `entity_embeddings` is partially populated. Rolling back a committed session to recover from an embedding API error is disproportionate. Async generation decouples the commit correctness boundary (world state write) from the eventual consistency concern (embeddings available for retrieval). The lag between commit and query availability is typically a few seconds — acceptable given that users are unlikely to query immediately after committing a session.
+
+No external queue infrastructure is required. Spring's `@Async` mechanism (or an `ApplicationEvent` fired after transaction commit) is sufficient for the expected load.
+
+**Alternatives considered:**
+- Synchronous commit with blocking embedding generation — rejected; unacceptable latency for sessions with many entities, and partial failure creates a data consistency problem with no clean recovery path.
+- Async with two-phase session status (`embeddings_ready` flag) — considered; adds UI state and a polling/notification concern with marginal benefit. The brief unavailability of newly committed entities in Query Mode does not require a visible user-facing status. Deferred as a potential v2 enhancement if the lag proves noticeable in practice.
+- External queue (Redis, SQS) — rejected; introduces operational infrastructure with no benefit at this scale. Spring `@Async` is sufficient.
 
 ---
 

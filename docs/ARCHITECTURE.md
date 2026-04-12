@@ -28,11 +28,11 @@ blue-steel/
 │   ├── PRD.md
 │   ├── ARCHITECTURE.md
 │   ├── ROADMAP.md
-│   ├── DECISIONS.md
-│   └── CLAUDE.md
+│   └── DECISIONS.md
 ├── apps/
 │   ├── api/               ← Java 25 / Spring Boot 4.0.3 backend
 │   └── web/               ← React / Vite / TypeScript frontend
+├── CLAUDE.md              ← repo root; picked up automatically by tooling
 ├── README.md
 └── .gitignore
 ```
@@ -50,9 +50,10 @@ blue-steel/
 | Language | Java | 25 (LTS) |
 | Framework | Spring Boot | 4.0.3 |
 | Build tool | Maven | latest stable |
-| LLM integration | Spring AI | aligned with Boot 4.x |
-| LLM provider (generation) | Anthropic (Claude) | via Spring AI |
-| LLM provider (embeddings) | OpenAI (`text-embedding-3-small`) | via Spring AI |
+| LLM integration | Spring AI (`ChatClient`, `EmbeddingModel`) | aligned with Boot 4.x |
+| LLM provider (generation) | Anthropic (Claude) | via Spring AI `ChatClient` |
+| LLM provider (embeddings) | OpenAI (`text-embedding-3-small`) | via Spring AI `EmbeddingModel` |
+| Vector similarity retrieval | Native pgvector queries via Spring Data JPA / `JdbcTemplate` | — |
 | ORM | Spring Data JPA + Hibernate | aligned with Boot 4.x |
 | Database driver | PostgreSQL JDBC | latest stable |
 | Migration | Liquibase | latest stable |
@@ -98,8 +99,8 @@ The backend follows Cockburn's Ports & Adapters pattern strictly. The domain nev
 |---|---|---|
 | Domain | `com.bluesteel.domain` | Entities, value objects, aggregates, domain events, domain services |
 | Application | `com.bluesteel.application` | Use case orchestration, input port interfaces, output port interfaces |
-| Adapters (driving) | `com.bluesteel.adapters.in` | REST controllers, request/response DTOs, exception handlers |
-| Adapters (driven) | `com.bluesteel.adapters.out` | JPA adapters, Spring AI adapter, security config |
+| Adapters (driving) | `com.bluesteel.adapters.in` | REST controllers, request/response DTOs, exception handlers, Spring Security filter chain |
+| Adapters (driven) | `com.bluesteel.adapters.out` | JPA adapters, Spring AI adapter |
 
 ### 3.4 Package Structure
 
@@ -122,15 +123,15 @@ apps/api/src/main/java/com/bluesteel/
 │   └── service/           ← use case implementations
 ├── adapters/
 │   ├── in/
-│   │   └── web/           ← REST controllers, DTOs, exception handlers
-│   │       └── WebConfig.java
+│   │   ├── web/           ← REST controllers, DTOs, exception handlers
+│   │   │   └── WebConfig.java
+│   │   └── security/      ← Spring Security filter chain, JWT validation filter
+│   │       └── SecurityConfig.java
 │   └── out/
 │       ├── persistence/   ← JPA entities, repositories, mappers
 │       │   └── PersistenceConfig.java
-│       ├── ai/            ← Spring AI adapters (extraction, embedding, conflict)
-│       │   └── AiConfig.java
-│       └── security/      ← Spring Security configuration
-│           └── SecurityConfig.java
+│       └── ai/            ← Spring AI adapters (extraction, embedding, conflict)
+│           └── AiConfig.java
 └── config/                ← cross-cutting config only (no adapter home)
     └── ApplicationConfig.java
 ```
@@ -158,9 +159,9 @@ Configuration classes are co-located with the adapter they configure — not gat
 | Config class | Package | Configures |
 |---|---|---|
 | `WebConfig` | `adapters.in.web` | CORS, serialization, web filters |
+| `SecurityConfig` | `adapters.in.security` | Spring Security filter chain, JWT validation filter, auth rules |
 | `PersistenceConfig` | `adapters.out.persistence` | Datasource, JPA settings |
 | `AiConfig` | `adapters.out.ai` | Spring AI beans, model config, API keys |
-| `SecurityConfig` | `adapters.out.security` | Spring Security filter chain, auth rules |
 | `ApplicationConfig` | `config` | Cross-cutting beans with no adapter home |
 
 **Rules:**
@@ -240,6 +241,7 @@ users
   password_hash TEXT NOT NULL
   is_admin BOOLEAN NOT NULL DEFAULT FALSE
   created_at TIMESTAMP
+  UNIQUE INDEX ON users (is_admin) WHERE is_admin = TRUE   ← enforces singleton admin at DB level
 
 campaigns
   id UUID PK
@@ -254,6 +256,7 @@ campaign_members
   role TEXT                        ← 'gm' | 'editor' | 'player'
   joined_at TIMESTAMP
   UNIQUE (campaign_id, user_id)
+  UNIQUE INDEX ON campaign_members (campaign_id) WHERE role = 'gm'   ← exactly one GM per campaign
 
 refresh_tokens
   id UUID PK
@@ -265,7 +268,7 @@ refresh_tokens
   created_at TIMESTAMP
 ```
 
-The `admin` role is platform-level and is not stored in `campaign_members`. Admin identity is resolved via the `is_admin` flag on the `users` record. Only one user may have `is_admin = TRUE` — this singleton invariant is enforced at the application layer.
+The `admin` role is platform-level and is not stored in `campaign_members`. Admin identity is resolved via the `is_admin` flag on the `users` record. Only one user may have `is_admin = TRUE` — this singleton invariant is enforced at both the DB level (partial unique index on `is_admin WHERE is_admin = TRUE`) and the application layer.
 
 ---
 
@@ -288,8 +291,9 @@ sessions
   campaign_id UUID FK → campaigns.id
   owner_id UUID FK → users.id   ← user who submitted the session
   sequence_number INTEGER        ← ordinal position within the campaign
-  status TEXT                    ← 'pending' | 'processing' | 'draft' | 'committed' | 'failed'
-  diff_payload JSONB             ← nullable; populated when status = 'draft'; cleared on commit
+  UNIQUE (campaign_id, sequence_number)
+  status TEXT                    ← 'pending' | 'processing' | 'draft' | 'committed' | 'failed' | 'discarded'
+  diff_payload JSONB             ← nullable; populated when status = 'draft'; cleared on commit or discard
   failure_reason TEXT            ← nullable; populated when status = 'failed'
   committed_at TIMESTAMP
   created_at TIMESTAMP
@@ -334,7 +338,7 @@ actor_versions
 
 ### 5.5 Vector Layer
 
-Embeddings are stored in PostgreSQL via pgvector. Each versioned entity snapshot generates an embedding at commit time, stored alongside the entity version.
+Embeddings are stored in PostgreSQL via pgvector. Each versioned entity snapshot generates an embedding after commit, stored alongside the entity version. Embedding generation is **asynchronous** — the commit endpoint returns immediately after writing world state; embeddings are generated in a background task (Spring `@Async` / `ApplicationEvent`) and inserted into `entity_embeddings` within seconds. Entity versions without a corresponding `entity_embeddings` row are excluded from Query Mode retrieval until generation completes (D-063).
 
 ```
 entity_embeddings
@@ -366,8 +370,7 @@ annotations
   entity_id UUID            ← references the annotated entity (polymorphic)
   author_id UUID FK → users.id
   content TEXT
-  created_at TIMESTAMP
-  updated_at TIMESTAMP
+  created_at TIMESTAMP      ← no updated_at; annotations are immutable after creation
 ```
 
 ### 5.7 Schema Conventions
@@ -421,7 +424,9 @@ Blue Steel uses two LLM providers with distinct responsibilities. Both are behin
 
 **Why two providers:** Anthropic does not provide an embedding API — Claude models are generative only. The embedding provider is necessarily separate from the generation provider. This is not a compromise; it is how the ecosystem works. The `EmbeddingPort` abstraction means the application layer is unaware of which provider handles embeddings.
 
-Spring AI provides the abstraction layer for both. The domain never references Anthropic, OpenAI, or any provider directly.
+Spring AI is used for two concerns only: `ChatClient` (text generation) and `EmbeddingModel` (vector generation). Spring AI's `VectorStore` abstraction is **not used** — it provides a generic flat similarity search interface that cannot express the domain-specific retrieval queries this system requires (filtering by `entity_type`, joining through `entity_versions → sessions`, scoping by `campaign_id`). All pgvector similarity searches are written as native PostgreSQL queries via Spring Data JPA or `JdbcTemplate`, giving full control over query shape and index usage. See D-062.
+
+The domain never references Anthropic, OpenAI, or any provider directly.
 
 ### 6.2 Port Definition
 
@@ -497,7 +502,15 @@ Session Summary (raw text)
  User Review (structured diff)
        │
        ▼
- Commit ── world state updated, embeddings generated  (OpenAI)
+ Commit ── world state written; session status → 'committed'
+       │    HTTP 200 returned to client immediately
+       │
+       ▼ (async, fire-and-forget)
+ Embedding generation ── OpenAI EmbeddingModel called per committed
+                          entity version; rows inserted into entity_embeddings
+                          Entities without embeddings are excluded from
+                          Query Mode context retrieval until generation completes
+                          (typically completes within seconds of commit)
 ```
 
 **Three bounded LLM calls maximum per session ingestion.** LLM call 2 (entity resolution) is bounded by the pgvector similarity floor — mentions that score below the floor are classified without an LLM call. The pipeline never passes unbounded world state to the LLM.
@@ -645,7 +658,7 @@ The session ingestion flow uses a staged endpoint sequence:
 |---|---|---|
 | `GET /api/v1/campaigns/{id}/sessions` | List all sessions ordered by `sequence_number`. Returns id, status, sequence_number, committed_at. Paginated. | campaign member |
 | `GET /api/v1/campaigns/{id}/sessions/{sid}` | Session detail including `sequence_number`, `status`, `committed_at`, and narrative block reference. | campaign member |
-| `DELETE /api/v1/campaigns/{id}/sessions/{sid}` | Discard a draft session. Only valid when status is `draft`. Preserves the `narrative_blocks` record. | gm |
+| `DELETE /api/v1/campaigns/{id}/sessions/{sid}` | Discard a draft session. Sets `status = 'discarded'` and clears `diff_payload`. Only valid when `status = 'draft'`. The session row and `narrative_blocks` record are preserved — no physical deletion occurs. | gm |
 
 **Ingestion flow:**
 
@@ -679,7 +692,7 @@ Supported actions per item: `accept` (no change), `edit` (user-modified data), `
 
 **Draft state persistence:** The draft diff is stored server-side in `sessions.diff_payload` (status `draft`). This enables failure recovery — if the user closes the browser mid-review, the diff is retrievable on return. Client-side edits to diff cards are submitted as part of the final commit payload, not persisted incrementally.
 
-**Draft session policy (D-054):** At most one session per campaign may be in `draft` or `processing` state simultaneously. A new session submission is rejected with `409` if another session is already in one of those states. The GM may explicitly discard a draft session via `DELETE /api/v1/campaigns/{id}/sessions/{sid}` (GM role required; only valid when status is `draft`). The `narrative_blocks` record is preserved on deletion; only the diff payload and session record are removed.
+**Draft session policy (D-054):** At most one session per campaign may be in `draft` or `processing` state simultaneously. A new session submission is rejected with `409` if another session is already in one of those states. The GM may explicitly discard a draft session via `DELETE /api/v1/campaigns/{id}/sessions/{sid}` (GM role required; only valid when status is `draft`). Discarding sets `status = 'discarded'` and clears `diff_payload`. The session row and `narrative_blocks` record are both preserved — no physical deletion occurs. `discarded` is a terminal status; a discarded session cannot be reactivated.
 
 **Failed status:** If the async pipeline fails (LLM error, token budget exceeded at extraction time, or unrecoverable processing error), the session status transitions to `failed` and `sessions.failure_reason` is populated. The status polling endpoint (Step 2) returns:
 
@@ -710,11 +723,14 @@ Token details: HS256, 15-minute access token, 30-day rotating refresh token. See
 
 **User management (D-051 — invitation model):**
 
-There is no self-registration endpoint. User accounts are created exclusively via invitation. Admin can invite any user; GMs can invite users to their campaign. An invitation sends an email containing a system-generated temporary password. The recipient logs in with that password and must change it on first login.
+There is no self-registration endpoint. User accounts are created exclusively via invitation. An invitation sends an email containing a system-generated temporary password. The recipient logs in with that password and must change it on first login.
+
+Two distinct invitation endpoints, one per caller context (D-051, D-064):
 
 | Method + Path | Description | Required role |
 |---|---|---|
-| `POST /api/v1/invitations` | Send an invitation email to an email address; creates a pending user account with a temporary password | admin, gm |
+| `POST /api/v1/invitations` | Platform-level invitation. Creates a user account only. Used by admin to provision users before campaign assignment. Returns `409` if the email address already has an account. | admin |
+| `POST /api/v1/campaigns/{id}/invitations` | Campaign-scoped invitation. Creates a user account AND adds the user to the campaign as `player` in a single transaction. If the email already has an account, adds them to the campaign directly without creating a new account (no `409`). Returns `409` if the user is already a campaign member. | gm |
 | `GET /api/v1/users/me` | Get the current authenticated user's profile | authenticated |
 | `GET /api/v1/users` | Search users by email (used by GM to find existing users to add to campaign) | admin, gm |
 | `PATCH /api/v1/users/me/password` | Change own password (required flow after first login with temporary password) | authenticated |
@@ -725,12 +741,23 @@ There is no self-registration endpoint. User accounts are created exclusively vi
 
 | Method + Path | Description | Required role |
 |---|---|---|
-| `POST /api/v1/campaigns` | Create campaign | admin |
+| `POST /api/v1/campaigns` | Create campaign and atomically assign the initial GM (D-061) | admin |
 | `GET /api/v1/campaigns` | List campaigns (admin: all; members: own only) | authenticated |
 | `GET /api/v1/campaigns/{id}` | Get campaign detail | campaign member |
 | `POST /api/v1/campaigns/{id}/members` | Add a user to the campaign with a role | gm |
 | `PATCH /api/v1/campaigns/{id}/members/{uid}` | Change a member's role | gm |
 | `DELETE /api/v1/campaigns/{id}/members/{uid}` | Remove a member | gm |
+
+**Campaign creation request shape (outline):**
+
+```json
+{
+  "name": "The Shattered Crown",
+  "gm_user_id": "<uuid of existing user to assign as GM>"
+}
+```
+
+`gm_user_id` is required. The request is rejected with `422` if the referenced user does not exist. On success, the campaign row is created and a `campaign_members` row is inserted in the same transaction with `role = 'gm'` for the specified user. A campaign can never exist in a GM-less state (D-061).
 
 ---
 
@@ -798,7 +825,11 @@ Spring Security handles authentication. JWT tokens are issued on login and valid
 | Rotation | Rotating — each refresh call issues a new token and invalidates the previous |
 | Reuse detection | If an already-used token from a family is presented, the entire family is revoked |
 
-Access token validation is stateless — Spring Security validates the JWT signature and expiry on each request with no DB call. Refresh token validation requires a DB lookup against the `refresh_tokens` table (§5.1).
+**Authentication is stateless** — Spring Security validates the JWT signature and expiry on each request with no DB call. The access token carries only `user_id` and `is_admin`.
+
+**Authorization is not stateless** — campaign-level role (`gm`, `editor`, `player`) is resolved at the use-case boundary via a DB read against `campaign_members` on every request that requires it. This is a deliberate design choice: it ensures that role changes (e.g., a player removed from a campaign) take effect immediately, with no stale-token window beyond the 15-minute access token TTL for authentication itself.
+
+Refresh token validation requires a DB lookup against the `refresh_tokens` table (§5.1).
 
 ### 8.2 Role Model
 
@@ -915,7 +946,7 @@ Frontend tests run in the `frontend.yml` GitHub Actions workflow as part of the 
 
 All open architecture questions are resolved. OQ-B is documented in D-059.
 
-**Pre-Phase 1 gate (D-057):** Before writing any production code, verify Spring Boot 4.0.3 compatibility for: Spring AI (`ChatClient`, `EmbeddingModel`, `VectorStore`), Testcontainers Spring Boot integration, Liquibase Spring Boot starter, and Spring Security 7. Log the verification result in DECISIONS.md. Any incompatible dependency must be resolved before Phase 1 begins.
+**Pre-Phase 1 gate (D-057):** Before writing any production code, verify Spring Boot 4.0.3 compatibility for: Spring AI (`ChatClient`, `EmbeddingModel`), Testcontainers Spring Boot integration, Liquibase Spring Boot starter, and Spring Security 7. Log the verification result in DECISIONS.md. Any incompatible dependency must be resolved before Phase 1 begins.
 
 ---
 

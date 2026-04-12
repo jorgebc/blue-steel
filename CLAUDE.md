@@ -75,6 +75,7 @@ blue-steel/
 ├── apps/
 │   ├── api/        ← Java 25 / Spring Boot backend
 │   └── web/        ← React / Vite / TypeScript frontend
+├── CLAUDE.md       ← repo root; picked up automatically by tooling
 ├── README.md
 └── .gitignore
 ```

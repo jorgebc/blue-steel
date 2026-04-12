@@ -118,9 +118,10 @@ Each item is an editable card. Per item, the user can:
 - **Accept** as-is (one click)
 - **Edit inline** — rename, reclassify, adjust description
 - **Delete** — remove false positives
-- **Add** — manually introduce items the AI missed
 
 A single **Commit** action finalizes all changes. Nothing enters world state before it.
+
+> **v1 scope note:** The ability to manually introduce entities the AI missed ("Add" action) is deferred to v2 (D-053). In v1, users who need to add a missed entity should submit a corrected session summary or use the proposal system once it ships in v2.
 
 **Narrative summary header:**
 
