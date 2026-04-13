@@ -160,7 +160,7 @@ Exploration mode is a set of interconnected views, not a single screen:
 **Read-only for world state.** No direct edits to entities, spaces, or relations from this mode. All world state mutation flows through Input Mode.
 
 **Annotations:**
-- Any campaign member can attach a free-text annotation to any entity, space, or relation
+- Any campaign member can attach a free-text annotation to any actor, space, relation, or event
 - Annotations work as a comment section — non-canonical and clearly marked as player commentary, not world state
 - Visible to all campaign members
 

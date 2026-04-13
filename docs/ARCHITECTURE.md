@@ -290,13 +290,16 @@ sessions
   id UUID PK
   campaign_id UUID FK → campaigns.id
   owner_id UUID FK → users.id   ← user who submitted the session
-  sequence_number INTEGER        ← ordinal position within the campaign
-  UNIQUE (campaign_id, sequence_number)
+  sequence_number INTEGER NULL   ← ordinal within the campaign; assigned at commit, null until then (D-069)
+  UNIQUE (campaign_id, sequence_number)   ← nulls are not considered duplicates; constraint applies to committed sessions only
   status TEXT                    ← 'pending' | 'processing' | 'draft' | 'committed' | 'failed' | 'discarded'
+  UNIQUE INDEX sessions_one_active_per_campaign ON sessions (campaign_id) WHERE status IN ('processing', 'draft')
+                                 ← enforces D-054: at most one active session per campaign at the DB level
   diff_payload JSONB             ← nullable; populated when status = 'draft'; cleared on commit or discard
   failure_reason TEXT            ← nullable; populated when status = 'failed'
-  committed_at TIMESTAMP
+  committed_at TIMESTAMP         ← nullable; set when status transitions to 'committed'
   created_at TIMESTAMP
+  updated_at TIMESTAMP           ← updated on every status transition; use to determine when a session failed or was discarded
 
 narrative_blocks
   id UUID PK
@@ -430,8 +433,29 @@ The domain never references Anthropic, OpenAI, or any provider directly.
 
 ### 6.2 Port Definition
 
+**Shared read model: `EntityContext`**
+
+`EntityContext` is a Java Record defined in `com.bluesteel.application.model`. It is the unit of world state knowledge passed to AI-driven ports. It is assembled by use cases from repository data before any AI port call — it is never built inside an adapter. It carries no JPA annotations and no Spring types; it is a plain immutable value.
+
+```java
+// com.bluesteel.application.model
+record EntityContext(
+    UUID entityId,
+    String entityType,      // "actor" | "space" | "event" | "relation"
+    String name,
+    String stateSnapshot,   // prose representation of the entity's current state (used as LLM context)
+    UUID sessionId,         // session that produced this version — used for citation grounding (D-003)
+    int versionNumber
+) {}
 ```
-// Driven port — defined in application layer, implemented in adapters.out.ai
+
+`stateSnapshot` is a prose string derived from `full_snapshot` JSONB at the persistence layer and projected into this record by the use case before passing it to the port. The AI adapter never reads the DB directly to build context.
+
+---
+
+**Port interfaces** — defined in `com.bluesteel.application.port.out`, implemented in `adapters.out.ai`:
+
+```java
 interface NarrativeExtractionPort {
     ExtractionResult extract(NarrativeBlock narrativeBlock);
 }
@@ -669,9 +693,47 @@ The session ingestion flow uses a staged endpoint sequence:
 | 3. Retrieve draft diff | `GET /api/v1/campaigns/{id}/sessions/{sid}/diff` | Returns the full structured diff payload when status is `draft` |
 | 4. Commit | `POST /api/v1/campaigns/{id}/sessions/{sid}/commit` | Submits the reviewed diff payload. Backend validates: zero UNCERTAIN entities, caller is GM or editor. Returns `422` with specific error codes on violation. |
 
-**Commit payload shape (outline):**
+**Diff payload shape (outline) — returned by `GET .../diff`, stored in `sessions.diff_payload`:**
 
-Supported actions per item: `accept` (no change), `edit` (user-modified data), `delete` (remove AI-extracted item). A `v1` scope note: manually adding entities the AI missed ("add" action) is deferred to v2 (D-053).
+This is what the frontend reads to render the review screen. It is the output of the ingestion pipeline; it is never submitted back to the server. The commit payload (below) is a separate, smaller shape derived from the user's review decisions.
+
+```json
+{
+  "narrative_summary": "Session 7 introduced a new faction, the Conclave, and shifted Mira's allegiance away from the party.",
+  "actors": [
+    {
+      "id": "...",
+      "resolution": "new|match|uncertain",
+      "matched_entity_id": "...",
+      "extracted_data": { },
+      "delta_fields": [ ]
+    }
+  ],
+  "spaces":    [ { "id": "...", "resolution": "new|match|uncertain", "extracted_data": { }, "delta_fields": [ ] } ],
+  "events":    [ { "id": "...", "resolution": "new", "extracted_data": { } } ],
+  "relations": [ { "id": "...", "resolution": "new|match|uncertain", "extracted_data": { }, "delta_fields": [ ] } ],
+  "conflicts": [
+    {
+      "conflict_id": "...",
+      "type": "hard_contradiction",
+      "description": "...",
+      "affected_entity_id": "...",
+      "affected_entity_type": "actor|space|event|relation"
+    }
+  ]
+}
+```
+
+- `narrative_summary` — 1–3 sentence AI-generated session header (D-005). Display-only; not submitted in the commit payload.
+- `resolution` — `new` (entity is brand new), `match` (resolved to an existing entity), `uncertain` (user must resolve before commit, D-042).
+- `delta_fields` — present for `match` resolutions only; lists the fields that changed this session (D-006). Absent for `new` entities (full profile shown instead, D-007).
+- `conflicts` — present only when hard contradictions were detected (D-033). Empty array when none.
+
+---
+
+**Commit payload shape (outline) — submitted via `POST .../commit`:**
+
+Supported actions per item: `accept` (no change), `edit` (user-modified data), `delete` (remove AI-extracted item). Manually adding entities the AI missed ("add" action) is deferred to v2 (D-053).
 
 ```json
 {
@@ -772,7 +834,9 @@ All endpoints are read-only. All require campaign membership. Pagination follows
 | `GET /api/v1/campaigns/{id}/spaces` | List all spaces (paginated) |
 | `GET /api/v1/campaigns/{id}/spaces/{sid}` | Get space with full version history |
 | `GET /api/v1/campaigns/{id}/events` | List events (filterable by actor, space, session; paginated) |
+| `GET /api/v1/campaigns/{id}/events/{eid}` | Get event with full version history. Used for timeline click-through and citation resolution from Query Mode responses. |
 | `GET /api/v1/campaigns/{id}/relations` | List relations (filterable by actor; paginated) |
+| `GET /api/v1/campaigns/{id}/relations/{rid}` | Get relation with full version history. Used for Relations graph edge click-through. |
 | `GET /api/v1/campaigns/{id}/timeline` | Ordered event feed across all sessions (filterable) |
 | `POST /api/v1/campaigns/{id}/annotations` | Create annotation on an entity |
 | `GET /api/v1/campaigns/{id}/annotations` | List annotations (filterable by entity_type + entity_id) |
@@ -877,6 +941,8 @@ There is no E2E test layer (D-056). The backend test pyramid's highest confidenc
 **Unit tests** — the majority. Domain entities, use cases, and domain services are tested with plain JUnit 5 and Mockito. No Spring context loaded. Fast feedback loop.
 
 **Integration tests** — Spring Boot Test with Testcontainers. A real PostgreSQL container runs for every integration test suite. JPA adapters, migration scripts, Spring AI adapter wiring, and controller behavior are tested here. LLM ports are always mocked — no real API calls in CI.
+
+**LLM mock binding in integration tests:** Mock LLM adapters are registered under the `local` Spring profile (D-049). All integration test classes extend a shared `BaseIntegrationTest` abstract class annotated with `@SpringBootTest` and `@ActiveProfiles("local")`. This ensures mock adapters are active in the full Spring context without any per-test configuration. The `BaseIntegrationTest` class also holds the shared Testcontainers PostgreSQL instance (started once per test suite, not per test method). No `@MockBean` on LLM ports — the real mock adapter implementations are wired by the profile, keeping the test Spring context identical to local dev.
 
 ### 9.3 Mutation Testing
 

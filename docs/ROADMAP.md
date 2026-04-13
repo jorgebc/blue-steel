@@ -10,7 +10,7 @@
 
 **Required before Phase 1 can begin:**
 
-- [x] Verify Spring Boot 4.0.3 compatibility for: Spring AI (`ChatClient`, `EmbeddingModel`, `VectorStore`), Testcontainers Spring Boot integration, Liquibase Spring Boot starter, Spring Security 7 (D-057)
+- [x] Verify Spring Boot 4.0.3 compatibility for: Spring AI (`ChatClient`, `EmbeddingModel`), Testcontainers Spring Boot integration, Liquibase Spring Boot starter, Spring Security 7 (D-057) — note: Spring AI `VectorStore` is not used; see D-062
 - [x] Log compatibility verification result in DECISIONS.md
 - [x] Resolve OQ-B (JWT algorithm, token expiry, refresh token strategy) — D-059
 - [x] Resolve OQ-6 (Q&A log — deferred to v2) — D-058

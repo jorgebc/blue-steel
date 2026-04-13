@@ -79,6 +79,8 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-066 | Branch naming: type/short-description (kebab-case) | ✅ Active | Definition |
 | D-067 | Frontend form library: React Hook Form | ✅ Active | Definition |
 | D-068 | Frontend package manager: npm | ✅ Active | Definition |
+| D-069 | Session `sequence_number` assigned at commit, nullable until then | ✅ Active | Definition |
+| D-070 | Self-service password reset not implemented in v1 | ✅ Active | Definition |
 
 ---
 
@@ -142,7 +144,9 @@ Prevents hallucination from poisoning the world state. Users need to trust that 
 **Status:** Active
 
 **Decision:**  
-The review screen presents extraction results as a structured diff organized by category (Actors, Spaces, Events, Relations). Each item is an editable card. Users can accept, edit inline, delete, or manually add items. A single Commit action finalizes all changes.
+The review screen presents extraction results as a structured diff organized by category (Actors, Spaces, Events, Relations). Each item is an editable card. Users can accept, edit inline, or delete items. A single Commit action finalizes all changes.
+
+**v1 scope note:** The ability to manually introduce entities the AI missed ("add" action) is deferred to v2 — see D-053. In v1, the three supported actions per item are `accept`, `edit`, and `delete`.
 
 **Reason:**  
 Gives users full scope of what is about to change before committing. Familiar mental model (PR review / diff merge). Keeps the interaction structured without being a data entry form.
@@ -246,7 +250,7 @@ Keeping mutation in one place eliminates a second surface to maintain, a second 
 **Status:** Active
 
 **Decision:**  
-Any campaign member can attach a free-text annotation to any entity, space, or relation. Annotations work as a comment section — non-canonical and clearly marked as player commentary, not world state. Visible to all campaign members.
+Any campaign member can attach a free-text annotation to any actor, space, relation, or event. Annotations work as a comment section — non-canonical and clearly marked as player commentary, not world state. Visible to all campaign members.
 
 **Reason:**  
 Players need a way to voice observations, hypotheses, and reminders without those notes being mistaken for established world facts. A comment section provides this without touching the world state model and without requiring any GM moderation role.
@@ -368,28 +372,37 @@ Prevents proposal backlog from accumulating indefinitely and polluting the revie
 ### D-020 — Platform minimum group size: 3
 
 **Date:** 2026-04-05  
+**Amended:** 2026-04-13  
 **Status:** Active
 
 **Decision:**  
 The platform is designed for groups of at least 3 (1 GM + 2 players). Duo campaigns (1 GM + 1 player) are out of scope.
 
+**Enforcement:** This is a **design-scope statement, not a runtime invariant in v1.** No API endpoint or DB constraint enforces a minimum member count in v1. The constraint becomes a runtime concern in v2, when the proposal co-signing rule (D-017) ships — co-signing requires at least two players to form a quorum, so the v2 proposal workflow design must include a membership count check before a proposal can be submitted. In v1, all shipped features (session ingestion, query, exploration) function correctly regardless of campaign member count.
+
 **Reason:**  
-The proposal co-signing rule (D-017) requires at least two players to function meaningfully. A duo campaign collapses the approval quorum to a single person, which undermines the social contract the system is built on.
+The proposal co-signing rule (D-017) requires at least two players to function meaningfully. A duo campaign collapses the approval quorum to a single person, which undermines the social contract the system is built on. The constraint is deferred to v1 runtime enforcement because the feature it protects (proposal co-signing) does not ship until v2.
 
 ---
 
 ### D-021 — All domain entities carry owner_id from day one
 
 **Date:** 2026-04-05  
+**Amended:** 2026-04-13  
 **Status:** Active
 
 **Decision:**  
-Every domain entity (Campaign, Session, Actor, Space, Event, Relation, Proposal) carries an `owner_id` field in the data model from initial implementation, even in v1 where a single GM owns the campaign.
+Every domain entity (Session, Actor, Space, Event, Relation, Proposal) carries an `owner_id` field in the data model from initial implementation. `owner_id` is set at creation and does not transfer.
 
-**Semantic definition:** `owner_id` refers to the `user_id` of the campaign member who created or committed the entity — the GM or editor whose session ingestion introduced it to world state. For the `Campaign` entity, `owner_id` is the GM assigned by the admin at campaign creation. `owner_id` is set at creation and does not transfer.
+**Semantic definition:** `owner_id` refers to the `user_id` of the campaign member who *committed* the entity — the GM or editor who performed the commit action that introduced it to world state. It is not the submitter of the session summary. In the common case (Editor submits and commits their own summary) these are the same person. When a GM reviews and commits a draft submitted by an Editor, `owner_id` on the resulting entities is the GM's `user_id`. The commit transaction sets `owner_id` from the authenticated caller of `POST .../commit` — it is never threaded forward from the submission step. Sessions track the submitter separately via `sessions.owner_id`; together these two fields provide a complete audit trail: who submitted, and who committed.
+
+**Campaign is the explicit exception.** The `campaigns` table does not carry an `owner_id` column. Campaign ownership (the GM relationship) is already a first-class structural relationship in `campaign_members`, enforced by a partial unique index (`WHERE role = 'gm'`). The `campaigns` table carries `created_by` for the admin audit trail. Adding a redundant `owner_id` column pointing to the GM would create two sources of truth for the same fact and introduce a synchronisation obligation with no query or authorization benefit — use cases that need the GM join through `campaign_members`. Do not add `owner_id` to `campaigns`.
 
 **Reason:**  
-Avoids a costly future migration when multi-user and multi-campaign features are introduced. Follows the principle of designing for tomorrow's constraints today without over-engineering the current feature set.
+Avoids a costly future migration when multi-user and multi-campaign features are introduced. Follows the principle of designing for tomorrow's constraints today without over-engineering the current feature set. The Campaign carve-out avoids redundancy that would violate normalization without any offsetting benefit.
+
+**Amendment rationale (2026-04-13):**  
+The original decision listed Campaign in the scope of the `owner_id` rule without accounting for the fact that GM ownership is already modelled structurally in `campaign_members`. The amendment removes Campaign from the scope and documents the structural reason explicitly to prevent a future developer from adding the column as an apparent fix.
 
 ---
 
@@ -723,7 +736,7 @@ Spring `@Configuration` classes live in the package of the adapter they configur
 | `WebConfig` | `adapters.in.web` |
 | `PersistenceConfig` | `adapters.out.persistence` |
 | `AiConfig` | `adapters.out.ai` |
-| `SecurityConfig` | `adapters.out.security` |
+| `SecurityConfig` | `adapters.in.security` |
 | `ApplicationConfig` | `config` |
 
 **Reason:**  
@@ -1019,10 +1032,22 @@ Allowing concurrent drafts would require conflict resolution between two uncommi
 **Amendment rationale (2026-04-12):**
 Physical deletion of the session row was originally specified alongside preservation of the `narrative_blocks` record. This creates an FK violation: `narrative_blocks.session_id` is non-nullable and references `sessions.id`. Soft deletion (status = `discarded`) resolves the constraint without sacrificing the discard capability, and is consistent with the append-only principle of D-001 — even a discarded submission is part of the campaign's record.
 
+**Amendment rationale (2026-04-13) — enforcement mechanism:**
+The original decision specified the policy (reject with 409) but not the enforcement mechanism. Application-layer checks alone are subject to a TOCTOU race: two simultaneous submissions can both read "no active draft" before either inserts, and both succeed. The constraint is enforced at the DB level via a partial unique index:
+
+```sql
+CREATE UNIQUE INDEX sessions_one_active_per_campaign
+ON sessions (campaign_id)
+WHERE status IN ('processing', 'draft');
+```
+
+This makes it physically impossible for two rows with the same `campaign_id` to simultaneously hold a status in the active set. A concurrent duplicate insert fails with a unique constraint violation, which the application layer catches and converts to `409 DRAFT_IN_PROGRESS`. The index is defined in the Liquibase migration for the `sessions` table.
+
 **Alternatives considered:**
 - Allow multiple concurrent drafts — rejected; would require ordering guarantees, concurrent entity resolution conflicts, and a merge step that adds significant complexity for no clear benefit.
 - No discard, force commit — rejected; forces GMs to commit a session they want to abandon, permanently polluting the world state.
 - Physical row deletion with nullable FK (ON DELETE SET NULL) — rejected; orphaned narrative_blocks with a null session_id lose traceability and create a second class of records with no clean query path.
+- Application-layer check only (no DB index) — rejected; TOCTOU race allows two simultaneous submissions to bypass the check. DB enforcement is the correct layer for invariants that must hold absolutely.
 
 ---
 
@@ -1326,6 +1351,51 @@ npm ships with Node and requires zero setup. For a single-frontend project with 
 
 **Alternatives considered:**
 - pnpm — rejected; faster installs and stricter hoisting are genuine advantages in large monorepos with shared packages. This project has no shared packages (D-022), so the tradeoff is all cost and no benefit.
+
+---
+
+### D-069 — Session `sequence_number` assigned at commit, nullable until then
+
+**Date:** 2026-04-13  
+**Status:** Active
+
+**Decision:**  
+`sessions.sequence_number` is assigned at commit time, not at submission time. The column is nullable in the DB schema. It is populated — as the next integer in the campaign's committed session sequence — atomically within the commit transaction. Sessions in `pending`, `processing`, `draft`, `failed`, or `discarded` states carry a null `sequence_number`.
+
+The assignment rule is: `sequence_number = MAX(sequence_number) + 1` across all `committed` sessions for the same `campaign_id`, evaluated inside the commit transaction.
+
+`sequence_number` is never exposed to clients on non-committed sessions. The status polling endpoint (§7.6, Step 2) and the draft diff endpoint do not include it in their response payloads. It appears in responses only once status = `committed`.
+
+**Reason:**  
+Assigning at submission would permanently consume a number for every failed or discarded session, producing visible gaps in the timeline sequence (sessions 1, 2, 4 — session 3 was discarded). Users would have no explanation for these gaps, and queries against `sequence_number` ranges would silently miss nothing but look wrong. Assigning at commit means the timeline is always a contiguous, gap-free sequence of committed sessions — which is the only sequence that has narrative meaning. Failed and discarded sessions are record-keeping artifacts, not narrative events, and should not occupy positions in the story sequence.
+
+**Constraints this imposes on the implementation:**
+- `sequence_number` must be defined as `INTEGER NULL` in the Liquibase migration (not `NOT NULL`).
+- The `UNIQUE (campaign_id, sequence_number)` constraint applies only to non-null values — which is PostgreSQL's default behavior for unique constraints (nulls are not considered duplicates).
+- The commit use case is responsible for computing and writing `sequence_number` atomically. No other code path sets it.
+- No query, sort, or filter on `sequence_number` is valid for non-committed sessions.
+
+**Alternatives considered:**  
+- Assign at submission — rejected; failed and discarded sessions permanently consume sequence positions, producing unexplained gaps in the timeline sequence visible to users.
+- Assign a `display_number` separately from `sequence_number` — rejected; introduces two numbering concepts with no benefit over a single number assigned at the only point it is meaningful.
+
+---
+
+### D-070 — Self-service password reset not implemented in v1
+
+**Date:** 2026-04-13  
+**Status:** Active
+
+**Decision:**  
+There is no self-service "forgot password" flow in v1. No `POST /api/v1/auth/password-reset` endpoint is provided. The only password change path for an authenticated user is `PATCH /api/v1/users/me/password`.
+
+If a user loses access to their account, the recovery path is: admin re-invites the user via `POST /api/v1/invitations`, which issues a new temporary password to their email address. The user's existing account and campaign memberships are preserved — the invitation endpoint handles the case where the email already has an account by reissuing credentials only.
+
+**Reason:**  
+Blue Steel is an invitation-only platform with a small, known user base. A self-service password reset flow requires a time-limited, single-use token, a dedicated email template, a reset endpoint, and first-login redirect logic. The recovery path via admin re-invitation already satisfies the need at this scale without additional infrastructure. D-060 identified email delivery as the one externally-managed concern — this decision keeps that contract minimal in v1.
+
+**Alternatives considered:**  
+- Self-service reset via `EmailPort` — considered; the `EmailPort` abstraction makes this straightforward to add. Deferred because it adds endpoint, token lifecycle, and email template scope that is not justified by the expected frequency of password loss on a small controlled-access platform. Can be added in v2 if the user base grows or admin-mediated recovery proves operationally burdensome.
 
 ---
 
