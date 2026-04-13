@@ -215,22 +215,21 @@ At most one session per campaign may be in `processing` or `draft` state simulta
 ## Running Locally with Mock Adapters
 
 ```bash
-# Start infrastructure
+# Start infrastructure (from repo root)
 docker compose up -d
 
-# Start backend with mock LLM adapters (default — zero API cost)
-# Profile: local
-# [Command TBD before Phase 1]
+# Start backend with mock LLM adapters (default local profile — zero API cost)
+mvn spring-boot:run -pl apps/api -Dspring-boot.run.profiles=local
 ```
 
 With mock adapters active (`local` profile), submitting any session summary returns a fixed
-extraction result. This is sufficient for testing the full ingestion flow, diff review, and
-commit without incurring Anthropic API costs.
+extraction result from `MockNarrativeExtractionAdapter`. This is sufficient for testing the full
+ingestion flow, diff review, and commit without incurring Anthropic API costs.
 
 To test with real LLMs:
 ```bash
-# Profile: local,llm-real (requires ANTHROPIC_API_KEY and OPENAI_API_KEY in .env.local)
-# [Command TBD before Phase 1]
+# Requires ANTHROPIC_API_KEY and OPENAI_API_KEY set in .env.local
+mvn spring-boot:run -pl apps/api -Dspring-boot.run.profiles=local,llm-real
 ```
 
 ## Common Pitfalls

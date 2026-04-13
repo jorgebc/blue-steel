@@ -122,8 +122,8 @@ In `adapters/in/web/GlobalExceptionHandler.java`:
 Run the ArchUnit test suite (fast, no Testcontainers):
 
 ```bash
-# [Command TBD before Phase 1 — see apps/api/CLAUDE.md §4]
-mvn test -Dtest=ArchitectureTest
+# Run from repo root — -pl apps/api scopes Maven to the backend module
+mvn test -pl apps/api -Dtest=ArchitectureTest
 ```
 
 A failing ArchUnit test means a layer boundary was violated. Fix the violation; do not adjust
@@ -132,11 +132,11 @@ the ArchUnit rule to accommodate the violation.
 ### 9. Run the full test suite
 
 ```bash
-# Unit + ArchUnit
-mvn test
+# Unit + ArchUnit (run from repo root)
+mvn test -pl apps/api
 
 # Integration tests (Testcontainers — needs Docker)
-mvn verify
+mvn verify -pl apps/api
 ```
 
 All tests must be green before the endpoint is considered complete.

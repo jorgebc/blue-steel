@@ -289,7 +289,7 @@ Do not write custom CSS unless absolutely unavoidable. Use Tailwind classes. The
 
 **The "Propose a change" affordance is a stub in v1.** It must render on every entity, space, and relation in Exploration Mode. Clicking it in v1 does nothing meaningful — the approval pipeline ships in v2 (D-012). Render the affordance as a visible but disabled/placeholder UI element with a tooltip indicating the feature is coming.
 
-**Annotation immutability.** Annotations have no `updated_at` and cannot be edited. Once posted, the only write operation is deletion (by the author, or by the GM). Do not render an edit button on annotation cards.
+**Annotation immutability.** Annotations have no `updated_at` and cannot be edited. The only post-creation write operation is deletion. The author of an annotation can delete it; the GM can delete any annotation in the campaign. Use `DELETE /api/v1/campaigns/{id}/annotations/{aid}` → 204. Do not render an edit button. Render a delete button only to the annotation author and the GM (derive role from campaign context store — D-043).
 
 ---
 
@@ -302,3 +302,6 @@ Frontend-relevant skills:
 - **`frontend-api-resource`** — typed API client files, TanStack Query hooks, DTO types, auth token handling.
 - **`frontend-diff-review`** — diff review screen: card types, UNCERTAIN resolution, commit button, payload assembly.
 - **`frontend-exploration`** — Timeline (keyset), Entities/Spaces (offset), Relations graph (React Flow v12), annotations.
+- **`frontend-query-mode`** — Query Mode UI: question form, mutation hook, answer display, citation rendering, 504 timeout handling.
+- **`frontend-testing`** — Vitest setup, React Testing Library patterns, axe-core assertions, hook isolation, mock strategies.
+- **`auth`** — in-memory token storage, 401 silent refresh, route guards, role derivation from campaign membership.

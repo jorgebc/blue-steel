@@ -3,8 +3,7 @@
 > This file is the entry point for any AI agent working in this repository.
 > Read it completely before touching any file. For work scoped to a single layer,
 > continue to `apps/api/CLAUDE.md` (backend) or `apps/web/CLAUDE.md` (frontend)
-> after reading this file. Those files do not exist yet — they will be created
-> before Phase 1 development begins.
+> after reading this file. Both subdirectory CLAUDE.md files exist and are complete.
 
 ---
 
@@ -42,107 +41,71 @@ blue-steel/
 
 ## 3. Tech Stack Overview
 
-**Backend (`apps/api`)**
+> Full stack details and version tables are in the authoritative layer-specific files:
+> `apps/api/CLAUDE.md §2` (backend) and `apps/web/CLAUDE.md §2` (frontend).
+> The summary below is for orientation only.
 
-- Java 25 (LTS), Spring Boot 4.0.3, Maven
-- Spring Security (stateless JWT, HS256)
-- Spring Data JPA + Hibernate, Liquibase migrations
-- PostgreSQL + pgvector (Neon free tier in prod)
-- Spring AI `ChatClient` → Anthropic (Claude) for text generation
-- Spring AI `EmbeddingModel` → OpenAI `text-embedding-3-small` (1536 dims) for embeddings
-- JUnit 5, Mockito, Testcontainers, PITest, ArchUnit
-
-**Frontend (`apps/web`)**
-
-- TypeScript, React 18, Vite
-- shadcn/ui (component library), TanStack Query v5 (server state), Zustand v5 (client state)
-- React Router v6, React Flow v12 (relations graph)
-- Vitest, React Testing Library, axe-core (`vitest-axe`)
-
-**Infrastructure / CI**
-
-- Local dev: Docker Compose (Postgres + pgvector only; app runs natively)
-- Prod hosting: Oracle Cloud Always Free ARM VM (backend), Vercel Hobby (frontend), Neon (database)
-- CI/CD: GitHub Actions with path-filtered workflows per project
-- Docker images: built for `linux/arm64` (Oracle ARM VM), pushed to `ghcr.io`
-- Secrets: `.env` on Oracle VM, `.env.local` locally — never committed
+| Layer | Key choices |
+|---|---|
+| Backend | Java 25, Spring Boot 4.0.3, Maven, Spring Security (JWT HS256), Spring Data JPA + Hibernate, Liquibase, PostgreSQL + pgvector, Spring AI (ChatClient + EmbeddingModel) |
+| Frontend | TypeScript, React 18, Vite, shadcn/ui, TanStack Query v5, Zustand v5, React Router v6, React Flow v12 (`@xyflow/react`) |
+| Testing | Backend: JUnit 5, Mockito, Testcontainers, PITest, ArchUnit — Frontend: Vitest, React Testing Library, axe-core (`vitest-axe`) |
+| Infrastructure | Local: Docker Compose (Postgres + pgvector only) — Prod: Oracle Cloud ARM VM (backend), Vercel (frontend), Neon (database) |
+| CI/CD | GitHub Actions, path-filtered per project, Docker `linux/arm64` images pushed to `ghcr.io` |
 
 ---
 
 ## 4. Workspace Setup
 
-> ⚠️ This project is in the **Definition & Analysis phase**. No repository scaffold exists yet.
-> All commands below will be documented once Phase 1 begins.
+> Full command reference, profile flags, and test commands for each layer live in:
+> `apps/api/CLAUDE.md §4` (backend) and `apps/web/CLAUDE.md §4` (frontend).
+> The key commands are summarised here for quick access.
 
-**Install dependencies**
-
-```bash
-# Backend
-# [NOT DOCUMENTED — fill in before Phase 1]
-
-# Frontend
-# [NOT DOCUMENTED — fill in before Phase 1]
-```
-
-**Environment variables**
-
-All secrets are stored in `.env` (prod, Oracle VM) or `.env.local` (local dev). Neither file is committed. Required variables across the full monorepo:
-
-```
-# Shared / Backend
-DATABASE_URL=           # Neon PostgreSQL connection string
-ANTHROPIC_API_KEY=      # Claude (text generation)
-OPENAI_API_KEY=         # text-embedding-3-small (embeddings)
-JWT_SECRET=             # HS256 symmetric secret
-
-# Email
-EMAIL_API_KEY=          # Transactional email provider (Resend or Brevo)
-```
-
-**Run locally (infrastructure only — start this first)**
+**Start infrastructure first (run from repo root):**
 
 ```bash
 docker compose up -d    # Starts PostgreSQL + pgvector on localhost:5432
 ```
 
-**Run backend (natively, not in Docker)**
+**Backend (from `apps/api/`):**
 
 ```bash
-# Default profile — all LLM ports are mocked, zero API cost
-# [NOT DOCUMENTED — fill in before Phase 1]
-
-# With real LLM APIs (Anthropic + OpenAI calls will be made and billed)
-# Activate: --spring.profiles.active=local,llm-real
-# [NOT DOCUMENTED — fill in before Phase 1]
+mvn dependency:resolve                                          # install dependencies
+mvn spring-boot:run -Dspring-boot.run.profiles=local           # dev server (LLM mocked)
+mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-real  # dev server (real LLM APIs)
+mvn test -pl apps/api                                          # unit + ArchUnit (fast)
+mvn verify -pl apps/api                                        # + integration tests (Docker required)
+mvn package -DskipTests -pl apps/api                           # production JAR
 ```
 
-**Run frontend dev server**
+**Frontend (from `apps/web/`):**
 
 ```bash
-# [NOT DOCUMENTED — fill in before Phase 1]
+npm install          # install dependencies
+npm run dev          # dev server
+npm run type-check   # TypeScript check (no emit)
+npm run lint         # ESLint
+npx vitest run       # tests (CI mode)
+npm run build        # production build
 ```
 
-**Run all tests**
+**Environment variables**
 
-```bash
-# Backend: unit + ArchUnit + integration (Testcontainers)
-# [NOT DOCUMENTED — fill in before Phase 1]
+All secrets are stored in `.env` (prod, Oracle VM) or `.env.local` (local dev). Neither file is
+committed. Copy `.env.example` to `.env.local` and fill in the values before running locally.
 
-# Backend: mutation tests (domain core only — slow, run deliberately)
-# [NOT DOCUMENTED — fill in before Phase 1]
-
-# Frontend: type check + lint + Vitest
-# [NOT DOCUMENTED — fill in before Phase 1]
 ```
+# Backend / Shared
+DATABASE_URL=           # Neon PostgreSQL connection string
+ANTHROPIC_API_KEY=      # Claude (text generation) — only needed with llm-real profile
+OPENAI_API_KEY=         # text-embedding-3-small embeddings — only needed with llm-real profile
+JWT_SECRET=             # HS256 symmetric secret (min 32 bytes, random)
 
-**Build for production**
+# Email (invitation flow — provider choice finalised in Phase 1)
+EMAIL_API_KEY=          # Transactional email provider API key (Resend recommended)
 
-```bash
-# Backend: produces JAR + linux/arm64 Docker image
-# [NOT DOCUMENTED — fill in before Phase 1]
-
-# Frontend: Vite build (auto-deployed by Vercel on push to main)
-# [NOT DOCUMENTED — fill in before Phase 1]
+# Frontend (Vite)
+VITE_API_BASE_URL=      # Backend base URL, e.g. http://localhost:8080
 ```
 
 ---
@@ -181,7 +144,7 @@ These concepts are used by both the frontend and the backend. When a term appear
 
 **Narrative Block** — The raw submitted text for a session, stored immutably in `narrative_blocks` after intake. It is the input to the extraction pipeline. All extraction results are traceable back to it. Invariant: `raw_summary_text` is never modified after storage.
 
-**Annotation** — A free-text, non-canonical comment any campaign member can attach to any Actor, Space, Relation, or Event. Not world state — explicitly player commentary. Immutable after creation. Defined in: `annotations` table; `POST /api/v1/campaigns/{id}/annotations`.
+**Annotation** — A free-text, non-canonical comment any campaign member can attach to any Actor, Space, Relation, or Event. Not world state — explicitly player commentary. Immutable after creation (content cannot be edited). The author or the GM may delete an annotation. Defined in: `annotations` table; `POST /api/v1/campaigns/{id}/annotations`; `DELETE /api/v1/campaigns/{id}/annotations/{aid}`.
 
 ---
 
@@ -247,10 +210,12 @@ Before starting any non-trivial task, read `SKILLS_INDEX.md` to find the most re
 
 ## 9. Where to Go Next
 
-- **For frontend work, read:** `apps/web/CLAUDE.md`
-- **For backend work, read:** `apps/api/CLAUDE.md`
+Both subdirectory CLAUDE.md files are complete and authoritative for their layer.
 
-> ⚠️ Neither subdirectory `CLAUDE.md` exists yet. They will be written before Phase 1 development begins and will cover layer-specific package structure, test commands, build commands, and conventions that do not apply to the full monorepo.
+- **For backend work, read:** `apps/api/CLAUDE.md` — covers directory structure, Maven commands, hexagonal architecture conventions, domain concepts, test tiers, and common workflows.
+- **For frontend work, read:** `apps/web/CLAUDE.md` — covers directory structure, npm commands, feature-slice architecture, component conventions, state management rules, and common workflows.
+
+After reading the relevant subdirectory file, check `skills/SKILLS_INDEX.md` for the skill that matches your task.
 
 ---
 

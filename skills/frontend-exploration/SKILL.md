@@ -158,10 +158,14 @@ This is the most complex single component in the frontend — keep its dependenc
 
 ### React Flow setup
 
+> ⚠️ React Flow v12 ships as the `@xyflow/react` package — the old `reactflow` package is v11.
+> Install with: `npm install @xyflow/react`
+
 ```typescript
 // src/features/exploration/relations/RelationsPage.tsx
-import ReactFlow, { Node, Edge, Background, Controls, MiniMap } from 'reactflow';
-import 'reactflow/dist/style.css';
+// React Flow v12 — package is @xyflow/react, NOT reactflow
+import { ReactFlow, Background, Controls, MiniMap, type Node, type Edge } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 
 // Transform API relations into React Flow nodes and edges
 function transformToGraph(actors: Actor[], relations: Relation[]): { nodes: Node[], edges: Edge[] } {
@@ -195,13 +199,14 @@ meaningfully. Options (pick one consistently):
 
 ```tsx
 // src/features/exploration/relations/RelationNode.tsx
-import { Handle, Position, type NodeProps } from 'reactflow';
+// React Flow v12 — import from @xyflow/react
+import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 export function ActorNode({ data }: NodeProps) {
   return (
     <div className="actor-node">
       <Handle type="target" position={Position.Left} />
-      <span>{data.label}</span>
+      <span>{data.label as string}</span>
       <Handle type="source" position={Position.Right} />
     </div>
   );

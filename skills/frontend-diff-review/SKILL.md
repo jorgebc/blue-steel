@@ -103,18 +103,28 @@ interface DiffItem {
 
 ### 2. Manage card-level user decisions in state
 
-Each card's user decision is tracked in a state map keyed by `DiffItem.id`:
+Each card's user decision is tracked in a state map keyed by `DiffItem.id`. Use a proper
+discriminated union — never use `as any` to access variant-specific fields.
 
 ```typescript
 // src/features/input/hooks/useDiffState.ts
-type CardDecision =
+export type CardDecision =
   | { action: 'accept' }
   | { action: 'edit'; data: Record<string, unknown> }
   | { action: 'delete' }
   | { action: 'uncertain_resolved'; resolution: 'match' | 'new'; matchedEntityId?: string }
   | { action: 'conflict_acknowledged' };
 
-interface DiffState {
+// Type guards — use these to narrow the union safely
+export function isUncertainResolved(d: CardDecision): d is Extract<CardDecision, { action: 'uncertain_resolved' }> {
+  return d.action === 'uncertain_resolved';
+}
+
+export function isEdit(d: CardDecision): d is Extract<CardDecision, { action: 'edit' }> {
+  return d.action === 'edit';
+}
+
+export interface DiffState {
   decisions: Map<string, CardDecision>;
   setDecision: (itemId: string, decision: CardDecision) => void;
   unresolvedUncertainCount: number;
@@ -189,26 +199,37 @@ depth — treat receiving it as a UI bug to fix.
 
 ### 5. Assembling the commit payload
 
-`useCommitPayload` translates the `DiffState` decisions map into the commit payload shape:
+`useCommitPayload` translates the `DiffState` decisions map into the commit payload shape.
+Use the type guards defined in §2 — no `as any` casts.
 
 ```typescript
 // src/features/input/hooks/useCommitPayload.ts
+import { isUncertainResolved, isEdit, type CardDecision } from './useDiffState';
+
 export function useCommitPayload(diff: DiffPayload, decisions: Map<string, CardDecision>): CommitPayload {
   const mapItems = (items: DiffItem[]) =>
     items
       .filter(item => item.kind !== 'uncertain' && item.kind !== 'conflict')
       .map(item => {
         const decision = decisions.get(item.id) ?? { action: 'accept' as const };
-        return { id: item.id, action: decision.action, data: 'data' in decision ? decision.data : {} };
+        return {
+          id: item.id,
+          action: decision.action,
+          data: isEdit(decision) ? decision.data : {},
+        };
       });
 
   const resolvedEntities = [...decisions.entries()]
-    .filter(([, d]) => d.action === 'uncertain_resolved')
-    .map(([mentionId, d]) => ({
-      mentionId,
-      resolution: (d as any).resolution,
-      matchedEntityId: (d as any).matchedEntityId ?? null,
-    }));
+    .filter(([, d]) => isUncertainResolved(d))
+    .map(([mentionId, d]) => {
+      // d is narrowed to { action: 'uncertain_resolved'; resolution: ...; matchedEntityId?: ... }
+      const resolved = d as Extract<CardDecision, { action: 'uncertain_resolved' }>;
+      return {
+        mentionId,
+        resolution: resolved.resolution,
+        matchedEntityId: resolved.matchedEntityId ?? null,
+      };
+    });
 
   const acknowledgedConflicts = [...decisions.entries()]
     .filter(([, d]) => d.action === 'conflict_acknowledged')

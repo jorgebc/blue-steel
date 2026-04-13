@@ -362,6 +362,21 @@ Entity list endpoints (`/actors`, `/spaces`, `/events`, `/relations`) use offset
 7. Write an integration test via Testcontainers before wiring the adapter.
 8. Validate the changeset against a Neon branch before applying to production (D-047).
 
+### Deleting an annotation
+
+Annotations are immutable in content (no `updated_at`, no edit endpoint) but can be deleted by
+the author or the GM.
+
+1. Driving port: `DeleteAnnotationUseCase.delete(UUID campaignId, UUID annotationId, UUID callerId)`.
+2. Authorization: resolve campaign role via `CampaignMembershipPort`. Allow if `callerId` matches
+   `annotation.authorId` OR caller's campaign role is `GM`. Throw `UnauthorizedException` otherwise.
+3. `DELETE /api/v1/campaigns/{id}/annotations/{aid}` → 204 No Content on success.
+4. No world state impact — deleting an annotation never touches `actors`, `spaces`, `events`,
+   `relations`, or any version history. The deletion is permanent (no soft-delete).
+5. If the annotation does not exist or belongs to a different campaign, return 404.
+
+---
+
 ### Adding a new background job
 
 1. Define a Spring `ApplicationEvent` record in `application/` (e.g., `SessionCommittedEvent`).
@@ -423,6 +438,6 @@ Backend-relevant skills:
 - **`database-migration`** — Liquibase changeset creation, pgvector schema, Neon branch validation.
 - **`backend-endpoint`** — end-to-end endpoint addition (controller → port → service → adapter).
 - **`backend-domain-model`** — domain entity + world state versioning pattern.
-- **`backend-testing`** — all four test tiers: domain unit, application unit, Testcontainers, ArchUnit, PITest.
+- **`backend-testing`** — all four test tiers: domain unit, application unit, Testcontainers, ArchUnit, PITest (includes mutation testing scope and surviving-mutant interpretation).
 - **`query-pipeline`** — Query Mode: embed → pgvector search → context assembly → LLM answer.
-- **PITest scope skill** — how to run mutation testing scoped to the domain core and interpret surviving mutants.
+- **`auth`** — JWT issuance, refresh token rotation (D-059), Spring Security filter chain, admin bootstrap.

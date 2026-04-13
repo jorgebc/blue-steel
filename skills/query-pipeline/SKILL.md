@@ -83,48 +83,121 @@ The similarity search query must scope results to the current campaign and filte
 versions that have embeddings. This is a native SQL query — do not use Spring AI `VectorStore`
 (ARCH-04, D-062).
 
+The query uses a `UNION ALL` across all four entity type version tables. This is the canonical
+pattern — never query only one entity type, as actors, spaces, events, and relations all contribute
+to the world state context.
+
 ```sql
 -- Top-N entity version snapshots most similar to the query embedding
--- Scoped to campaign, filtered to entities with embeddings
+-- UNION ALL across all four entity types; scoped to campaign; committed sessions only
 SELECT
     ee.entity_type,
     ee.entity_id,
     ee.entity_version_id,
     ee.session_id,
-    ee.embedding <=> :queryEmbedding::vector AS cosine_distance,
+    s.sequence_number,
+    ee.embedding <=> CAST(:queryEmbedding AS vector) AS cosine_distance,
     av.full_snapshot
 FROM entity_embeddings ee
-JOIN actor_versions av ON av.id = ee.entity_version_id  -- adjust per entity_type
-WHERE ee.session_id IN (
-    SELECT id FROM sessions WHERE campaign_id = :campaignId AND status = 'committed'
-)
+JOIN actor_versions av ON av.id = ee.entity_version_id
+JOIN sessions s ON s.id = ee.session_id
+WHERE ee.entity_type = 'actor'
+  AND s.campaign_id = :campaignId
+  AND s.status = 'committed'
+
+UNION ALL
+
+SELECT
+    ee.entity_type,
+    ee.entity_id,
+    ee.entity_version_id,
+    ee.session_id,
+    s.sequence_number,
+    ee.embedding <=> CAST(:queryEmbedding AS vector) AS cosine_distance,
+    sv.full_snapshot
+FROM entity_embeddings ee
+JOIN space_versions sv ON sv.id = ee.entity_version_id
+JOIN sessions s ON s.id = ee.session_id
+WHERE ee.entity_type = 'space'
+  AND s.campaign_id = :campaignId
+  AND s.status = 'committed'
+
+UNION ALL
+
+SELECT
+    ee.entity_type,
+    ee.entity_id,
+    ee.entity_version_id,
+    ee.session_id,
+    s.sequence_number,
+    ee.embedding <=> CAST(:queryEmbedding AS vector) AS cosine_distance,
+    ev.full_snapshot
+FROM entity_embeddings ee
+JOIN event_versions ev ON ev.id = ee.entity_version_id
+JOIN sessions s ON s.id = ee.session_id
+WHERE ee.entity_type = 'event'
+  AND s.campaign_id = :campaignId
+  AND s.status = 'committed'
+
+UNION ALL
+
+SELECT
+    ee.entity_type,
+    ee.entity_id,
+    ee.entity_version_id,
+    ee.session_id,
+    s.sequence_number,
+    ee.embedding <=> CAST(:queryEmbedding AS vector) AS cosine_distance,
+    rv.full_snapshot
+FROM entity_embeddings ee
+JOIN relation_versions rv ON rv.id = ee.entity_version_id
+JOIN sessions s ON s.id = ee.session_id
+WHERE ee.entity_type = 'relation'
+  AND s.campaign_id = :campaignId
+  AND s.status = 'committed'
+
 ORDER BY cosine_distance ASC
 LIMIT :topN
 ```
 
-In practice, use a UNION across all entity types or a polymorphic join approach. The key
-constraints are: scoped to `campaign_id`, limited to `committed` sessions, ordered by cosine
-distance ascending (lower = more similar for `<=>` cosine operator), limited to top-N.
+Key constraints: scoped to `campaign_id` via the sessions join, limited to `committed` sessions,
+ordered by cosine distance ascending (`<=>` produces lower values for more similar vectors), limited
+to top-N results.
 
 **Spring Data JPA with native query:**
 
 ```java
-@Query(nativeQuery = true, value = """
-    SELECT ee.entity_type, ee.entity_id, ee.session_id,
-           ee.embedding <=> CAST(:queryEmbedding AS vector) AS distance,
-           ev.full_snapshot
-    FROM entity_embeddings ee
-    JOIN ...
-    WHERE ...
-    ORDER BY distance ASC
-    LIMIT :topN
-    """)
-List<EntitySnapshotProjection> findMostSimilarInCampaign(
-    UUID campaignId,
-    float[] queryEmbedding,
-    int topN
-);
+// adapters/out/persistence/embedding/EntityEmbeddingJpaRepository.java
+public interface EntityEmbeddingJpaRepository extends JpaRepository<EntityEmbeddingEntity, UUID> {
+
+    @Query(nativeQuery = true, value = """
+        SELECT ee.entity_type, ee.entity_id, ee.entity_version_id,
+               ee.session_id, s.sequence_number,
+               ee.embedding <=> CAST(:queryEmbedding AS vector) AS cosine_distance,
+               COALESCE(av.full_snapshot, sv.full_snapshot,
+                        ev.full_snapshot, rv.full_snapshot) AS full_snapshot
+        FROM entity_embeddings ee
+        JOIN sessions s ON s.id = ee.session_id
+        LEFT JOIN actor_versions   av ON av.id = ee.entity_version_id AND ee.entity_type = 'actor'
+        LEFT JOIN space_versions   sv ON sv.id = ee.entity_version_id AND ee.entity_type = 'space'
+        LEFT JOIN event_versions   ev ON ev.id = ee.entity_version_id AND ee.entity_type = 'event'
+        LEFT JOIN relation_versions rv ON rv.id = ee.entity_version_id AND ee.entity_type = 'relation'
+        WHERE s.campaign_id = :campaignId
+          AND s.status = 'committed'
+        ORDER BY cosine_distance ASC
+        LIMIT :topN
+        """)
+    List<EntitySnapshotProjection> findMostSimilarInCampaign(
+        @Param("campaignId") UUID campaignId,
+        @Param("queryEmbedding") float[] queryEmbedding,
+        @Param("topN") int topN
+    );
+}
 ```
+
+> Note: The LEFT JOIN + COALESCE approach is an alternative to UNION ALL — both are correct.
+> The LEFT JOIN pattern avoids repeating the embedding distance expression four times. Choose
+> the approach and stick to it; do not mix patterns in the same codebase.
 
 ### 3. Context assembly and token budgeting
 
