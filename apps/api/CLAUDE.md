@@ -31,7 +31,7 @@ This is a stateless, synchronous REST monolith following hexagonal (Ports & Adap
 | LLM embeddings | Spring AI `EmbeddingModel` → OpenAI `text-embedding-3-small` (1536 dims) | aligned with Boot 4.x |
 | Vector retrieval | Native pgvector queries via Spring Data JPA / `JdbcTemplate` | — |
 | Testing | JUnit 5, Mockito, Testcontainers, PITest, ArchUnit | latest stable |
-| Linting/style | [NOT DOCUMENTED — fill in before Phase 1] | — |
+| Linting/style | Spotless (Maven plugin) + google-java-format | latest stable |
 
 **Spring AI scope:** `ChatClient` (text generation) and `EmbeddingModel` (vector generation) only. `VectorStore` is never used — see Rule ARCH-04 and D-062.
 
@@ -274,7 +274,7 @@ Domain and application layers use unchecked domain exceptions (no `throws` decla
 
 ### LOG-01 — Logging
 
-Every LLM call must be logged at INFO with: tokens in, tokens out, estimated cost, `session_id`, `user_id`, pipeline stage. Failed LLM calls are logged at ERROR with full context. Do not log raw LLM response content at INFO — it can contain sensitive narrative data. Structured logging (JSON) is the target format in prod; the exact field names and appender configuration are [NOT DOCUMENTED — confirm before Phase 1].
+Every LLM call must be logged at INFO with: tokens in, tokens out, estimated cost, `session_id`, `user_id`, pipeline stage. Failed LLM calls are logged at ERROR with full context. Do not log raw LLM response content at INFO — it can contain sensitive narrative data. Structured logging (JSON) is the target format in prod via `logstash-logback-encoder`. Configuration lives in `logback-spring.xml` with profile-conditional appenders: human-readable pattern on the `local` profile; JSON appender in all other environments. LLM call logging uses MDC to carry `session_id` and `user_id` automatically; `stage`, `tokens_in`, `tokens_out`, and `cost_usd` are emitted as structured fields on every LLM log line. (D-071, D-072)
 
 ### DB-01 — Database access pattern
 

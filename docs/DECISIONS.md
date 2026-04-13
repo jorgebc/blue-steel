@@ -81,6 +81,8 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-068 | Frontend package manager: npm | ✅ Active | Definition |
 | D-069 | Session `sequence_number` assigned at commit, nullable until then | ✅ Active | Definition |
 | D-070 | Self-service password reset not implemented in v1 | ✅ Active | Definition |
+| D-071 | Java code style: Spotless + google-java-format | ✅ Active | Definition |
+| D-072 | Structured logging: logstash-logback-encoder; MDC fields for LLM calls | ✅ Active | Definition |
 
 ---
 
@@ -1396,6 +1398,45 @@ Blue Steel is an invitation-only platform with a small, known user base. A self-
 
 **Alternatives considered:**  
 - Self-service reset via `EmailPort` — considered; the `EmailPort` abstraction makes this straightforward to add. Deferred because it adds endpoint, token lifecycle, and email template scope that is not justified by the expected frequency of password loss on a small controlled-access platform. Can be added in v2 if the user base grows or admin-mediated recovery proves operationally burdensome.
+
+---
+
+### D-071 — Java code style: Spotless + google-java-format
+
+**Date:** 2026-04-13  
+**Status:** Active
+
+**Decision:**  
+The backend uses the [Spotless Maven plugin](https://github.com/diffplug/spotless) with `google-java-format` to enforce a canonical Java code style. Spotless runs as part of `mvn verify` and fails the build on any formatting violation. The formatter is applied via `mvn spotless:apply` before committing. No custom style file is maintained — `google-java-format` is the canonical source of truth.
+
+**Reason:**  
+A solo portfolio project benefits from zero-configuration style enforcement: no style file to write, no rule debates, no drift. `google-java-format` is opinionated and non-negotiable, which is a feature — formatting decisions never require thought. Spotless integrates cleanly with the Maven lifecycle and can be wired into the CI `backend.yml` workflow as a pre-test check. This approach aligns with Martin (clean code, remove subjective bikeshedding) by eliminating style as a decision surface entirely.
+
+**Alternatives considered:**  
+- Checkstyle + config file — more granular control, but requires maintaining a style configuration. Adds a file to own and decisions to make. Not justified for a solo build.
+- No formatter — rejected; inconsistent style in a portfolio project signals lack of discipline. Automated enforcement costs nothing once configured.
+
+---
+
+### D-072 — Structured logging: logstash-logback-encoder; MDC fields for LLM calls
+
+**Date:** 2026-04-13  
+**Status:** Active
+
+**Decision:**  
+The backend uses `logstash-logback-encoder` for structured JSON logging in production. Configuration lives in `logback-spring.xml` with profile-conditional appenders:
+
+- **`local` profile:** human-readable pattern — `%d{HH:mm:ss} [%-5level] %logger{36} - %msg%n`
+- **All other environments (prod):** JSON appender via `LogstashEncoder`, one JSON object per log line
+
+MDC (Mapped Diagnostic Context) carries `session_id` and `user_id` for the duration of each request. These fields appear automatically on every log line within that request's scope. LLM call log lines at INFO additionally emit the following structured fields: `stage` (pipeline stage: `intake`, `extraction`, `resolution`, `commit`, `query`), `tokens_in` (int), `tokens_out` (int), `cost_usd` (decimal string).
+
+**Reason:**  
+`logstash-logback-encoder` is the de facto standard for structured JSON logging in the Spring Boot ecosystem. It adds one dependency and zero Logback API changes — the application code uses SLF4J as normal. MDC-based propagation of `session_id` and `user_id` means every log line within a request is automatically correlated without passing these values through every method. The cost visibility requirement (D-041 context: usage logging) is satisfied by the `cost_usd` field on every LLM call log line, enabling per-session and per-stage cost analysis from raw logs.
+
+**Alternatives considered:**  
+- Spring Boot 3.x native structured logging (`logging.structured.format=logstash`) — available in Boot 3.4+; not yet verified for Boot 4.x compatibility. `logstash-logback-encoder` is the established path and is known to work. Revisit in v2 if Boot 4.x native structured logging reaches parity.
+- OpenTelemetry logging — premature for a solo portfolio project. No observability stack is in scope (no staging environment, D-044).
 
 ---
 
