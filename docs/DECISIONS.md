@@ -88,6 +88,10 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-075 | `EmailPort` activation: `email-real` Spring profile, independent of `llm-real` | ✅ Active | Phase 1 |
 | D-076 | DiffPayload and CommitPayload are formalized JSON contracts in ARCHITECTURE.md §7.6 | ✅ Active | Phase 2 |
 | D-077 | Invitation model: no invitations table; temporary password + `force_password_change` flag | ✅ Active | Phase 1 |
+| D-078 | Domain constructors enforce non-blank invariants; adapter Bean Validation is first line, not sole gatekeeper | ✅ Active | Definition |
+| D-079 | CommitPayload: `matched_entity_id` validated at adapter (non-null) and application (campaign ownership) | ✅ Active | Definition |
+| D-080 | CommitPayload completeness: explicit decision required for every diff card | ✅ Active | Definition |
+| D-081 | CommitPayload validation owned by `CommitService` (application layer); `DiffPayload`/`CommitPayload` remain application-layer types | ✅ Active | Definition |
 
 ---
 
@@ -1577,6 +1581,88 @@ An `invitations` table requires token lifecycle management (expiry, reuse detect
 **Alternatives considered:**  
 - Token-based invitation accept flow (separate `invitations` table with `token_hash`, `expires_at`, `accepted_at`) — considered; provides better audit trail and token expiry. Rejected for v1 in favour of simplicity. The `users.force_password_change` flag provides the essential first-login enforcement. Token-based flow can be introduced in v2 if the audit trail becomes important.
 - Send a magic link (one-time login URL) — rejected; requires token storage and expiry enforcement, which is the complexity we are avoiding.
+
+---
+
+---
+
+### D-078 — Domain constructors enforce non-blank invariants; adapter Bean Validation is first line, not sole gatekeeper
+
+**Date:** 2026-04-14  
+**Status:** Active
+
+**Decision:**  
+Domain constructors for all entities that carry required `String` fields (e.g., `NarrativeBlock.rawSummaryText`, `Actor.name`, `Space.name`, `Event.description`) must reject null or blank values with an unchecked `DomainException`. The adapter's `@NotBlank` Bean Validation annotation is a convenience and the first line of defence, but the domain is the authoritative enforcer.
+
+**Reason:**  
+If adapters are bypassed — internal call paths, test harnesses, future CLI adapters, or mappers receiving data from the DB — the domain must still protect itself. A blank `rawSummaryText` passes the token budget check (zero tokens) and reaches the extraction pipeline, producing meaningless LLM results. A blank Actor `name` passed to `EntityContext` degrades LLM extraction and resolution output with no error signal. Under Cockburn's hexagonal model, the domain is independent of all external actors, including the adapter's validation layer. "Make invalid states unrepresentable" (Martin).
+
+**Scope:**
+- `NarrativeBlock`: non-blank `rawSummaryText`
+- `Actor`, `Space`, `Event`, `Relation`: non-blank primary identifier (`name` or equivalent)
+- `RefreshToken.consume()`: non-expired at invocation time (see D-059, auth skill)
+- `Actor.applyVersion()`: `versionNumber` must be strictly greater than current max (D-001)
+
+**Alternatives considered:**  
+- Rely solely on `@NotBlank` Bean Validation at the adapter level — rejected; does not protect against internal paths, test fixtures with raw SQL data, or mapper errors after persistence reads.
+
+---
+
+### D-079 — CommitPayload: `matched_entity_id` validated at adapter (non-null) and application (campaign ownership)
+
+**Date:** 2026-04-14  
+**Status:** Active
+
+**Decision:**  
+When `uncertain_resolutions[*].resolution = MATCH`, the `matched_entity_id` field is validated at two tiers:
+
+1. **Adapter (Bean Validation):** Cross-field constraint — `matched_entity_id` must be non-null when `resolution = MATCH`. Returns `400` if violated.
+2. **Application (`CommitService`):** `matched_entity_id` must reference an entity that exists within the same `campaign_id` as the session being committed. Returns `422 INVALID_ENTITY_REFERENCE` if not found.
+
+**Reason:**  
+Without the campaign ownership check, a client (malicious or buggy) could submit a `matched_entity_id` from a different campaign, causing a cross-campaign entity merge — a data integrity violation. This is an IDOR-adjacent pattern: the adapter cannot enforce ownership (it has no DB access), so the application service is the correct enforcement tier for the ownership check. The null check is a format constraint that belongs at the adapter level.
+
+**Alternatives considered:**  
+- Rely on DB foreign key only — rejected; a mismatched entity from another campaign passes the FK check (the entity exists), and the merge would succeed silently. The FK does not enforce `campaign_id` scope.
+
+---
+
+### D-080 — CommitPayload completeness: explicit decision required for every diff card
+
+**Date:** 2026-04-14  
+**Status:** Active
+
+**Decision:**  
+The `card_decisions` array in the CommitPayload must contain an explicit entry for every `DiffCard` in the stored `diff_payload`. A missing decision for any non-UNCERTAIN card is rejected with `422 INCOMPLETE_CARD_DECISIONS`. There is no implicit accept for omitted cards.
+
+UNCERTAIN cards are covered by `uncertain_resolutions`, not `card_decisions`. Conflict cards are covered by `acknowledged_conflicts`. The completeness check applies only to `card_decisions` vs. non-UNCERTAIN `DiffCard` entries.
+
+**Reason:**  
+Implicit accept creates an ambiguous failure mode: a network error dropping half the payload is indistinguishable from a deliberate decision to accept all unmentioned cards. Requiring explicit decisions makes the commit payload self-describing and auditable. Every card decision is on the record. This is consistent with D-002 (no auto-commit) — the user must explicitly sign off on every extraction item, not just the contentious ones.
+
+**Alternatives considered:**  
+- Missing decision = implicit accept — rejected; ambiguous on partial payload delivery; inconsistent with D-002's principle that no extraction enters world state without explicit user confirmation.
+
+---
+
+### D-081 — CommitPayload validation owned by `CommitService`; `DiffPayload` / `CommitPayload` remain application-layer types
+
+**Date:** 2026-04-14  
+**Status:** Active
+
+**Decision:**  
+Validation of the commit payload against the stored `diff_payload` is owned entirely by `CommitService` in the application layer. `DiffPayload` and `CommitPayload` remain Java Records in `com.bluesteel.application.model` (per D-076). The `Session` domain aggregate does not receive or validate the commit payload — it only receives the result of a validated commit (status transition + cleared `diff_payload`).
+
+The validation boundary is documented explicitly: `CommitService` is the authoritative gatekeeper. This is enforced with a mandatory unit test suite that proves all validation preconditions are checked before `session.commit()` is ever invoked.
+
+**Reason:**  
+Promoting `DiffPayload` and `CommitPayload` to the domain layer would require moving the canonical JSON contract types (D-076) into `com.bluesteel.domain`, coupling the domain to a schema that is inherently application/transport-level (JSONB persistence + HTTP response shape). The domain aggregate's invariants are about state transitions, version history append-only behaviour, and field-level constraints — not about validating structured application payloads. Keeping the types in `application.model` and making `CommitService` the authoritative validator satisfies the defence-in-depth requirement without polluting the domain model with transport concerns.
+
+**Mitigation for single-point-of-validation risk:**  
+A mandatory set of unit tests in `test/application/` must prove `CommitService` performs all validation checks (UNCERTAIN completeness, conflict acknowledgment, card completeness, card_id existence, matched_entity_id non-null and campaign-owned) before calling any world-state write method. Any future alternative commit path must implement the same checks or delegate to the same validation logic.
+
+**Alternatives considered:**  
+- Session aggregate validates commit payload — rejected; requires domain types for `DiffPayload` / `CommitPayload`, coupling the domain to a transport/persistence contract. The domain invariant (write-once history, valid state transitions) does not require the domain to parse structured application payloads.
 
 ---
 

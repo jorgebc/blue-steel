@@ -797,6 +797,10 @@ Supported actions per card: `accept` (no change to extracted data), `edit` (user
 **Validation rules enforced server-side (defence in depth):**
 - `uncertain_resolutions` must include an entry for every `UNCERTAIN` card in the diff. Any missing resolution → `422 UNCERTAIN_ENTITIES_PRESENT` (D-042).
 - `acknowledged_conflicts` must include an entry for every `ConflictCard` in `detected_conflicts`. An empty array is valid only when the diff had no conflicts → `422 CONFLICTS_NOT_ACKNOWLEDGED` (D-033).
+- `action = "edit"` requires `edited_fields` to be present and non-empty → `400` (adapter Bean Validation). `edited_fields` is ignored and should be null when `action` is `accept` or `delete`.
+- `uncertain_resolutions[*].matched_entity_id` must be non-null when `resolution = MATCH` → `400` (adapter). The application layer additionally verifies `matched_entity_id` references an entity within the same campaign → `422 INVALID_ENTITY_REFERENCE`.
+- Any `card_id` in `card_decisions` or `uncertain_resolutions` that does not match a `card_id` in the stored `diff_payload` → `422 UNKNOWN_CARD_ID`. Duplicate `card_id` entries within the same array → `422 DUPLICATE_CARD_DECISION`.
+- `card_decisions` must contain an explicit entry for **every** non-UNCERTAIN `DiffCard` in the stored diff. A missing entry for any card is rejected → `422 INCOMPLETE_CARD_DECISIONS` (D-080). There is no implicit accept for omitted cards.
 - `edited_fields` is required and non-empty when `action = edit`. It is omitted or null for `accept` and `delete`.
 - `card_decisions` must not be empty (at least one card must be in the diff for commit to be valid).
 

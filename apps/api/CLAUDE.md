@@ -197,13 +197,18 @@ At most **one** session per campaign may be in `processing` or `draft` state sim
 
 The raw submitted summary text, stored in `narrative_blocks.raw_summary_text` immediately on intake. Immutable after storage — never modified for any reason. `token_count` is estimated at intake for the budget check. Stored in: `narrative_blocks` table. Preserved even when the parent session is discarded or failed.
 
-**Invariant:** `raw_summary_text` is write-once.
+**Invariants:**
+- `raw_summary_text` is write-once — the field is set at construction and never updated.
+- `raw_summary_text` must be non-blank — a `NarrativeBlock` cannot be constructed with a null or whitespace-only summary. The domain constructor enforces this. The adapter's `@NotBlank` Bean Validation annotation is a first line of defence, not the sole gatekeeper. An empty summary would pass the token budget check (zero tokens) and produce meaningless extraction results.
 
 ### World State Entities (Actor, Space, Event, Relation)
 
 Versioned domain entities. Each carries an append-only version history table (e.g., `actor_versions`). Every version row references the session that produced it. Current state = max `version_number` per entity. Point-in-time state = max version where `session_id ≤ target`. Each version stores both `changed_fields` (delta, D-006) and `full_snapshot` (complete state, for efficient reads). All carry `campaign_id` and `owner_id` (D-021). Stored in: `actors`, `actor_versions` (and equivalents for space, event, relation).
 
-**Invariant:** version history is append-only; no deletes or updates to existing version rows. Every world state fact is traceable to a session (D-003).
+**Invariants:**
+- Version history is append-only; no deletes or updates to existing version rows. Every world state fact is traceable to a session (D-003).
+- The `name` field (and equivalent primary identifier) must be non-blank for all world-state entities. Domain constructors enforce this — an Actor, Space, Event, or Relation cannot be constructed with a null or blank name. The DB `NOT NULL` constraint and adapter Bean Validation are redundant defences, not the primary enforcers. A blank name in `EntityContext` passed to LLM ports produces degraded extraction and resolution results with no error signal.
+- `version_number` must be strictly greater than the current highest version number for the entity. `Actor.applyVersion()` throws `DomainException` if the incoming version is not monotonically increasing.
 
 ### Entity Embeddings
 
@@ -213,7 +218,7 @@ Post-commit async: OpenAI `text-embedding-3-small` generates a 1536-dimension ve
 
 ### Diff Payload
 
-The structured extraction result stored in `sessions.diff_payload` (JSONB) while a session is in `draft` status. Enables failure recovery — users who close the browser mid-review can retrieve the diff on return. Cleared when the session is committed or discarded. The commit endpoint validates the payload before applying it: zero `UNCERTAIN` entities (D-042), all detected conflicts acknowledged. Returns `422` on violation — defence in depth against UI bypass.
+The structured extraction result stored in `sessions.diff_payload` (JSONB) while a session is in `draft` status. Enables failure recovery — users who close the browser mid-review can retrieve the diff on return. Cleared when the session is committed or discarded. The commit endpoint validates the payload before applying it via `CommitService` (D-081), which is the authoritative validation boundary. Eight preconditions must all pass before any world-state write occurs (see `session-ingestion-pipeline` skill §8 for the full list). Returns `422` on violation — defence in depth against UI bypass.
 
 **Invariant:** `diff_payload` is null on any status other than `draft`.
 
@@ -288,9 +293,24 @@ Liquibase changelogs in `db/changelog/` are never modified after they have been 
 
 Controllers extract `user_id` and `is_admin` from the validated JWT. Campaign-level role resolution (`gm`, `editor`, `player`) happens at the use-case boundary via a DB read against `campaign_members`. Never authorize based on JWT claims alone for campaign-scoped operations — always verify against the live DB (D-043).
 
-### VALID-01 — Input validation
+### VALID-01 — Three-tier validation model
 
-Request DTO validation uses Bean Validation (`@NotNull`, `@Size`, etc.) on controller layer DTOs. Business rule validation (e.g., single active draft per campaign, UNCERTAIN entities in commit payload) is enforced in the application service. The controller never contains business logic. `422` is the correct status for business rule violations.
+Validation is distributed across three layers. All three must be present. No single tier is
+the sole gatekeeper.
+
+| Tier | Layer | Validates | Mechanism | HTTP status |
+|---|---|---|---|---|
+| **Format** | Adapter (REST controller) | Null checks, size bounds, enum membership, cross-field constraints (e.g., `matched_entity_id` required when `resolution = MATCH`) | Bean Validation (`@NotNull`, `@Size`, `@AssertTrue`, custom) | 400 |
+| **Preconditions** | Application service | Cross-aggregate rules requiring DB reads (single active draft per campaign, UNCERTAIN cards in commit payload, conflict acknowledgment, card completeness against stored diff, entity ownership checks) | Unchecked domain exceptions caught by `GlobalExceptionHandler` | 409 / 422 |
+| **Invariants** | Domain entity / aggregate | Single-object business rules derivable from the object's own state (non-blank name, valid state machine transitions, monotonically increasing version numbers, ACTIVE + non-expired check on token consume) | Unchecked domain exceptions thrown in constructors and methods | 422 (via handler) |
+
+**Rules:**
+- Domain invariants are enforced regardless of which adapter calls the domain. The adapter's
+  Bean Validation is a convenience and the first line of defence; the domain invariant is
+  authoritative and the last.
+- A rule that requires a DB read cannot live in the domain — it belongs in the application service.
+- A rule that can be evaluated from the object's own state **must** live in the domain.
+- The controller never contains business logic. Use-case services never contain format validation.
 
 ### TEST-01 — Test requirements
 
@@ -413,6 +433,8 @@ the author or the GM.
 **Single active draft per campaign (D-054).** Attempting to submit a second session while one is in `processing` or `draft` returns `409`. This constraint is enforced at the application layer but also indirectly at the DB level via the unique constraint on `(campaign_id, status)` for draft states. Be aware of this when writing ingestion tests — each test campaign needs a clean session state.
 
 **Embedding generation is async and not immediate (D-063).** Entity versions committed in a session will not appear in Query Mode vector retrieval until embedding generation completes (typically seconds). Tests that exercise the query pipeline after a commit must either wait for embedding completion or mock the `EmbeddingPort`. Do not assert query results synchronously after a commit without accounting for this.
+
+**`CommitService` has eight mandatory validation preconditions (D-078–D-081).** Missing any one is a test gap, not a "nice-to-have." The full list: (1) all `card_id` values reference existing diff cards → `422 UNKNOWN_CARD_ID`; (2) no duplicate `card_id` entries → `422 DUPLICATE_CARD_DECISION`; (3) every non-UNCERTAIN diff card has an explicit decision → `422 INCOMPLETE_CARD_DECISIONS`; (4) all UNCERTAIN cards are resolved → `422 UNCERTAIN_ENTITIES_PRESENT`; (5) all ConflictCards acknowledged → `422 CONFLICTS_NOT_ACKNOWLEDGED`; (6) `matched_entity_id` non-null for MATCH resolutions → `400` (adapter); (7) `matched_entity_id` belongs to the campaign → `422 INVALID_ENTITY_REFERENCE`; (8) no `add` action in v1 → `422 UNSUPPORTED_ACTION`. A mandatory unit test suite must prove every check fires before `session.commit()` is called. See `session-ingestion-pipeline` skill §8.
 
 **UNCERTAIN entities block commit at the backend (D-042).** The backend performs independent validation of the commit payload and returns `422` if `UNCERTAIN` entities are present — regardless of what the frontend sent. Tests for the commit endpoint must include a case where the payload contains `UNCERTAIN` entities and assert the `422` response with error code `UNCERTAIN_ENTITIES_PRESENT`.
 

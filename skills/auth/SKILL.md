@@ -159,9 +159,15 @@ public class RefreshToken {
         if (this.status != RefreshTokenStatus.ACTIVE) {
             throw new DomainException("Cannot consume a non-active refresh token");
         }
+        if (Instant.now().isAfter(this.expiresAt)) {
+            throw new DomainException("Refresh token has expired");
+        }
         return new RefreshToken(id, userId, familyId, tokenHash,
             RefreshTokenStatus.CONSUMED, expiresAt, createdAt);
     }
+    // Note: the application layer also checks expiry before calling consume() (early 401 return).
+    // The domain check here is defence in depth — it ensures the invariant holds even if a future
+    // use-case path bypasses the application-layer expiry check.
 }
 ```
 

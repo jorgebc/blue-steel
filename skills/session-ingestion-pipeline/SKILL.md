@@ -156,6 +156,37 @@ validates that all `UNCERTAIN` entities from the diff have been resolved. If any
 1. Check `resolved_entities` in the payload covers all `UNCERTAIN` entities from the stored diff.
 2. Reject with `422` if any remain — this is a defence-in-depth check, not reliance on the UI.
 
+### 6b. Uncertain resolution integrity: `matched_entity_id` validation
+
+Before applying any MATCH resolutions, `CommitService` must:
+
+1. **Adapter layer (Bean Validation):** Verify `matched_entity_id` is non-null when `resolution = MATCH`.
+   This is a cross-field constraint on the commit payload DTO — implement via `@AssertTrue` or a
+   custom constraint annotation. Returns `400` if violated.
+
+2. **Application layer (CommitService):** Verify each `matched_entity_id` references an entity
+   that exists in the current campaign (`campaign_id` scope). Returns `422 INVALID_ENTITY_REFERENCE`
+   if the entity is not found. This prevents cross-campaign entity merges (IDOR-adjacent integrity
+   violation).
+
+```java
+// In CommitService, before applying world state writes
+for (UncertainResolution resolution : payload.uncertainResolutions()) {
+    if (resolution.resolution() == Resolution.MATCH) {
+        if (resolution.matchedEntityId() == null) {
+            throw new ValidationException("matched_entity_id required for MATCH resolution");
+        }
+        boolean exists = entityRepository.existsByIdAndCampaignId(
+            resolution.matchedEntityId(), campaignId);
+        if (!exists) {
+            throw new BusinessRuleViolationException(
+                ErrorCode.INVALID_ENTITY_REFERENCE,
+                "matched_entity_id does not belong to campaign " + campaignId);
+        }
+    }
+}
+```
+
 ### 7. Conflict detection: non-blocking warning cards
 
 `ConflictDetectionPort` receives the extraction result and relevant world state context
@@ -171,12 +202,31 @@ conflicts were detected and the array is absent or empty.
 
 `CommitService.commit()` performs these steps in order:
 
-1. Validate commit payload (UNCERTAIN check, conflict acknowledgment check).
+**Step 1 — Validate commit payload (all checks must pass before any world-state write):**
+
+`CommitService` is the authoritative validator (D-081). These checks are mandatory and must be
+enforced by a dedicated unit test suite that proves each one fires before `session.commit()` is
+called. Validation order:
+
+| Check | Error code | Decision |
+|---|---|---|
+| All `card_id` values in `card_decisions` exist in stored diff | `422 UNKNOWN_CARD_ID` | D-080 |
+| No duplicate `card_id` entries in `card_decisions` | `422 DUPLICATE_CARD_DECISION` | D-080 |
+| Every non-UNCERTAIN card in diff has an entry in `card_decisions` | `422 INCOMPLETE_CARD_DECISIONS` | D-080 |
+| All UNCERTAIN cards in diff have an entry in `uncertain_resolutions` | `422 UNCERTAIN_ENTITIES_PRESENT` | D-042 |
+| All ConflictCards in diff have an entry in `acknowledged_conflicts` | `422 CONFLICTS_NOT_ACKNOWLEDGED` | D-033 |
+| `matched_entity_id` non-null for every MATCH resolution | `400` (adapter) / `422` if missed | D-079 |
+| `matched_entity_id` belongs to the same campaign | `422 INVALID_ENTITY_REFERENCE` | D-079 |
+| No `add` action in any `card_decisions` entry | `422 UNSUPPORTED_ACTION` | D-053 |
+
+**Step 2 — Apply world state:**
+
 2. Apply each accepted/edited entity to world state — append new version rows.
 3. Transition session status to `COMMITTED`, clear `diff_payload`.
-4. Return HTTP 200 immediately.
-5. Publish `SessionCommittedEvent` via `ApplicationEventPublisher`.
-6. An `@EventListener @Async` handler in `adapters/out/ai/` picks up the event and generates
+4. Assign `sequence_number` (next ordinal within the campaign) (D-069).
+5. Return HTTP 200 immediately.
+6. Publish `SessionCommittedEvent` via `ApplicationEventPublisher`.
+7. An `@EventListener @Async` handler in `adapters/out/ai/` picks up the event and generates
    embeddings for each committed entity version via `EmbeddingPort` (D-063).
 
 **Do not await embedding completion in the commit endpoint.** It is fire-and-forget.
