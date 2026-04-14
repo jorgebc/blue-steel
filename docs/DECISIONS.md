@@ -83,6 +83,11 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-070 | Self-service password reset not implemented in v1 | ✅ Active | Definition |
 | D-071 | Java code style: Spotless + google-java-format | ✅ Active | Definition |
 | D-072 | Structured logging: logstash-logback-encoder; MDC fields for LLM calls | ✅ Active | Definition |
+| D-073 | Admin bootstrap: `ApplicationReadyEvent` startup listener seeded from env vars | ✅ Active | Phase 1 |
+| D-074 | Stuck-processing recovery: startup transition + scheduled TTL check | ✅ Active | Phase 2 |
+| D-075 | `EmailPort` activation: `email-real` Spring profile, independent of `llm-real` | ✅ Active | Phase 1 |
+| D-076 | DiffPayload and CommitPayload are formalized JSON contracts in ARCHITECTURE.md §7.6 | ✅ Active | Phase 2 |
+| D-077 | Invitation model: no invitations table; temporary password + `force_password_change` flag | ✅ Active | Phase 1 |
 
 ---
 
@@ -1437,6 +1442,141 @@ MDC (Mapped Diagnostic Context) carries `session_id` and `user_id` for the durat
 **Alternatives considered:**  
 - Spring Boot 3.x native structured logging (`logging.structured.format=logstash`) — available in Boot 3.4+; not yet verified for Boot 4.x compatibility. `logstash-logback-encoder` is the established path and is known to work. Revisit in v2 if Boot 4.x native structured logging reaches parity.
 - OpenTelemetry logging — premature for a solo portfolio project. No observability stack is in scope (no staging environment, D-044).
+
+---
+
+### D-073 — Admin bootstrap: `ApplicationReadyEvent` startup listener seeded from env vars
+
+**Date:** 2026-04-14  
+**Status:** Active
+
+**Decision:**  
+The singleton admin user is seeded on application startup via a Spring `@EventListener(ApplicationReadyEvent.class)` bean. It reads `ADMIN_EMAIL` and `ADMIN_PASSWORD` from environment variables, hashes the password with BCrypt, and inserts the admin user if and only if no user with `is_admin = TRUE` already exists. The listener is idempotent: subsequent restarts are no-ops. Both `ADMIN_EMAIL` and `ADMIN_PASSWORD` are required env vars; missing values fail startup with a clear error message.
+
+**Reason:**  
+The admin user must exist before any invitation can be sent or any campaign created. An `ApplicationReadyEvent` listener is the standard Spring Boot mechanism for startup side effects: it runs after the full context — including Liquibase migrations — is ready, ensuring the schema exists before the insert. Idempotency is essential: the listener must never fail on a redeployment where the admin already exists. Seeding from env vars keeps secrets out of the codebase (D-050) and makes the bootstrap reproducible without a manual step.
+
+**Constraints this imposes on the implementation:**  
+- Both `ADMIN_EMAIL` and `ADMIN_PASSWORD` must be declared in `.env.example`.
+- The application layer enforces the singleton invariant before inserting: if `users WHERE is_admin = TRUE` exists, the listener logs "Admin already exists — skipping bootstrap" and returns without error.
+- The DB-level partial unique index on `users WHERE is_admin = TRUE` (§5.1) is the second enforcement layer.
+- The admin user has `force_password_change = FALSE` (D-077): the bootstrap password is intentionally set by the operator, not a temporary value.
+
+**Alternatives considered:**  
+- CLI command / seed script — rejected; requires a separate manual step that is easy to forget and cannot be automated in CI. A startup listener requires zero operator action.
+- First-request bootstrap (lazy) — rejected; the first request to create a campaign would fail if the admin doesn't exist. Eager bootstrap on startup gives a clear error at deploy time, not at runtime.
+
+---
+
+### D-074 — Stuck-processing session recovery: startup transition + scheduled TTL check
+
+**Date:** 2026-04-14  
+**Status:** Active
+
+**Decision:**  
+Sessions can become permanently stuck in `processing` state if the JVM is restarted while the async pipeline is in flight. Two mechanisms address this:
+
+1. **Startup recovery:** the same `ApplicationReadyEvent` listener (D-073) queries for all sessions with `status = 'processing'` at startup and bulk-transitions them to `failed` with `failure_reason = 'PIPELINE_INTERRUPTED'`. This handles crash-recovery.
+
+2. **Scheduled TTL check:** a `@Scheduled` task runs every 5 minutes and transitions any session in `processing` for longer than `blue-steel.ingestion.processing-timeout-minutes` (default: 10 minutes, evaluated against `updated_at`) to `failed` with `failure_reason = 'PIPELINE_TIMEOUT'`. This handles silent hangs where the JVM is alive but the async task is blocked.
+
+Both transitions are non-destructive: the `narrative_blocks` record is preserved. The user can re-submit the summary.
+
+**Reason:**  
+Without recovery, a server restart during ingestion leaves the campaign permanently blocked (D-054: at most one active session per campaign). A user would have no recourse — the 409 block cannot be cleared without an admin intervention that is not exposed in the API. The startup recovery eliminates the most common failure mode (deploy during ingestion). The scheduled check handles less common but equally blocking scenarios (LLM provider timeout, network partition). Both mechanisms are cheap to implement and critical for operational reliability.
+
+**Constraints this imposes on the implementation:**  
+- `blue-steel.ingestion.processing-timeout-minutes` must be declared in `application.yml` with default `10` and in `.env.example`.
+- The scheduled task must be in an `adapters.in` or `application.service` class — not domain code.
+- Both recovery paths must update `sessions.updated_at` and log at WARN with `session_id`.
+- The `@Scheduled` task must be activated in all profiles including `local` (stuck sessions are not test-environment-specific).
+
+**Alternatives considered:**  
+- Manual admin endpoint to un-stick sessions — considered as a complement; not included in v1 because the automatic recovery covers the primary failure modes. Can be added as an ops endpoint in v2 if needed.
+- Retry stuck sessions instead of failing them — rejected; partial retry is complex, and the user's review of the diff would see results from a different pipeline run than the original. Failing cleanly and requiring re-submission is simpler and safer.
+
+---
+
+### D-075 — `EmailPort` activation: `email-real` Spring profile, independent of `llm-real`
+
+**Date:** 2026-04-14  
+**Status:** Active
+
+**Decision:**  
+The real `EmailPort` adapter is activated by a dedicated `email-real` Spring profile, separate from `llm-real`. The mock `EmailPort` adapter (which logs email content to the console) is active on the `local` profile by default. Activating `email-real` in addition to `local` and/or `llm-real` enables real email delivery without affecting LLM behavior.
+
+Profile combinations:
+- `local` — all adapters mocked; no external calls
+- `local,llm-real` — real LLM calls; email still mocked
+- `local,email-real` — real email; LLM still mocked
+- `local,llm-real,email-real` — all real (closest to prod behavior)
+
+**Reason:**  
+A developer testing the extraction pipeline in local dev does not want to send real emails. Conversely, a developer testing the invitation flow does not need real LLM calls. Coupling both behind a single profile forces developers to choose between incurring LLM cost when testing email, or forgoing email testing when validating the pipeline. Separate profiles give fine-grained control. This follows D-049's principle of safe defaults (local profile = all mocked) extended to the email channel.
+
+**Constraints this imposes on the implementation:**  
+- `EMAIL_API_KEY` must be in `.env.example` with a comment indicating it is only required with `email-real` profile.
+- The real `EmailAdapter` is a stub in Phase 1 — it implements `EmailPort` and throws `UnsupportedOperationException("Activate email-real profile and configure EMAIL_API_KEY")` unless a provider is wired. Provider selection (Resend recommended) is a Phase 1 delivery task.
+- The `MockEmailAdapter` must log the full `EmailMessage` (recipient, subject, body) at INFO level so developers can verify invitation flows locally.
+
+**Alternatives considered:**  
+- `@ConditionalOnProperty(name = "blue-steel.email.mock")` — more granular but introduces a new config key. Profiles are already the established pattern in this codebase (D-049). Consistency wins.
+- Include email in `llm-real` profile — rejected; conflates two independent concerns. See reasoning above.
+
+---
+
+### D-076 — DiffPayload and CommitPayload are formalized JSON contracts in ARCHITECTURE.md §7.6
+
+**Date:** 2026-04-14  
+**Status:** Active
+
+**Decision:**  
+`DiffPayload` (returned by `GET .../diff`, stored in `sessions.diff_payload` JSONB) and `CommitPayload` (submitted to `POST .../commit`) are formalized as canonical JSON schemas in ARCHITECTURE.md §7.6. These schemas are the authoritative source for both the backend Java records and the frontend TypeScript types. Any change to either schema requires a simultaneous update to both the Java record and the TypeScript type — enforced as a review convention (D-077).
+
+The field names use `snake_case` for JSON keys, consistent with the existing API convention. Java records map these via Jackson `@JsonProperty` or a global `PropertyNamingStrategies.SNAKE_CASE` config.
+
+**Reason:**  
+`DiffPayload` is a triple-boundary contract: (1) the backend serializes it, (2) it is persisted as JSONB in PostgreSQL, and (3) the frontend deserializes it. Schema drift at any of these three points produces bugs that are hard to detect because the JSONB column accepts any valid JSON and JPA maps it as a String. Without a formal, canonical definition, the backend and frontend are likely to diverge silently. Formalizing the schema in ARCHITECTURE.md makes it a first-class architectural artifact, not an implicit assumption.
+
+**Constraints this imposes on the implementation:**  
+- Backend: `DiffPayload` and `CommitPayload` are Java Records in `com.bluesteel.application.model` (not in the adapter layer). They have zero framework imports. Jackson serialization is handled by the adapter.
+- Frontend: `DiffPayload` and `CommitPayload` TypeScript types in `apps/web/src/types/sessions.ts` must mirror the schema field-for-field.
+- JSONB round-trip: any change to the schema requires a Liquibase migration if the shape changes in a way that makes existing stored `diff_payload` values unreadable. For v1 (no committed sessions in production yet), this is not a practical concern but must be in the review checklist for v2.
+
+**Alternatives considered:**  
+- OpenAPI code generation — deferred to v2 (D-030). Not justified for v1 given the small number of shared types.
+- Separate schema file (`.json` schema) — over-engineering for v1. A clearly formatted section in ARCHITECTURE.md with explicit JSON examples serves the same purpose.
+
+---
+
+### D-077 — Invitation model: no invitations table; temporary password + `force_password_change` flag
+
+**Date:** 2026-04-14  
+**Status:** Active
+
+**Decision:**  
+User accounts are created directly by invitation endpoints — there is no separate `invitations` table. When an invitation is sent:
+1. A cryptographically random temporary password is generated (not stored; only its BCrypt hash is stored in `users.password_hash`).
+2. The password is emailed to the recipient via `EmailPort`.
+3. The `users.force_password_change` column is set to `TRUE`.
+
+The recipient logs in with the temporary password, which succeeds and returns a JWT. The login response includes `"force_password_change": true`. The frontend redirects to the change-password screen. `PATCH /api/v1/users/me/password` clears `force_password_change` on success.
+
+**For re-invitation** (D-070 recovery path): calling `POST /api/v1/invitations` with an existing email generates a new temporary password, hashes it, updates `users.password_hash`, sets `force_password_change = TRUE`, and sends a new email. The user's account, campaign memberships, and world state data are unchanged.
+
+**Reason:**  
+An `invitations` table requires token lifecycle management (expiry, reuse detection, claimed state) that duplicates the pattern already in place for refresh tokens — without the additional security benefit. The temporary password approach is simpler: the email IS the "token" delivery channel; logging in with the temp password IS the acceptance event; the forced password change IS the acknowledgment. This is the pattern described in ARCHITECTURE.md §7.7 and is consistent with how many small, controlled-access platforms handle onboarding.
+
+**Constraints this imposes on the implementation:**  
+- `users` table requires a `force_password_change BOOLEAN NOT NULL DEFAULT FALSE` column (Liquibase changeset `0002_create_users`).
+- The temporary password is generated with `SecureRandom`, minimum 16 characters, alphanumeric + symbols. It is NEVER logged or stored in raw form.
+- The login response (`POST /api/v1/auth/login`) must include `"force_password_change": true|false` in the `data` object so the frontend can gate the redirect.
+- `PATCH /api/v1/users/me/password` requires the authenticated user's current password as confirmation before setting the new one. On success, sets `force_password_change = FALSE`.
+- `force_password_change = FALSE` for the bootstrapped admin (D-073): the operator sets the admin password intentionally via env var.
+
+**Alternatives considered:**  
+- Token-based invitation accept flow (separate `invitations` table with `token_hash`, `expires_at`, `accepted_at`) — considered; provides better audit trail and token expiry. Rejected for v1 in favour of simplicity. The `users.force_password_change` flag provides the essential first-login enforcement. Token-based flow can be introduced in v2 if the audit trail becomes important.
+- Send a magic link (one-time login URL) — rejected; requires token storage and expiry enforcement, which is the complexity we are avoiding.
 
 ---
 

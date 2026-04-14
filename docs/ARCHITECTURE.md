@@ -550,6 +550,13 @@ Session Summary (raw text)
 
 If the user is genuinely uncertain, the correct choice is **different entity** (create new). An incorrect split can be corrected through the proposal system in v2 (D-016). An unresolved entity creates an orphaned record that degrades the world state more than a recoverable wrong decision does.
 
+**Stuck-processing recovery (D-074):** The async pipeline runs inside the JVM. A server restart while the pipeline is in flight leaves the session permanently in `processing`, which blocks all future submissions for that campaign (D-054). Two recovery mechanisms are in place:
+
+1. **Startup recovery (`ApplicationReadyEvent` listener, D-073):** On every startup, all sessions with `status = 'processing'` are immediately transitioned to `failed` with `failure_reason = 'PIPELINE_INTERRUPTED'`. This handles crash-recovery atomically at boot.
+2. **Scheduled TTL check:** A `@Scheduled` task runs every 5 minutes and transitions any session in `processing` for longer than `blue-steel.ingestion.processing-timeout-minutes` (default: 10 minutes, evaluated against `sessions.updated_at`) to `failed` with `failure_reason = 'PIPELINE_TIMEOUT'`. This handles silent hangs.
+
+Both transitions log at WARN per session and preserve the `narrative_blocks` record. The user must re-submit the summary — no automatic retry.
+
 ### 6.4 Query Pipeline
 
 Each natural language query runs the following pipeline:
@@ -693,64 +700,105 @@ The session ingestion flow uses a staged endpoint sequence:
 | 3. Retrieve draft diff | `GET /api/v1/campaigns/{id}/sessions/{sid}/diff` | Returns the full structured diff payload when status is `draft` |
 | 4. Commit | `POST /api/v1/campaigns/{id}/sessions/{sid}/commit` | Submits the reviewed diff payload. Backend validates: zero UNCERTAIN entities, caller is GM or editor. Returns `422` with specific error codes on violation. |
 
-**Diff payload shape (outline) — returned by `GET .../diff`, stored in `sessions.diff_payload`:**
+**DiffPayload — canonical schema (D-076)**
 
-This is what the frontend reads to render the review screen. It is the output of the ingestion pipeline; it is never submitted back to the server. The commit payload (below) is a separate, smaller shape derived from the user's review decisions.
+This is the formal, authoritative definition of the `DiffPayload` JSON contract. Backend Java records in `com.bluesteel.application.model` and frontend TypeScript types in `apps/web/src/types/sessions.ts` must mirror this schema exactly. This value is returned by `GET .../diff` and persisted as-is in `sessions.diff_payload` (JSONB). It is **never submitted back to the server** — it is read-only from the client's perspective. The commit payload (below) is a separate, derived shape.
 
 ```json
 {
-  "narrative_summary": "Session 7 introduced a new faction, the Conclave, and shifted Mira's allegiance away from the party.",
-  "actors": [
-    {
-      "id": "...",
-      "resolution": "new|match|uncertain",
-      "matched_entity_id": "...",
-      "extracted_data": { },
-      "delta_fields": [ ]
-    }
-  ],
-  "spaces":    [ { "id": "...", "resolution": "new|match|uncertain", "extracted_data": { }, "delta_fields": [ ] } ],
-  "events":    [ { "id": "...", "resolution": "new", "extracted_data": { } } ],
-  "relations": [ { "id": "...", "resolution": "new|match|uncertain", "extracted_data": { }, "delta_fields": [ ] } ],
-  "conflicts": [
-    {
-      "conflict_id": "...",
-      "type": "hard_contradiction",
-      "description": "...",
-      "affected_entity_id": "...",
-      "affected_entity_type": "actor|space|event|relation"
-    }
-  ]
+  "narrative_summary_header": "string — 1–3 sentence AI-generated session summary (D-005); display-only",
+  "actors":    [ "<DiffCard>" ],
+  "spaces":    [ "<DiffCard>" ],
+  "events":    [ "<DiffCard>" ],
+  "relations": [ "<DiffCard>" ],
+  "detected_conflicts": [ "<ConflictCard>" ]
 }
 ```
 
-- `narrative_summary` — 1–3 sentence AI-generated session header (D-005). Display-only; not submitted in the commit payload.
-- `resolution` — `new` (entity is brand new), `match` (resolved to an existing entity), `uncertain` (user must resolve before commit, D-042).
-- `delta_fields` — present for `match` resolutions only; lists the fields that changed this session (D-006). Absent for `new` entities (full profile shown instead, D-007).
-- `conflicts` — present only when hard contradictions were detected (D-033). Empty array when none.
+**DiffCard** — four variants, discriminated by `card_type`:
+
+```json
+// EXISTING — entity already in world state; shows delta only (D-006)
+{
+  "card_id":          "uuid — stable identifier used in commit payload to reference this card",
+  "card_type":        "EXISTING",
+  "entity_id":        "uuid — world state entity this card refers to",
+  "entity_type":      "actor | space | event | relation",
+  "name":             "string — current entity name",
+  "changed_fields":   { "fieldName": "newValue", "...": "..." }
+}
+
+// NEW — entity appearing for the first time; shows full profile (D-007)
+{
+  "card_id":          "uuid",
+  "card_type":        "NEW",
+  "entity_type":      "actor | space | event | relation",
+  "name":             "string — extracted name",
+  "full_profile":     { "fieldName": "value", "...": "..." }
+}
+
+// UNCERTAIN — AI cannot determine if this is a new entity or an existing one (D-041, D-042)
+// User must resolve to MATCH or NEW before commit. No defer option.
+{
+  "card_id":              "uuid",
+  "card_type":            "UNCERTAIN",
+  "entity_type":          "actor | space | event | relation",
+  "extracted_mention":    "string — the raw text mention from the summary",
+  "candidate_entity_id":  "uuid — best candidate match in world state",
+  "candidate_entity_name":"string — name of the candidate for display"
+}
+```
+
+**ConflictCard** — non-blocking; user must acknowledge before commit (D-033):
+
+```json
+{
+  "conflict_id":      "uuid — referenced in commit payload acknowledged_conflicts",
+  "entity_id":        "uuid — entity where the contradiction was detected",
+  "entity_type":      "actor | space | event | relation",
+  "description":      "string — human-readable description of the contradiction",
+  "extracted_fact":   "string — what the current session claims",
+  "existing_fact":    "string — what the world state currently holds"
+}
+```
 
 ---
 
-**Commit payload shape (outline) — submitted via `POST .../commit`:**
+**CommitPayload — canonical schema (D-076)**
 
-Supported actions per item: `accept` (no change), `edit` (user-modified data), `delete` (remove AI-extracted item). Manually adding entities the AI missed ("add" action) is deferred to v2 (D-053).
+This is the formal, authoritative definition of the body submitted to `POST .../commit`. Backend Java records and frontend TypeScript types must mirror this schema exactly.
+
+Supported actions per card: `accept` (no change to extracted data), `edit` (user-modified fields), `delete` (discard AI-extracted item — no world state change). The `add` action (manually introducing entities the AI missed) is deferred to v2 (D-053).
 
 ```json
 {
-  "actors":    [ { "id": "...", "action": "accept|edit|delete", "data": { } } ],
-  "spaces":    [ { "id": "...", "action": "accept|edit|delete", "data": { } } ],
-  "events":    [ { "id": "...", "action": "accept|edit|delete", "data": { } } ],
-  "relations": [ { "id": "...", "action": "accept|edit|delete", "data": { } } ],
-  "resolved_entities": [
-    { "mention_id": "...", "resolution": "match|new", "matched_entity_id": "..." }
+  "card_decisions": [
+    {
+      "card_id":      "uuid — references a DiffCard.card_id from the diff payload",
+      "action":       "accept | edit | delete",
+      "edited_fields": { "fieldName": "newValue" }
+    }
+  ],
+  "uncertain_resolutions": [
+    {
+      "card_id":           "uuid — references an UNCERTAIN DiffCard.card_id",
+      "resolution":        "MATCH | NEW",
+      "matched_entity_id": "uuid — required when resolution = MATCH; null when NEW"
+    }
   ],
   "acknowledged_conflicts": [
-    { "conflict_id": "...", "accepted": true }
+    {
+      "conflict_id": "uuid — references a ConflictCard.conflict_id"
+    }
   ]
 }
 ```
 
-`acknowledged_conflicts` is required when the diff contains conflict warnings. The backend rejects with `422` if conflicts were detected but the commit payload contains no acknowledgments — consistent with D-002 (user must confirm before commit) and D-033 (non-blocking warnings). An empty array is valid only when no conflicts were detected.
+**Validation rules enforced server-side (defence in depth):**
+- `uncertain_resolutions` must include an entry for every `UNCERTAIN` card in the diff. Any missing resolution → `422 UNCERTAIN_ENTITIES_PRESENT` (D-042).
+- `acknowledged_conflicts` must include an entry for every `ConflictCard` in `detected_conflicts`. An empty array is valid only when the diff had no conflicts → `422 CONFLICTS_NOT_ACKNOWLEDGED` (D-033).
+- `edited_fields` is required and non-empty when `action = edit`. It is omitted or null for `accept` and `delete`.
+- `card_decisions` must not be empty (at least one card must be in the diff for commit to be valid).
 
 **Draft state persistence:** The draft diff is stored server-side in `sessions.diff_payload` (status `draft`). This enables failure recovery — if the user closes the browser mid-review, the diff is retrievable on return. Client-side edits to diff cards are submitted as part of the final commit payload, not persisted incrementally.
 
