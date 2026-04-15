@@ -6,6 +6,12 @@
 out/
 .idea_modules/
 
+# Maven
+target/
+*.class
+*.jar
+!**/test/**/*.jar
+
 # OS
 .DS_Store
 .DS_Store?

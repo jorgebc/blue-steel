@@ -1,0 +1,94 @@
+name: Backend CI/CD
+
+# Triggered only when backend files change (D-048)
+on:
+  push:
+    paths:
+      - 'apps/api/**'
+  pull_request:
+    paths:
+      - 'apps/api/**'
+
+jobs:
+  # ── Test ────────────────────────────────────────────────────────────────────
+  # Runs on every push and pull_request that touches apps/api/**
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Spotless check (google-java-format, D-071)
+        working-directory: apps/api
+        run: mvn spotless:check
+
+      - name: Compile
+        working-directory: apps/api
+        run: mvn compile -DskipTests
+
+      - name: Unit tests + ArchUnit (D-037)
+        working-directory: apps/api
+        run: mvn test
+
+      - name: Integration tests (Testcontainers, D-056)
+        working-directory: apps/api
+        run: mvn verify
+
+      - name: Mutation tests — domain core (PITest, D-036)
+        working-directory: apps/api
+        run: mvn test-compile pitest:mutationCoverage
+
+  # ── Build + Deploy ───────────────────────────────────────────────────────────
+  # Runs only on push to main (not on pull_request)
+  build-and-deploy:
+    name: Build and Deploy
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build JAR
+        working-directory: apps/api
+        run: mvn package -DskipTests -Dspring-boot.repackage.skip=false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        # linux/arm64 required — Oracle Cloud Always Free ARM VM (D-046)
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image (linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/api
+          platforms: linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository }}/api:latest
+
+      - name: Deploy to Oracle VM
+        # TODO: Wire secrets before first production deploy (Phase 1 gate D-057)
+        # Required GitHub secrets: ORACLE_SSH_KEY, ORACLE_VM_HOST, ORACLE_VM_USER
+        # Commands: SSH into VM, docker pull, docker stop blue-steel-api, docker run
+        run: echo "Deploy step stubbed — secrets not yet provisioned"

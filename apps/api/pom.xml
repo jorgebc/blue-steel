@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project
+  xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.0.3</version>
+    <relativePath />
+  </parent>
+
+  <groupId>com.bluesteel</groupId>
+  <artifactId>blue-steel-api</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>blue-steel-api</name>
+  <description>AI-assisted narrative memory system for tabletop RPG campaigns</description>
+
+  <properties>
+    <java.version>25</java.version>
+
+    <!-- Spring AI — ChatClient (Anthropic) + EmbeddingModel (OpenAI) -->
+    <spring-ai.version>2.0.0-M4</spring-ai.version>
+
+    <!-- Testing -->
+    <archunit.version>1.3.0</archunit.version>
+    <testcontainers.version>1.21.0</testcontainers.version>
+
+    <!-- JWT -->
+    <nimbus-jose-jwt.version>9.40</nimbus-jose-jwt.version>
+
+    <!-- Structured logging -->
+    <logstash-logback-encoder.version>8.0</logstash-logback-encoder.version>
+
+    <!-- Code style -->
+    <google-java-format.version>1.22.0</google-java-format.version>
+    <spotless-maven-plugin.version>2.43.0</spotless-maven-plugin.version>
+
+    <!-- Mutation testing -->
+    <pitest-maven.version>1.17.0</pitest-maven.version>
+    <pitest-junit5-plugin.version>1.2.1</pitest-junit5-plugin.version>
+
+    <!-- Repackage is skipped during mvn test / mvn verify (no main class until F1.2).
+         CI build-and-deploy step overrides: mvn package -Dspring-boot.repackage.skip=false -->
+    <spring-boot.repackage.skip>true</spring-boot.repackage.skip>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Spring AI BOM — ChatClient + EmbeddingModel (D-032, D-062) -->
+      <dependency>
+        <groupId>org.springframework.ai</groupId>
+        <artifactId>spring-ai-bom</artifactId>
+        <version>${spring-ai.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Testcontainers BOM -->
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- ── Web ─────────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- ── Security ────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
+    <!-- ── Validation ──────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+
+    <!-- ── Data JPA + Hibernate ────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+
+    <!-- ── PostgreSQL JDBC driver ──────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!-- ── Liquibase (migration runner — D-029) ────────────────────────── -->
+    <dependency>
+      <groupId>org.liquibase</groupId>
+      <artifactId>liquibase-core</artifactId>
+    </dependency>
+
+    <!-- ── Spring AI — Anthropic (text generation, D-032) ─────────────── -->
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-starter-model-anthropic</artifactId>
+    </dependency>
+
+    <!-- ── Spring AI — OpenAI (text-embedding-3-small, 1536 dims) ─────── -->
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-starter-model-openai</artifactId>
+    </dependency>
+
+    <!-- ── JWT HS256 (nimbus-jose-jwt, D-043) ──────────────────────────── -->
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+      <version>${nimbus-jose-jwt.version}</version>
+    </dependency>
+
+    <!-- ── Structured logging — logstash-logback-encoder (D-072) ──────── -->
+    <dependency>
+      <groupId>net.logstash.logback</groupId>
+      <artifactId>logstash-logback-encoder</artifactId>
+      <version>${logstash-logback-encoder.version}</version>
+    </dependency>
+
+    <!-- ── Test ────────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Testcontainers — PostgreSQL + pgvector for integration tests (D-056) -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ArchUnit — layer boundary enforcement (D-037) -->
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <version>${archunit.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- ── Spring Boot Maven plugin ─────────────────────────────────── -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <!-- ── Surefire — unit tests only (excludes *IT.java) ───────────── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/*IT.java</exclude>
+            <exclude>**/*IntegrationTest.java</exclude>
+          </excludes>
+          <failIfNoTests>false</failIfNoTests>
+          <!-- Pass JVM flags needed by google-java-format at compile time -->
+          <argLine>
+            --add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+          </argLine>
+        </configuration>
+      </plugin>
+
+      <!-- ── Failsafe — integration tests (*IT.java), verify phase ─────── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <configuration>
+          <includes>
+            <include>**/*IT.java</include>
+            <include>**/*IntegrationTest.java</include>
+          </includes>
+          <failIfNoTests>false</failIfNoTests>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ── Spotless — google-java-format (D-071) ─────────────────────── -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless-maven-plugin.version}</version>
+        <configuration>
+          <java>
+            <googleJavaFormat>
+              <version>${google-java-format.version}</version>
+              <style>GOOGLE</style>
+            </googleJavaFormat>
+            <removeUnusedImports />
+            <trimTrailingWhitespace />
+            <endWithNewline />
+          </java>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotless-check</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ── PITest — mutation testing, scoped to domain core (D-036) ──── -->
+      <!-- Run explicitly: mvn test-compile pitest:mutationCoverage         -->
+      <!-- Excluded from standard mvn test / mvn verify                     -->
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <version>${pitest-maven.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-junit5-plugin</artifactId>
+            <version>${pitest-junit5-plugin.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <!-- Scope: domain core only (application + adapter layers excluded) -->
+          <targetClasses>
+            <param>com.bluesteel.domain.*</param>
+          </targetClasses>
+          <targetTests>
+            <param>com.bluesteel.domain.*</param>
+          </targetTests>
+          <!-- Minimum mutation coverage threshold (D-036) -->
+          <mutationThreshold>80</mutationThreshold>
+          <!-- Do not run during standard mvn test / mvn verify phases -->
+          <skipDependencyCheck>false</skipDependencyCheck>
+        </configuration>
+      </plugin>
+
+      <!-- ── Liquibase Maven plugin ─────────────────────────────────────── -->
+      <plugin>
+        <groupId>org.liquibase</groupId>
+        <artifactId>liquibase-maven-plugin</artifactId>
+        <configuration>
+          <changeLogFile>src/main/resources/db/changelog/db.changelog-master.xml</changeLogFile>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
