@@ -1,9 +1,5 @@
 # PRD — Narrative Memory System for Tabletop RPG Campaigns
 
-**Status:** Draft v0.4  
-**Phase:** Definition & Analysis  
-**Last updated:** 2026-04-05
-
 ---
 
 ## 1. Problem Statement
@@ -122,9 +118,10 @@ Each item is an editable card. Per item, the user can:
 - **Accept** as-is (one click)
 - **Edit inline** — rename, reclassify, adjust description
 - **Delete** — remove false positives
-- **Add** — manually introduce items the AI missed
 
 A single **Commit** action finalizes all changes. Nothing enters world state before it.
+
+> **v1 scope note:** The ability to manually introduce entities the AI missed ("Add" action) is deferred to v2 (D-053). In v1, users who need to add a missed entity should submit a corrected session summary or use the proposal system once it ships in v2.
 
 **Narrative summary header:**
 
@@ -137,6 +134,8 @@ Entities already present in the world state show **only what changed this sessio
 **Entity resolution:**
 
 Before generating the diff, the system must reliably determine whether an extracted entity maps to an existing world state entity or is genuinely new. This is a non-trivial AI step (alias matching, name variation, contextual identity) — architectural implications deferred to ARCHITECTURE.md.
+
+**Oversized input:** If a submitted summary exceeds the system token limit, the submission is rejected before any processing occurs. The user is shown the configured limit and a suggestion to split the summary across multiple session records.
 
 ### 6.2 Query Mode
 **Purpose:** Ask natural language questions about the campaign.
@@ -161,10 +160,9 @@ Exploration mode is a set of interconnected views, not a single screen:
 **Read-only for world state.** No direct edits to entities, spaces, or relations from this mode. All world state mutation flows through Input Mode.
 
 **Annotations:**
-- Any campaign member can attach a free-text annotation to any entity, space, or relation
-- Annotations are non-canonical — clearly marked as player commentary, not world state
+- Any campaign member can attach a free-text annotation to any actor, space, relation, or event
+- Annotations work as a comment section — non-canonical and clearly marked as player commentary, not world state
 - Visible to all campaign members
-- GMs can pin or dismiss annotations
 
 **Propose a change:**
 - A *"Propose a change"* affordance is present on every entity, space, and relation in v1
@@ -190,6 +188,7 @@ Exploration mode is a set of interconnected views, not a single screen:
 - Player proposal and approval workflow (UI + approval logic)
 - Proposal expiry / TTL enforcement
 - Conflict resolution between concurrent proposals
+- Q&A log — campaign history of queries and answers, with a history panel inside Query Mode (D-058)
 
 ### Out of scope entirely (post-v2)
 - Real-time collaborative editing
@@ -203,10 +202,10 @@ Exploration mode is a set of interconnected views, not a single screen:
 
 | Attribute | Requirement |
 |---|---|
-| **Latency** | Knowledge extraction and query responses must feel responsive; target < 10s for standard summaries |
+| **Latency** | Knowledge extraction: target < 10s for summaries up to 2,000 tokens (~1,500 words). Query responses: target < 5s. Summaries approaching the token limit may exceed the 10s target; this is acceptable. |
 | **Accuracy** | Extractions must be reviewable and correctable — the system never commits without user confirmation |
 | **Traceability** | Every piece of world state must be traceable to the session that produced it |
-| **Consistency** | World state must never contain contradictory facts without surfacing a conflict to the user |
+| **Consistency** | When a session introduces facts that contradict existing world state, the system must surface the contradiction to the user before commit. The user retains authority to accept the contradiction (e.g., narrative retcon). The system never silently admits contradictions. |
 | **Simplicity** | The interface must be usable by non-technical users with no onboarding |
 
 ---
@@ -216,10 +215,11 @@ Exploration mode is a set of interconnected views, not a single screen:
 | # | Question | Priority |
 |---|---|---|
 | ~~OQ-1~~ | ~~What is the correction/annotation UX in Input Mode?~~ | ✅ Resolved — see §6.1 |
-| OQ-2 | How are conflicts handled when a new session contradicts existing world state? | High |
-| OQ-3 | What is the granularity of world state versioning — per session commit, or finer? | Medium |
+| ~~OQ-2~~ | ~~How are conflicts handled when a new session contradicts existing world state?~~ | ✅ Resolved — see DECISIONS.md D-033 |
+| ~~OQ-3~~ | ~~What is the granularity of world state versioning — per session commit, or finer?~~ | ✅ Resolved — see DECISIONS.md D-035 |
 | ~~OQ-4~~ | ~~Single-user vs multi-user per campaign in v1?~~ | ✅ Resolved — see §3 and §7 |
 | ~~OQ-5~~ | ~~Is Exploration Mode read-only, or can users annotate / manually add information?~~ | ✅ Resolved — see §6.3 |
+| ~~OQ-6~~ | ~~Should submitted queries and their answers be persisted and viewable as a Q&A log?~~ | ✅ Resolved — deferred to v2, see DECISIONS.md D-058 |
 
 ---
 
@@ -234,4 +234,3 @@ The system is successful if:
 
 ---
 
-*Next document to produce: ARCHITECTURE.md*

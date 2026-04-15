@@ -18,7 +18,7 @@ Tabletop RPG campaigns are long-running, complex narratives. Characters evolve, 
 
 **Query:** Ask natural language questions about your campaign. *"What does Aldric know about the Conclave?"* *"Who was at the battle of Thornwall?"* Every answer is sourced back to a specific session.
 
-**Explore:** Browse the world visually — a timeline of events, entity profiles, a map of locations, a web of relationships. Annotate anything. Nothing you see here is invented.
+**Explore:** Browse the world visually across four interconnected views — a **Timeline** of events, **Entity** profiles, **Spaces** and locations, and a **Relations** graph of connections between actors. Annotate anything. Nothing you see here is invented.
 
 ---
 
@@ -38,9 +38,9 @@ All project decisions and specifications live in `/docs`:
 |---|---|
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements — what and why |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Stack, structure, patterns, conventions |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases, functional blocks, status |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases, functional blocks, status *(in progress — complete before development starts)* |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decision log — every significant technical and product choice |
-| [`docs/CLAUDE.md`](docs/CLAUDE.md) | Principles and conventions for AI-assisted development |
+| [`docs/CLAUDE.md`](docs/CLAUDE.md) | Principles and conventions for AI-assisted development *(in progress — complete before development starts)* |
 
 ---
 
