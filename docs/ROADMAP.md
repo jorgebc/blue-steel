@@ -31,7 +31,7 @@
 
 | # | Feature | Status |
 |---|---|---|
-| F1.0 | Repo scaffold + CI/CD pipelines | 🔲 |
+| F1.0 | Repo scaffold + CI/CD pipelines | ✅ |
 | F1.1 | Test infrastructure baseline | 🔲 |
 | F1.2 | Backend health skeleton (deployable) | 🔲 |
 | F1.3 | Database connectivity + Liquibase baseline | 🔲 |
