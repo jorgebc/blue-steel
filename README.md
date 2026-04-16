@@ -24,9 +24,9 @@ Tabletop RPG campaigns are long-running, complex narratives. Characters evolve, 
 
 ## Project status
 
-**Current phase:** Definition & Analysis — no code yet.
+**Current phase:** Phase 1 — active development.
 
-We are defining what to build, the technology stack, and the architecture before writing a single line of code.
+Definition & Analysis is complete. Architecture decisions are finalized and documented. Phase 1 development is underway.
 
 ---
 
@@ -38,9 +38,9 @@ All project decisions and specifications live in `/docs`:
 |---|---|
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements — what and why |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Stack, structure, patterns, conventions |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases, functional blocks, status *(in progress — complete before development starts)* |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phases, functional blocks, status |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decision log — every significant technical and product choice |
-| [`docs/CLAUDE.md`](docs/CLAUDE.md) | Principles and conventions for AI-assisted development *(in progress — complete before development starts)* |
+| [`CLAUDE.md`](CLAUDE.md) | Conventions and context for AI-assisted development |
 
 ---
 
