@@ -4,6 +4,7 @@
 *.iws
 *.ipr
 out/
+!**/src/**/out/
 .idea_modules/
 
 # Maven

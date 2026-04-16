@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    Enable the pgvector extension.
+    Must run before any table that uses vector columns (DB-01, D-062).
+    runAlways="false" is the default — applied exactly once per schema.
+  -->
+  <changeSet id="0001-pgvector-extension" author="blue-steel">
+    <sql>CREATE EXTENSION IF NOT EXISTS vector</sql>
+  </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    Migrations are included here as they are added in subsequent phases.
+    See skills/database-migration/SKILL.md for naming conventions.
+    Never modify a changeset once it has been applied to any environment (DB-02).
+  -->
+
+  <include file="db/changelog/0001_pgvector_extension.xml"/>
+
+</databaseChangeLog>
