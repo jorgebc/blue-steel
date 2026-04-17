@@ -6,7 +6,7 @@
 # The JAR is built by Maven in CI (mvn package -DskipTests) before Docker build.
 
 # ── Runtime stage ──────────────────────────────────────────────────────────
-FROM eclipse-temurin:25-jre-jammy
+FROM eclipse-temurin:25-jre-jammy@sha256:d36843a6f1af5d0aca01ef3d926e2220444eb19fe38e1b23cef3d663ef29b306
 
 WORKDIR /app
 

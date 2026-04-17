@@ -1,0 +1,103 @@
+version: 2
+
+updates:
+  # ── GitHub Actions ────────────────────────────────────────────────────────────
+  # Keeps SHA-pinned action references up to date across both workflows.
+  # Dependabot will open PRs to bump the SHA and update the version comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "ci(deps)"
+
+  # ── Frontend — npm (apps/web) ─────────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    labels:
+      - dependencies
+      - frontend
+    commit-message:
+      prefix: "chore(deps/web)"
+    groups:
+      # Batch minor/patch React ecosystem updates into a single PR
+      # (dependency-review-action is intentionally ungrouped — Node.js 24 upgrade needs manual review)
+      react-ecosystem:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "react-router-dom"
+          - "react-hook-form"
+        update-types:
+          - minor
+          - patch
+      # Batch TanStack Query + Zustand together (server/client state)
+      state-management:
+        patterns:
+          - "@tanstack/*"
+          - "zustand"
+        update-types:
+          - minor
+          - patch
+      # Batch all dev tooling (Vite, Vitest, ESLint, TypeScript, Prettier)
+      dev-tooling:
+        patterns:
+          - "vite"
+          - "vitest"
+          - "@vitejs/*"
+          - "eslint*"
+          - "typescript*"
+          - "prettier"
+          - "@eslint/*"
+          - "globals"
+        update-types:
+          - minor
+          - patch
+
+  # ── Backend — Maven (apps/api) ────────────────────────────────────────────────
+  - package-ecosystem: maven
+    directory: /apps/api
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    labels:
+      - dependencies
+      - backend
+    commit-message:
+      prefix: "chore(deps/api)"
+    groups:
+      # Batch Spring Boot managed dependencies together
+      spring-boot:
+        patterns:
+          - "org.springframework.boot:*"
+        update-types:
+          - minor
+          - patch
+      # Spring AI kept separate — milestone → GA transition requires manual review
+      spring-ai:
+        patterns:
+          - "org.springframework.ai:*"
+      # Batch testing infrastructure
+      testing:
+        patterns:
+          - "org.testcontainers:*"
+          - "com.tngtech.archunit:*"
+          - "org.pitest:*"
+        update-types:
+          - minor
+          - patch
