@@ -1,7 +1,4 @@
 name: Frontend CI
-# TODO(security): pin all 'uses:' steps to commit SHA digests before first production deploy.
-#   Replace tag-based refs (e.g. @v4) with SHA-based refs (e.g. @<40-char SHA>  # v4.x.x).
-#   Use 'pin-github-actions' CLI or enable Dependabot for the github-actions ecosystem.
 
 # Triggered only when frontend files change (D-048)
 # Deployment is handled by Vercel's GitHub integration — not by this workflow (D-045)
@@ -21,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout v4.3.1 — https://github.com/actions/checkout/releases/tag/v4.3.1
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48  # actions/dependency-review-action v4.9.0 — https://github.com/actions/dependency-review-action/releases/tag/v4.9.0
 
   # ── CI ──────────────────────────────────────────────────────────────────────
   # Runs on every push and pull_request that touches apps/web/**
@@ -31,10 +28,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout v4.3.1 — https://github.com/actions/checkout/releases/tag/v4.3.1
 
       - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # actions/setup-node v4.4.0 — https://github.com/actions/setup-node/releases/tag/v4.4.0
         with:
           node-version: '20'
           cache: 'npm'
