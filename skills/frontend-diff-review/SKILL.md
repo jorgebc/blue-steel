@@ -71,69 +71,99 @@ src/features/input/
 
 ### 1. Understand the diff payload shape
 
-The diff payload from `GET /sessions/{id}/diff` contains:
+The diff payload from `GET /sessions/{id}/diff` matches the canonical schema in ARCHITECTURE.md §7.6.
+TypeScript types in `src/types/sessions.ts` must mirror this exactly.
 
 ```typescript
-interface DiffPayload {
-  narrativeSummary: string;     // D-005: shown at top before cards
-  actors: DiffItem[];
-  spaces: DiffItem[];
-  events: DiffItem[];
-  relations: DiffItem[];
+// src/types/sessions.ts — mirrors ARCHITECTURE.md §7.6 exactly
+
+export type CardType = 'EXISTING' | 'NEW' | 'UNCERTAIN';
+
+// Base shape shared by EXISTING and NEW cards
+export interface ExistingDiffCard {
+  card_id: string;        // stable identifier; used in CommitPayload.card_decisions
+  card_type: 'EXISTING';
+  entity_id: string;      // world state entity this card refers to
+  entity_type: 'actor' | 'space' | 'event' | 'relation';
+  name: string;
+  changed_fields: Record<string, unknown>;  // delta only (D-006)
 }
 
-type DiffItemKind = 'new' | 'delta' | 'uncertain' | 'conflict';
+export interface NewDiffCard {
+  card_id: string;
+  card_type: 'NEW';
+  entity_type: 'actor' | 'space' | 'event' | 'relation';
+  name: string;
+  full_profile: Record<string, unknown>;    // complete extracted profile (D-007)
+}
 
-interface DiffItem {
-  id: string;                   // temporary ID for this diff item
-  kind: DiffItemKind;
-  entityType: 'actor' | 'space' | 'event' | 'relation';
-  // For 'new': full extracted profile
-  extractedData: Record<string, unknown>;
-  // For 'delta': only changed fields
-  changedFields: Record<string, { previous: unknown; current: unknown }>;
-  // For 'uncertain': the mention + the candidate existing entity
-  mention: ExtractedMention | null;
-  candidateEntity: WorldStateEntity | null;
-  // For 'conflict': the contradiction
-  conflictDescription: string | null;
-  conflictId: string | null;
+// UNCERTAIN: AI cannot determine match vs. new — user must resolve
+export interface UncertainDiffCard {
+  card_id: string;
+  card_type: 'UNCERTAIN';
+  entity_type: 'actor' | 'space' | 'event' | 'relation';
+  extracted_mention: string;          // raw text mention from the summary
+  candidate_entity_id: string;        // best candidate match in world state
+  candidate_entity_name: string;      // display name of candidate
+}
+
+export type DiffCard = ExistingDiffCard | NewDiffCard | UncertainDiffCard;
+
+// ConflictCard — non-blocking; user must acknowledge before commit (D-033)
+export interface ConflictCard {
+  conflict_id: string;        // referenced in CommitPayload.acknowledged_conflicts
+  entity_id: string;
+  entity_type: 'actor' | 'space' | 'event' | 'relation';
+  description: string;
+  extracted_fact: string;
+  existing_fact: string;
+}
+
+export interface DiffPayload {
+  narrative_summary_header: string;   // D-005: AI-generated 1-3 sentence summary
+  actors: DiffCard[];
+  spaces: DiffCard[];
+  events: DiffCard[];
+  relations: DiffCard[];
+  detected_conflicts: ConflictCard[];
 }
 ```
 
 ### 2. Manage card-level user decisions in state
 
-Each card's user decision is tracked in a state map keyed by `DiffItem.id`. Use a proper
+Each card's user decision is tracked in a state map keyed by `DiffCard.card_id`. Use a proper
 discriminated union — never use `as any` to access variant-specific fields.
 
 ```typescript
 // src/features/input/hooks/useDiffState.ts
 export type CardDecision =
   | { action: 'accept' }
-  | { action: 'edit'; data: Record<string, unknown> }
-  | { action: 'delete' }
-  | { action: 'uncertain_resolved'; resolution: 'match' | 'new'; matchedEntityId?: string }
-  | { action: 'conflict_acknowledged' };
+  | { action: 'edit'; edited_fields: Record<string, unknown> }
+  | { action: 'delete' };
+
+export type UncertainResolution =
+  | { card_id: string; resolution: 'MATCH'; matched_entity_id: string }
+  | { card_id: string; resolution: 'NEW'; matched_entity_id: null };
 
 // Type guards — use these to narrow the union safely
-export function isUncertainResolved(d: CardDecision): d is Extract<CardDecision, { action: 'uncertain_resolved' }> {
-  return d.action === 'uncertain_resolved';
-}
-
 export function isEdit(d: CardDecision): d is Extract<CardDecision, { action: 'edit' }> {
   return d.action === 'edit';
 }
 
 export interface DiffState {
-  decisions: Map<string, CardDecision>;
-  setDecision: (itemId: string, decision: CardDecision) => void;
+  decisions: Map<string, CardDecision>;           // keyed by card_id
+  uncertainResolutions: Map<string, UncertainResolution>;  // keyed by card_id
+  acknowledgedConflicts: Set<string>;             // conflict_ids
+  setDecision: (cardId: string, decision: CardDecision) => void;
+  resolveUncertain: (resolution: UncertainResolution) => void;
+  acknowledgeConflict: (conflictId: string) => void;
   unresolvedUncertainCount: number;
   unacknowledgedConflictCount: number;
 }
 ```
 
-The default state for a card is `accept`. Users only need to interact with cards they want to
-change, delete, or resolve.
+The default state for a non-UNCERTAIN card is `accept`. Users only need to interact with cards
+they want to change, delete, or resolve.
 
 ### 3. The UNCERTAIN card — mandatory resolution
 
@@ -142,7 +172,12 @@ option:
 
 ```tsx
 // src/features/input/components/UncertainCard.tsx
-export function UncertainCard({ item, onResolve }: Props) {
+interface Props {
+  card: UncertainDiffCard;
+  onResolve: (resolution: UncertainResolution) => void;
+}
+
+export function UncertainCard({ card, onResolve }: Props) {
   return (
     <Card>
       <CardHeader>
@@ -150,20 +185,26 @@ export function UncertainCard({ item, onResolve }: Props) {
         <h3>Is this the same entity?</h3>
       </CardHeader>
       <CardContent>
-        {/* Show extracted mention side-by-side with candidate existing entity */}
-        <MentionPreview mention={item.mention} />
-        <CandidatePreview entity={item.candidateEntity} />
+        <p>Extracted: <strong>{card.extracted_mention}</strong></p>
+        <p>Possible match: <strong>{card.candidate_entity_name}</strong></p>
       </CardContent>
       <CardFooter>
         <Button
-          onClick={() => onResolve(item.id, { action: 'uncertain_resolved', resolution: 'match',
-            matchedEntityId: item.candidateEntity?.id })}
+          onClick={() => onResolve({
+            card_id: card.card_id,
+            resolution: 'MATCH',
+            matched_entity_id: card.candidate_entity_id,
+          })}
         >
           Same entity (link to existing)
         </Button>
         <Button
           variant="outline"
-          onClick={() => onResolve(item.id, { action: 'uncertain_resolved', resolution: 'new' })}
+          onClick={() => onResolve({
+            card_id: card.card_id,
+            resolution: 'NEW',
+            matched_entity_id: null,
+          })}
         >
           Different entity (create new)
         </Button>
@@ -199,56 +240,63 @@ depth — treat receiving it as a UI bug to fix.
 
 ### 5. Assembling the commit payload
 
-`useCommitPayload` translates the `DiffState` decisions map into the commit payload shape.
+`useCommitPayload` translates `DiffState` into the canonical `CommitPayload` shape from ARCHITECTURE.md §7.6.
 Use the type guards defined in §2 — no `as any` casts.
 
 ```typescript
+// src/types/sessions.ts — CommitPayload (mirrors ARCHITECTURE.md §7.6)
+export interface CardDecisionPayload {
+  card_id: string;
+  action: 'accept' | 'edit' | 'delete';
+  edited_fields?: Record<string, unknown>;  // required + non-empty when action = 'edit'
+}
+
+export interface UncertainResolutionPayload {
+  card_id: string;
+  resolution: 'MATCH' | 'NEW';
+  matched_entity_id: string | null;  // non-null when resolution = MATCH
+}
+
+export interface CommitPayload {
+  card_decisions: CardDecisionPayload[];
+  uncertain_resolutions: UncertainResolutionPayload[];
+  acknowledged_conflicts: Array<{ conflict_id: string }>;
+}
+
 // src/features/input/hooks/useCommitPayload.ts
-import { isUncertainResolved, isEdit, type CardDecision } from './useDiffState';
+export function buildCommitPayload(diff: DiffPayload, state: DiffState): CommitPayload {
+  // card_decisions: every non-UNCERTAIN card must have an explicit entry
+  const allNonUncertainCards = [
+    ...diff.actors, ...diff.spaces, ...diff.events, ...diff.relations
+  ].filter((c): c is ExistingDiffCard | NewDiffCard => c.card_type !== 'UNCERTAIN');
 
-export function useCommitPayload(diff: DiffPayload, decisions: Map<string, CardDecision>): CommitPayload {
-  const mapItems = (items: DiffItem[]) =>
-    items
-      .filter(item => item.kind !== 'uncertain' && item.kind !== 'conflict')
-      .map(item => {
-        const decision = decisions.get(item.id) ?? { action: 'accept' as const };
-        return {
-          id: item.id,
-          action: decision.action,
-          data: isEdit(decision) ? decision.data : {},
-        };
-      });
+  const card_decisions: CardDecisionPayload[] = allNonUncertainCards.map(card => {
+    const decision = state.decisions.get(card.card_id) ?? { action: 'accept' as const };
+    return {
+      card_id: card.card_id,
+      action: decision.action,
+      ...(isEdit(decision) ? { edited_fields: decision.edited_fields } : {}),
+    };
+  });
 
-  const resolvedEntities = [...decisions.entries()]
-    .filter(([, d]) => isUncertainResolved(d))
-    .map(([mentionId, d]) => {
-      // d is narrowed to { action: 'uncertain_resolved'; resolution: ...; matchedEntityId?: ... }
-      const resolved = d as Extract<CardDecision, { action: 'uncertain_resolved' }>;
-      return {
-        mentionId,
-        resolution: resolved.resolution,
-        matchedEntityId: resolved.matchedEntityId ?? null,
-      };
-    });
+  const uncertain_resolutions: UncertainResolutionPayload[] =
+    [...state.uncertainResolutions.values()].map(r => ({
+      card_id: r.card_id,
+      resolution: r.resolution,
+      matched_entity_id: r.resolution === 'MATCH' ? r.matched_entity_id : null,
+    }));
 
-  const acknowledgedConflicts = [...decisions.entries()]
-    .filter(([, d]) => d.action === 'conflict_acknowledged')
-    .map(([conflictId]) => ({ conflictId, accepted: true }));
+  const acknowledged_conflicts = [...state.acknowledgedConflicts].map(id => ({
+    conflict_id: id,
+  }));
 
-  return {
-    actors: mapItems(diff.actors),
-    spaces: mapItems(diff.spaces),
-    events: mapItems(diff.events),
-    relations: mapItems(diff.relations),
-    resolvedEntities,
-    acknowledgedConflicts,
-  };
+  return { card_decisions, uncertain_resolutions, acknowledged_conflicts };
 }
 ```
 
-**Important:** `acknowledgedConflicts` must only be non-empty when conflicts exist. Sending an
-empty array `[]` when no conflicts were detected is valid — sending `[]` when conflicts were
-detected triggers `422 CONFLICTS_NOT_ACKNOWLEDGED`.
+**Important:** `acknowledged_conflicts` must be non-empty when conflicts exist. An empty array
+`[]` is valid only when the diff had no conflicts. Sending `[]` when conflicts were detected
+triggers `422 CONFLICTS_NOT_ACKNOWLEDGED`.
 
 ### 6. Inline editing
 

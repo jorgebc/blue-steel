@@ -261,27 +261,26 @@ admin password set via environment variable at first deploy.
 
 ## Backend — User Invitation Flow (D-051)
 
-Self-registration is disabled. All accounts are created by the admin via invitation. The
-invitation flow in v1 is:
+Self-registration is disabled. Two distinct invitation endpoints exist (ARCHITECTURE.md §7.7):
 
-1. Admin calls `POST /api/v1/admin/invitations` with `{ email, campaignId?, role? }`.
-2. Backend generates a one-time invitation token (UUID, 48h TTL) and stores it in
-   `invitations` table.
-3. Backend sends an invitation email via the email adapter (`EmailPort`). The email contains
-   a link with the token: `<frontend-url>/accept-invite?token=<token>`.
-4. User visits the link, sets a password. Frontend calls `POST /api/v1/auth/accept-invitation`
-   with `{ token, password }`.
-5. Backend validates the token, creates the user account, returns a JWT + refresh token.
+| Endpoint | Caller | Behaviour |
+|---|---|---|
+| `POST /api/v1/invitations` | admin | Platform-level: creates user account only. `409` if email already exists. |
+| `POST /api/v1/campaigns/{id}/invitations` | gm | Campaign-scoped: creates user account AND adds to campaign as `player` in one transaction. If account already exists, adds to campaign directly (no `409` for existing account). `409` if already a campaign member. |
 
-> ⚠️ The email provider (Resend recommended) and `EmailPort` implementation details are
-> finalized in Phase 1. The port interface is defined now; the adapter is wired in Phase 1.
+Both endpoints send an email with a system-generated temporary password. The recipient logs in
+with that password and must change it on first login via `PATCH /api/v1/users/me/password`.
 
 ```java
-// application/port/out/EmailPort.java
+// application/port/out/EmailPort.java — matches ARCHITECTURE.md §6.2
 public interface EmailPort {
-    void sendInvitation(String recipientEmail, String invitationToken, String frontendBaseUrl);
+    void send(EmailMessage message);
+    // EmailMessage carries: to, subject, body (plain text + HTML)
 }
 ```
+
+> ⚠️ The email provider (Resend recommended) and `EmailPort` adapter details are finalized
+> in Phase 1. The port interface is defined now; the adapter is wired in Phase 1.
 
 ---
 
