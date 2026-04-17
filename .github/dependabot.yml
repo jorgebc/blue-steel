@@ -32,6 +32,7 @@ updates:
       prefix: "chore(deps/web)"
     groups:
       # Batch minor/patch React ecosystem updates into a single PR
+      # (dependency-review-action is intentionally ungrouped — Node.js 24 upgrade needs manual review)
       react-ecosystem:
         patterns:
           - "react"

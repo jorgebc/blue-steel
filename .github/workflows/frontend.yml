@@ -18,8 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout v4.3.1 — https://github.com/actions/checkout/releases/tag/v4.3.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # actions/checkout v6.0.2 — https://github.com/actions/checkout/releases/tag/v6.0.2
       - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48  # actions/dependency-review-action v4.9.0 — https://github.com/actions/dependency-review-action/releases/tag/v4.9.0
+        # NOTE: v4.9.0 is the latest release and still runs on Node.js 20. The upstream project
+        # has not yet shipped a Node.js 24-compatible release. A deprecation warning will appear
+        # until they do. Track: https://github.com/actions/dependency-review-action/releases
 
   # ── CI ──────────────────────────────────────────────────────────────────────
   # Runs on every push and pull_request that touches apps/web/**
@@ -28,10 +31,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout v4.3.1 — https://github.com/actions/checkout/releases/tag/v4.3.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # actions/checkout v6.0.2 — https://github.com/actions/checkout/releases/tag/v6.0.2
 
       - name: Set up Node.js 20
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # actions/setup-node v4.4.0 — https://github.com/actions/setup-node/releases/tag/v4.4.0
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # actions/setup-node v6.3.0 — https://github.com/actions/setup-node/releases/tag/v6.3.0
         with:
           node-version: '20'
           cache: 'npm'
