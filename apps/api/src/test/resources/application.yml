@@ -1,0 +1,12 @@
+# Test-only placeholder configuration.
+# No real API calls are made in integration tests — Spring AI auto-configuration
+# requires keys to be present to initialise the context, but the AI adapters are
+# never invoked in F1.1 tests (database smoke only).
+spring:
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+  ai:
+    openai:
+      api-key: test-placeholder
+    anthropic:
+      api-key: test-placeholder
