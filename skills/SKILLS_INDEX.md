@@ -19,11 +19,14 @@
 | **session-ingestion-pipeline** | `session-ingestion-pipeline/SKILL.md` | Working on the extraction → entity resolution → conflict detection → diff → commit pipeline |
 | **query-pipeline** | `query-pipeline/SKILL.md` | Working on the Query Mode pipeline: embed → vector search → context assembly → LLM answer → citations |
 | **auth** | `auth/SKILL.md` | Implementing or modifying authentication/authorization on either side — JWT issuance, refresh token rotation, Spring Security filter chain, admin bootstrap, invitation flow, frontend token storage, silent refresh, route guards |
+| **spring-ai-llm-adapter** | `spring-ai-llm-adapter/SKILL.md` | Implementing or modifying any LLM-backed port adapter: `NarrativeExtractionPort`, `EntityResolutionPort`, `ConflictDetectionPort`, `QueryAnsweringPort`, `EmbeddingPort`; mock vs real profile wiring; structured output; cost logging |
+| **error-handling** | `error-handling/SKILL.md` | Implementing validation, exception handling, or error responses — three-tier validation model, GlobalExceptionHandler, domain exception hierarchy, project-specific error codes |
 | **frontend-api-resource** | `frontend-api-resource/SKILL.md` | Adding a typed API client file, TanStack Query hooks, DTO types, or connecting any component to a backend endpoint |
 | **frontend-diff-review** | `frontend-diff-review/SKILL.md` | Building or modifying the diff review screen: card types, UNCERTAIN resolution, commit button, payload assembly |
 | **frontend-exploration** | `frontend-exploration/SKILL.md` | Building any Exploration Mode view: Timeline (keyset), Entities/Spaces (offset), Relations graph (React Flow v12 / `@xyflow/react`) |
 | **frontend-query-mode** | `frontend-query-mode/SKILL.md` | Building or modifying the Query Mode UI: question form, answer display, citation rendering, 504 timeout handling |
 | **frontend-testing** | `frontend-testing/SKILL.md` | Writing any frontend test — Vitest setup, React Testing Library patterns, axe-core assertions, hook isolation, fetch mocking |
+| **react-hook-form** | `react-hook-form/SKILL.md` | Building any form in the frontend — React Hook Form v7 + shadcn/ui Form primitives, client-side validation, API `400` error mapping to form fields |
 | **database-migration** | `database-migration/SKILL.md` | Adding or modifying any database schema — Liquibase changeset creation, pgvector columns, Neon branch validation |
 | **ci-cd** | `ci-cd/SKILL.md` | Modifying GitHub Actions workflows, Docker builds, deployment configuration, or secret management |
 
@@ -38,16 +41,22 @@
 → `backend-domain-model` (primary), `database-migration` (for schema), `backend-testing` (for tests), `backend-endpoint` (to expose it via REST)
 
 **"I need to modify the extraction/ingestion pipeline"**
-→ `session-ingestion-pipeline` (primary), `backend-testing`
+→ `session-ingestion-pipeline` (primary), `spring-ai-llm-adapter`, `backend-testing`
 
 **"I need to modify Query Mode (backend)"**
-→ `query-pipeline` (primary), `backend-testing`
+→ `query-pipeline` (primary), `spring-ai-llm-adapter`, `backend-testing`
 
 **"I need to build the Query Mode UI (frontend)"**
 → `frontend-query-mode` (primary), `frontend-api-resource`, `frontend-testing`
 
 **"I need to implement or modify auth (either side)"**
 → `auth` (primary), `backend-endpoint` (for login/refresh endpoints), `database-migration` (for refresh_tokens/invitations schema)
+
+**"I need to implement an LLM adapter (extraction, resolution, query, embedding)"**
+→ `spring-ai-llm-adapter` (primary), `session-ingestion-pipeline` or `query-pipeline`
+
+**"I need to add validation or error handling to a backend endpoint"**
+→ `error-handling` (primary), `backend-endpoint`
 
 **"I need to connect a frontend component to the backend"**
 → `frontend-api-resource` (primary)
@@ -57,6 +66,9 @@
 
 **"I need to add a view in Exploration Mode"**
 → `frontend-exploration` (primary), `frontend-api-resource`
+
+**"I need to build a form (login, session submission, annotation, password change)"**
+→ `react-hook-form` (primary), `frontend-api-resource`, `frontend-testing`
 
 **"I need to write a backend test"**
 → `backend-testing`

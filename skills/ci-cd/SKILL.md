@@ -292,7 +292,7 @@ ci: add path filter for backend workflow
 
 ## References
 
-- `CLAUDE.md` §7 (commit format, branch naming)
+- `CLAUDE.md` §5 (commit format, branch naming)
 - `DECISIONS.md` D-044, D-045, D-046, D-048, D-050, D-065, D-066
-- `apps/api/CLAUDE.md` §4 (run commands — to be completed before Phase 1)
-- `apps/web/CLAUDE.md` §4 (run commands — to be completed before Phase 1)
+- `apps/api/CLAUDE.md` §3 (backend run commands)
+- `apps/web/CLAUDE.md` §3 (frontend run commands)

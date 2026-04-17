@@ -231,25 +231,35 @@ called. Validation order:
 
 **Do not await embedding completion in the commit endpoint.** It is fire-and-forget.
 
-## Commit Payload Structure
+## Commit Payload Structure (canonical — ARCHITECTURE.md §7.6)
 
 ```json
 {
-  "actors":    [{ "id": "...", "action": "accept|edit|delete", "data": { } }],
-  "spaces":    [{ "id": "...", "action": "accept|edit|delete", "data": { } }],
-  "events":    [{ "id": "...", "action": "accept|edit|delete", "data": { } }],
-  "relations": [{ "id": "...", "action": "accept|edit|delete", "data": { } }],
-  "resolved_entities": [
-    { "mention_id": "...", "resolution": "match|new", "matched_entity_id": "..." }
+  "card_decisions": [
+    {
+      "card_id": "uuid — references a DiffCard.card_id from the diff payload",
+      "action": "accept | edit | delete",
+      "edited_fields": { "fieldName": "newValue" }
+    }
+  ],
+  "uncertain_resolutions": [
+    {
+      "card_id": "uuid — references an UNCERTAIN DiffCard.card_id",
+      "resolution": "MATCH | NEW",
+      "matched_entity_id": "uuid — required when resolution = MATCH; null when NEW"
+    }
   ],
   "acknowledged_conflicts": [
-    { "conflict_id": "...", "accepted": true }
+    { "conflict_id": "uuid — references a ConflictCard.conflict_id" }
   ]
 }
 ```
 
-Note: `add` action is deferred to v2 (D-053). Any `add` action in a v1 commit payload
-should return `422 UNSUPPORTED_ACTION`.
+**Notes:**
+- `card_decisions` must contain an entry for **every** non-UNCERTAIN card in the diff (D-080).
+- `edited_fields` is required and non-empty when `action = edit`; null/omitted otherwise.
+- `add` action is deferred to v2 (D-053). Any `add` action returns `422 UNSUPPORTED_ACTION`.
+- Backend Java records and frontend TypeScript types in `src/types/sessions.ts` must mirror this schema exactly.
 
 ## Draft Session Policy (D-054)
 
