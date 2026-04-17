@@ -138,6 +138,13 @@ Refresh tokens use a family-based rotation model to detect token reuse:
    new token hash, return 200.
 3. On logout: mark the current refresh token as `revoked`; invalidate the cookie.
 
+> **Security requirement:** The refresh token `Set-Cookie` header **must** include `SameSite=Strict`
+> (or `SameSite=Lax` if cross-site navigation must preserve sessions) to prevent CSRF-driven
+> token rotation. `HttpOnly` and `Secure` flags are required. Example:
+> ```
+> Set-Cookie: refresh_token=<value>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth/refresh; Max-Age=2592000
+> ```
+
 ```java
 // domain/auth/RefreshToken.java
 public class RefreshToken {

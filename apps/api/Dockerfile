@@ -6,6 +6,9 @@
 # The JAR is built by Maven in CI (mvn package -DskipTests) before Docker build.
 
 # ── Runtime stage ──────────────────────────────────────────────────────────
+# TODO(security): pin to a specific digest before first production deploy.
+#   Example: FROM eclipse-temurin:25-jre-jammy@sha256:<digest>
+#   Obtain the current digest with: docker pull eclipse-temurin:25-jre-jammy && docker inspect --format='{{index .RepoDigests 0}}' eclipse-temurin:25-jre-jammy
 FROM eclipse-temurin:25-jre-jammy
 
 WORKDIR /app

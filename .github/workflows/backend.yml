@@ -1,4 +1,7 @@
 name: Backend CI/CD
+# TODO(security): pin all 'uses:' steps to commit SHA digests before first production deploy.
+#   Replace tag-based refs (e.g. @v4) with SHA-based refs (e.g. @<40-char SHA>  # v4.x.x).
+#   Use 'pin-github-actions' CLI or enable Dependabot for the github-actions ecosystem.
 
 # Triggered only when backend files change (D-048)
 on:
@@ -10,6 +13,16 @@ on:
       - 'apps/api/**'
 
 jobs:
+  # ── Dependency Review ────────────────────────────────────────────────────────
+  # Blocks PRs that introduce packages with known CVEs (A06)
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+
   # ── Test ────────────────────────────────────────────────────────────────────
   # Runs on every push and pull_request that touches apps/api/**
   test:
