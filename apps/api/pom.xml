@@ -27,7 +27,7 @@
 
     <!-- Testing -->
     <archunit.version>1.4.1</archunit.version>
-    <testcontainers.version>2.0.4</testcontainers.version>
+    <testcontainers.version>1.21.3</testcontainers.version>
 
     <!-- JWT -->
     <nimbus-jose-jwt.version>10.9</nimbus-jose-jwt.version>
