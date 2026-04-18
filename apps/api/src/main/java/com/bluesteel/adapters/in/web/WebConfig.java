@@ -7,6 +7,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * CORS configuration: always allows {@code localhost:5173} for local development; additionally
+ * allows the origin set via the {@code VITE_API_BASE_URL} env var when present (production).
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 

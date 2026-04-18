@@ -95,7 +95,40 @@ Secrets are **never committed**. `.env` and `.env.local` are always gitignored (
 
 ---
 
-## 6. Skills
+## 6. Quality Standards
+
+### Javadoc (backend)
+
+Add Javadoc to:
+- Every public class/interface/enum whose purpose is not fully obvious from its name and annotations alone
+- Public methods where the name does not convey the contract, parameters, or non-obvious behaviour
+- Factory methods and any method with a non-trivial return contract
+
+Do **not** add Javadoc to:
+- Standard Spring Boot main classes (`@SpringBootApplication`)
+- Simple record components, getters, or constructors whose signature is self-explanatory
+- `@Override` implementations when the interface already documents the contract
+
+Rules for the text itself:
+- One sentence is enough when it describes the purpose clearly
+- Never paraphrase the method name — add context the name cannot carry
+- No `@param` / `@return` tags unless the semantics are ambiguous from the type alone
+
+### `@DisplayName` on tests (backend + frontend)
+
+Every `@Test` method must have a `@DisplayName` that describes the scenario in plain language:
+
+```java
+@Test
+@DisplayName("should return 200 with status=DEGRADED when database is unreachable")
+void health_returnsDegradedWhenDbIsDown() { ... }
+```
+
+The method name and the display name serve different audiences: the method name is code; the display name is the test report that humans read. Both must be present.
+
+---
+
+## 7. Skills (formerly §6)
 
 Read `skills/SKILLS_INDEX.md` before starting any non-trivial task.
 
@@ -113,6 +146,6 @@ Read `skills/SKILLS_INDEX.md` before starting any non-trivial task.
 
 ---
 
-## 7. Out of Scope (v1)
+## 8. Out of Scope (v1)
 
 **Never implement:** proposal approval UI/logic, `add` action in commit payload (D-053), Q&A log (D-058), SSE streaming for queries (D-052), Spring AI `VectorStore` (D-062), E2E tests (D-056), staging environment (D-044), self-registration (D-051), real-time collaboration, audio/image ingestion, mobile app.

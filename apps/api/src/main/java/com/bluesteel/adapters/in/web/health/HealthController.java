@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** Exposes {@code GET /api/v1/health} — the only unauthenticated endpoint in the API. */
 @RestController
 @RequestMapping("/api/v1/health")
 public class HealthController {

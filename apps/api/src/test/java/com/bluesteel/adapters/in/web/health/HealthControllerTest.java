@@ -11,6 +11,7 @@ import com.bluesteel.application.port.out.ComponentStatus;
 import com.bluesteel.application.port.out.HealthPort;
 import com.bluesteel.application.port.out.SystemHealth;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -45,6 +46,7 @@ class HealthControllerTest {
   }
 
   @Test
+  @DisplayName("should return 200 with status=UP and db=UP when all components are healthy")
   void health_returnsUpWithoutAuthentication() throws Exception {
     mockMvc
         .perform(get("/api/v1/health"))
@@ -56,6 +58,7 @@ class HealthControllerTest {
   }
 
   @Test
+  @DisplayName("should return 200 with status=DEGRADED and db=DOWN when database is unreachable")
   void health_returnsDegradedWhenDbIsDown() throws Exception {
     when(healthPort.check()).thenReturn(SystemHealth.of(ComponentStatus.DOWN));
 
@@ -67,6 +70,7 @@ class HealthControllerTest {
   }
 
   @Test
+  @DisplayName("should return 401 on any route other than /health when request is unauthenticated")
   void otherRoutes_requireAuthentication() throws Exception {
     mockMvc.perform(get("/api/v1/campaigns")).andExpect(status().isUnauthorized());
   }
