@@ -33,7 +33,7 @@
 |---|---|---|
 | F1.0 | Repo scaffold + CI/CD pipelines | ✅ |
 | F1.1 | Test infrastructure baseline | ✅ |
-| F1.2 | Backend health skeleton (deployable) | 🔲 |
+| F1.2 | Backend health skeleton (deployable) | ✅ |
 | F1.3 | Database connectivity + Liquibase baseline | 🔲 |
 | F1.4 | Core schema migration: auth tables | 🔲 |
 | F1.5 | Admin bootstrap + platform invitation + password change | 🔲 |
