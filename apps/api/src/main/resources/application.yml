@@ -2,9 +2,6 @@ server:
   port: 8080
 
 spring:
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false
   autoconfigure:
     exclude:
       - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
