@@ -1,0 +1,21 @@
+{
+  "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+  "name": "Oracle Cloud",
+  "_postman_variable_scope": "environment",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "https://TU_DOMINIO_ORACLE.com",
+      "type": "default",
+      "enabled": true,
+      "description": "Sustituye TU_DOMINIO_ORACLE.com por la IP pública o dominio de tu VM de Oracle Cloud Always Free."
+    },
+    {
+      "key": "bearerToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true,
+      "description": "JWT access token de producción. Déjalo vacío; rellénalo en Postman después de autenticarte (no lo guardes en el fichero)."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+  "name": "Local",
+  "_postman_variable_scope": "environment",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "default",
+      "enabled": true,
+      "description": "Base URL — matches server.port=8080 in application.properties"
+    },
+    {
+      "key": "bearerToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true,
+      "description": "JWT access token. Paste here after calling POST /api/v1/auth/login (not yet implemented)."
+    }
+  ]
+}
