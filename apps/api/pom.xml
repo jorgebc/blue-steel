@@ -43,9 +43,7 @@
     <pitest-maven.version>1.23.0</pitest-maven.version>
     <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
 
-    <!-- Repackage is skipped during mvn test / mvn verify (no main class until F1.2).
-         CI build-and-deploy step overrides: mvn package -Dspring-boot.repackage.skip=false -->
-    <spring-boot.repackage.skip>true</spring-boot.repackage.skip>
+    <spring-boot.repackage.skip>false</spring-boot.repackage.skip>
   </properties>
 
   <dependencyManagement>

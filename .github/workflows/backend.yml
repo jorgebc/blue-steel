@@ -79,7 +79,7 @@ jobs:
 
       - name: Build JAR
         working-directory: apps/api
-        run: mvn package -DskipTests -Dspring-boot.repackage.skip=false
+        run: mvn package -DskipTests
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # docker/setup-buildx-action v4.0.0 — https://github.com/docker/setup-buildx-action/releases/tag/v4.0.0
@@ -101,7 +101,24 @@ jobs:
           tags: ghcr.io/${{ github.repository }}/api:latest
 
       - name: Deploy to Oracle VM
-        # TODO: Wire secrets before first production deploy (Phase 1 gate D-057)
-        # Required GitHub secrets: ORACLE_SSH_KEY, ORACLE_VM_HOST, ORACLE_VM_USER
-        # Commands: SSH into VM, docker pull, docker stop blue-steel-api, docker run
-        run: echo "Deploy step stubbed — secrets not yet provisioned"
+        # Required GitHub secrets: ORACLE_SSH_KEY, ORACLE_VM_HOST, ORACLE_VM_USER (D-046)
+        # The VM must have ~/blue-steel.env with all runtime env vars (DATABASE_URL, JWT_SECRET, etc.)
+        env:
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          ORACLE_VM_HOST: ${{ secrets.ORACLE_VM_HOST }}
+          ORACLE_VM_USER: ${{ secrets.ORACLE_VM_USER }}
+        run: |
+          echo "$ORACLE_SSH_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          ssh -i /tmp/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              "$ORACLE_VM_USER@$ORACLE_VM_HOST" \
+              "docker pull ghcr.io/${{ github.repository }}/api:latest && \
+               docker stop blue-steel-api 2>/dev/null || true && \
+               docker rm blue-steel-api 2>/dev/null || true && \
+               docker run -d --name blue-steel-api --restart unless-stopped \
+                 -p 8080:8080 \
+                 --env-file ~/blue-steel.env \
+                 ghcr.io/${{ github.repository }}/api:latest"
+          rm /tmp/deploy_key
