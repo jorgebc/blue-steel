@@ -124,3 +124,46 @@ jobs:
                  --env-file ~/blue-steel.env \
                  ghcr.io/${{ github.repository }}/api:latest"
           rm /tmp/deploy_key
+
+  # ── Smoke Test ───────────────────────────────────────────────────────────────
+  # Polls GET /api/v1/health after deploy. Up to 10 attempts × 15 s = 2.5 min.
+  # Required secret: ORACLE_URL — full base URL, e.g. https://1.2.3.4
+  smoke-test:
+    name: Smoke Test
+    needs: build-and-deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Wait for application to become healthy
+        env:
+          ORACLE_URL: ${{ secrets.ORACLE_URL }}
+        run: |
+          HEALTH_URL="${ORACLE_URL}/api/v1/health"
+          MAX_ATTEMPTS=10
+          WAIT_SECONDS=15
+
+          echo "Polling ${HEALTH_URL} (max ${MAX_ATTEMPTS} attempts, ${WAIT_SECONDS}s between retries)"
+
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Attempt ${attempt}/${MAX_ATTEMPTS}..."
+            HTTP_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+                               --max-time 10 --connect-timeout 5 \
+                               "${HEALTH_URL}" || echo "000")
+
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "✓ Health check passed (HTTP ${HTTP_STATUS}) on attempt ${attempt}"
+              exit 0
+            fi
+
+            echo "✗ Got HTTP ${HTTP_STATUS} — waiting ${WAIT_SECONDS}s before retry"
+            if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+              sleep $WAIT_SECONDS
+            fi
+          done
+
+          echo ""
+          echo "ERROR: deployment is not healthy after ${MAX_ATTEMPTS} attempts ($(( MAX_ATTEMPTS * WAIT_SECONDS ))s)"
+          echo "Last status: HTTP ${HTTP_STATUS}"
+          echo "Check container logs on the Oracle VM: docker logs blue-steel-api --tail 100"
+          exit 1
