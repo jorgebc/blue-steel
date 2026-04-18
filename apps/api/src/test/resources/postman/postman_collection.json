@@ -1,0 +1,77 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Blue Steel API",
+    "description": "AI-assisted narrative memory system for tabletop RPG campaigns.\n\n**Auth:** All endpoints except `/api/v1/health` require a JWT Bearer token.\nSet `bearerToken` in the active environment after obtaining a token.\n\n**Envelope:** Every response uses `{ \"data\": {}, \"meta\": {}, \"errors\": [] }`.\n\n**Generated from:** `apps/api/src/main/java/com/bluesteel/adapters/in/web`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearerToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "{{baseUrl}}",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "HealthController — GET /api/v1/health\nPublic endpoint (no authentication required).",
+      "item": [
+        {
+          "name": "Get health status",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "health"]
+            },
+            "description": "Returns the current application status.\n\n- **Auth:** None (permitAll)\n- **200 OK** — application is running\n- **503** — application is unhealthy (future)"
+          },
+          "response": [
+            {
+              "name": "200 OK — application healthy",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/health",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "health"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"status\": \"UP\"\n  },\n  \"meta\": {},\n  \"errors\": []\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
