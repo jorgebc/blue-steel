@@ -1,8 +1,9 @@
 package com.bluesteel.adapters.in.web.health;
 
 import com.bluesteel.adapters.in.web.ApiResponse;
+import com.bluesteel.application.port.out.HealthPort;
+import com.bluesteel.application.port.out.SystemHealth;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -11,25 +12,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/health")
 public class HealthController {
 
-  private final JdbcTemplate jdbcTemplate;
+  private final HealthPort healthPort;
 
-  public HealthController(JdbcTemplate jdbcTemplate) {
-    this.jdbcTemplate = jdbcTemplate;
+  public HealthController(HealthPort healthPort) {
+    this.healthPort = healthPort;
   }
 
   @GetMapping
   public ResponseEntity<ApiResponse<HealthResponse>> health() {
-    String dbStatus = checkDb();
-    String overallStatus = "UP".equals(dbStatus) ? "UP" : "DEGRADED";
-    return ResponseEntity.ok(ApiResponse.success(new HealthResponse(overallStatus, dbStatus)));
-  }
-
-  private String checkDb() {
-    try {
-      jdbcTemplate.queryForObject("SELECT 1", Integer.class);
-      return "UP";
-    } catch (Exception e) {
-      return "DOWN";
-    }
+    SystemHealth health = healthPort.check();
+    return ResponseEntity.ok(
+        ApiResponse.success(new HealthResponse(health.overall(), health.db())));
   }
 }

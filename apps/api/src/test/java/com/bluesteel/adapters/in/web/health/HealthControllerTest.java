@@ -1,7 +1,5 @@
 package com.bluesteel.adapters.in.web.health;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -9,12 +7,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bluesteel.BlueSteelApplication;
+import com.bluesteel.application.port.out.ComponentStatus;
+import com.bluesteel.application.port.out.HealthPort;
+import com.bluesteel.application.port.out.SystemHealth;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -32,7 +32,7 @@ import org.springframework.web.context.WebApplicationContext;
     })
 class HealthControllerTest {
 
-  @MockitoBean private JdbcTemplate jdbcTemplate;
+  @MockitoBean private HealthPort healthPort;
 
   @Autowired private WebApplicationContext context;
 
@@ -40,7 +40,7 @@ class HealthControllerTest {
 
   @BeforeEach
   void setup() {
-    when(jdbcTemplate.queryForObject(anyString(), any(Class.class))).thenReturn(1);
+    when(healthPort.check()).thenReturn(SystemHealth.of(ComponentStatus.UP));
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
@@ -57,8 +57,7 @@ class HealthControllerTest {
 
   @Test
   void health_returnsDegradedWhenDbIsDown() throws Exception {
-    when(jdbcTemplate.queryForObject(anyString(), any(Class.class)))
-        .thenThrow(new RuntimeException("connection refused"));
+    when(healthPort.check()).thenReturn(SystemHealth.of(ComponentStatus.DOWN));
 
     mockMvc
         .perform(get("/api/v1/health"))
