@@ -42,6 +42,9 @@ build/
 .env.development
 .env.production
 
+# Postman environments with real values — commit only *.example.json
+**/postman/postman_env_oracle.json
+
 # Logs
 logs/
 *.log
