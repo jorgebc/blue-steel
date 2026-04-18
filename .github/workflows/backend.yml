@@ -107,6 +107,7 @@ jobs:
           ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
           ORACLE_VM_HOST: ${{ secrets.ORACLE_VM_HOST }}
           ORACLE_VM_USER: ${{ secrets.ORACLE_VM_USER }}
+          SPRING_PROFILES_ACTIVE: prod
         run: |
           echo "$ORACLE_SSH_KEY" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
@@ -119,6 +120,7 @@ jobs:
                docker rm blue-steel-api 2>/dev/null || true && \
                docker run -d --name blue-steel-api --restart unless-stopped \
                  -p 8080:8080 \
+                 -e SPRING_PROFILES_ACTIVE=prod \
                  --env-file ~/blue-steel.env \
                  ghcr.io/${{ github.repository }}/api:latest"
           rm /tmp/deploy_key
