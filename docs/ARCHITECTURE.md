@@ -1170,10 +1170,14 @@ Secrets required at runtime:
 
 | Secret | Consumer |
 |---|---|
-| `DATABASE_URL` | Spring Boot (Neon connection string) |
-| `ANTHROPIC_API_KEY` | Spring AI adapter |
-| `OPENAI_API_KEY` | Spring AI embedding adapter |
-| `JWT_SECRET` | Spring Security |
+| `DATABASE_URL` | Spring Boot — Neon JDBC URL without credentials |
+| `DB_USERNAME` | Spring Boot — Neon database user |
+| `DB_PASSWORD` | Spring Boot — Neon database password |
+| `ANTHROPIC_API_KEY` | Spring AI adapter — text generation |
+| `OPENAI_API_KEY` | Spring AI embedding adapter — text-embedding-3-small |
+| `JWT_SECRET` | Spring Security — HS256 symmetric secret (min 32 bytes) |
+| `EMAIL_API_KEY` | Email adapter (Resend) — transactional email |
+| `VITE_API_BASE_URL` | CORS — frontend origin allowed by the backend |
 
 The `.env` file is read by Docker Compose at container start via the `env_file` directive. Rotating a secret requires SSH access to the VM and a container restart.
 
