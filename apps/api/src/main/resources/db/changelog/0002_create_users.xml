@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <changeSet id="0002-create-users" author="jorge">
+
+    <createTable tableName="users">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="email" type="TEXT">
+        <constraints nullable="false" unique="true" uniqueConstraintName="uidx_users_email"/>
+      </column>
+      <column name="password_hash" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <column name="is_admin" type="BOOLEAN" defaultValueBoolean="false">
+        <constraints nullable="false"/>
+      </column>
+      <column name="force_password_change" type="BOOLEAN" defaultValueBoolean="false">
+        <!-- D-077: set to TRUE on invitation; cleared on first password change -->
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+
+    <!-- D-025: singleton admin — at most one row may have is_admin = TRUE -->
+    <sql>
+      CREATE UNIQUE INDEX uidx_users_singleton_admin
+      ON users (is_admin)
+      WHERE is_admin = TRUE;
+    </sql>
+
+    <rollback>
+      <dropIndex tableName="users" indexName="uidx_users_singleton_admin"/>
+      <dropTable tableName="users"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

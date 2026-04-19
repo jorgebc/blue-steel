@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <changeSet id="0004-create-campaign-members" author="jorge">
+
+    <createTable tableName="campaign_members">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="campaign_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_campaign_members_campaign"
+                     references="campaigns(id)"/>
+      </column>
+      <column name="user_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_campaign_members_user"
+                     references="users(id)"/>
+      </column>
+      <column name="role" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <column name="joined_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+
+    <!-- UNIQUE (campaign_id, user_id): a user can only be a member of a campaign once -->
+    <addUniqueConstraint tableName="campaign_members"
+                         columnNames="campaign_id, user_id"
+                         constraintName="uidx_campaign_members_campaign_user"/>
+
+    <!-- D-061: CHECK constraint — only valid roles are permitted -->
+    <sql>
+      ALTER TABLE campaign_members
+        ADD CONSTRAINT chk_campaign_members_role
+        CHECK (role IN ('gm', 'editor', 'player'));
+    </sql>
+
+    <!-- D-061: exactly one GM per campaign -->
+    <sql>
+      CREATE UNIQUE INDEX uidx_campaign_members_singleton_gm
+      ON campaign_members (campaign_id)
+      WHERE role = 'gm';
+    </sql>
+
+    <rollback>
+      <dropIndex tableName="campaign_members" indexName="uidx_campaign_members_singleton_gm"/>
+      <sql>
+        ALTER TABLE campaign_members DROP CONSTRAINT chk_campaign_members_role;
+      </sql>
+      <dropUniqueConstraint tableName="campaign_members"
+                            constraintName="uidx_campaign_members_campaign_user"/>
+      <dropTable tableName="campaign_members"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>
