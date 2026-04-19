@@ -10,6 +10,10 @@ import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.health.ComponentStatus;
 import com.bluesteel.application.model.health.SystemHealth;
 import com.bluesteel.application.port.in.health.CheckHealthUseCase;
+import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
+import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
+import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
+import com.bluesteel.application.port.in.user.InvitePlatformUserUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,11 +33,17 @@ import org.springframework.web.context.WebApplicationContext;
           + "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
           + "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration,"
           + "org.springframework.boot.data.jpa.autoconfigure.JpaRepositoriesAutoConfiguration,"
-          + "org.springframework.boot.liquibase.autoconfigure.LiquibaseAutoConfiguration"
+          + "org.springframework.boot.liquibase.autoconfigure.LiquibaseAutoConfiguration",
+      "admin.email=admin@test.com",
+      "admin.password=AdminTest!Password123"
     })
 class HealthControllerTest {
 
   @MockitoBean private CheckHealthUseCase checkHealthUseCase;
+  @MockitoBean private AdminBootstrapUseCase adminBootstrapUseCase;
+  @MockitoBean private InvitePlatformUserUseCase invitePlatformUserUseCase;
+  @MockitoBean private GetCurrentUserUseCase getCurrentUserUseCase;
+  @MockitoBean private ChangePasswordUseCase changePasswordUseCase;
 
   @Autowired private WebApplicationContext context;
 

@@ -1,5 +1,8 @@
 package com.bluesteel.adapters.in.web;
 
+import com.bluesteel.domain.exception.InvalidPasswordException;
+import com.bluesteel.domain.exception.UnauthorizedException;
+import com.bluesteel.domain.exception.UserNotFoundException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +39,24 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.FORBIDDEN)
   public ApiResponse<Void> handleAccessDenied(AccessDeniedException ex) {
     return ApiResponse.error(ApiError.of("ACCESS_DENIED", "Access denied"));
+  }
+
+  @ExceptionHandler(UnauthorizedException.class)
+  @ResponseStatus(HttpStatus.FORBIDDEN)
+  public ApiResponse<Void> handleUnauthorized(UnauthorizedException ex) {
+    return ApiResponse.error(ApiError.of("FORBIDDEN", ex.getMessage()));
+  }
+
+  @ExceptionHandler(UserNotFoundException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public ApiResponse<Void> handleUserNotFound(UserNotFoundException ex) {
+    return ApiResponse.error(ApiError.of("USER_NOT_FOUND", ex.getMessage()));
+  }
+
+  @ExceptionHandler(InvalidPasswordException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
+  public ApiResponse<Void> handleInvalidPassword(InvalidPasswordException ex) {
+    return ApiResponse.error(ApiError.of("INVALID_CURRENT_PASSWORD", ex.getMessage()));
   }
 
   @ExceptionHandler(RuntimeException.class)
