@@ -1,8 +1,8 @@
 package com.bluesteel.adapters.out.health;
 
-import com.bluesteel.application.port.out.ComponentStatus;
-import com.bluesteel.application.port.out.HealthPort;
-import com.bluesteel.application.port.out.SystemHealth;
+import com.bluesteel.application.model.health.ComponentStatus;
+import com.bluesteel.application.model.health.SystemHealth;
+import com.bluesteel.application.port.out.health.HealthPort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;

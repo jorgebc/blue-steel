@@ -1,4 +1,4 @@
-package com.bluesteel.application.port.out;
+package com.bluesteel.application.model.health;
 
 /**
  * Snapshot of overall system health. Add a new field per component as the system grows; update

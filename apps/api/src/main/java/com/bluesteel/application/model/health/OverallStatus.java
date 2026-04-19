@@ -1,4 +1,4 @@
-package com.bluesteel.application.port.out;
+package com.bluesteel.application.model.health;
 
 /**
  * Aggregate health status of the application. {@code DEGRADED} means at least one component is down

@@ -7,9 +7,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bluesteel.BlueSteelApplication;
-import com.bluesteel.application.port.out.ComponentStatus;
-import com.bluesteel.application.port.out.HealthPort;
-import com.bluesteel.application.port.out.SystemHealth;
+import com.bluesteel.application.model.health.ComponentStatus;
+import com.bluesteel.application.model.health.SystemHealth;
+import com.bluesteel.application.port.in.health.CheckHealthUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,7 @@ import org.springframework.web.context.WebApplicationContext;
     })
 class HealthControllerTest {
 
-  @MockitoBean private HealthPort healthPort;
+  @MockitoBean private CheckHealthUseCase checkHealthUseCase;
 
   @Autowired private WebApplicationContext context;
 
@@ -41,7 +41,7 @@ class HealthControllerTest {
 
   @BeforeEach
   void setup() {
-    when(healthPort.check()).thenReturn(SystemHealth.of(ComponentStatus.UP));
+    when(checkHealthUseCase.check()).thenReturn(SystemHealth.of(ComponentStatus.UP));
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
@@ -60,7 +60,7 @@ class HealthControllerTest {
   @Test
   @DisplayName("should return 200 with status=DEGRADED and db=DOWN when database is unreachable")
   void health_returnsDegradedWhenDbIsDown() throws Exception {
-    when(healthPort.check()).thenReturn(SystemHealth.of(ComponentStatus.DOWN));
+    when(checkHealthUseCase.check()).thenReturn(SystemHealth.of(ComponentStatus.DOWN));
 
     mockMvc
         .perform(get("/api/v1/health"))
