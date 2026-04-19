@@ -30,6 +30,31 @@ Definition & Analysis is complete. Architecture decisions are finalized and docu
 
 ---
 
+## Local development
+
+**Requirements:** JDK 25, Maven, Podman (or Docker).
+
+```bash
+# 1. Start the database
+podman compose up -d        # or: docker compose up -d
+
+# 2. Start the backend (mock LLMs — zero API cost)
+cd apps/api
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+```
+
+The API is available at `http://localhost:8080`. Health check: `GET /api/v1/health`.
+
+To use real LLM calls, add the `llm-real` profile and set `ANTHROPIC_API_KEY` + `OPENAI_API_KEY` in your environment.
+
+```bash
+# 3. Start the frontend (separate terminal)
+cd apps/web
+npm install && npm run dev   # http://localhost:5173
+```
+
+---
+
 ## Documentation
 
 All project decisions and specifications live in `/docs`:
