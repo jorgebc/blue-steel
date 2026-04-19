@@ -35,7 +35,7 @@
 | F1.1 | Test infrastructure baseline | ✅ |
 | F1.2 | Backend health skeleton (deployable) | ✅ |
 | F1.3 | Database connectivity + Liquibase baseline | ✅ |
-| F1.4 | Core schema migration: auth tables | 🔲 |
+| F1.4 | Core schema migration: auth tables | ✅ |
 | F1.5 | Admin bootstrap + platform invitation + password change | 🔲 |
 | F1.6 | Login + JWT issuance + refresh token rotation + logout | 🔲 |
 | F1.7 | Frontend: walking skeleton + auth scaffold | 🔲 |
