@@ -1,6 +1,7 @@
 package com.bluesteel.application.service.user;
 
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
+import com.bluesteel.application.port.out.session.SessionRecoveryPort;
 import com.bluesteel.application.port.out.user.UserRepository;
 import com.bluesteel.domain.user.User;
 import java.time.Instant;
@@ -10,8 +11,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.jdbc.BadSqlGrammarException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +26,7 @@ public class AdminBootstrapService implements AdminBootstrapUseCase {
 
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
-  private final JdbcTemplate jdbcTemplate;
+  private final SessionRecoveryPort sessionRecoveryPort;
 
   @Value("${admin.email}")
   private String adminEmail;
@@ -36,10 +35,12 @@ public class AdminBootstrapService implements AdminBootstrapUseCase {
   private String adminPassword;
 
   public AdminBootstrapService(
-      UserRepository userRepository, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
+      UserRepository userRepository,
+      PasswordEncoder passwordEncoder,
+      SessionRecoveryPort sessionRecoveryPort) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
-    this.jdbcTemplate = jdbcTemplate;
+    this.sessionRecoveryPort = sessionRecoveryPort;
   }
 
   @EventListener(ApplicationReadyEvent.class)
@@ -65,27 +66,10 @@ public class AdminBootstrapService implements AdminBootstrapUseCase {
     log.info("Admin user seeded for email={}", adminEmail);
   }
 
-  /**
-   * Bulk-transitions sessions stuck in {@code processing} to {@code failed}. If the sessions table
-   * does not yet exist (Phase 1), the error is silently swallowed (D-074).
-   */
   private void recoverStuckSessions() {
-    try {
-      int updated =
-          jdbcTemplate.update(
-              """
-              UPDATE sessions
-              SET status = 'failed',
-                  failure_reason = 'PIPELINE_INTERRUPTED',
-                  updated_at = now()
-              WHERE status = 'processing'
-              """);
-      if (updated > 0) {
-        log.warn(
-            "Recovered {} session(s) stuck in processing state (PIPELINE_INTERRUPTED)", updated);
-      }
-    } catch (BadSqlGrammarException e) {
-      log.debug("Sessions table not yet present — skipping stuck-session recovery");
+    int updated = sessionRecoveryPort.recoverStuckSessions();
+    if (updated > 0) {
+      log.warn("Recovered {} session(s) stuck in processing state (PIPELINE_INTERRUPTED)", updated);
     }
   }
 }

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.bluesteel.application.port.out.session.SessionRecoveryPort;
 import com.bluesteel.application.port.out.user.UserRepository;
 import com.bluesteel.application.service.user.AdminBootstrapService;
 import com.bluesteel.domain.user.User;
@@ -16,8 +17,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.jdbc.BadSqlGrammarException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -27,13 +26,13 @@ class AdminBootstrapServiceTest {
 
   @Mock private UserRepository userRepository;
   @Mock private PasswordEncoder passwordEncoder;
-  @Mock private JdbcTemplate jdbcTemplate;
+  @Mock private SessionRecoveryPort sessionRecoveryPort;
 
   private AdminBootstrapService service;
 
   @BeforeEach
   void setUp() {
-    service = new AdminBootstrapService(userRepository, passwordEncoder, jdbcTemplate);
+    service = new AdminBootstrapService(userRepository, passwordEncoder, sessionRecoveryPort);
     ReflectionTestUtils.setField(service, "adminEmail", "admin@example.com");
     ReflectionTestUtils.setField(service, "adminPassword", "SecurePass!123456");
   }
@@ -66,27 +65,24 @@ class AdminBootstrapServiceTest {
   }
 
   @Test
-  @DisplayName(
-      "should silently swallow BadSqlGrammarException from stuck-session recovery when sessions table does not exist")
+  @DisplayName("should complete without error when sessions table does not yet exist")
   void bootstrap_sessionsTableMissing_doesNotThrow() {
     when(userRepository.existsByIsAdminTrue()).thenReturn(true);
-    when(jdbcTemplate.update(any(String.class)))
-        .thenThrow(
-            new BadSqlGrammarException(
-                "task", "sql", new java.sql.SQLException("relation does not exist")));
+    when(sessionRecoveryPort.recoverStuckSessions()).thenReturn(-1);
 
-    // Should not throw
     service.bootstrap();
+
+    verify(sessionRecoveryPort).recoverStuckSessions();
   }
 
   @Test
-  @DisplayName("should update stuck sessions when sessions table exists")
-  void bootstrap_stuckSessionsExist_updatesThemToFailed() {
+  @DisplayName("should delegate stuck-session recovery to SessionRecoveryPort")
+  void bootstrap_stuckSessionsExist_delegatesToPort() {
     when(userRepository.existsByIsAdminTrue()).thenReturn(true);
-    when(jdbcTemplate.update(any(String.class))).thenReturn(3);
+    when(sessionRecoveryPort.recoverStuckSessions()).thenReturn(3);
 
     service.bootstrap();
 
-    verify(jdbcTemplate).update(any(String.class));
+    verify(sessionRecoveryPort).recoverStuckSessions();
   }
 }
