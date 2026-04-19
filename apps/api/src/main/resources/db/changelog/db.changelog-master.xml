@@ -12,5 +12,9 @@
   -->
 
   <include file="db/changelog/0001_pgvector_extension.xml"/>
+  <include file="db/changelog/0002_create_users.xml"/>
+  <include file="db/changelog/0003_create_campaigns.xml"/>
+  <include file="db/changelog/0004_create_campaign_members.xml"/>
+  <include file="db/changelog/0005_create_refresh_tokens.xml"/>
 
 </databaseChangeLog>
