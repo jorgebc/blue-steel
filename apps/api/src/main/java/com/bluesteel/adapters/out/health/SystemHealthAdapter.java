@@ -3,6 +3,8 @@ package com.bluesteel.adapters.out.health;
 import com.bluesteel.application.model.health.ComponentStatus;
 import com.bluesteel.application.model.health.SystemHealth;
 import com.bluesteel.application.port.out.health.HealthPort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class SystemHealthAdapter implements HealthPort {
+
+  private static final Logger log = LoggerFactory.getLogger(SystemHealthAdapter.class);
 
   private final JdbcTemplate jdbcTemplate;
 
@@ -35,6 +39,7 @@ public class SystemHealthAdapter implements HealthPort {
       jdbcTemplate.queryForObject("SELECT 1", Integer.class);
       return ComponentStatus.UP;
     } catch (Exception e) {
+      log.error("[Adapter] Database connectivity check failed", e);
       return ComponentStatus.DOWN;
     }
   }

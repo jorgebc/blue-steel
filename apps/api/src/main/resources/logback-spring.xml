@@ -15,6 +15,14 @@
         <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
       </encoder>
     </appender>
+
+    <!-- Project packages at DEBUG in local; third-party noise suppressed at WARN -->
+    <logger name="com.bluesteel" level="DEBUG"/>
+    <logger name="org.hibernate.SQL" level="WARN"/>
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="liquibase" level="WARN"/>
+
     <root level="INFO">
       <appender-ref ref="CONSOLE"/>
     </root>
@@ -24,6 +32,12 @@
     <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
       <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
     </appender>
+
+    <!-- Third-party noise suppressed at WARN in production; DEBUG disabled by root INFO -->
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="liquibase" level="WARN"/>
+
     <root level="INFO">
       <appender-ref ref="JSON_CONSOLE"/>
     </root>

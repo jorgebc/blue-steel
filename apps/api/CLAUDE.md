@@ -151,6 +151,8 @@ Never put business logic in controllers. Never put format validation in services
 
 **Logging (LOG-01):** Every LLM call logged at INFO with `tokens_in`, `tokens_out`, `cost_usd`, `session_id`, `user_id`, `stage`. No raw LLM response content at INFO (may contain narrative data). JSON appender in prod via `logstash-logback-encoder`.
 
+**Logging (LOG-02):** One static `Logger` per class (`LoggerFactory.getLogger`). Domain layer: no logging — domain must not depend on infrastructure. Application services: INFO on use-case entry/exit with minimum business IDs; ERROR on unhandled exceptions. Adapters out: ERROR on infrastructure failures with full exception; never silently swallow a caught exception. Never log at INFO on high-throughput paths (e.g. health check polling). Never log passwords, tokens, or PII. Local profile: `com.bluesteel` packages at DEBUG; third-party at WARN. Prod profile: project at INFO; third-party at WARN; DEBUG disabled.
+
 **Testing (TEST-01):** Every domain class → unit tests. Every use-case service → unit tests with mocked ports. Persistence adapters → Testcontainers IT. Domain core → PITest on every build.
 
 **Proposals schema (D-016):** `proposals` + `proposal_votes` tables exist from day one but the approval pipeline ships in v2. Do NOT implement proposal approval logic.
