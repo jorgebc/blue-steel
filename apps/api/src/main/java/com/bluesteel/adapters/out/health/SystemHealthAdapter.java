@@ -33,6 +33,7 @@ public class SystemHealthAdapter implements HealthPort {
 
   private ComponentStatus checkDb() {
     if (jdbcTemplate == null) {
+      log.warn("[Adapter] JdbcTemplate not available - datasource was not initialised");
       return ComponentStatus.DOWN;
     }
     try {
