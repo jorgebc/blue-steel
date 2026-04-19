@@ -8,6 +8,10 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * Stateless security filter chain. {@code /api/v1/health} is public; all other routes require a
+ * valid JWT. The JWT authentication filter is a stub until F1.6 wires the real implementation.
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {

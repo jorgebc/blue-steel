@@ -11,6 +11,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+/**
+ * Maps exceptions to the standard error envelope ({@code { "errors": [...] }}) defined in ERR-01.
+ * Never leaks stack traces to the client.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

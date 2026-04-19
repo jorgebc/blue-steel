@@ -92,6 +92,8 @@ The backend follows Cockburn's Ports & Adapters pattern strictly. The domain nev
 - Ports are Java interfaces defined in the application layer — the domain has no knowledge of ports
 - Adapters implement ports — they are never called directly by domain code
 - Dependency inversion is enforced structurally, not by convention
+- **Driving adapters (`adapters.in`) call only driving port interfaces (`application.port.in`) — never driven port interfaces (`application.port.out`) or driven adapter classes directly**
+- The correct dependency flow is always: `adapter/in → port/in → application/service → port/out → adapter/out`
 
 ### 3.3 Layer Map
 
@@ -117,10 +119,15 @@ apps/api/src/main/java/com/bluesteel/
 │   ├── annotation/
 │   └── proposal/
 ├── application/
+│   ├── model/             ← shared value types used across port/in and port/out (e.g. EntityContext)
+│   │   └── health/
 │   ├── port/
-│   │   ├── in/            ← driving ports (use case interfaces)
-│   │   └── out/           ← driven ports (repository and service interfaces)
-│   └── service/           ← use case implementations
+│   │   ├── in/            ← driving ports (use case interfaces); sub-packages by domain concept
+│   │   │   └── health/
+│   │   └── out/           ← driven ports (repository and service interfaces); sub-packages by domain concept
+│   │       └── health/
+│   └── service/           ← use case implementations; sub-packages by domain concept
+│       └── health/
 ├── adapters/
 │   ├── in/
 │   │   ├── web/           ← REST controllers, DTOs, exception handlers
@@ -1024,6 +1031,10 @@ The following rules are enforced:
 | Driven adapters never imported by domain or application | Dependency direction is always inward |
 | Ports are interfaces | Everything in `application.port.in` and `application.port.out` is an interface |
 | No Spring annotations on domain classes | `@Service`, `@Component`, `@Repository` never appear in `com.bluesteel.domain` |
+| Driving adapters do not depend on driven ports (ARCH-05) | `adapters.in` never imports from `application.port.out` — prevents controllers from bypassing the application service and wiring directly to a driven port interface |
+| Driving adapters do not depend on driven adapter implementations (ARCH-06) | `adapters.in` never imports from `adapters.out` — closes the other side of the adapter-to-adapter shortcut |
+| Port packages contain only interfaces (ARCH-07) | Everything in `application.port.in.*` and `application.port.out.*` must be a Java interface — shared value types belong in `application.model` |
+| Port interfaces are organised in domain sub-packages (ARCH-08) | No class may reside directly in `application.port.in` or `application.port.out`; all ports must live in a domain concept sub-package (e.g. `port/in/health/`) |
 
 These tests are the executable specification of the hexagonal architecture. A layer boundary violation that slips through code review does not slip through the build.
 

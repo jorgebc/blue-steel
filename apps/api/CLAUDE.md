@@ -81,6 +81,14 @@ mvn package -DskipTests -pl apps/api                         # production JAR
 | **ARCH-02** | Ports are interfaces in `application.port.in/out`; adapters implement them; domain never imports adapters |
 | **ARCH-03** | Config classes co-located with their adapter (`WebConfig` in `adapters.in.web`, etc.) |
 | **ARCH-04** | Spring AI `VectorStore` never used; all pgvector = native SQL (D-062) |
+| **ARCH-05** | `adapters.in` never imports from `application.port.out` — controllers must call driving port interfaces (`port/in`) only; only application services may inject driven ports (`port/out`) |
+| **ARCH-06** | `adapters.in` never imports from `adapters.out` — no direct controller-to-adapter wiring |
+| **ARCH-07** | Everything in `application.port.in.*` and `application.port.out.*` must be an interface — shared value types go in `application.model.*` |
+| **ARCH-08** | All port interfaces must live in a domain concept sub-package, never at the root of `port/in` or `port/out` |
+
+**Dependency flow (never deviate):** `adapter/in → port/in → application/service → port/out → adapter/out`
+
+**port/out sub-packages:** `application.port.out` must be organized into domain sub-packages (e.g., `port/out/health/`, `port/out/session/`). Never dump interfaces at the root of `port/out`. Mirror the sub-package structure in `port/in` and `application/service`.
 
 A failing ArchUnit test is a layer violation in production code — fix the code, not the rule.
 
@@ -142,6 +150,8 @@ Never put business logic in controllers. Never put format validation in services
 **DB (DB-01/02):** JPA for standard CRUD; native SQL for all pgvector queries. Liquibase changelogs are **append-only**.
 
 **Logging (LOG-01):** Every LLM call logged at INFO with `tokens_in`, `tokens_out`, `cost_usd`, `session_id`, `user_id`, `stage`. No raw LLM response content at INFO (may contain narrative data). JSON appender in prod via `logstash-logback-encoder`.
+
+**Logging (LOG-02):** One static `Logger` per class (`LoggerFactory.getLogger`). Domain layer: no logging — domain must not depend on infrastructure. Application services: INFO on use-case entry/exit with minimum business IDs; ERROR on unhandled exceptions. Adapters out: ERROR on infrastructure failures with full exception; never silently swallow a caught exception. Never log at INFO on high-throughput paths (e.g. health check polling). Never log passwords, tokens, or PII. Local profile: `com.bluesteel` packages at DEBUG; third-party at WARN. Prod profile: project at INFO; third-party at WARN; DEBUG disabled.
 
 **Testing (TEST-01):** Every domain class → unit tests. Every use-case service → unit tests with mocked ports. Persistence adapters → Testcontainers IT. Domain core → PITest on every build.
 

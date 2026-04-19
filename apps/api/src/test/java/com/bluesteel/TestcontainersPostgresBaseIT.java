@@ -24,10 +24,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
     classes = BlueSteelApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = {
-      // Re-enable DataSource, JPA, and Liquibase for persistence ITs
-      // (excluded in application.yml until F1.3 adds PersistenceConfig)
-      "spring.autoconfigure.exclude=",
-      "spring.liquibase.enabled=true",
+      // Prevent Hibernate from attempting schema validation — Liquibase owns the schema
       "spring.jpa.hibernate.ddl-auto=none"
     })
 public abstract class TestcontainersPostgresBaseIT {
