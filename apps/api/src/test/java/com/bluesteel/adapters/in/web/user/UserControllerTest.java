@@ -40,7 +40,8 @@ import org.springframework.web.context.WebApplicationContext;
           + "org.springframework.boot.data.jpa.autoconfigure.JpaRepositoriesAutoConfiguration,"
           + "org.springframework.boot.liquibase.autoconfigure.LiquibaseAutoConfiguration",
       "admin.email=admin@test.com",
-      "admin.password=AdminTest!Password123"
+      "admin.password=AdminTest!Password123",
+      "jwt.secret=test-jwt-secret-test-jwt-secret-test-jwt-secret!"
     })
 @DisplayName("UserController")
 class UserControllerTest {

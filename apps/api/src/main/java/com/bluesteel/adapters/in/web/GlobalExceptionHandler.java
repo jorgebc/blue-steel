@@ -1,6 +1,8 @@
 package com.bluesteel.adapters.in.web;
 
+import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
+import com.bluesteel.domain.exception.RefreshTokenException;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.exception.UserNotFoundException;
 import java.util.List;
@@ -57,6 +59,18 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
   public ApiResponse<Void> handleInvalidPassword(InvalidPasswordException ex) {
     return ApiResponse.error(ApiError.of("INVALID_CURRENT_PASSWORD", ex.getMessage()));
+  }
+
+  @ExceptionHandler(InvalidCredentialsException.class)
+  @ResponseStatus(HttpStatus.UNAUTHORIZED)
+  public ApiResponse<Void> handleInvalidCredentials(InvalidCredentialsException ex) {
+    return ApiResponse.error(ApiError.of("INVALID_CREDENTIALS", ex.getMessage()));
+  }
+
+  @ExceptionHandler(RefreshTokenException.class)
+  @ResponseStatus(HttpStatus.UNAUTHORIZED)
+  public ApiResponse<Void> handleRefreshToken(RefreshTokenException ex) {
+    return ApiResponse.error(ApiError.of(ex.code(), ex.getMessage()));
   }
 
   @ExceptionHandler(RuntimeException.class)
