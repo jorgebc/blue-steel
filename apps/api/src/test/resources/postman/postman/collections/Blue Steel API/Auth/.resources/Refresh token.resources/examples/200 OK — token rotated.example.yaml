@@ -1,0 +1,23 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/auth/refresh"
+  method: POST
+  headers:
+    Cookie: "refresh_token=<valid-raw-token>"
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+    Set-Cookie: "refresh_token=<new-raw-token>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=2592000"
+  body:
+    type: json
+    content: |-
+      {
+        "data": {
+          "accessToken": "<new-jwt>"
+        },
+        "meta": {},
+        "errors": []
+      }
+order: 1000

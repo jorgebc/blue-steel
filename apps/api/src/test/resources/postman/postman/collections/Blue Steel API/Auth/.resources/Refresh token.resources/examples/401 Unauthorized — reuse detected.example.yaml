@@ -1,0 +1,26 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/auth/refresh"
+  method: POST
+  headers:
+    Cookie: "refresh_token=<already-consumed-token>"
+response:
+  statusCode: 401
+  statusText: Unauthorized
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "data": null,
+        "meta": {},
+        "errors": [
+          {
+            "code": "REFRESH_TOKEN_REUSE_DETECTED",
+            "message": "Refresh token reuse detected",
+            "field": null
+          }
+        ]
+      }
+order: 2000

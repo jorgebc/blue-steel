@@ -1,0 +1,24 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/users/me"
+  method: GET
+response:
+  statusCode: 401
+  statusText: Unauthorized
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "data": null,
+        "meta": {},
+        "errors": [
+          {
+            "code": "UNAUTHORIZED",
+            "message": "Authentication required",
+            "field": null
+          }
+        ]
+      }
+order: 3000

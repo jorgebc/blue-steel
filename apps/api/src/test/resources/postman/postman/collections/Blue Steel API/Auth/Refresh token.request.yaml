@@ -1,0 +1,15 @@
+$kind: http-request
+description: |-
+  Rotates the refresh token pair using the httpOnly cookie sent by the browser.
+
+  - **Auth:** None (public); refresh token read from `refresh_token` cookie
+  - **200 OK** — new access token in body; new refresh token cookie set
+  - **401** — token not found, expired, or reuse detected (`REFRESH_TOKEN_REUSE_DETECTED` revokes entire family)
+url: "{{baseUrl}}/api/v1/auth/refresh"
+method: POST
+headers:
+  Accept: application/json
+auth:
+  type: noauth
+examples: ./.resources/Refresh token.resources/examples
+order: 2000
