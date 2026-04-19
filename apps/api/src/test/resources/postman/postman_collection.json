@@ -45,11 +45,11 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "health"]
             },
-            "description": "Returns the current application status.\n\n- **Auth:** None (permitAll)\n- **200 OK** — application is running\n- **503** — application is unhealthy (future)"
+            "description": "Returns the current application status.\n\n- **Auth:** None (permitAll)\n- **200 OK** — application is running"
           },
           "response": [
             {
-              "name": "200 OK — application healthy",
+              "name": "200 OK — all components UP",
               "originalRequest": {
                 "method": "GET",
                 "url": {
@@ -61,13 +61,295 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": {\n    \"status\": \"UP\",\n    \"db\": \"UP\"\n  },\n  \"meta\": {},\n  \"errors\": []\n}"
+            },
+            {
+              "name": "200 OK — database DOWN (degraded)",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/health",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "health"]
                 }
-              ],
-              "body": "{\n  \"data\": {\n    \"status\": \"UP\"\n  },\n  \"meta\": {},\n  \"errors\": []\n}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": {\n    \"status\": \"DEGRADED\",\n    \"db\": \"DOWN\"\n  },\n  \"meta\": {},\n  \"errors\": []\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invitations",
+      "description": "InvitationController — POST /api/v1/invitations\nAdmin-only. Creates a new platform user or refreshes credentials for an existing account.",
+      "item": [
+        {
+          "name": "Invite platform user",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newuser@example.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invitations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "invitations"]
+            },
+            "description": "Invites a user to the platform.\n\n- **Auth:** Bearer token required; caller must be an admin (`ROLE_ADMIN`)\n- **201 Created** — new account created; temporary password emailed\n- **200 OK** — existing account credentials refreshed; new temporary password emailed\n- **400** — email missing or invalid\n- **401** — unauthenticated\n- **403** — authenticated but not admin"
+          },
+          "response": [
+            {
+              "name": "201 Created — new user account",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"newuser@example.com\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/invitations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "invitations"]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": {\n    \"email\": \"newuser@example.com\",\n    \"status\": \"created\"\n  },\n  \"meta\": {},\n  \"errors\": []\n}"
+            },
+            {
+              "name": "200 OK — existing account refreshed",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"existing@example.com\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/invitations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "invitations"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": {\n    \"email\": \"existing@example.com\",\n    \"status\": \"refreshed\"\n  },\n  \"meta\": {},\n  \"errors\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — invalid email",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/invitations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "invitations"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": null,\n  \"meta\": {},\n  \"errors\": [\n    {\n      \"code\": \"VALIDATION_ERROR\",\n      \"message\": \"email: must not be blank\",\n      \"field\": \"email\"\n    }\n  ]\n}"
+            },
+            {
+              "name": "403 Forbidden — caller is not admin",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"someone@example.com\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/invitations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "invitations"]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": null,\n  \"meta\": {},\n  \"errors\": [\n    {\n      \"code\": \"FORBIDDEN\",\n      \"message\": \"Caller is not an admin\",\n      \"field\": null\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "UserController — /api/v1/users/me\nAuthenticated user profile and password management.",
+      "item": [
+        {
+          "name": "Get current user profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "me"]
+            },
+            "description": "Returns the authenticated user's profile.\n\n- **Auth:** Bearer token required\n- **200 OK** — profile returned\n- **401** — unauthenticated"
+          },
+          "response": [
+            {
+              "name": "200 OK — user profile",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "users", "me"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": {\n    \"id\": \"00000000-0000-0000-0000-000000000001\",\n    \"email\": \"user@example.com\",\n    \"isAdmin\": false,\n    \"forcePasswordChange\": false\n  },\n  \"meta\": {},\n  \"errors\": []\n}"
+            },
+            {
+              "name": "200 OK — admin with forcePasswordChange",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "users", "me"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": {\n    \"id\": \"00000000-0000-0000-0000-000000000001\",\n    \"email\": \"admin@example.com\",\n    \"isAdmin\": true,\n    \"forcePasswordChange\": true\n  },\n  \"meta\": {},\n  \"errors\": []\n}"
+            },
+            {
+              "name": "401 Unauthorized — missing token",
+              "originalRequest": {
+                "auth": { "type": "noauth" },
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "users", "me"]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": null,\n  \"meta\": {},\n  \"errors\": [\n    {\n      \"code\": \"UNAUTHORIZED\",\n      \"message\": \"Authentication required\",\n      \"field\": null\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"OldPass1!\",\n  \"newPassword\": \"NewPass1!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "me", "password"]
+            },
+            "description": "Changes the authenticated user's password and clears the `forcePasswordChange` flag.\n\n- **Auth:** Bearer token required\n- **200 OK** — password updated\n- **400** — `newPassword` too short (min 8 chars) or fields blank\n- **401** — unauthenticated\n- **422** — `currentPassword` does not match stored hash"
+          },
+          "response": [
+            {
+              "name": "200 OK — password changed",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"OldPass1!\",\n  \"newPassword\": \"NewPass1!\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/me/password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "users", "me", "password"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": null,\n  \"meta\": {},\n  \"errors\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — newPassword too short",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"OldPass1!\",\n  \"newPassword\": \"short\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/me/password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "users", "me", "password"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": null,\n  \"meta\": {},\n  \"errors\": [\n    {\n      \"code\": \"VALIDATION_ERROR\",\n      \"message\": \"newPassword: size must be between 8 and 2147483647\",\n      \"field\": \"newPassword\"\n    }\n  ]\n}"
+            },
+            {
+              "name": "422 Unprocessable — current password incorrect",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"wrongpass\",\n  \"newPassword\": \"NewPass1!\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/me/password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "users", "me", "password"]
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"data\": null,\n  \"meta\": {},\n  \"errors\": [\n    {\n      \"code\": \"INVALID_CURRENT_PASSWORD\",\n      \"message\": \"Current password is incorrect\",\n      \"field\": null\n    }\n  ]\n}"
             }
           ]
         }

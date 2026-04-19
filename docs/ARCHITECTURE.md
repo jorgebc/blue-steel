@@ -1188,6 +1188,8 @@ Secrets required at runtime:
 | `OPENAI_API_KEY` | Spring AI embedding adapter — text-embedding-3-small |
 | `JWT_SECRET` | Spring Security — HS256 symmetric secret (min 32 bytes) |
 | `EMAIL_API_KEY` | Email adapter (Resend) — transactional email |
+| `ADMIN_EMAIL` | `AdminBootstrapService` — email address of the singleton admin seeded on first startup (D-073) |
+| `ADMIN_PASSWORD` | `AdminBootstrapService` — initial plaintext password for the singleton admin; BCrypt-hashed before storage; should be changed immediately after first login |
 | `VITE_API_BASE_URL` | CORS — frontend origin allowed by the backend |
 
 The `.env` file is read by Docker Compose at container start via the `env_file` directive. Rotating a secret requires SSH access to the VM and a container restart.

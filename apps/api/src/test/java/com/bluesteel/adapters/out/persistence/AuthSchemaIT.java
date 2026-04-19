@@ -86,13 +86,8 @@ class AuthSchemaIT extends TestcontainersPostgresBaseIT {
   @Test
   @DisplayName("should enforce singleton admin — second is_admin=TRUE insert must fail (D-025)")
   void singletonAdminPartialUniqueIndexEnforced() {
-    jdbcTemplate.update(
-        """
-        INSERT INTO users (id, email, password_hash, is_admin, force_password_change, created_at)
-        VALUES (?, 'admin@example.com', 'hash', TRUE, FALSE, now())
-        """,
-        UUID.randomUUID());
-
+    // AdminBootstrapService seeds the first admin on ApplicationReadyEvent,
+    // so any subsequent is_admin=TRUE insert must violate the partial unique index.
     assertThatThrownBy(
             () ->
                 jdbcTemplate.update(

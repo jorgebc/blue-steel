@@ -3,6 +3,7 @@ package com.bluesteel;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -18,12 +19,16 @@ import org.testcontainers.containers.PostgreSQLContainer;
  *
  * <p>Subclasses inherit {@link #dataSource} and may inject additional Spring beans as needed.
  */
+@ActiveProfiles("local")
 @SpringBootTest(
     classes = BlueSteelApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = {
       // Prevent Hibernate from attempting schema validation — Liquibase owns the schema
-      "spring.jpa.hibernate.ddl-auto=none"
+      "spring.jpa.hibernate.ddl-auto=none",
+      // Provide admin bootstrap values required by AdminBootstrapService (D-073)
+      "admin.email=bootstrap-test@example.com",
+      "admin.password=Bootstrap!Test123456"
     })
 public abstract class TestcontainersPostgresBaseIT {
 
