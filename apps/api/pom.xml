@@ -26,7 +26,7 @@
     <spring-ai.version>2.0.0-M4</spring-ai.version>
 
     <!-- Testing -->
-    <archunit.version>1.4.1</archunit.version>
+    <archunit.version>1.4.2</archunit.version>
     <testcontainers.version>1.21.3</testcontainers.version>
 
     <!-- JWT -->
