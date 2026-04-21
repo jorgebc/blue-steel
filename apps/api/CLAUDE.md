@@ -58,18 +58,22 @@ src/test/java/com/bluesteel/
 ```bash
 # All commands from repo root; -pl apps/api scopes Maven to backend
 
-docker compose up -d                                          # start Postgres+pgvector
+podman compose up -d                                          # start Postgres+pgvector (or: docker compose up -d)
 
 mvn spring-boot:run -pl apps/api \
   -Dspring-boot.run.profiles=local                           # mock LLMs (zero cost)
 mvn spring-boot:run -pl apps/api \
   -Dspring-boot.run.profiles=local,llm-real                  # real Anthropic+OpenAI
 
-mvn test -pl apps/api                                        # unit + ArchUnit (fast)
-mvn verify -pl apps/api                                      # + Testcontainers IT
-mvn test-compile pitest:mutationCoverage -pl apps/api        # mutation tests (slow)
+mvn spotless:check -pl apps/api                              # format check (google-java-format)
+mvn spotless:apply -pl apps/api                              # auto-fix formatting
+mvn test -pl apps/api                                        # unit + ArchUnit (fast; also runs spotless:check)
+mvn verify -pl apps/api                                      # + Testcontainers IT (Podman/Docker required)
+mvn test-compile pitest:mutationCoverage -pl apps/api        # mutation tests — domain core (slow)
 mvn package -DskipTests -pl apps/api                         # production JAR
 ```
+
+**CI step order** (mirrors `backend.yml`): `spotless:check → compile → test → verify → pitest`
 
 ---
 
@@ -168,5 +172,6 @@ Never put business logic in controllers. Never put format validation in services
 - **`backend-testing`** — all test tiers: domain unit, application unit, Testcontainers IT, ArchUnit, PITest
 - **`database-migration`** — Liquibase changeset creation, pgvector schema, Neon branch validation
 - **`auth`** — JWT issuance, refresh rotation, Spring Security filter chain, admin bootstrap, invitation flow
+- **`security-hardening`** — HTTP security headers, CORS policy, BCrypt DoS protection, password policy, credential logging rules
 - **`spring-ai-llm-adapter`** — ChatClient + EmbeddingModel usage, mock adapter wiring, structured output, cost logging
 - **`error-handling`** — GlobalExceptionHandler, domain exception hierarchy, three-tier validation
