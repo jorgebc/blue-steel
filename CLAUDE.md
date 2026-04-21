@@ -33,17 +33,23 @@ blue-steel/
 ## 3. Quick Start
 
 ```bash
+# One-time repo setup (after cloning)
+git config core.hooksPath .githooks   # activates pre-push CI checks
+
 # Start local infra (run from repo root)
-docker compose up -d
+podman compose up -d        # or: docker compose up -d
 
 # Backend (from apps/api/)
 mvn spring-boot:run -Dspring-boot.run.profiles=local   # mocked LLMs, zero API cost
+mvn spotless:check    # format check
 mvn test              # unit + ArchUnit (fast)
-mvn verify            # + integration tests (Docker required)
+mvn verify            # + integration tests (Podman/Docker required)
 
 # Frontend (from apps/web/)
 npm install && npm run dev
-npx vitest run        # tests (CI mode)
+npm audit --audit-level=high --production   # dependency vulnerability check
+npm run type-check    # TypeScript
+npm test              # Vitest (CI mode)
 ```
 
 **Required env vars** — copy `.env.example` → `.env.local`:
@@ -137,6 +143,7 @@ Read `skills/SKILLS_INDEX.md` before starting any non-trivial task.
 - Session ingestion / commit → `session-ingestion-pipeline`
 - Query Mode backend → `query-pipeline`
 - Auth (either side) → `auth`
+- Security hardening (headers, CORS, rate limiting, credential logging) → `security-hardening`
 - Frontend data fetching → `frontend-api-resource`
 - Diff review UI → `frontend-diff-review`
 - Exploration Mode → `frontend-exploration`

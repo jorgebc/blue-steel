@@ -1,0 +1,14 @@
+$kind: http-request
+description: |-
+  Returns the current application status.
+
+  - **Auth:** None (permitAll)
+  - **200 OK** — application is running
+url: "{{baseUrl}}/api/v1/health"
+method: GET
+headers:
+  Accept: application/json
+auth:
+  type: noauth
+examples: ./.resources/Get health status.resources/examples
+order: 1000

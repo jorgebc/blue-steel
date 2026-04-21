@@ -1,0 +1,18 @@
+$kind: collection
+description: |-
+  AI-assisted narrative memory system for tabletop RPG campaigns.
+
+  **Auth:** All endpoints except `/api/v1/health` require a JWT Bearer token.
+  Set `bearerToken` in the active environment after obtaining a token.
+
+  **Envelope:** Every response uses `{ "data": {}, "meta": {}, "errors": [] }`.
+
+  **Generated from:** `apps/api/src/main/java/com/bluesteel/adapters/in/web`
+variables:
+  baseUrl: "{{baseUrl}}"
+auth:
+  - id: 0e9ba0a7-7f44-4273-8f8f-0e8e103491a2
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{bearerToken}}"

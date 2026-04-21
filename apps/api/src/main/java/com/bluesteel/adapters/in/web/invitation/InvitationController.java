@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,19 +29,19 @@ public class InvitationController {
 
   /**
    * Creates a new platform user (201) or refreshes credentials for an existing account (200). Admin
-   * only.
+   * only — enforced by {@code @PreAuthorize} at the controller boundary and also by the use-case
+   * service (defence in depth).
    */
   @PostMapping
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<ApiResponse<InvitationResponse>> invite(
       @Valid @RequestBody InvitePlatformUserRequest request) {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     UUID callerId = UUID.fromString(auth.getName());
-    boolean isAdmin =
-        auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
     InvitationResult result =
         invitePlatformUserUseCase.invite(
-            new InvitePlatformUserCommand(callerId, isAdmin, request.email()));
+            new InvitePlatformUserCommand(callerId, true, request.email()));
 
     InvitationResponse body = new InvitationResponse(request.email(), result.name().toLowerCase());
 

@@ -1,0 +1,23 @@
+$kind: http-request
+description: |-
+  Invites a user to the platform.
+
+  - **Auth:** Bearer token required; caller must be an admin (`ROLE_ADMIN`)
+  - **201 Created** — new account created; temporary password emailed
+  - **200 OK** — existing account credentials refreshed; new temporary password emailed
+  - **400** — email missing or invalid
+  - **401** — unauthenticated
+  - **403** — authenticated but not admin
+url: "{{baseUrl}}/api/v1/invitations"
+method: POST
+headers:
+  Content-Type: application/json
+  Accept: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "newuser@example.com"
+    }
+examples: ./.resources/Invite platform user.resources/examples
+order: 1000

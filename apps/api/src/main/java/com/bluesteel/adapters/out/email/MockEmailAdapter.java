@@ -16,7 +16,7 @@ public class MockEmailAdapter implements EmailPort {
 
   @Override
   public void send(EmailMessage message) {
-    log.info(
-        "[MOCK EMAIL] to={} subject='{}' body={}", message.to(), message.subject(), message.body());
+    // Body is deliberately omitted from the log — it may contain temporary passwords (LOG-02)
+    log.info("[MOCK EMAIL] to={} subject='{}'", message.to(), message.subject());
   }
 }

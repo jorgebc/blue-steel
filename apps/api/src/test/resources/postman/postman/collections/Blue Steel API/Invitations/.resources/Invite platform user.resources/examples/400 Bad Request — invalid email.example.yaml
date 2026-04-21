@@ -1,0 +1,32 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/invitations"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: text
+    content: |-
+      {
+        "email": ""
+      }
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "data": null,
+        "meta": {},
+        "errors": [
+          {
+            "code": "VALIDATION_ERROR",
+            "message": "email: must not be blank",
+            "field": "email"
+          }
+        ]
+      }
+order: 3000

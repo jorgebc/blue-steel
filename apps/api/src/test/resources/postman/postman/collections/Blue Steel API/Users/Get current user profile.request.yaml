@@ -1,0 +1,13 @@
+$kind: http-request
+description: |-
+  Returns the authenticated user's profile.
+
+  - **Auth:** Bearer token required
+  - **200 OK** — profile returned
+  - **401** — unauthenticated
+url: "{{baseUrl}}/api/v1/users/me"
+method: GET
+headers:
+  Accept: application/json
+examples: ./.resources/Get current user profile.resources/examples
+order: 1000

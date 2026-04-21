@@ -1,0 +1,10 @@
+name: Oracle Cloud
+values:
+  - key: baseUrl
+    enabled: true
+    value: 'https://TU_DOMINIO_ORACLE.com'
+    description: Sustituye TU_DOMINIO_ORACLE.com por la IP pública o dominio de tu VM de Oracle Cloud Always Free.
+  - key: bearerToken
+    enabled: true
+    value: ''
+    description: JWT access token de producción. Déjalo vacío; rellénalo en Postman después de autenticarte (no lo guardes en el fichero).

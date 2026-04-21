@@ -1,0 +1,22 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/auth/logout"
+  method: POST
+  headers:
+    Authorization: "Bearer <access-token>"
+    Cookie: "refresh_token=<raw-token>"
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+    Set-Cookie: "refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=0"
+  body:
+    type: json
+    content: |-
+      {
+        "data": null,
+        "meta": {},
+        "errors": []
+      }
+order: 1000
