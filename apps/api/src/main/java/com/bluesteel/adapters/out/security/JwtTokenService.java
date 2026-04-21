@@ -1,6 +1,7 @@
 package com.bluesteel.adapters.out.security;
 
 import com.bluesteel.application.model.auth.JwtClaims;
+import com.bluesteel.application.port.in.auth.JwtValidationPort;
 import com.bluesteel.application.port.out.auth.JwtPort;
 import com.bluesteel.domain.exception.JwtValidationException;
 import com.nimbusds.jose.JOSEException;
@@ -24,7 +25,7 @@ import org.springframework.stereotype.Component;
 
 /** HS256 JWT implementation using nimbus-jose-jwt (D-060). */
 @Component
-public class JwtTokenService implements JwtPort {
+public class JwtTokenService implements JwtPort, JwtValidationPort {
 
   private static final String CLAIM_USER_ID = "user_id";
   private static final String CLAIM_IS_ADMIN = "is_admin";
@@ -70,6 +71,10 @@ public class JwtTokenService implements JwtPort {
   public JwtClaims validate(String token) {
     try {
       SignedJWT jwt = SignedJWT.parse(token);
+      // Explicit algorithm check prevents algorithm-confusion attacks (e.g. alg:none)
+      if (!JWSAlgorithm.HS256.equals(jwt.getHeader().getAlgorithm())) {
+        throw new JwtValidationException("Unexpected JWT algorithm");
+      }
       JWSVerifier verifier = new MACVerifier(secretBytes);
       if (!jwt.verify(verifier)) {
         throw new JwtValidationException("JWT signature verification failed");

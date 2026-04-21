@@ -58,9 +58,13 @@ public class AdminBootstrapService implements AdminBootstrapUseCase {
   private void seedAdmin() {
     if (userRepository.existsByIsAdminTrue()) {
       log.info("Admin already exists — skipping bootstrap");
+      // Clear the password from memory after confirming it is not needed
+      adminPassword = null;
       return;
     }
     String hash = passwordEncoder.encode(adminPassword);
+    // Clear plaintext password from memory immediately after hashing (LOG-02 — never log passwords)
+    adminPassword = null;
     User admin = User.create(UUID.randomUUID(), adminEmail, hash, true, false, Instant.now());
     userRepository.save(admin);
     log.info("Admin user seeded for email={}", adminEmail);

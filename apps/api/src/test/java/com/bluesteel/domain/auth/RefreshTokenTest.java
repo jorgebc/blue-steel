@@ -26,7 +26,26 @@ class RefreshTokenTest {
   }
 
   @Test
-  @DisplayName("should transition to CONSUMED when consume() is called on an ACTIVE token")
+  @DisplayName("should set all fields correctly on create()")
+  void create_setsAllFields() {
+    UUID userId = UUID.randomUUID();
+    UUID familyId = UUID.randomUUID();
+    Instant before = Instant.now();
+
+    RefreshToken token = RefreshToken.create(userId, familyId, "raw");
+
+    Instant after = Instant.now();
+    assertThat(token.id()).isNotNull();
+    assertThat(token.userId()).isEqualTo(userId);
+    assertThat(token.familyId()).isEqualTo(familyId);
+    assertThat(token.createdAt()).isBetween(before, after);
+    assertThat(token.expiresAt()).isAfter(before.plus(29, ChronoUnit.DAYS));
+    assertThat(token.expiresAt()).isBefore(after.plus(31, ChronoUnit.DAYS));
+  }
+
+  @Test
+  @DisplayName(
+      "should transition to CONSUMED and preserve all fields when consume() is called on an ACTIVE token")
   void consume_activeToken_transitionsToConsumed() {
     RefreshToken token = RefreshToken.create(UUID.randomUUID(), UUID.randomUUID(), "raw");
 
@@ -34,7 +53,11 @@ class RefreshTokenTest {
 
     assertThat(consumed.status()).isEqualTo(RefreshTokenStatus.CONSUMED);
     assertThat(consumed.id()).isEqualTo(token.id());
+    assertThat(consumed.userId()).isEqualTo(token.userId());
     assertThat(consumed.familyId()).isEqualTo(token.familyId());
+    assertThat(consumed.tokenHash()).isEqualTo(token.tokenHash());
+    assertThat(consumed.expiresAt()).isEqualTo(token.expiresAt());
+    assertThat(consumed.createdAt()).isEqualTo(token.createdAt());
   }
 
   @Test

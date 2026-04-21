@@ -55,23 +55,28 @@ class UserTest {
   @Test
   @DisplayName("should return a new user with updated password and forcePasswordChange cleared")
   void withUpdatedPassword_clearsForcePasswordChange() {
-    User original = User.create(ID, EMAIL, HASH, false, true, NOW);
+    User original = User.create(ID, EMAIL, HASH, true, true, NOW);
     User updated = original.withUpdatedPassword("$2a$10$newhash");
 
     assertThat(updated.passwordHash()).isEqualTo("$2a$10$newhash");
     assertThat(updated.forcePasswordChange()).isFalse();
     assertThat(updated.id()).isEqualTo(original.id());
     assertThat(updated.email()).isEqualTo(original.email());
+    assertThat(updated.isAdmin()).isEqualTo(original.isAdmin());
+    assertThat(updated.createdAt()).isEqualTo(original.createdAt());
   }
 
   @Test
   @DisplayName("should return a new user with refreshed invitation and forcePasswordChange set")
   void withRefreshedInvitation_setsForcePasswordChange() {
-    User original = User.create(ID, EMAIL, HASH, false, false, NOW);
+    User original = User.create(ID, EMAIL, HASH, true, false, NOW);
     User refreshed = original.withRefreshedInvitation("$2a$10$freshhash");
 
     assertThat(refreshed.passwordHash()).isEqualTo("$2a$10$freshhash");
     assertThat(refreshed.forcePasswordChange()).isTrue();
     assertThat(refreshed.id()).isEqualTo(original.id());
+    assertThat(refreshed.email()).isEqualTo(original.email());
+    assertThat(refreshed.isAdmin()).isEqualTo(original.isAdmin());
+    assertThat(refreshed.createdAt()).isEqualTo(original.createdAt());
   }
 }

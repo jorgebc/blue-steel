@@ -94,7 +94,7 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    { "currentPassword": "OldPass1!", "newPassword": "NewPass1!" }
+                    { "currentPassword": "OldPass1!", "newPassword": "NewPassword1!" }
                     """))
         .andExpect(status().isOk());
   }
@@ -113,7 +113,7 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    { "currentPassword": "wrongpass", "newPassword": "NewPass1!" }
+                    { "currentPassword": "wrongpass", "newPassword": "NewPassword1!" }
                     """))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.errors[0].code").value("INVALID_CURRENT_PASSWORD"));
