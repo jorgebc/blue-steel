@@ -23,7 +23,7 @@
     <java.version>25</java.version>
 
     <!-- Spring AI — ChatClient (Anthropic) + EmbeddingModel (OpenAI) -->
-    <spring-ai.version>2.0.0-M4</spring-ai.version>
+    <spring-ai.version>2.0.0-M5</spring-ai.version>
 
     <!-- Testing -->
     <archunit.version>1.4.2</archunit.version>
