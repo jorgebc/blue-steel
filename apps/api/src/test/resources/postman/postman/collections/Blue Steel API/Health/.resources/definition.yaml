@@ -1,0 +1,5 @@
+$kind: collection
+description: |-
+  HealthController — GET /api/v1/health
+  Public endpoint (no authentication required).
+order: 1000

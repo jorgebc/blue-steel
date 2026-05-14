@@ -29,6 +29,7 @@
 | **react-hook-form** | `react-hook-form/SKILL.md` | Building any form in the frontend — React Hook Form v7 + shadcn/ui Form primitives, client-side validation, API `400` error mapping to form fields |
 | **database-migration** | `database-migration/SKILL.md` | Adding or modifying any database schema — Liquibase changeset creation, pgvector columns, Neon branch validation |
 | **ci-cd** | `ci-cd/SKILL.md` | Modifying GitHub Actions workflows, Docker builds, deployment configuration, or secret management |
+| **security-hardening** | `security-hardening/SKILL.md` | Modifying security headers, CORS policy, rate limiting, JWT algorithm checks, BCrypt DoS protection, password policy, or logging of sensitive data |
 
 ---
 
@@ -81,6 +82,9 @@
 
 **"CI is broken / I need to update the CI pipeline"**
 → `ci-cd`
+
+**"I need to harden the API (headers, CORS, rate limiting, password policy, credential logging)"**
+→ `security-hardening`
 
 ---
 

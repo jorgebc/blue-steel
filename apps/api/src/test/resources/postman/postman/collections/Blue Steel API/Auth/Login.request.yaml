@@ -1,0 +1,24 @@
+$kind: http-request
+description: |-
+  Validates email/password credentials and issues a token pair.
+
+  - **Auth:** None (public)
+  - **200 OK** — access token in body; refresh token in `Set-Cookie: refresh_token` (httpOnly, SameSite=Strict, Secure)
+  - **400** — missing or invalid email format
+  - **401** — invalid credentials (`INVALID_CREDENTIALS`)
+url: "{{baseUrl}}/api/v1/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+  Accept: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{adminEmail}}",
+      "password": "{{adminPassword}}"
+    }
+auth:
+  type: noauth
+examples: ./.resources/Login.resources/examples
+order: 1000

@@ -1,0 +1,5 @@
+$kind: collection
+description: |-
+  InvitationController — POST /api/v1/invitations
+  Admin-only. Creates a new platform user or refreshes credentials for an existing account.
+order: 2000

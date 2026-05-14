@@ -1,0 +1,5 @@
+$kind: collection
+description: |-
+  UserController — /api/v1/users/me
+  Authenticated user profile and password management.
+order: 3000

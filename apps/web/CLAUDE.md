@@ -52,16 +52,18 @@ apps/web/src/
 
 ```bash
 # From apps/web/
-npm install
-npm run dev                   # dev server
-npx tsc --noEmit              # type check
-npm run lint                  # ESLint
-npx prettier --write src/     # format
-npx vitest run                # tests (CI mode)
-npm run build                 # production build
+npm install                              # local dev install (CI uses npm ci)
+npm run dev                             # dev server
+
+npm audit --audit-level=high --production  # dependency vulnerability check
+npm run type-check                      # TypeScript (tsc --noEmit)
+npm run lint                            # ESLint
+npx prettier --write src/              # auto-format (not in CI — keep code clean locally)
+npm test                                # Vitest in CI mode (same as npx vitest run)
+npm run build                           # production build
 ```
 
-**CI step order** (from `frontend.yml`): `type-check → lint → vitest run → vite build`
+**CI step order** (mirrors `frontend.yml`): `npm audit → type-check → lint → test → build`
 
 ---
 

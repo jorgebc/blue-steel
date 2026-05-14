@@ -1,0 +1,32 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/invitations"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: text
+    content: |-
+      {
+        "email": "someone@example.com"
+      }
+response:
+  statusCode: 403
+  statusText: Forbidden
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "data": null,
+        "meta": {},
+        "errors": [
+          {
+            "code": "FORBIDDEN",
+            "message": "Caller is not an admin",
+            "field": null
+          }
+        ]
+      }
+order: 4000

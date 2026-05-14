@@ -1,0 +1,10 @@
+name: Local
+values:
+  - key: baseUrl
+    enabled: true
+    value: 'http://localhost:8080'
+    description: Base URL — matches server.port=8080 in application.properties
+  - key: bearerToken
+    enabled: true
+    value: ''
+    description: JWT access token. Paste here after calling POST /api/v1/auth/login (not yet implemented).
