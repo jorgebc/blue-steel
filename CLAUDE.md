@@ -150,6 +150,11 @@ Read `skills/SKILLS_INDEX.md` before starting any non-trivial task.
 - Schema change → `database-migration`
 - Frontend test → `frontend-testing`
 - CI/CD → `ci-cd`
+- Frontend visual component / loading state → `ux-focused-overlay` + `ux-skeleton-crafting`
+- Frontend inline feedback (success/error after action) → `ux-inline-feedback`
+- Sidebar / application navigation → `ux-navigation-logic`
+
+**Frontend design authority:** `docs/UX_CONSTITUTION.md` — read before any UI task (D-087).
 
 ---
 

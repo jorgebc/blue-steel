@@ -92,6 +92,12 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-079 | CommitPayload: `matched_entity_id` validated at adapter (non-null) and application (campaign ownership) | ✅ Active | Definition |
 | D-080 | CommitPayload completeness: explicit decision required for every diff card | ✅ Active | Definition |
 | D-081 | CommitPayload validation owned by `CommitService` (application layer); `DiffPayload`/`CommitPayload` remain application-layer types | ✅ Active | Definition |
+| D-082 | Modals forbidden — all contextual interactions use Focused Overlays | ✅ Active | Definition |
+| D-083 | Toast notifications forbidden — system feedback uses InlineBanner components | ✅ Active | Definition |
+| D-084 | 8pt grid system with 4pt micro-spacing — all layout spacing multiples of 4px | ✅ Active | Definition |
+| D-085 | Progressive density — low density for Input/Settings/Onboarding; high density for Exploration/Timeline | ✅ Active | Definition |
+| D-086 | Mandatory skeleton loading — spinners banned in primary content areas; skeletons derived from DTOs | ✅ Active | Definition |
+| D-087 | UX_CONSTITUTION.md is the frontend design authority — read before any UI task | ✅ Active | Definition |
 
 ---
 
@@ -1663,6 +1669,94 @@ A mandatory set of unit tests in `test/application/` must prove `CommitService` 
 
 **Alternatives considered:**  
 - Session aggregate validates commit payload — rejected; requires domain types for `DiffPayload` / `CommitPayload`, coupling the domain to a transport/persistence contract. The domain invariant (write-once history, valid state transitions) does not require the domain to parse structured application payloads.
+
+---
+
+---
+
+### D-082 — Modals forbidden — all contextual interactions use Focused Overlays
+
+**Date:** 2026-05-14
+**Status:** Active
+
+**Decision:**
+Traditional viewport-centred modals (`Dialog`, `AlertDialog`) are prohibited across the entire frontend. Any interaction that would conventionally use a modal — UNCERTAIN card resolution, annotation creation, entity detail expansion, confirmation prompts — uses a **Focused Overlay** instead: the originating element elevates in place with a backdrop-blur behind it; focus remains anchored to the original DOM position. See `skills/ux-focused-overlay/SKILL.md` and `docs/UX_CONSTITUTION.md §4`.
+
+**Reason:**
+Viewport-centred modals interrupt spatial context: the user loses the relationship between the triggering element and the action. Focused Overlays preserve that context — the element expands in place, making the action feel like an extension of the element rather than an interruption of the flow. This reduces cognitive load and aligns with the "Less is More" design principle.
+
+**Alternatives considered:**
+- Standard modals — rejected; breaks spatial context and creates visual discontinuity.
+- Drawer / sheet panels — may be considered for multi-step flows in v2, but anchored overlays are the default.
+
+---
+
+### D-083 — Toast notifications forbidden — system feedback uses InlineBanner
+
+**Date:** 2026-05-14
+**Status:** Active
+
+**Decision:**
+Toast notifications (floating, timed, dismissable overlays appearing at viewport corners) are prohibited. System feedback — form submission results, commit success/failure, API errors — is delivered via `InlineBanner` components that push content naturally within the layout above the section they describe. See `skills/ux-inline-feedback/SKILL.md` and `docs/UX_CONSTITUTION.md §5`.
+
+**Reason:**
+Toasts appear outside the user's current focus area and disappear before users with slower reading speeds or assistive technologies can consume them. Inline banners are spatially associated with the action that caused them, are persistent (errors never auto-clear), and participate naturally in the document flow without z-index conflicts.
+
+**Alternatives considered:**
+- Toast library (sonner, react-hot-toast) — rejected; violates contextual clarity principle and accessibility requirements.
+- Status bars at page top — rejected; too distant from the triggering action.
+
+---
+
+### D-084 — 8pt grid system with 4pt micro-spacing
+
+**Date:** 2026-05-14
+**Status:** Active
+
+**Decision:**
+All layout spacing is based on an 8pt grid (8px base unit) with 4pt (4px) for micro-spacing. Only multiples of 4px are permitted: `p-1` (4px), `p-2` (8px), `p-3` (12px), `p-4` (16px), `p-6` (24px), `p-8` (32px). Non-grid values (`p-3.5`, `gap-2.5`) are forbidden. See `docs/UX_CONSTITUTION.md §1`.
+
+**Reason:**
+A consistent grid eliminates arbitrary spacing decisions, creates visual rhythm, and ensures components align predictably across views. The 8pt grid is the Material Design 3 standard and maps cleanly to Tailwind's default spacing scale.
+
+---
+
+### D-085 — Progressive density by interaction context
+
+**Date:** 2026-05-14
+**Status:** Active
+
+**Decision:**
+UI density varies by interaction context. Low density (`p-6`/`p-8` containers, `p-6` page padding) is used for Input Mode, Settings, and Onboarding screens where the user is making considered decisions. High density (`p-2` list items, `p-4` containers) is used for Exploration Mode views and Timelines where information throughput is the priority. Query Mode uses medium density. See `docs/UX_CONSTITUTION.md §1`.
+
+**Reason:**
+One-size-fits-all density forces a compromise: low density wastes space in data-heavy views; high density is fatiguing for forms and decision-making contexts. Matching density to cognitive context reduces friction.
+
+---
+
+### D-086 — Mandatory skeleton loading states; spinners forbidden in primary content areas
+
+**Date:** 2026-05-14
+**Status:** Active
+
+**Decision:**
+Every data-fetching component in a primary content area renders a skeleton loading state (Tailwind `animate-pulse` blocks) rather than a spinner. Skeleton dimensions are derived from the TypeScript DTO that the component renders, ensuring zero layout shift when data arrives. Spinners (`<Loader2 className="animate-spin" />`) are only permitted inside buttons to indicate a submit-in-progress state. See `skills/ux-skeleton-crafting/SKILL.md` and `docs/UX_CONSTITUTION.md §5`.
+
+**Reason:**
+Spinners cause layout shift (the spinner height rarely matches the content height) and provide no structural information about what is loading. Skeletons preserve the spatial structure of the page, reducing perceived load time and preventing disorienting layout jumps when data arrives.
+
+---
+
+### D-087 — UX_CONSTITUTION.md is the frontend design authority
+
+**Date:** 2026-05-14
+**Status:** Active
+
+**Decision:**
+`docs/UX_CONSTITUTION.md` is the single source of truth for all frontend visual and interaction decisions. Every AI agent and developer must read it before touching any UI component. It supersedes any implicit design assumption or shadcn/ui default when they conflict. The four UX skill files (`ux-focused-overlay`, `ux-inline-feedback`, `ux-navigation-logic`, `ux-skeleton-crafting`) implement the patterns defined in the constitution.
+
+**Reason:**
+Without a written design authority, visual decisions are made ad-hoc per component. This produces inconsistent spacing, mismatched elevation levels, and interaction patterns that vary by feature. The constitution makes the design system enforceable and explicit — especially important for an AI-agent-driven development workflow where each agent otherwise starts from its own priors.
 
 ---
 

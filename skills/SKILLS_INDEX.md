@@ -30,6 +30,10 @@
 | **database-migration** | `database-migration/SKILL.md` | Adding or modifying any database schema — Liquibase changeset creation, pgvector columns, Neon branch validation |
 | **ci-cd** | `ci-cd/SKILL.md` | Modifying GitHub Actions workflows, Docker builds, deployment configuration, or secret management |
 | **security-hardening** | `security-hardening/SKILL.md` | Modifying security headers, CORS policy, rate limiting, JWT algorithm checks, BCrypt DoS protection, password policy, or logging of sensitive data |
+| **ux-focused-overlay** | `ux-focused-overlay/SKILL.md` | Building any contextual interaction that would traditionally use a modal or dialog: UNCERTAIN card resolution, annotation creation, entity detail expansion, confirmation prompts, inline editing with backdrop (D-082) |
+| **ux-inline-feedback** | `ux-inline-feedback/SKILL.md` | Adding any system feedback visible to the user: form submission results, API errors, commit success/failure, pipeline status changes. Toast notifications are forbidden — use InlineBanner (D-083) |
+| **ux-navigation-logic** | `ux-navigation-logic/SKILL.md` | Building or modifying the application sidebar, route-based active state, campaign switcher, or mode navigation |
+| **ux-skeleton-crafting** | `ux-skeleton-crafting/SKILL.md` | Adding a loading state to any data-fetching component. Spinners are forbidden in primary content areas — use skeletons derived from the TypeScript DTO (D-086) |
 
 ---
 
@@ -86,6 +90,18 @@
 **"I need to harden the API (headers, CORS, rate limiting, password policy, credential logging)"**
 → `security-hardening`
 
+**"I need to build any UI component with a loading state"**
+→ `ux-skeleton-crafting` (primary), then the relevant feature skill
+
+**"I need to show a contextual action without a modal (UNCERTAIN resolution, annotation, expand)"**
+→ `ux-focused-overlay` (primary), `frontend-diff-review` or `frontend-exploration` for feature context
+
+**"I need to display feedback after a form submission or API action"**
+→ `ux-inline-feedback`
+
+**"I need to build or modify the sidebar or application navigation"**
+→ `ux-navigation-logic`
+
 ---
 
 ## Architecture Invariants (never skip)
@@ -103,6 +119,7 @@ These rules apply to all skills. Any skill that appears to contradict them is wr
 9. **`components/ui/` is auto-generated.** Never edit it manually — wrap in `components/domain/`.
 10. **Server state in TanStack Query; client state in Zustand.** Never put API-fetched data in Zustand.
 11. **React Flow v12 is `@xyflow/react`, not `reactflow`.** Import from `@xyflow/react`; CSS from `@xyflow/react/dist/style.css`.
+12. **`docs/UX_CONSTITUTION.md` is the frontend design authority.** Read it before any UI task. No modals (D-082), no toasts (D-083), no spinners in primary content areas (D-086), 8pt grid, `blue-500` accent only on primary actions.
 
 ---
 

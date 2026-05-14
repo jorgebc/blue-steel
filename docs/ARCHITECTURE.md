@@ -233,6 +233,16 @@ The frontend consumes the backend REST API through a typed client layer in `src/
 
 There is no code generation in v1 — types are hand-written and kept in sync manually. If drift becomes a problem in v2, OpenAPI generation is the upgrade path.
 
+### 4.5 Frontend Design System
+
+The frontend follows a design system documented in **`docs/UX_CONSTITUTION.md`**. Every agent building UI must read that document before touching any component. Three rules are absolute:
+
+- **No modals** (D-082) — contextual actions use `FocusedOverlay` (see `skills/ux-focused-overlay/SKILL.md`)
+- **No toast notifications** (D-083) — system feedback uses `InlineBanner` (see `skills/ux-inline-feedback/SKILL.md`)
+- **No spinners in primary content** (D-086) — loading states use skeletons derived from DTOs (see `skills/ux-skeleton-crafting/SKILL.md`)
+
+The design language is **"Blue Steel"**: Material Design 3 elevation + minimalist slate/white surfaces + `blue-500` Electric Blue accent. Layout uses an 8pt grid. Navigation uses a collapsible sidebar managed by Zustand `uiStore` (see `skills/ux-navigation-logic/SKILL.md`). Tailwind v4 is configured via `@theme {}` in `src/index.css` — there is no `tailwind.config.js`.
+
 ---
 
 ## 5. Database Architecture
