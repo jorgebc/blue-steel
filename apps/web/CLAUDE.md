@@ -134,7 +134,36 @@ npm run build                           # production build
 
 ---
 
-## 7. Relevant Skills
+## 7. Design System
+
+**Read `docs/UX_CONSTITUTION.md` before any UI task.** It is the single source of truth for visual and interaction decisions (D-087).
+
+### Three Absolute Rules
+
+| Rule | Detail |
+|---|---|
+| No modals | Use `FocusedOverlay` from `components/domain/`. See `skills/ux-focused-overlay/SKILL.md` |
+| No toasts | Use `InlineBanner` from `components/domain/`. See `skills/ux-inline-feedback/SKILL.md` |
+| No spinners in content | Use skeletons derived from TypeScript DTOs. See `skills/ux-skeleton-crafting/SKILL.md` |
+
+### UX Skill Triggers
+
+- **Building a contextual action (UNCERTAIN resolution, annotation, confirm, expand)** → `ux-focused-overlay`
+- **Showing feedback after a mutation or API call** → `ux-inline-feedback`
+- **Adding a loading state to a data-fetching component** → `ux-skeleton-crafting`
+- **Building or modifying the sidebar or mode navigation** → `ux-navigation-logic`
+
+### Quick Design Reference
+
+- Grid: 8pt layout, 4pt micro. Only multiples of 4px (`p-1`=4px…`p-8`=32px).
+- Colors: background `slate-50`, surface `white`, border `slate-200`, accent `blue-500`.
+- Radius: cards → `rounded-2xl`, buttons → `rounded-lg`, badges/icon-buttons → `rounded-full`.
+- Sidebar state: Zustand `uiStore.sidebarExpanded` (persisted). Never local state.
+- Tailwind v4: CSS-based `@theme {}` in `src/index.css`. No `tailwind.config.js`.
+
+---
+
+## 8. Relevant Skills
 
 - **`frontend-api-resource`** — typed API client files, TanStack Query hooks, DTO types, auth token handling
 - **`frontend-diff-review`** — diff review screen: card types, UNCERTAIN resolution, commit button, payload assembly
@@ -143,3 +172,7 @@ npm run build                           # production build
 - **`frontend-testing`** — Vitest setup, React Testing Library, axe-core assertions, hook isolation, fetch mocking
 - **`auth`** — in-memory token storage, silent refresh, route guards, role derivation from campaign membership
 - **`react-hook-form`** — React Hook Form v7 + shadcn Form primitives, API error mapping to form fields
+- **`ux-focused-overlay`** — FocusedOverlay component: z-index contract, ESC/backdrop-click, anchored positioning
+- **`ux-inline-feedback`** — InlineBanner component: four variants, auto-clear rules, no-toast enforcement
+- **`ux-navigation-logic`** — Sidebar component: collapsed/expanded, active route, Zustand uiStore, role gating
+- **`ux-skeleton-crafting`** — Skeleton loading: DTO-derived dimensions, animate-pulse, zero layout shift
