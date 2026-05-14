@@ -7,6 +7,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -24,7 +25,7 @@ public class SecurityConfig {
 
   @Bean
   public SecurityFilterChain securityFilterChain(
-      HttpSecurity http, JwtAuthenticationFilter jwtFilter) throws Exception {
+      HttpSecurity http, JwtAuthenticationFilter jwtFilter) {
     return http.csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(
@@ -49,7 +50,7 @@ public class SecurityConfig {
                     // Prevent MIME-type sniffing
                     .contentTypeOptions(ct -> {})
                     // Disallow framing (clickjacking protection)
-                    .frameOptions(frame -> frame.deny())
+                    .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
                     // Disable legacy XSS filter (modern browsers ignore it; can cause issues)
                     .xssProtection(
                         xss -> xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.DISABLED))
@@ -57,7 +58,8 @@ public class SecurityConfig {
                     .referrerPolicy(
                         ref -> ref.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                     // Permissions-Policy: restrict access to sensitive browser APIs
-                    .permissionsPolicy(pp -> pp.policy("camera=(), microphone=(), geolocation=()")))
+                    .permissionsPolicyHeader(
+                        pp -> pp.policy("camera=(), microphone=(), geolocation=()")))
         .build();
   }
 }

@@ -56,21 +56,21 @@ src/test/java/com/bluesteel/
 ## 3. Run Commands
 
 ```bash
-# All commands from repo root; -pl apps/api scopes Maven to backend
+# Infra (from repo root)
+podman compose up -d                              # start Postgres+pgvector (or: docker compose up -d)
 
-podman compose up -d                                          # start Postgres+pgvector (or: docker compose up -d)
+# All Maven commands run from apps/api/ (no root pom.xml — -pl does not work)
+cd apps/api
 
-mvn spring-boot:run -pl apps/api \
-  -Dspring-boot.run.profiles=local                           # mock LLMs (zero cost)
-mvn spring-boot:run -pl apps/api \
-  -Dspring-boot.run.profiles=local,llm-real                  # real Anthropic+OpenAI
+mvn spring-boot:run -Dspring-boot.run.profiles=local                  # mock LLMs (zero cost)
+mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-real         # real Anthropic+OpenAI
 
-mvn spotless:check -pl apps/api                              # format check (google-java-format)
-mvn spotless:apply -pl apps/api                              # auto-fix formatting
-mvn test -pl apps/api                                        # unit + ArchUnit (fast; also runs spotless:check)
-mvn verify -pl apps/api                                      # + Testcontainers IT (Podman/Docker required)
-mvn test-compile pitest:mutationCoverage -pl apps/api        # mutation tests — domain core (slow)
-mvn package -DskipTests -pl apps/api                         # production JAR
+mvn spotless:check                               # format check (google-java-format)
+mvn spotless:apply                               # auto-fix formatting
+mvn test                                         # unit + ArchUnit (fast; also runs spotless:check)
+mvn verify                                       # + Testcontainers IT (Podman/Docker required)
+mvn test-compile pitest:mutationCoverage         # mutation tests — domain core (slow)
+mvn package -DskipTests                          # production JAR
 ```
 
 **CI step order** (mirrors `backend.yml`): `spotless:check → compile → test → verify → pitest`

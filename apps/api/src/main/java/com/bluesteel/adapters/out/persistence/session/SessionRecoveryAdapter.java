@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /** JdbcTemplate-backed implementation of {@link SessionRecoveryPort}. */
 @Component
@@ -21,6 +23,7 @@ public class SessionRecoveryAdapter implements SessionRecoveryPort {
   }
 
   @Override
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public int recoverStuckSessions() {
     try {
       return jdbcTemplate.update(

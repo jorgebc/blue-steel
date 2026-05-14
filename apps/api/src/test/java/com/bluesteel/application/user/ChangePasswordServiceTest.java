@@ -45,9 +45,8 @@ class ChangePasswordServiceTest {
     UUID userId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () -> service.change(new ChangePasswordCommand(userId, "current", "newpass")))
-        .isInstanceOf(UserNotFoundException.class);
+    ChangePasswordCommand command = new ChangePasswordCommand(userId, "current", "newpass");
+    assertThatThrownBy(() -> service.change(command)).isInstanceOf(UserNotFoundException.class);
   }
 
   @Test
@@ -59,9 +58,8 @@ class ChangePasswordServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(passwordEncoder.matches("wrongpass", "$2a$10$stored")).thenReturn(false);
 
-    assertThatThrownBy(
-            () -> service.change(new ChangePasswordCommand(userId, "wrongpass", "newpass")))
-        .isInstanceOf(InvalidPasswordException.class);
+    ChangePasswordCommand command = new ChangePasswordCommand(userId, "wrongpass", "newpass");
+    assertThatThrownBy(() -> service.change(command)).isInstanceOf(InvalidPasswordException.class);
   }
 
   @Test

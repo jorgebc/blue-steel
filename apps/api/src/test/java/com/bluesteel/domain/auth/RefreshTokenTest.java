@@ -107,7 +107,6 @@ class RefreshTokenTest {
     String hash1 = RefreshToken.sha256("token-value");
     String hash2 = RefreshToken.sha256("token-value");
 
-    assertThat(hash1).isEqualTo(hash2);
-    assertThat(hash1).hasSize(64);
+    assertThat(hash1).isEqualTo(hash2).hasSize(64);
   }
 }

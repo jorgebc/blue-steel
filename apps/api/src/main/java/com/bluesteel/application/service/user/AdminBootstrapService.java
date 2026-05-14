@@ -43,12 +43,8 @@ public class AdminBootstrapService implements AdminBootstrapUseCase {
     this.sessionRecoveryPort = sessionRecoveryPort;
   }
 
-  @EventListener(ApplicationReadyEvent.class)
-  public void onApplicationReady() {
-    bootstrap();
-  }
-
   @Override
+  @EventListener(ApplicationReadyEvent.class)
   @Transactional
   public void bootstrap() {
     seedAdmin();

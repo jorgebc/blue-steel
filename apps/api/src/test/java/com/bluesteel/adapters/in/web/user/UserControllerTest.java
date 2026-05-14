@@ -115,7 +115,7 @@ class UserControllerTest {
                     """
                     { "currentPassword": "wrongpass", "newPassword": "NewPassword1!" }
                     """))
-        .andExpect(status().isUnprocessableEntity())
+        .andExpect(status().isUnprocessableContent())
         .andExpect(jsonPath("$.errors[0].code").value("INVALID_CURRENT_PASSWORD"));
   }
 

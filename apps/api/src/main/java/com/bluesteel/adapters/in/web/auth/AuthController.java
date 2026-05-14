@@ -23,12 +23,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
   private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
-  private static final String COOKIE_PATH = "/api/v1/auth";
   private static final int THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
 
   private final LoginUseCase loginUseCase;
   private final RefreshTokenUseCase refreshTokenUseCase;
   private final LogoutUseCase logoutUseCase;
+  private final String cookiePath;
 
   public AuthController(
       LoginUseCase loginUseCase,
@@ -37,6 +37,7 @@ public class AuthController {
     this.loginUseCase = loginUseCase;
     this.refreshTokenUseCase = refreshTokenUseCase;
     this.logoutUseCase = logoutUseCase;
+    this.cookiePath = AuthController.class.getAnnotation(RequestMapping.class).value()[0];
   }
 
   @PostMapping("/login")
@@ -83,7 +84,7 @@ public class AuthController {
     String header =
         String.format(
             "%s=%s; HttpOnly; Secure; SameSite=Strict; Path=%s; Max-Age=%d",
-            REFRESH_TOKEN_COOKIE, value, COOKIE_PATH, maxAge);
+            REFRESH_TOKEN_COOKIE, value, cookiePath, maxAge);
     response.addHeader("Set-Cookie", header);
   }
 }
