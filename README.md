@@ -81,6 +81,24 @@ This project is built with a clear engineering philosophy:
 
 ---
 
+## Security
+
+SBOMs (Software Bill of Materials) are generated automatically on every push to `main` using [CycloneDX](https://cyclonedx.org/) and scanned for known vulnerabilities with [Trivy](https://github.com/aquasecurity/trivy).
+
+| What | When |
+|---|---|
+| Vulnerability scan | Every push to `main` and every Monday at 08:00 UTC |
+| Manual trigger | GitHub Actions → **vulnerability-scan** → Run workflow |
+| Results | GitHub Security tab → **Code scanning** |
+
+**Scan categories:**
+- `sbom-frontend` — React/npm dependency scan (`apps/web`)
+- `sbom-backend` — Java/Maven dependency scan (`apps/api`)
+
+SBOM JSON files are uploaded as workflow artifacts for download and audit. CVE exceptions are managed in [`.trivyignore`](.trivyignore) at the repository root.
+
+---
+
 ## License
 
 MIT

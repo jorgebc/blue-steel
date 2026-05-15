@@ -1,0 +1,18 @@
+# .trivyignore — Trivy CVE exception list
+#
+# Add CVE IDs here (one per line) to suppress known/accepted vulnerabilities
+# from Trivy SBOM scan results and SARIF uploads to GitHub Security.
+#
+# Format:
+#   CVE-YYYY-NNNNN
+#
+# Guidelines:
+#   - Document the reason for each exception in a comment above the CVE ID
+#   - Include an expiry date in the comment if the exception is time-bounded
+#   - Review this file quarterly or whenever a new exception is added
+#   - Remove entries when the underlying dependency is patched or removed
+#
+# Example:
+#   # False positive — only reachable in test scope, not bundled in production
+#   # Accepted until: 2026-06-01
+#   CVE-2024-12345

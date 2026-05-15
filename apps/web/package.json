@@ -10,7 +10,8 @@
     "type-check": "tsc -b --noEmit",
     "lint": "eslint .",
     "format": "prettier --write src/",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "sbom": "cyclonedx-npm --output-format JSON --output-file sbom-frontend.json --no-short-PURLs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.9",
@@ -25,6 +26,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@cyclonedx/cyclonedx-npm": "^1.19.0",
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.4.6",
     "@testing-library/react": "^16.0.0",
