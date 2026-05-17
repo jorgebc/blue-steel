@@ -38,7 +38,12 @@ def _make_model() -> LiteLLMModel:
     elif api_key_raw:
         api_key = api_key_raw
 
-    return LiteLLMModel(model_id=model_id, api_key=api_key, api_base=api_base)
+    return LiteLLMModel(
+        model_id=model_id,
+        api_key=api_key,
+        api_base=api_base,
+        timeout=1800,  # 30 min — local models (qwen3:14b) can take 5-10 min per step
+    )
 
 
 def _build_prompt_templates(persona_content: str) -> dict:

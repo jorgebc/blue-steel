@@ -194,10 +194,18 @@ def run_planning(task_id: str) -> str:
     # Sanitize content for Windows console safety — arrows and emojis crash cp1252
     safe_description = _ascii_safe(task_description)
     safe_roadmap_entry = _ascii_safe(roadmap_entry)
-    # Trim long docs to keep context manageable for local models
-    safe_prd = _ascii_safe(docs["prd"])[:8000]
-    safe_architecture = _ascii_safe(docs["architecture"])[:10000]
-    safe_decisions = _ascii_safe(docs["decisions"])[:6000]
+    # Trim long docs to keep context manageable for local models.
+    # Architecture and Decisions are large; local models (qwen3:14b) time out
+    # with >15K tokens — keep each reference doc under 5K chars.
+    pipeline_mode = os.environ.get("PIPELINE_MODE", "local").lower()
+    if pipeline_mode == "cloud":
+        safe_prd = _ascii_safe(docs["prd"])[:8000]
+        safe_architecture = _ascii_safe(docs["architecture"])[:10000]
+        safe_decisions = _ascii_safe(docs["decisions"])[:6000]
+    else:
+        safe_prd = _ascii_safe(docs["prd"])[:4000]
+        safe_architecture = _ascii_safe(docs["architecture"])[:5000]
+        safe_decisions = _ascii_safe(docs["decisions"])[:3000]
 
     # ── PO Round 1: Define scope and acceptance criteria ──────────────────
     print("\n[2/5] PO Round 1: defining scope and acceptance criteria...")
