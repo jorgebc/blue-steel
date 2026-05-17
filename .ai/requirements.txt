@@ -1,0 +1,8 @@
+langgraph>=0.4.0
+litellm>=1.0.0
+smolagents>=1.0.0
+agno>=1.0.0
+semgrep
+python-dotenv
+pyyaml
+click
