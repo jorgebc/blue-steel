@@ -27,13 +27,16 @@ for _p in [
         sys.path.insert(0, _p)
 
 import litellm
+from colorama import Fore, Style
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
 from agents.engineers.execution_crew import run_execution
 from agents.planning.planning_crew import run_planning
 from agents.quality.quality_pipeline import run_quality
-from config import get_llm
+from callbacks import PipelineConsoleCallback
+from config import get_llm, should_stream
+from logger import MARKER_FAIL, MARKER_INFO, MARKER_OK, ROLE_COLORS, get_logger
 from state import PipelineState
 from tools.filesystem import read_file, write_file
 
@@ -45,15 +48,18 @@ _CONTEXT_DIR = ".ai/context/tasks"
 
 def _planning_node(state: PipelineState) -> dict:
     task_id = state["task_id"]
-    print(f"\n[ORCHESTRATOR] Phase 1/4: Planning — {task_id}")
+    logger = get_logger(task_id)
+    logger.info(f"{MARKER_INFO} Starting planning phase", extra={"role": "planning"})
     try:
         plan_path = run_planning(task_id)
+        logger.info(f"{MARKER_OK} Plan written: {plan_path}", extra={"role": "planning"})
         return {
             "plan_path": plan_path,
             "phase": 1,
             "log": [f"Planning complete: {plan_path}"],
         }
     except Exception as exc:
+        logger.error(f"{MARKER_FAIL} Planning failed: {exc}", extra={"role": "planning"})
         return {
             "blocked": True,
             "blocked_reason": f"Planning failed: {exc}",
@@ -64,9 +70,17 @@ def _planning_node(state: PipelineState) -> dict:
 def _execution_node(state: PipelineState) -> dict:
     task_id = state["task_id"]
     iteration = state.get("iteration_count", 0)
-    print(f"\n[ORCHESTRATOR] Phase 2/4: Execution — {task_id} (iteration {iteration + 1})")
+    logger = get_logger(task_id)
+    logger.info(
+        f"{MARKER_INFO} Execution iteration {iteration + 1}",
+        extra={"role": "execution"},
+    )
     try:
         summary = run_execution(task_id)
+        logger.info(
+            f"{MARKER_OK} Execution complete: {summary.get('report_path')}",
+            extra={"role": "execution"},
+        )
         return {
             "execution_summary": summary,
             "iteration_count": iteration + 1,
@@ -74,6 +88,7 @@ def _execution_node(state: PipelineState) -> dict:
             "log": [f"Execution complete (iter {iteration + 1}): {summary.get('report_path')}"],
         }
     except Exception as exc:
+        logger.error(f"{MARKER_FAIL} Execution failed: {exc}", extra={"role": "execution"})
         return {
             "blocked": True,
             "blocked_reason": f"Execution failed: {exc}",
@@ -83,7 +98,8 @@ def _execution_node(state: PipelineState) -> dict:
 
 def _quality_node(state: PipelineState) -> dict:
     task_id = state["task_id"]
-    print(f"\n[ORCHESTRATOR] Phase 3/4: Quality — {task_id}")
+    logger = get_logger(task_id)
+    logger.info(f"{MARKER_INFO} Starting quality phase", extra={"role": "quality"})
     try:
         result = run_quality(task_id)
         updates: dict = {
@@ -95,8 +111,6 @@ def _quality_node(state: PipelineState) -> dict:
                 f"secops={result.get('secops_verdict')}"
             ],
         }
-        # Quality review verdict goes into review_verdict only if the quality
-        # pipeline passed completely; otherwise we preserve it for diagnostics.
         if result.get("review_verdict"):
             updates["review_verdict"] = result["review_verdict"]
 
@@ -106,13 +120,21 @@ def _quality_node(state: PipelineState) -> dict:
                 f"Quality blocked at phase '{result.get('stopped_at')}'"
             )
         elif not result.get("passed") and result.get("stopped_at"):
-            # Failed but not explicitly blocked (e.g., verification failed after retry)
             updates["blocked"] = True
             updates["blocked_reason"] = (
                 f"Quality failed at phase '{result.get('stopped_at')}'"
             )
+        logger.info(
+            f"{MARKER_OK} Quality: passed={result.get('passed')}, "
+            f"secops={result.get('secops_verdict')}",
+            extra={"role": "quality"},
+        )
         return updates
     except Exception as exc:
+        logger.error(
+            f"{MARKER_FAIL} Quality pipeline raised exception: {exc}",
+            extra={"role": "quality"},
+        )
         return {
             "blocked": True,
             "blocked_reason": f"Quality pipeline raised exception: {exc}",
@@ -122,7 +144,8 @@ def _quality_node(state: PipelineState) -> dict:
 
 def _final_review_node(state: PipelineState) -> dict:
     task_id = state["task_id"]
-    print(f"\n[ORCHESTRATOR] Phase 4/4: Final Review — {task_id}")
+    logger = get_logger(task_id)
+    logger.info(f"{MARKER_INFO} Running final coherence review", extra={"role": "final"})
 
     try:
         plan_path = state.get("plan_path") or f"{_CONTEXT_DIR}/{task_id}_plan.md"
@@ -154,18 +177,32 @@ def _final_review_node(state: PipelineState) -> dict:
             f"Begin your response with APPROVED or REQUIRES_CHANGES."
         )
 
+        stream = should_stream()
         response = litellm.completion(
             **llm_params,
             messages=[{"role": "user", "content": prompt}],
             timeout=120,
+            stream=stream,
         )
-        verdict_text = response.choices[0].message.content.strip()
+
+        if stream:
+            color = ROLE_COLORS.get("final", Fore.WHITE)
+            print(f"{color}final        ", end="", flush=True)
+            verdict_text = ""
+            for chunk in response:
+                delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
+                verdict_text += delta
+                print(delta, end="", flush=True)
+            print(Style.RESET_ALL)
+        else:
+            verdict_text = response.choices[0].message.content.strip()
+
         verdict = (
             "APPROVED"
             if verdict_text.upper().startswith("APPROVED")
             else "REQUIRES_CHANGES"
         )
-        print(f"      Final review verdict: {verdict}")
+        logger.info(f"{MARKER_OK} Final review verdict: {verdict}", extra={"role": "final"})
         return {
             "review_verdict": verdict,
             "phase": 4,
@@ -173,7 +210,10 @@ def _final_review_node(state: PipelineState) -> dict:
         }
     except Exception as exc:
         # If the LLM is unreachable, default to APPROVED rather than blocking the pipeline.
-        print(f"      Final review error ({exc}) — defaulting to APPROVED")
+        logger.warning(
+            f"Final review error ({exc}) — defaulting to APPROVED",
+            extra={"role": "final"},
+        )
         return {
             "review_verdict": "APPROVED",
             "phase": 4,
@@ -183,7 +223,7 @@ def _final_review_node(state: PipelineState) -> dict:
 
 def _done_node(state: PipelineState) -> dict:
     task_id = state["task_id"]
-    print(f"\n[ORCHESTRATOR] Done — {task_id}")
+    logger = get_logger(task_id)
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     summary_lines = [
@@ -208,7 +248,7 @@ def _done_node(state: PipelineState) -> dict:
     ]
     done_path = f"{_CONTEXT_DIR}/{task_id}_done.md"
     write_file(done_path, "\n".join(summary_lines))
-    print(f"      Summary written: {done_path}")
+    logger.info(f"{MARKER_OK} Summary written: {done_path}", extra={"role": "pipeline"})
 
     _mark_task_done_in_roadmap(task_id)
 
@@ -221,7 +261,8 @@ def _done_node(state: PipelineState) -> dict:
 def _error_node(state: PipelineState) -> dict:
     task_id = state["task_id"]
     reason = state.get("blocked_reason") or "Unknown error"
-    print(f"\n[ORCHESTRATOR] ERROR — {task_id}: {reason}")
+    logger = get_logger(task_id)
+    logger.error(f"{MARKER_FAIL} Pipeline error: {reason}", extra={"role": "pipeline"})
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     content = (
@@ -256,11 +297,11 @@ def _mark_task_done_in_roadmap(task_id: str) -> None:
         updated = "\n".join(updated_lines)
         if updated != roadmap:
             write_file("docs/ROADMAP.md", updated)
-            print(f"      ROADMAP.md updated: {task_id} marked done")
-        else:
-            print(f"      ROADMAP.md: no pending status found for {task_id}")
     except Exception as exc:
-        print(f"      WARNING: could not update ROADMAP.md: {exc}")
+        # Non-fatal: roadmap update failure should not block the pipeline
+        get_logger(task_id).warning(
+            f"Could not update ROADMAP.md: {exc}", extra={"role": "pipeline"}
+        )
 
 
 # ── Conditional routers ───────────────────────────────────────────────────────
@@ -340,23 +381,29 @@ def run_pipeline(task_id: str, resume: bool = False) -> dict:
     checkpointer = SqliteSaver(conn)
     graph = _build_graph(checkpointer)
 
-    config = {"configurable": {"thread_id": task_id}}
+    callback = PipelineConsoleCallback(task_id)
+    run_config = {
+        "configurable": {"thread_id": task_id},
+        "callbacks": [callback],
+    }
+
+    logger = get_logger(task_id)
 
     try:
         if resume:
-            print(f"\n[ORCHESTRATOR] Resuming pipeline for {task_id}...")
+            logger.info(f"Resuming pipeline for {task_id}...", extra={"role": "pipeline"})
             try:
-                saved = graph.get_state(config)
+                saved = graph.get_state(run_config)
                 if saved and saved.values:
-                    result = graph.invoke(None, config=config)
+                    result = graph.invoke(None, config=run_config)
                 else:
-                    print("[ORCHESTRATOR] No checkpoint found — starting fresh.")
-                    result = graph.invoke(_fresh_state(task_id), config=config)
+                    logger.info("No checkpoint found — starting fresh.", extra={"role": "pipeline"})
+                    result = graph.invoke(_fresh_state(task_id), config=run_config)
             except Exception:
-                result = graph.invoke(_fresh_state(task_id), config=config)
+                result = graph.invoke(_fresh_state(task_id), config=run_config)
         else:
-            print(f"\n[ORCHESTRATOR] Starting full pipeline for {task_id}...")
-            result = graph.invoke(_fresh_state(task_id), config=config)
+            logger.info(f"Starting full pipeline for {task_id}...", extra={"role": "pipeline"})
+            result = graph.invoke(_fresh_state(task_id), config=run_config)
     finally:
         conn.close()
 

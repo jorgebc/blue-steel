@@ -21,6 +21,11 @@ def _load_config() -> dict:
         return yaml.safe_load(f)
 
 
+def should_stream() -> bool:
+    """Return True when running in local mode — streams tokens to the console."""
+    return os.environ.get("PIPELINE_MODE", "cloud") == "local"
+
+
 def get_llm(phase: str = "planning") -> dict:
     """Return the litellm model params for the active PIPELINE_MODE and phase.
 

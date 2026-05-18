@@ -51,6 +51,7 @@ if sys.platform == "win32":
 
 sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
+from logger import MARKER_INFO, MARKER_OK, get_logger
 from tools.filesystem import read_file, write_file
 
 import po_agent
@@ -178,18 +179,17 @@ def run_planning(task_id: str) -> str:
     Raises:
         ValueError: If the generated plan is missing required sections.
     """
-    print(f"\n{'='*60}")
-    print(f"Blue Steel Planning Crew — Task: {task_id}")
-    print(f"{'='*60}\n")
+    logger = get_logger(task_id)
+    logger.info(f"{MARKER_INFO} Blue Steel Planning Crew — Task: {task_id}", extra={"role": "planning"})
 
     # ── Load reference documents ──────────────────────────────────────────
-    print("[1/5] Loading reference documents...")
+    logger.info(f"{MARKER_INFO} Loading reference documents...", extra={"role": "planning"})
     docs = _load_docs()
     task_description = _get_task_description(task_id, docs["roadmap"])
     roadmap_entry = _extract_task_from_roadmap(task_id, docs["roadmap"])
 
-    print(f"      Task: {task_description}")
-    print(f"      Roadmap entry ({len(roadmap_entry)} chars)")
+    logger.info(f"{MARKER_INFO} Task: {task_description}", extra={"role": "planning"})
+    logger.info(f"{MARKER_INFO} Roadmap entry: {len(roadmap_entry)} chars", extra={"role": "planning"})
 
     # Sanitize content for Windows console safety — arrows and emojis crash cp1252
     safe_description = _ascii_safe(task_description)
@@ -208,7 +208,7 @@ def run_planning(task_id: str) -> str:
         safe_decisions = _ascii_safe(docs["decisions"])[:3000]
 
     # ── PO Round 1: Define scope and acceptance criteria ──────────────────
-    print("\n[2/5] PO Round 1: defining scope and acceptance criteria...")
+    logger.info(f"{MARKER_INFO} PO Round 1: defining scope and acceptance criteria...", extra={"role": "po"})
     po_output_1 = po_agent.run(
         task_id=task_id,
         context={
@@ -218,10 +218,10 @@ def run_planning(task_id: str) -> str:
             "prd": safe_prd,
         },
     )
-    print(f"      PO output: {len(po_output_1)} chars")
+    logger.info(f"{MARKER_OK} PO Round 1 complete — {len(po_output_1)} chars", extra={"role": "po"})
 
     # ── Architect Round 1: Technical proposal ─────────────────────────────
-    print("\n[3/5] Architect Round 1: technical proposal...")
+    logger.info(f"{MARKER_INFO} Architect Round 1: technical proposal...", extra={"role": "architect"})
     arch_output_1 = architect_agent.run(
         task_id=task_id,
         context={
@@ -231,10 +231,10 @@ def run_planning(task_id: str) -> str:
             "decisions": safe_decisions,
         },
     )
-    print(f"      Architect output: {len(arch_output_1)} chars")
+    logger.info(f"{MARKER_OK} Architect Round 1 complete — {len(arch_output_1)} chars", extra={"role": "architect"})
 
     # ── PO Round 2: Challenge ─────────────────────────────────────────────
-    print("\n[4/5] PO Round 2: challenging the architect's proposal...")
+    logger.info(f"{MARKER_INFO} PO Round 2: challenging the architect's proposal...", extra={"role": "po"})
     po_output_2 = po_agent.run(
         task_id=task_id,
         context={
@@ -242,10 +242,10 @@ def run_planning(task_id: str) -> str:
             "architect_proposal": arch_output_1,
         },
     )
-    print(f"      PO challenge: {len(po_output_2)} chars")
+    logger.info(f"{MARKER_OK} PO Round 2 complete — {len(po_output_2)} chars", extra={"role": "po"})
 
     # ── Architect Round 2: Finalized plan ─────────────────────────────────
-    print("\n[5/5] Architect Round 2: finalizing plan...")
+    logger.info(f"{MARKER_INFO} Architect Round 2: finalizing plan...", extra={"role": "architect"})
     arch_output_2 = architect_agent.run(
         task_id=task_id,
         context={
@@ -254,7 +254,7 @@ def run_planning(task_id: str) -> str:
             "architect_proposal_1": arch_output_1,
         },
     )
-    print(f"      Final plan: {len(arch_output_2)} chars")
+    logger.info(f"{MARKER_OK} Architect Round 2 complete — {len(arch_output_2)} chars", extra={"role": "architect"})
 
     # ── Assemble and write plan ───────────────────────────────────────────
     header = _assemble_plan_header(task_id, task_description)
@@ -288,5 +288,5 @@ def run_planning(task_id: str) -> str:
     plan_path = f"{_PLAN_DIR}/{task_id}_plan.md"
     write_file(plan_path, plan_content)
 
-    print(f"\nDone. Plan written to: {plan_path}")
+    logger.info(f"{MARKER_OK} Plan written: {plan_path}", extra={"role": "planning"})
     return plan_path

@@ -13,9 +13,14 @@ Usage examples:
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import click
+import colorama
+from colorama import Fore, Style
+
+colorama.init(autoreset=True)
 
 # ── sys.path: make the pipeline package importable ────────────────────────────
 _REPO_ROOT = Path(__file__).parent
@@ -34,6 +39,42 @@ for _p in [
         sys.path.insert(0, _p)
 
 
+# ── Box helpers ───────────────────────────────────────────────────────────────
+
+_BOX_WIDTH = 58
+_BOX_BORDER = "=" * _BOX_WIDTH
+
+
+def _print_header(task_id: str, mode: str) -> None:
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(_BOX_BORDER)
+    print(" BLUE STEEL - AI PIPELINE")
+    print(f" Task:  {task_id}")
+    print(f" Mode:  {mode}")
+    print(f" Start: {ts}")
+    print(_BOX_BORDER)
+
+
+def _print_footer_ok(task_id: str, elapsed_s: float) -> None:
+    mins = int(elapsed_s // 60)
+    secs = int(elapsed_s % 60)
+    elapsed_str = f"{mins}m {secs:02d}s" if mins > 0 else f"{secs}s"
+    log_path = f".ai/logs/{task_id}.log"
+    print(f"\n{_BOX_BORDER}")
+    print(f" [OK] Task {task_id} completed in {elapsed_str}")
+    print(f" Log: {log_path}")
+    print(_BOX_BORDER)
+
+
+def _print_footer_blocked(task_id: str, reason: str) -> None:
+    log_path = f".ai/logs/{task_id}.log"
+    print()
+    print(f"{Fore.RED}{_BOX_BORDER}")
+    print(f"{Fore.RED} [BLOCKED] Task {task_id} - {reason}")
+    print(f"{Fore.RED} Log: {log_path}")
+    print(f"{Fore.RED}{_BOX_BORDER}{Style.RESET_ALL}")
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 _CONTEXT_DIR = ".ai/context/tasks"
@@ -49,13 +90,6 @@ _REPORT_LABELS = [
 ]
 
 
-def _phase_banner(label: str) -> None:
-    width = 60
-    click.echo("\n" + "=" * width)
-    click.echo(f"  {label}")
-    click.echo("=" * width)
-
-
 def _print_report_table(task_id: str) -> None:
     click.echo("\n--- Generated reports ---")
     found_any = False
@@ -68,7 +102,7 @@ def _print_report_table(task_id: str) -> None:
         click.echo("  (none)")
 
 
-def _overall_verdict(task_id: str, result: dict) -> str:
+def _overall_verdict(result: dict) -> str:
     if result.get("completed"):
         return "DONE"
     if result.get("blocked"):
@@ -81,61 +115,77 @@ def _overall_verdict(task_id: str, result: dict) -> str:
 def _run_phase_1(task_id: str) -> None:
     """Planning phase: PO + Architect conversation -> _plan.md."""
     from agents.planning.planning_crew import run_planning
+    from logger import get_logger
 
-    _phase_banner(f"Phase 1 — Planning  ({task_id})")
+    get_logger(task_id)  # ensure log file is open before phase starts
     t0 = time.time()
-    plan_path = run_planning(task_id)
-    elapsed = time.time() - t0
-    click.echo(f"\nPhase 1 complete in {elapsed:.1f}s")
-    click.echo(f"Plan: {plan_path}")
-    _print_report_table(task_id)
+    try:
+        plan_path = run_planning(task_id)
+        elapsed = time.time() - t0
+        click.echo(f"\nPhase 1 complete in {elapsed:.1f}s")
+        click.echo(f"Plan: {plan_path}")
+        _print_report_table(task_id)
+        _print_footer_ok(task_id, elapsed)
+    except Exception as exc:
+        elapsed = time.time() - t0
+        _print_footer_blocked(task_id, str(exc))
+        raise
 
 
 def _run_phase_2(task_id: str) -> None:
     """Execution phase: BE + FE engineer agents -> _execution.md."""
     from agents.engineers.execution_crew import run_execution
+    from logger import get_logger
 
-    _phase_banner(f"Phase 2 — Execution  ({task_id})")
+    get_logger(task_id)
     t0 = time.time()
-    summary = run_execution(task_id)
-    elapsed = time.time() - t0
-    click.echo(f"\nPhase 2 complete in {elapsed:.1f}s")
-    click.echo(f"Report: {summary.get('report_path')}")
-    _print_report_table(task_id)
+    try:
+        summary = run_execution(task_id)
+        elapsed = time.time() - t0
+        click.echo(f"\nPhase 2 complete in {elapsed:.1f}s")
+        click.echo(f"Report: {summary.get('report_path')}")
+        _print_report_table(task_id)
+        _print_footer_ok(task_id, elapsed)
+    except Exception as exc:
+        _print_footer_blocked(task_id, str(exc))
+        raise
 
 
 def _run_phase_3(task_id: str) -> None:
     """Quality phase: verification + review + secops -> three reports."""
     from agents.quality.quality_pipeline import run_quality
+    from logger import get_logger
 
-    _phase_banner(f"Phase 3 — Quality  ({task_id})")
+    get_logger(task_id)
     t0 = time.time()
-    result = run_quality(task_id)
-    elapsed = time.time() - t0
-    click.echo(f"\nPhase 3 complete in {elapsed:.1f}s")
-    click.echo(f"  Verification : {result.get('verification_verdict')}")
-    click.echo(f"  Review       : {result.get('review_verdict')}")
-    click.echo(f"  SecOps       : {result.get('secops_verdict')}")
-    click.echo(f"  Passed       : {result.get('passed')}")
-    _print_report_table(task_id)
+    try:
+        result = run_quality(task_id)
+        elapsed = time.time() - t0
+        click.echo(f"\nPhase 3 complete in {elapsed:.1f}s")
+        click.echo(f"  Verification : {result.get('verification_verdict')}")
+        click.echo(f"  Review       : {result.get('review_verdict')}")
+        click.echo(f"  SecOps       : {result.get('secops_verdict')}")
+        click.echo(f"  Passed       : {result.get('passed')}")
+        _print_report_table(task_id)
+        _print_footer_ok(task_id, elapsed)
+    except Exception as exc:
+        _print_footer_blocked(task_id, str(exc))
+        raise
 
 
 def _run_full_pipeline(task_id: str, resume: bool) -> None:
     """Full pipeline: all phases connected by LangGraph."""
     from orchestrator import run_pipeline
 
-    _phase_banner(f"Full Pipeline  ({task_id}){' [RESUME]' if resume else ''}")
     t0 = time.time()
     result = run_pipeline(task_id, resume=resume)
     elapsed = time.time() - t0
 
-    click.echo(f"\nPipeline finished in {elapsed:.1f}s")
-    click.echo(f"Verdict: {_overall_verdict(task_id, result)}")
-
-    if result.get("log"):
-        click.echo("\n--- Execution log ---")
-        for entry in result["log"]:
-            click.echo(f"  {entry}")
+    if result.get("blocked"):
+        reason = result.get("blocked_reason", "see error report")
+        _print_footer_blocked(task_id, reason)
+    else:
+        _print_footer_ok(task_id, elapsed)
 
     _print_report_table(task_id)
 
@@ -165,14 +215,9 @@ def _run_full_pipeline(task_id: str, resume: bool) -> None:
 )
 def main(task: str, mode: str, phase: str, resume: bool) -> None:
     """Run a Blue Steel AI pipeline task."""
-    # Propagate mode to all pipeline modules via env var
     os.environ["PIPELINE_MODE"] = mode
 
-    click.echo(f"Task:   {task}")
-    click.echo(f"Mode:   {mode}")
-    click.echo(f"Phase:  {phase}")
-    if resume:
-        click.echo("Resume: enabled")
+    _print_header(task, mode)
 
     if phase == "1":
         _run_phase_1(task)

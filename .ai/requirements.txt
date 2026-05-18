@@ -7,3 +7,4 @@ semgrep
 python-dotenv
 pyyaml
 click
+colorama>=0.4.6
