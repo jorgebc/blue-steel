@@ -72,6 +72,19 @@ apps/api/src/main/java/com/bluesteel/
 | ARCH-07 | Everything in `port/in/*` and `port/out/*` must be an interface |
 | ARCH-08 | All port interfaces live in a domain concept sub-package, never at root of `port/in` or `port/out` |
 
+**Port sub-package structure:** Every interface in `port/in` and `port/out` must live in a domain concept sub-package (e.g. `port/out/session/`, `port/out/health/`). Mirror the sub-package structure across `port/in`, `port/out`, and `application/service`. Never place interfaces at the package root.
+
+**`application/model/`:** Shared value types (e.g. `EntityContext`) used across multiple ports. Plain Java Records — no Spring or JPA imports. Use cases assemble `EntityContext` from repository data before passing it to any AI port; the AI adapter never reads the DB directly.
+
+---
+
+## Java Language Conventions
+
+- **Records** for all DTOs, command/query objects, and immutable value objects
+- **Lombok** only where Records are insufficient — primarily JPA entities requiring builders (`@Builder`, `@Getter`, `@NoArgsConstructor`)
+- **Sealed classes** for discriminated domain types (e.g. resolution outcomes)
+- Unchecked exceptions only in domain and application layers — no checked `throws` declarations on use-case methods
+
 ---
 
 ## Naming Conventions (NAMING-01)
@@ -112,6 +125,13 @@ void commit_returns422WhenUncertainCardUnresolved() { ... }
 
 Method name = code audience. Display name = test report audience. Both must be present.
 
+**Test scope (TEST-01):** Every domain class → unit tests (no Spring). Every use-case service → unit tests with Mockito-mocked ports. Persistence adapters → Testcontainers integration tests. Domain core → PITest on every build; application layer on pre-merge.
+
+**Integration test conventions:**
+- Class name suffix `IT` (e.g. `SessionRepositoryIT`)
+- Extend `BaseIntegrationTest` (`@SpringBootTest`, `@ActiveProfiles("local")`) — shared Testcontainers PostgreSQL instance started once per suite
+- **Never use `@MockBean` on LLM port interfaces** — the `local` profile wires real mock adapter implementations; `@MockBean` corrupts the Spring context identity
+
 ### Formatting
 All Java code must pass `mvn spotless:check` (google-java-format). Run `mvn spotless:apply` if
 unsure. Never submit code that fails the formatter.
@@ -124,6 +144,26 @@ unsure. Never submit code that fails the formatter.
 | Invariants | Domain entity | Constructor + method guard clauses | 422 (via GlobalExceptionHandler) |
 
 Never put business logic in controllers. Never put format validation in services.
+
+### Error Response Shape (ERR-01)
+
+All errors use: `{ "errors": [{ "code": "MACHINE_READABLE", "message": "...", "field": null }] }`
+
+`GlobalExceptionHandler` is the **only** place to map domain/application exceptions to HTTP status codes. Never call `response.setStatus()` inside a controller or service. Never include a stack trace in any response body.
+
+---
+
+## Logging
+
+**LOG-01 — LLM call logging:** Every LLM call logged at `INFO` with structured fields: `tokens_in`, `tokens_out`, `cost_usd`, `session_id`, `user_id`, `stage`. Never log raw LLM response content at `INFO` — it may contain narrative PII.
+
+**LOG-02 — General logging:**
+- One static `Logger` per class via `LoggerFactory.getLogger(ClassName.class)`
+- **Domain layer: no logging** — domain must not depend on infrastructure
+- Application services: `INFO` on use-case entry/exit with minimum business IDs; `ERROR` on unhandled exceptions
+- Adapters out: `ERROR` on infrastructure failures with full exception; never silently swallow a caught exception
+- Never log at `INFO` on high-throughput paths (e.g. health check polling)
+- **Never log passwords, tokens, refresh tokens, or any PII**
 
 ---
 
@@ -144,6 +184,7 @@ Never put business logic in controllers. Never put format validation in services
 - **World state is cumulative** (D-001) — two-table versioning: head table + `_versions` append-only table
 - **JWT carries only `user_id` + `is_admin`** (D-043) — campaign role resolved from `campaign_members` via DB
 - **pgvector uses native SQL only** (D-062, ARCH-04) — never use Spring AI `VectorStore`
+- **Embedding generation is async post-commit** (D-063) — commit returns `200` before embeddings are created; generation fires via `ApplicationEvent` / `@Async`; entity versions without embeddings are excluded from Query Mode until complete
 - **Secrets never committed** (D-050) — no API keys, passwords, or tokens in any file
 
 ---
@@ -169,7 +210,9 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 4. **Write files** — use `write_project_file` for each new or modified file
 5. **Run the linter** — use `run_linter_backend` after writing Java files; if it fails, fix and rewrite
 6. **Run tests** — use `run_tests_backend` to verify unit + ArchUnit tests pass
-7. **Report** — record every file you created or modified, any migration filename, and any notes
+7. **Report** — write `.ai/context/tasks/{task_id}_execution.md` with: all files created or modified (full paths), any Liquibase migration filename, build/test pass or fail, and any assumptions or deviations from the plan
 
 Never guess at existing class names — read the actual files first. Never write to protected paths.
-Never install Maven dependencies not already listed in the implementation plan.
+Never install Maven dependencies not already listed in the implementation plan. Never modify `pom.xml` unless the plan explicitly requires it.
+
+**Escalation:** If the linter or tests cannot be fixed after a second attempt, write `BLOCKED: <reason>` at the top of the execution report and stop. Do not make speculative further changes.
