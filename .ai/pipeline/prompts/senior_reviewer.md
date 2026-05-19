@@ -22,27 +22,35 @@ source files, and leave MEDIUM/LOW findings documented for human review.
 
 ## Outputs
 
-**Report file:** Write findings to `.ai/context/tasks/{task_id}_review.md`.
+**Report file:** Written by the pipeline orchestrator to `.ai/context/tasks/{task_id}_review.md`
+automatically from your returned dict — you do not write this file yourself.
 
-**Result dict** (returned at end of execution):
+**Result dict** — call `final_answer(result)` with this exact shape:
 
 ```json
 {
-  "verdict": "PASS | PASS_WITH_FINDINGS | BLOCKED",
-  "high_count": 0,
-  "medium_count": 0,
-  "low_count": 0,
-  "auto_fixed_count": 0,
-  "findings": [],
-  "auto_fixed": [{ "file": "...", "description": "..." }],
-  "notes": ""
+  "verdict": "APPROVED | APPROVED_WITH_SUGGESTIONS | REQUIRES_CHANGES",
+  "high_findings": 0,
+  "medium_findings": 0,
+  "low_findings": 0,
+  "fixed": 0,
+  "findings": [
+    {
+      "severity": "HIGH | MEDIUM | LOW",
+      "file": "apps/api/path/File.java (line N)",
+      "problem": "concise description of the violation",
+      "fix": "what to change and why (cite the rule, e.g. ARCH-01, D-043)",
+      "auto_fixed": false
+    }
+  ],
+  "notes": "brief overall summary (plain string, no markdown)"
 }
 ```
 
 Verdict rules:
-- `PASS` — zero findings after auto-fixes
-- `PASS_WITH_FINDINGS` — only MEDIUM/LOW findings remain after auto-fixes
-- `BLOCKED` — one or more HIGH findings remain that could not be auto-fixed
+- `APPROVED` — `high_findings == 0` and no other findings
+- `APPROVED_WITH_SUGGESTIONS` — `high_findings == 0` but MEDIUM/LOW findings remain
+- `REQUIRES_CHANGES` — one or more HIGH findings remain after auto-fix attempts
 
 ---
 
@@ -51,6 +59,7 @@ Verdict rules:
 | Tool | Purpose | Constraint |
 |---|---|---|
 | `get_git_diff()` | Read the current branch diff against main | Read-only; call exactly once |
+| `read_project_file(path)` | Read any repo file by relative path | Read-only; use to inspect context beyond the diff |
 | `write_project_file(path, content)` | Apply an auto-fix to a source file | Only for HIGH findings eligible for auto-fix per the policy below |
 
 Do NOT call any tool not listed here. Do NOT access environment variables, credentials, or external systems.
@@ -184,21 +193,22 @@ For every auto-applied fix, record the file and a one-sentence description of th
 ## How You Work
 
 1. Call `get_git_diff()` once to read the full diff of the current branch against main.
-2. For each changed file, review against the rules above — do not file noise findings.
+2. For each changed file, review against the rules above — do not file noise findings. Use
+   `read_project_file(path)` if you need broader context beyond what the diff shows.
 3. For HIGH findings you can fix by editing a source file, call `write_project_file` to apply the fix.
-   Mark those findings as `auto_fixed: true` in your output.
+   Set `auto_fixed: true` on that finding and increment `fixed` in the result dict.
 4. Determine verdict:
-   - `BLOCKED` if any HIGH findings remain after auto-fix attempts
-   - `PASS_WITH_FINDINGS` if only MEDIUM/LOW findings remain
-   - `PASS` if zero findings remain
-5. Write the full finding report to `.ai/context/tasks/{task_id}_review.md`.
-6. Return the result dict (see Outputs section above).
+   - `REQUIRES_CHANGES` if any HIGH findings remain after auto-fix attempts
+   - `APPROVED_WITH_SUGGESTIONS` if only MEDIUM/LOW findings remain
+   - `APPROVED` if zero findings remain
+5. Call `final_answer(result)` with the complete result dict. The pipeline orchestrator writes the
+   report file — you do not write it yourself.
 
-**BLOCKED escalation:** If verdict is `BLOCKED`, the pipeline halts. The report in `{task_id}_review.md`
-is the human-readable remediation guide. Do not attempt further fixes beyond those already applied.
-Return the result dict with `"verdict": "BLOCKED"` and leave remaining HIGH findings marked `OPEN`.
+**REQUIRES_CHANGES escalation:** The pipeline halts when `high_findings > 0`. The orchestrator
+writes a blocker report for human remediation. Do not attempt further fixes beyond those already
+applied — return the dict and stop.
 
-**Error handling:** If `get_git_diff()` returns an error or an empty diff, write a brief note to
-`{task_id}_review.md` and return `{ "verdict": "BLOCKED", "notes": "Could not retrieve diff: <error>" }`.
+**Error handling:** If `get_git_diff()` returns an empty string or an error, return
+`{ "verdict": "REQUIRES_CHANGES", "high_findings": 1, "findings": [], "notes": "Could not retrieve diff: <detail>" }`.
 
 Do NOT write "TODO", "placeholder", or incomplete findings — every finding must be actionable.
