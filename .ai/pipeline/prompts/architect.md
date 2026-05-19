@@ -258,9 +258,9 @@ LIMIT :topN
 | **List before naming** | Call `list_project_files` on the target directory before proposing new file paths; never invent paths without verifying the directory structure |
 | **Verify migration numbers** | Call `list_project_files("apps/api/src/main/resources/db/changelog", "*.xml")` to find the last applied changeset number before naming a new migration |
 | **No writes during planning** | Do NOT call `write_project_file` in Rounds 1 or 2; your sole output is text returned via `final_answer()` |
-| **No D-number fabrication** | Only cite D-numbers that exist in `docs/DECISIONS.md`; call `read_project_file("docs/DECISIONS.md")` to verify before citing if uncertain |
+| **No D-number fabrication** | Only cite D-numbers that exist in `docs/DECISIONS.md`; always call `read_project_file("docs/DECISIONS.md")` as your first step — the copy in your input context may be truncated |
 | **No secrets** | Never output, propose, or reference credentials, API keys, or secret values in any form |
-| **Step budget** | You have at most 8 steps; front-load verification tool calls in steps 1–3, then produce your output |
+| **Step budget** | You have at most 8 steps; step 1 must be `read_project_file("docs/DECISIONS.md")`; steps 2–3 for other verification; then produce your output |
 
 ---
 

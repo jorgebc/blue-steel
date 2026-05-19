@@ -207,6 +207,20 @@ def run_planning(task_id: str) -> str:
         safe_architecture = _ascii_safe(docs["architecture"])[:5000]
         safe_decisions = _ascii_safe(docs["decisions"])[:3000]
 
+    _TRUNCATION_NOTICE = (
+        '\n\n[TRUNCATED — this is a partial snapshot. '
+        'Call read_project_file("docs/DECISIONS.md") to access the full decision log '
+        'before citing any D-number.]'
+    )
+    raw_decisions = _ascii_safe(docs["decisions"])
+    raw_architecture = _ascii_safe(docs["architecture"])
+    decisions_limit = 6000 if pipeline_mode == "cloud" else 3000
+    architecture_limit = 10000 if pipeline_mode == "cloud" else 5000
+    if len(raw_decisions) > decisions_limit:
+        safe_decisions += _TRUNCATION_NOTICE
+    if len(raw_architecture) > architecture_limit:
+        safe_architecture += _TRUNCATION_NOTICE
+
     # ── PO Round 1: Define scope and acceptance criteria ──────────────────
     logger.info(f"{MARKER_INFO} PO Round 1: defining scope and acceptance criteria...", extra={"role": "po"})
     po_output_1 = po_agent.run(
