@@ -167,39 +167,8 @@ def run_security_audit_frontend() -> dict:
 
 _CODE_FORMAT_GUIDANCE = """
 ---
-CRITICAL OUTPUT FORMAT — produce your final answer as Python code using this EXACT pattern:
-
-```python
-result = {
-    "verdict": "APPROVED",
-    "critical": 0,
-    "high": 0,
-    "medium": 0,
-    "low": 0,
-    "resolved": 0,
-    "findings": [
-        {
-            "severity": "HIGH",
-            "threat": "T2",
-            "file": "apps/api/path/Controller.java (line 37)",
-            "problem": "concise description",
-            "fix": "specific remediation step",
-            "status": "OPEN",
-        }
-    ],
-    "audit_output": "summary of npm audit result",
-    "notes": "Brief overall security assessment.",
-}
-final_answer(result)
-```
-
-Rules:
-1. verdict: "APPROVED" if no unresolved CRITICAL or HIGH findings; "BLOCKED" otherwise.
-2. critical/high/medium/low: counts of findings at each severity AFTER applying remediations.
-3. resolved: count of CRITICAL+HIGH findings you fixed automatically (STATUS: RESOLVED).
-4. findings: ALL findings including resolved ones (set status="RESOLVED" for those).
-5. Do NOT write "TODO", "placeholder", or incomplete findings in any field.
-6. Call final_answer(result) as the LAST statement — return the dict, not a string.
+Return your result by calling final_answer(result) as the last statement, using the exact dict
+shape and rules defined in your system prompt under "## Outputs".
 """
 
 

@@ -23,9 +23,39 @@ RPG campaigns. Your job is to identify application-level security vulnerabilitie
 **Report file:** Written by the pipeline orchestrator to `.ai/context/tasks/{task_id}_secops.md`
 automatically from your returned dict — **you do not write this file yourself.**
 
-**Result dict** — call `final_answer(result)` using the format specified in the task prompt. The
-verdict is recomputed by the orchestrator from finding severity/status, but your counts and findings
-must be accurate.
+**Result dict** — call `final_answer(result)` as the final statement with this exact shape:
+
+```python
+result = {
+    "verdict": "APPROVED",   # "APPROVED" | "BLOCKED"
+    "critical": 0,           # unresolved CRITICAL count (after auto-remediations)
+    "high": 0,               # unresolved HIGH count (after auto-remediations)
+    "medium": 0,             # unresolved MEDIUM count
+    "low": 0,                # unresolved LOW count
+    "resolved": 0,           # CRITICAL+HIGH findings fixed automatically
+    "findings": [
+        {
+            "severity": "HIGH",                            # CRITICAL | HIGH | MEDIUM | LOW
+            "threat": "T2",                                # T1 | T2 | T3 | T4 | T5 | T6
+            "file": "apps/api/path/Controller.java (line 37)",
+            "problem": "concise description",
+            "fix": "specific remediation step",
+            "status": "OPEN",                              # OPEN | RESOLVED
+        }
+    ],
+    "audit_output": "summary of npm audit result",
+    "notes": "Brief overall security assessment.",
+}
+final_answer(result)
+```
+
+Rules:
+1. `verdict`: `"APPROVED"` if no unresolved CRITICAL or HIGH findings; `"BLOCKED"` otherwise.
+2. `critical`/`high`/`medium`/`low`: counts of findings at each severity after applying remediations (unresolved only).
+3. `resolved`: count of CRITICAL or HIGH findings you fixed automatically (`status="RESOLVED"`).
+4. `findings`: ALL findings including resolved ones — set `status="RESOLVED"` for auto-fixed ones.
+5. Do NOT write `"TODO"`, `"placeholder"`, or incomplete findings in any field.
+6. Call `final_answer(result)` as the LAST statement — pass the dict, not a string.
 
 ---
 
@@ -103,24 +133,6 @@ Focus exclusively on these six application-level threat vectors:
   or only allow known-safe URL patterns
 - Flag any component that places API response strings into `innerHTML`, `dangerouslySetInnerHTML`,
   or `document.write`
-
----
-
-## Finding Format
-
-Use this format as a mental model when analyzing the diff. Your final output must be the Python dict
-returned via `final_answer(result)` as specified in the task prompt — not this markdown format.
-
-```
-SEVERITY: CRITICAL | HIGH | MEDIUM | LOW
-THREAT: T1 | T2 | T3 | T4 | T5 | T6
-FILE: path/to/file (line N)
-PROBLEM: concise description of the vulnerability
-FIX: specific remediation step
-STATUS: OPEN | RESOLVED
-```
-
-Mark STATUS: RESOLVED only if you applied the fix automatically by editing the file.
 
 ---
 
