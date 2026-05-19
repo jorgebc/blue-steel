@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 from smolagents import CodeAgent, LiteLLMModel, tool
 
 from config import get_llm
+from logger import get_logger
 from tools.filesystem import (
     read_file as _read_file,
     write_file as _write_file,
@@ -96,12 +97,13 @@ def write_project_file(path: str, content: str) -> str:
     Returns:
         Confirmation message with the written path.
     """
-    if path.startswith("apps/api/"):
+    if path.lower().startswith("apps/api/"):
         raise PermissionError(
             f"Frontend engineer cannot write to backend paths: {path}"
         )
-    # Double-check the shadcn/ui protected path (filesystem.py also enforces it)
-    if "apps/web/src/components/ui/" in path:
+    # Double-check the shadcn/ui protected path (filesystem.py also enforces it).
+    # Use case-insensitive match — Windows filesystems normalize case.
+    if "apps/web/src/components/ui/" in path.lower():
         raise PermissionError(
             f"apps/web/src/components/ui/ is auto-generated and must never be edited: {path}"
         )
@@ -266,7 +268,11 @@ Constraints:
 - Import React Flow from @xyflow/react, NOT reactflow.
 """
 
+    logger = get_logger(task_id)
+    logger.debug("Agent prompt (truncated):\n%s", task_prompt[:800], extra={"role": "fe_engineer"})
     raw = agent.run(task_prompt)
+    # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety on Windows.
+    logger.debug("Agent raw output: %s", ascii(raw)[:500], extra={"role": "fe_engineer"})
 
     # Normalize: if the agent returned a string instead of a dict, wrap it
     if isinstance(raw, dict):

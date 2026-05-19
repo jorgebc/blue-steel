@@ -57,6 +57,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 from smolagents import CodeAgent, LiteLLMModel, tool
 
 from config import get_llm
+from logger import get_logger
 from tools.filesystem import (
     REPO_ROOT,
     get_modified_files as _get_modified_files,
@@ -213,7 +214,7 @@ def list_modified_source_files() -> list:
     return _get_modified_files(base="main")
 
 
-def _run_auto_fix_agent(check_name: str, error_output: str) -> str:
+def _run_auto_fix_agent(check_name: str, error_output: str, task_id: str | None = None) -> str:
     """Run a CodeAgent to attempt a source-code fix for a failing check."""
     agent = CodeAgent(
         tools=[read_source_file, write_source_file, list_modified_source_files],
@@ -250,9 +251,30 @@ result = "Brief description of what was fixed, or 'No fix applied: <reason>'."
 final_answer(result)
 ```
 """
+    logger = get_logger(task_id) if task_id else None
+    if logger:
+        logger.debug(
+            "Agent prompt (truncated):\n%s",
+            prompt[:800],
+            extra={"role": "verification"},
+        )
     try:
-        return str(agent.run(prompt))
+        raw = agent.run(prompt)
+        if logger:
+            # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety.
+            logger.debug(
+                "Agent raw output: %s",
+                ascii(raw)[:500],
+                extra={"role": "verification"},
+            )
+        return str(raw)
     except Exception as exc:
+        if logger:
+            logger.debug(
+                "Agent raised exception: %s",
+                ascii(str(exc))[:500],
+                extra={"role": "verification"},
+            )
         return f"Auto-fix agent error: {exc}"
 
 
@@ -321,7 +343,7 @@ def _check_with_llm_fix(task_id: str, name: str, run_fn, max_attempts: int = 3) 
 
         if attempt < max_attempts:
             print(f"    [{name}] Attempting LLM auto-fix ({attempt}/{max_attempts - 1})...")
-            fix_summary = _run_auto_fix_agent(name, error_output)
+            fix_summary = _run_auto_fix_agent(name, error_output, task_id=task_id)
             print(f"    [{name}] Fix: {fix_summary[:120]}")
 
     return {"status": "BLOCKED", "attempts": max_attempts, "error_output": error_output}

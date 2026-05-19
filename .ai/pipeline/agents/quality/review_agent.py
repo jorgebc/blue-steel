@@ -50,6 +50,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 from smolagents import CodeAgent, LiteLLMModel, tool
 
 from config import get_llm
+from logger import get_logger
 from tools.filesystem import (
     file_exists as _file_exists,
     get_git_diff as _get_git_diff,
@@ -280,7 +281,11 @@ Do NOT flag formatting issues (Spotless and TypeScript handle those).
 Do NOT write TODO, placeholder, or incomplete findings.
 """
 
+    logger = get_logger(task_id)
+    logger.debug("Agent prompt (truncated):\n%s", task_prompt[:800], extra={"role": "review"})
     raw = agent.run(task_prompt)
+    # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety on Windows.
+    logger.debug("Agent raw output: %s", ascii(raw)[:500], extra={"role": "review"})
 
     # Normalize response
     if isinstance(raw, dict):

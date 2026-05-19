@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 from smolagents import CodeAgent, LiteLLMModel, tool
 
 from config import get_llm
+from logger import get_logger
 from tools.filesystem import read_file as _read_file, write_file as _write_file
 
 _PROMPTS_DIR = Path(__file__).parents[2] / "prompts"
@@ -226,4 +227,9 @@ Review the architect's proposal and challenge it on product grounds:
 Be direct and precise. Cite D-numbers when challenging decisions. Do not accept generic or placeholder answers.
 """
 
-    return agent.run(task_prompt)
+    logger = get_logger(task_id)
+    logger.debug("Agent prompt (truncated):\n%s", task_prompt[:800], extra={"role": "po"})
+    raw = agent.run(task_prompt)
+    # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety on Windows.
+    logger.debug("Agent raw output: %s", ascii(raw)[:500], extra={"role": "po"})
+    return raw

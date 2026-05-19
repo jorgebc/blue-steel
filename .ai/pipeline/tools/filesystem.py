@@ -27,19 +27,33 @@ def read_file(path: str) -> str:
 def write_file(path: str, content: str) -> bool:
     """Write content to a file, creating intermediate directories as needed.
 
-    Raises PermissionError for paths protected by project conventions
-    (shadcn/ui auto-generated components, Liquibase changelogs).
+    Raises PermissionError for paths outside the repo root, for shadcn/ui
+    auto-generated components, and for modifications to existing Liquibase
+    changeset files (new changesets in db/changelog/ are allowed).
     """
     resolved = _resolve(path)
     try:
         rel = resolved.relative_to(REPO_ROOT).as_posix()
-        for protected in PROTECTED_WRITE_PATHS:
-            if rel.startswith(protected):
+    except ValueError:
+        raise PermissionError(
+            f"Writing outside the repository root is forbidden: {resolved}"
+        )
+
+    rel_lower = rel.lower()
+    for protected in PROTECTED_WRITE_PATHS:
+        if rel_lower.startswith(protected.lower()):
+            if protected == "apps/api/src/main/resources/db/changelog/":
+                # Liquibase is append-only: creating new changesets is OK,
+                # modifying existing files is forbidden.
+                if resolved.exists():
+                    raise PermissionError(
+                        f"Modifying an existing Liquibase changeset is forbidden: {rel}"
+                    )
+            else:
                 raise PermissionError(
                     f"Writing to '{protected}' is forbidden by project conventions: {rel}"
                 )
-    except ValueError:
-        pass  # path is outside REPO_ROOT — no restriction applies
+
     resolved.parent.mkdir(parents=True, exist_ok=True)
     resolved.write_text(content, encoding="utf-8")
     return True
