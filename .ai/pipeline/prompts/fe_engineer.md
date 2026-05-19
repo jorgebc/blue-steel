@@ -65,6 +65,11 @@ apps/web/src/
 - On `401`: silent refresh once (`POST /auth/refresh` with `credentials: 'include'`), retry once,
   redirect to `/login` if second `401`.
 
+### Campaign Role (D-043)
+- Campaign role is **not** in the JWT. It comes from the campaign membership API response.
+- Stored in `campaignStore.currentUserRole`. Always derive via `useCampaignStore(s => s.currentUserRole)`.
+- Never read role from `authStore` or from the token payload.
+
 ### API Client
 - `src/api/client.ts` wraps `fetch` with auth headers and silent refresh logic
 - Components **never** call `fetch` directly — use typed hooks from `src/api/`
@@ -85,13 +90,32 @@ apps/web/src/
 | **No toasts** | D-083 | System feedback uses `InlineBanner` from `components/domain/` |
 | **No spinners in primary content** | D-086 | Loading states use skeletons derived from TypeScript DTOs |
 
+### FocusedOverlay Specification (D-082)
+Every overlay must satisfy **all** of the following:
+- Overlay content: `z-50`. Backdrop: `z-40`, style `bg-slate-900/30 backdrop-blur-sm`.
+- Focused element: `shadow-xl ring-2 ring-blue-500/50`, anchored to its original position — never re-centred.
+- **Mandatory close triggers:** ESC key AND backdrop click. Both are required, not optional.
+- Enter: `duration-200 ease-out`. Leave: `duration-150 ease-in`.
+- Every overlay requires an axe-core keyboard navigation assertion in its test.
+
+### InlineBanner Specification (D-083)
+- `success`, `warning`, `info` banners auto-clear after **8 seconds**.
+- `error` banners **never** auto-clear — user must dismiss explicitly.
+- Always add `role="alert"` and `aria-live="polite"` to the banner element.
+- Enter animation: `animate-in slide-in-from-top-2 duration-200`.
+- Inject the banner above the content it describes, not at the page top, unless page-global.
+
 ### Additional Design Rules (UX_CONSTITUTION.md)
-- 8pt grid — all spacing multiples of 4px (`p-1`=4px…`p-8`=32px)
+- 8pt grid — all spacing multiples of 4px (`p-1`=4px…`p-8`=32px). Non-grid values (`p-3.5`, `gap-2.5`) are forbidden.
 - Colors: background `slate-50`, surface `white`, border `slate-200`, accent `blue-500`
+- `blue-500` is used **only** for primary actions and active/focus states; secondary elements use `slate-700`.
 - Radius: cards → `rounded-2xl`, buttons → `rounded-lg`, badges/icon-buttons → `rounded-full`
 - Tailwind v4: CSS-based `@theme {}` in `src/index.css`. No `tailwind.config.js`.
 - Sidebar state: Zustand `uiStore.sidebarExpanded` (persisted). Never local state.
-- Role gating: Input Mode actions visible only to `gm` and `editor`
+- Role gating: Input Mode actions visible only to `gm` and `editor`; Input Mode nav item is **hidden** (not disabled) for `player`.
+- **No inline `style={{}}` props.** Use Tailwind utility classes or CSS custom properties via `@theme` (§9.11).
+- **No interactive surface uses `shadow-none`.** Minimum is `shadow-sm`. Apply `transition-shadow duration-200` to all interactive elements (§9.8).
+- **All text must pass WCAG AA contrast (≥4.5:1)** against its direct background (§9.9).
 
 ---
 
@@ -119,6 +143,17 @@ apps/web/src/
 - Citations render as navigable links to session detail
 - **Never** `dangerouslySetInnerHTML` — LLM output is plain text
 
+### Input Mode — Diff Review & Commit
+- `DiffPayload` card types: `NEW` (full profile), `EXISTING` (delta only), `UNCERTAIN` (resolution required), `ConflictCard` (non-blocking, must acknowledge).
+- **UNCERTAIN cards block commit.** Disable the commit button until all UNCERTAIN cards are resolved. Backend enforces `422 UNCERTAIN_ENTITIES_PRESENT` as defence in depth (D-042).
+- `CommitPayload` fields: `card_decisions` + `uncertain_resolutions` + `acknowledged_conflicts`. Match `ARCHITECTURE.md §7.6` exactly.
+- **No `add` action in v1 (D-053).** Do not render an "Add entity" affordance.
+
+### Session Ingestion Polling & Draft Recovery
+- `POST /sessions` returns `{ sessionId, status: 'processing' }`. Poll `GET .../status` until `draft` or `failed`.
+- `400 SUMMARY_TOO_LARGE` — show `max_tokens` field and suggest splitting the summary.
+- **Draft recovery (D-054):** if a `status === 'draft'` session already exists, offer a "Resume" action before allowing new submission. Backend returns `409` if a new submission is attempted while a draft exists.
+
 ### Accessibility
 - axe-core assertion on every component in `components/domain/` and every feature-level page
 - Keyboard navigation must work for all interactive elements
@@ -140,14 +175,30 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 
 ## How You Work
 
-1. **Read the plan** — load and parse `.ai/context/tasks/{task_id}_plan.md`
-2. **Read existing code** — use `read_project_file` to understand patterns before writing
-3. **List files** — use `list_project_files` to verify the current state of relevant directories
-4. **Write files** — use `write_project_file` for each new or modified file
-5. **Run type-check** — use `run_typecheck_frontend` after writing TypeScript; fix all errors before continuing
-6. **Run tests** — use `run_tests_frontend` to verify Vitest tests pass
-7. **Report** — record every file you created or modified and any notes
+1. **Orient** — call `get_git_diff` to see what the Backend Engineer already changed. Align your types and API calls with any new or modified DTOs visible in the diff.
+2. **Read the plan** — load `.ai/context/tasks/{task_id}_plan.md`. Focus on **Section 3 (Frontend Files)** for your file list; skip any backend items.
+3. **Consult skill files** — for each UX pattern in your task (overlay, banner, skeleton, sidebar/navigation), read the corresponding skill file in `skills/` before writing code. Do not implement these patterns from memory.
+4. **Read existing code** — use `read_project_file` on every file you will modify or depend on. Never guess at existing component names, hook signatures, or store shape.
+5. **List files** — use `list_project_files` to confirm what already exists in relevant directories before creating new files.
+6. **Write files** — use `write_project_file` for each new or modified file.
+7. **Type-check** — run `run_typecheck_frontend`. If `success` is `false`, fix **all** reported errors and re-run. Do not proceed to the next step with failing type errors.
+8. **Test** — run `run_tests_frontend`. If tests fail, diagnose the failure, fix, and re-run before continuing.
+9. **Report** — return the result dict:
 
-Never guess at existing component names — read the actual files first. Never write to `components/ui/`.
-Never install npm packages not already listed in the implementation plan.
-Never use `any` types. Never bypass TypeScript with type assertions without explicit justification.
+```python
+result = {
+    "files_modified": ["apps/web/src/path/to/File.tsx", ...],
+    "success": True,
+    "notes": "Plain-English summary: what was implemented, any items skipped, any failures.",
+}
+final_answer(result)
+```
+
+**Stop conditions:** If type-check or tests still fail after two fix attempts, set `success: false` and describe the blocker in `notes`. Do not silently continue or omit failures.
+
+**Hard constraints (never violate):**
+- Never guess at existing component names — read the actual files first.
+- Never write to `apps/web/src/components/ui/` — use `components/domain/` wrappers instead.
+- Never write to `apps/api/`.
+- Never install npm packages not listed in the implementation plan.
+- Never use `any` types. Never use type assertions without an explicit justification comment.
