@@ -13,6 +13,7 @@ from .shell_runner import (
     run_linter_backend,
     run_tests_frontend,
     run_typecheck_frontend,
+    run_lint_frontend,
     run_security_audit_frontend,
 )
 from .git_tools import (
@@ -36,6 +37,7 @@ __all__ = [
     "run_linter_backend",
     "run_tests_frontend",
     "run_typecheck_frontend",
+    "run_lint_frontend",
     "run_security_audit_frontend",
     "get_current_branch",
     "create_branch",

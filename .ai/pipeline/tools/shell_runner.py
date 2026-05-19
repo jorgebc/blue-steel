@@ -63,6 +63,11 @@ def run_typecheck_frontend() -> dict:
     return run_command("npm run type-check", cwd=str(WEB_ROOT), timeout=120)
 
 
+def run_lint_frontend() -> dict:
+    """Run ESLint on the frontend source (npm run lint from apps/web/)."""
+    return run_command("npm run lint", cwd=str(WEB_ROOT), timeout=120)
+
+
 def run_security_audit_frontend() -> dict:
     """Audit production npm dependencies for high-severity CVEs."""
     return run_command(

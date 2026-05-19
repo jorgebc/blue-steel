@@ -21,7 +21,11 @@ from tools.filesystem import (
     list_files as _list_files,
     get_git_diff as _get_git_diff,
 )
-from tools.shell_runner import run_tests_frontend as _run_tests, run_typecheck_frontend as _run_typecheck
+from tools.shell_runner import (
+    run_tests_frontend as _run_tests,
+    run_typecheck_frontend as _run_typecheck,
+    run_lint_frontend as _run_lint,
+)
 
 _PROMPTS_DIR = Path(__file__).parents[2] / "prompts"
 
@@ -145,6 +149,17 @@ def run_typecheck_frontend() -> dict:
 
 
 @tool
+def run_lint_frontend() -> dict:
+    """Run the ESLint linter on the frontend source (npm run lint from apps/web/).
+    If success is False, fix all lint errors before continuing.
+
+    Returns:
+        Dict with keys: stdout, stderr, returncode, success.
+    """
+    return _run_lint()
+
+
+@tool
 def run_tests_frontend() -> dict:
     """Run frontend tests in CI mode (npm test from apps/web/).
 
@@ -154,6 +169,8 @@ def run_tests_frontend() -> dict:
     return _run_tests()
 
 
+# Sole authoritative source for the final_answer output format. The persona
+# (fe_engineer.md) does not duplicate this block to avoid divergence between the two.
 _CODE_FORMAT_GUIDANCE = """
 ---
 CRITICAL OUTPUT FORMAT:
@@ -187,6 +204,7 @@ def _create_agent() -> CodeAgent:
             list_project_files,
             get_git_diff,
             run_typecheck_frontend,
+            run_lint_frontend,
             run_tests_frontend,
         ],
         model=_make_model(),
@@ -230,8 +248,9 @@ Steps:
 3. List the relevant directories to understand what already exists (use list_project_files).
 4. Write every frontend file listed in the plan (use write_project_file).
 5. Run the type-checker (run_typecheck_frontend) after writing TypeScript files; fix all errors.
-6. Run the tests (run_tests_frontend) to verify Vitest tests pass.
-7. Return your result dict with files_modified, success, and notes.
+6. Run the linter (run_lint_frontend). If success is False, fix all lint errors before continuing.
+7. Run the tests (run_tests_frontend) to verify Vitest tests pass.
+8. Return your result dict with files_modified, success, and notes.
 
 Constraints:
 - Only implement frontend files (apps/web/) — skip any backend files listed in the plan.

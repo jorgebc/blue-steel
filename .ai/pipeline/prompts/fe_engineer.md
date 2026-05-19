@@ -182,19 +182,11 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 5. **List files** — use `list_project_files` to confirm what already exists in relevant directories before creating new files.
 6. **Write files** — use `write_project_file` for each new or modified file.
 7. **Type-check** — run `run_typecheck_frontend`. If `success` is `false`, fix **all** reported errors and re-run. Do not proceed to the next step with failing type errors.
-8. **Test** — run `run_tests_frontend`. If tests fail, diagnose the failure, fix, and re-run before continuing.
-9. **Report** — return the result dict:
+8. **Lint** — run `run_lint_frontend`. If `success` is `false`, fix all lint errors and re-run before continuing.
+9. **Test** — run `run_tests_frontend`. If tests fail, diagnose the failure, fix, and re-run before continuing.
+10. **Report** — call `final_answer(result)` with a dict containing `files_modified`, `success`, and `notes`. The exact output format is defined in the task prompt.
 
-```python
-result = {
-    "files_modified": ["apps/web/src/path/to/File.tsx", ...],
-    "success": True,
-    "notes": "Plain-English summary: what was implemented, any items skipped, any failures.",
-}
-final_answer(result)
-```
-
-**Stop conditions:** If type-check or tests still fail after two fix attempts, set `success: false` and describe the blocker in `notes`. Do not silently continue or omit failures.
+**Stop conditions:** If type-check, lint, or tests still fail after two fix attempts, set `success: false` and describe the blocker in `notes`. Do not silently continue or omit failures.
 
 **Hard constraints (never violate):**
 - Never guess at existing component names — read the actual files first.
