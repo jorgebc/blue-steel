@@ -22,7 +22,11 @@ from tools.filesystem import (
     list_files as _list_files,
     get_git_diff as _get_git_diff,
 )
-from tools.shell_runner import run_linter_backend as _run_linter, run_tests_backend as _run_tests
+from tools.shell_runner import (
+    run_linter_backend as _run_linter,
+    run_sonar_backend as _run_sonar,
+    run_tests_backend as _run_tests,
+)
 
 _PROMPTS_DIR = Path(__file__).parents[2] / "prompts"
 
@@ -150,6 +154,26 @@ def run_tests_backend() -> dict:
     return _run_tests()
 
 
+@tool
+def run_sonar_backend() -> dict:
+    """Run the local SonarQube quality gate (mvn sonar:sonar) and return only issues in changed files.
+
+    Findings are pre-filtered to files you modified on the current branch —
+    legacy issues in unmodified files are excluded by the tool. Do NOT attempt
+    to fix anything outside the returned findings list. Requires a local
+    sonarqube-local Podman container and $SONAR_TOKEN in the environment.
+
+    Returns:
+        Dict with keys: stdout, stderr, returncode, success.
+        On clean: success=True, notes describes filter count.
+        On issues: success=False, plus `findings` list of
+        {file, line, rule, severity, message} entries — fix and re-run.
+        On infra failure (missing token, podman, boot timeout): success=False
+        with an actionable stderr — surface as BLOCKED in the execution report.
+    """
+    return _run_sonar()
+
+
 _CODE_FORMAT_GUIDANCE = """
 ---
 CRITICAL OUTPUT FORMAT:
@@ -184,10 +208,11 @@ def _create_agent() -> CodeAgent:
             get_git_diff,
             run_linter_backend,
             run_tests_backend,
+            run_sonar_backend,
         ],
         model=_make_model(),
         prompt_templates=_build_prompt_templates(persona),
-        max_steps=20,
+        max_steps=25,
     )
 
 
@@ -229,7 +254,13 @@ Steps:
    apps/api/src/main/resources/db/changelog/ (new file — never modify an existing one).
 6. Run the linter (run_linter_backend) after writing Java files; fix any failures.
 7. Run the tests (run_tests_backend) to verify ArchUnit and unit tests pass.
-8. Return your result dict with files_modified, success, and notes.
+8. Run the Sonar quality gate (run_sonar_backend); if it returns findings in
+   files you modified, fix them and re-run. Maximum 2 attempts. If the second
+   attempt still returns findings, write `BLOCKED: Sonar gate failed after 2
+   attempts — <summary>` in your notes and stop. Legacy issues in unmodified
+   files are filtered out by the tool — do not act on anything outside the
+   returned findings list.
+9. Return your result dict with files_modified, success, and notes.
 
 Constraints:
 - Only implement backend files (apps/api/) — skip any frontend files listed in the plan.

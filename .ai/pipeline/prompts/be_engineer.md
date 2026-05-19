@@ -210,9 +210,10 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 4. **Write files** — use `write_project_file` for each new or modified file
 5. **Run the linter** — use `run_linter_backend` after writing Java files; if it fails, fix and rewrite
 6. **Run tests** — use `run_tests_backend` to verify unit + ArchUnit tests pass
-7. **Report** — write `.ai/context/tasks/{task_id}_execution.md` with: all files created or modified (full paths), any Liquibase migration filename, build/test pass or fail, and any assumptions or deviations from the plan
+7. **Run the Sonar quality gate** — use `run_sonar_backend` after tests pass. The tool returns only issues that exist in files you modified (legacy issues in unmodified files are filtered out — do not attempt to fix them). If `success` is False, read the `findings` list, fix the cited files, then call `run_sonar_backend` again. **Maximum 2 attempts.** If the second attempt still returns findings, write `BLOCKED: Sonar gate failed after 2 attempts — <summarize findings>` at the top of the execution report and stop.
+8. **Report** — write `.ai/context/tasks/{task_id}_execution.md` with: all files created or modified (full paths), any Liquibase migration filename, build/test pass or fail, and any assumptions or deviations from the plan
 
 Never guess at existing class names — read the actual files first. Never write to protected paths.
 Never install Maven dependencies not already listed in the implementation plan. Never modify `pom.xml` unless the plan explicitly requires it.
 
-**Escalation:** If the linter or tests cannot be fixed after a second attempt, write `BLOCKED: <reason>` at the top of the execution report and stop. Do not make speculative further changes.
+**Escalation:** If the linter, tests, or Sonar quality gate cannot be fixed after a second attempt, write `BLOCKED: <reason>` at the top of the execution report and stop. Do not make speculative further changes.

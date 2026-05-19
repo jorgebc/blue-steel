@@ -71,6 +71,10 @@ mvn test                                         # unit + ArchUnit (fast; also r
 mvn verify                                       # + Testcontainers IT (Podman/Docker required)
 mvn test-compile pitest:mutationCoverage         # mutation tests — domain core (slow)
 mvn package -DskipTests                          # production JAR
+
+# SonarQube — local-only quality gate, not part of CI. Requires the
+# sonarqube-local Podman container to be running and $SONAR_TOKEN in env.
+mvn sonar:sonar -Dsonar.host.url=http://localhost:9000 -Dsonar.token=$SONAR_TOKEN -Dsonar.projectKey=blue-steel-api
 ```
 
 **CI step order** (mirrors `backend.yml`): `spotless:check → compile → test → verify → pitest`
@@ -158,6 +162,8 @@ Never put business logic in controllers. Never put format validation in services
 **Logging (LOG-02):** One static `Logger` per class (`LoggerFactory.getLogger`). Domain layer: no logging — domain must not depend on infrastructure. Application services: INFO on use-case entry/exit with minimum business IDs; ERROR on unhandled exceptions. Adapters out: ERROR on infrastructure failures with full exception; never silently swallow a caught exception. Never log at INFO on high-throughput paths (e.g. health check polling). Never log passwords, tokens, or PII. Local profile: `com.bluesteel` packages at DEBUG; third-party at WARN. Prod profile: project at INFO; third-party at WARN; DEBUG disabled.
 
 **Testing (TEST-01):** Every domain class → unit tests. Every use-case service → unit tests with mocked ports. Persistence adapters → Testcontainers IT. Domain core → PITest on every build.
+
+**SonarQube (local-only):** A `sonar-maven-plugin` is configured in `pom.xml` so the AI pipeline's BE engineer can run `mvn sonar:sonar` against a local Podman container (`sonarqube-local`, `http://localhost:9000`, project key `blue-steel-api`). Token comes from `$SONAR_TOKEN` (`.env.local`, never committed — D-050). The pipeline filters reported issues down to files modified on the current branch and iterates fixes up to 2 attempts. Not part of CI today. See repo-root `CLAUDE.md` §6 for the developer setup steps.
 
 **Proposals schema (D-016):** `proposals` + `proposal_votes` tables exist from day one but the approval pipeline ships in v2. Do NOT implement proposal approval logic.
 
