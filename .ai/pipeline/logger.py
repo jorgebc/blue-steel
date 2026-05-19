@@ -37,7 +37,34 @@ MARKER_FAIL    = "[FAIL]"
 MARKER_BLOCKED = "[BLOCKED]"
 MARKER_INFO    = "---"
 
-_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+_ANSI_ESCAPE = re.compile(
+    # SGR (color/style):           \x1b[...m
+    # OSC (window title, etc.):    \x1b]...\x07
+    # Cursor visibility / DECSET:  \x1b[?...h  or  \x1b[?...l
+    # Misc CSI ending in a letter: \x1b[...<letter>
+    r"\x1b\[[0-9;]*m"
+    r"|\x1b\][^\x07]*\x07"
+    r"|\x1b\[\?[0-9;]*[hl]"
+    r"|\x1b\[[0-9;]*[A-Za-z]"
+)
+
+# Patterns that should never land in a log file in plaintext. Each pattern keeps
+# enough context for debugging while masking the credential body.
+_SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"sk-ant-[A-Za-z0-9_\-]{6,}"),            "sk-ant-***REDACTED***"),
+    (re.compile(r"sk-[A-Za-z0-9]{20,}"),                  "sk-***REDACTED***"),
+    (re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]+"),        "Bearer ***REDACTED***"),
+    (re.compile(r"(?i)(password|passwd|pwd)\s*=\s*\S+"),  r"\1=***REDACTED***"),
+    (re.compile(r"(?i)(api[_-]?key)\s*=\s*\S+"),          r"\1=***REDACTED***"),
+)
+
+
+def _scrub_secrets(text: str) -> str:
+    for pattern, replacement in _SECRET_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
 _SEPARATOR   = "-" * 58
 _LOGS_DIR    = Path(__file__).parent.parent / "logs"
 
@@ -60,6 +87,7 @@ class _PlainFileFormatter(logging.Formatter):
         ts    = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S")
         level = record.levelname
         msg   = _ANSI_ESCAPE.sub("", record.getMessage())
+        msg   = _scrub_secrets(msg)
         return f"{ts} [{level}] {role} - {msg}"
 
 

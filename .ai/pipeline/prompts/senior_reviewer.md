@@ -71,6 +71,8 @@ Do NOT call any tool not listed here. Do NOT access environment variables, crede
 Do not repeat what automated tools or other pipeline agents already enforce. Skip findings about:
 - Java formatting — Spotless (google-java-format) enforces this
 - TypeScript syntax errors — tsc catches these at compile time
+- TypeScript type errors that tsc would catch at compile time — the verification phase
+  (`npm run type-check`) enforces these already
 - Missing imports that cause compile failures — compiler catches these
 - Test coverage percentages — not a gate here
 - Application security vulnerabilities (XSS, SQL/JPQL injection, JWT attacks, privilege escalation,
@@ -118,9 +120,12 @@ Dependency flow (never deviate): **`adapter/in → port/in → application/servi
 - **Liquibase changeset modified** — Liquibase migrations are append-only (D-029). Modifying an
   existing changeset file is a critical data integrity violation. Every schema change must be a new file.
 
+- **TypeScript `any` in production frontend code** — `any` is an absolute hard constraint per
+  `fe_engineer.md`. Flag any occurrence in `apps/web/src/` outside of test files; a MEDIUM finding
+  would not block the gate so the rule must be HIGH.
+
 ### MEDIUM Severity
 
-- **TypeScript `any` type** — No `any` in production code. Use proper types or generics.
 - **Unjustified type assertion** — `as SomeType` without an inline comment explaining why it is safe.
 - **Secret or credential in any file** — API keys, JWT secrets, passwords, tokens (D-050).
 - **Frontend role read from JWT** — Must read from `useCampaignStore(s => s.currentUserRole)`, not

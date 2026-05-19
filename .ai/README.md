@@ -5,6 +5,22 @@ Phases: Planning (PO + Architect) -> Execution (BE + FE engineers) -> Quality (v
 
 ---
 
+## Prerequisites
+
+- **Python 3.10 or later** required (the pipeline uses PEP 604 `X | Y` union syntax;
+  Python 3.9 will fail with a cryptic `SyntaxError`).
+- **Ollama** running locally for `--mode local` (the default). Pull the models the
+  pipeline expects before the first run:
+
+  ```bash
+  ollama pull qwen3:14b           # local-reasoning model (PO, architect, review)
+  ollama pull qwen2.5-coder:14b   # local-coding model (BE/FE engineers)
+  ```
+
+  Roughly **16 GB of RAM** is needed to run both models concurrently. If you only
+  have a single model loaded, expect Ollama to swap weights between phases, which
+  adds 20–60 s per swap.
+
 ## Setup
 
 ```bash
@@ -87,6 +103,7 @@ All reports land in `.ai/context/tasks/` and are gitignored.
 | `{id}_done.md` | Done | Pipeline summary + all report links |
 | `{id}_error.md` | Error | Failure reason + recovery instructions |
 | `{id}_blocker.md` | Quality | Created when pipeline is blocked |
+| `SETUP_NOTES.md` | Quality | Cumulative log of missing-tool gaps discovered during verification runs (shared across tasks) |
 
 Checkpoint databases are stored in `.ai/logs/` (also gitignored).
 

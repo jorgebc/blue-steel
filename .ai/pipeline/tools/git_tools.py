@@ -1,3 +1,13 @@
+"""Git helpers reserved for future pipeline integration.
+
+`create_branch`, `stage_files`, and `commit` are intentionally not wired into
+the orchestrator: the Blue Steel pipeline NEVER auto-commits. All commit
+authoring is performed manually by a human reviewer after inspecting the
+generated reports under `.ai/context/tasks/`. These functions exist as a
+foundation for a possible future auto-commit phase and should not be invoked
+from pipeline code today.
+"""
+
 import subprocess
 from pathlib import Path
 

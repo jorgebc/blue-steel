@@ -215,6 +215,15 @@ def _run_full_pipeline(task_id: str, resume: bool) -> None:
 )
 def main(task: str, mode: str, phase: str, resume: bool) -> None:
     """Run a Blue Steel AI pipeline task."""
+    # --resume is implemented via LangGraph SqliteSaver, which only runs in the
+    # full-pipeline orchestrator. Individual phase runners would silently ignore
+    # it. Reject the combination explicitly.
+    if resume and phase != "all":
+        raise click.UsageError(
+            "--resume requires --phase all; single-phase runners do not support "
+            "checkpoint resume."
+        )
+
     os.environ["PIPELINE_MODE"] = mode
 
     _print_header(task, mode)

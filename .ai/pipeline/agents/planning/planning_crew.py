@@ -282,22 +282,31 @@ def run_planning(task_id: str) -> str:
     if has_all_sections:
         plan_content = header + arch_output_2
     else:
-        # Architect did not produce a fully structured plan; assemble from all outputs
+        # Architect did not produce a fully structured plan; assemble from all outputs.
+        # The architect's final output is placed under "## 3. Proposed Technical Solution"
+        # so that downstream parsers (_extract_section_3, _determine_scope) can locate
+        # the BE/FE indicators in the expected heading.
         plan_content = (
             header
-            + "## Planning Conversation\n\n"
-            + "### PO — Scope & Acceptance Criteria\n\n"
+            + "## 1. Executive Summary\n\n"
             + po_output_1
-            + "\n\n---\n\n"
-            + "### Architect — Technical Proposal\n\n"
+            + "\n\n"
+            + "## 2. Acceptance Criteria\n\n"
+            + "_See PO scope above._\n\n"
+            + "## 3. Proposed Technical Solution\n\n"
+            + arch_output_2
+            + "\n\n"
+            + "## Planning Conversation\n\n"
+            + "### Architect — Initial Proposal\n\n"
             + arch_output_1
             + "\n\n---\n\n"
             + "### PO — Challenge\n\n"
             + po_output_2
-            + "\n\n---\n\n"
-            + "### Architect — Final Plan\n\n"
-            + arch_output_2
+            + "\n"
         )
+
+    if len(plan_content.strip()) <= 200:
+        raise ValueError("Plan is empty or malformed")
 
     plan_path = f"{_PLAN_DIR}/{task_id}_plan.md"
     write_file(plan_path, plan_content)

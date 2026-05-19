@@ -147,7 +147,9 @@ def _document_missing_tool(task_id: str, check_name: str, error: str) -> None:
 
 
 def _make_model() -> LiteLLMModel:
-    llm_params = get_llm(phase="execution")
+    # Auto-fix needs root-cause diagnosis, not just code transcription — use the
+    # reasoning model rather than the code-completion model.
+    llm_params = get_llm(phase="review")
     model_id: str = llm_params["model"]
     api_key_raw: str = llm_params.get("api_key", "")
     api_base: str | None = llm_params.get("api_base")
@@ -163,6 +165,22 @@ def _make_model() -> LiteLLMModel:
         api_base=api_base,
         timeout=1800,
     )
+
+
+_PROMPTS_DIR = Path(__file__).parents[2] / "prompts"
+
+
+def _load_persona(check_name: str) -> str:
+    """Pick a Blue Steel engineering persona based on which check is failing.
+
+    npm_typecheck and npm_test failures live in frontend code, so we load
+    fe_engineer.md. Everything else (mvn_test, spotless) is backend.
+    """
+    fname = "fe_engineer.md" if check_name.startswith("npm_") else "be_engineer.md"
+    try:
+        return (_PROMPTS_DIR / fname).read_text(encoding="utf-8")
+    except OSError:
+        return ""
 
 
 @tool
@@ -221,8 +239,13 @@ def _run_auto_fix_agent(check_name: str, error_output: str, task_id: str | None 
         model=_make_model(),
         max_steps=8,
     )
+    persona = _load_persona(check_name)
+    persona_block = (
+        f"## Blue Steel Engineering Persona\n\n{persona}\n\n---\n"
+        if persona else ""
+    )
     prompt = f"""
-You are a code fixer for Blue Steel. A quality check has failed and you must
+{persona_block}You are a code fixer for Blue Steel. A quality check has failed and you must
 attempt to fix the root cause by editing source files.
 
 ## Failing Check

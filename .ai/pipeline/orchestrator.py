@@ -103,7 +103,7 @@ def _quality_node(state: PipelineState) -> dict:
     try:
         result = run_quality(task_id)
         updates: dict = {
-            "verification_passed": result.get("passed", False),
+            "quality_passed": result.get("passed", False),
             "secops_verdict": result.get("secops_verdict"),
             "phase": 3,
             "log": [
@@ -209,13 +209,15 @@ def _final_review_node(state: PipelineState) -> dict:
             "log": [f"Final review: {verdict}"],
         }
     except Exception as exc:
-        # If the LLM is unreachable, default to APPROVED rather than blocking the pipeline.
+        # If the LLM is unreachable, mark with a sentinel so the done report can warn the user
+        # instead of falsely advertising an APPROVED outcome.
         logger.warning(
-            f"Final review error ({exc}) — defaulting to APPROVED",
+            f"Final review error ({exc}) — marking ERROR_DEFAULTED_APPROVED",
             extra={"role": "final"},
         )
         return {
-            "review_verdict": "APPROVED",
+            "review_verdict": "ERROR_DEFAULTED_APPROVED",
+            "final_review_error": f"{type(exc).__name__}: {exc}",
             "phase": 4,
             "log": [f"Final review ERROR (defaulted APPROVED): {exc}"],
         }
@@ -226,15 +228,36 @@ def _done_node(state: PipelineState) -> dict:
     logger = get_logger(task_id)
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    summary_lines = [
+    verdict = state.get("review_verdict")
+    iteration_count = state.get("iteration_count", 0)
+    review_unresolved = verdict == "REQUIRES_CHANGES"
+    review_errored = verdict == "ERROR_DEFAULTED_APPROVED"
+
+    summary_lines: list[str] = []
+    if review_unresolved:
+        summary_lines += [
+            "> **WARNING:** Pipeline completed after max iterations with unresolved review findings.",
+            "> ROADMAP.md was NOT marked complete (status left as 🔄 in-progress).",
+            "",
+        ]
+    elif review_errored:
+        err = state.get("final_review_error") or "unknown error"
+        summary_lines += [
+            "> **WARNING:** Final coherence review could not run.",
+            f"> Reason: {err}",
+            "> Treat the APPROVED verdict below as DEFAULTED, not validated.",
+            "",
+        ]
+
+    summary_lines += [
         f"# Pipeline Complete: {task_id}",
         "",
         f"**Completed:** {ts}",
-        f"**Iterations:** {state.get('iteration_count', 0)}",
+        f"**Iterations:** {iteration_count}",
         "",
         "## Phase Results",
         "",
-        f"- Verification : {'PASSED' if state.get('verification_passed') else 'N/A'}",
+        f"- Verification : {'PASSED' if state.get('quality_passed') else 'N/A'}",
         f"- Quality Review: {state.get('secops_verdict', 'N/A')} (secops)",
         f"- Final Review  : {state.get('review_verdict', 'N/A')}",
         "",
@@ -250,7 +273,13 @@ def _done_node(state: PipelineState) -> dict:
     write_file(done_path, "\n".join(summary_lines))
     logger.info(f"{MARKER_OK} Summary written: {done_path}", extra={"role": "pipeline"})
 
-    _mark_task_done_in_roadmap(task_id)
+    if review_unresolved:
+        logger.warning(
+            f"{MARKER_FAIL} ROADMAP not marked complete: review verdict is REQUIRES_CHANGES.",
+            extra={"role": "pipeline"},
+        )
+    else:
+        _mark_task_done_in_roadmap(task_id)
 
     return {
         "completed": True,
@@ -313,7 +342,7 @@ def _route_after_planning(state: PipelineState) -> str:
 
 
 def _route_after_quality(state: PipelineState) -> str:
-    if state.get("blocked") or not state.get("verification_passed"):
+    if state.get("blocked") or not state.get("quality_passed"):
         return "error"
     return "final_review"
 
@@ -416,7 +445,7 @@ def _fresh_state(task_id: str) -> PipelineState:
         "phase": 0,
         "plan_path": None,
         "execution_summary": None,
-        "verification_passed": False,
+        "quality_passed": False,
         "review_verdict": None,
         "secops_verdict": None,
         "iteration_count": 0,

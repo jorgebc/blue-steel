@@ -240,14 +240,14 @@ def run_execution(task_id: str) -> dict:
 
     # ── Load plan ─────────────────────────────────────────────────────────────
     plan_path = f"{_PLAN_DIR}/{task_id}_plan.md"
-    print(f"[1/4] Loading plan: {plan_path}")
+    print(f"[1/5] Loading plan: {plan_path}")
     plan_content = read_file(plan_path)
     print(f"      Plan loaded: {len(plan_content)} chars")
 
     # ── Determine scope from section 3 ────────────────────────────────────────
     section_3 = _extract_section_3(plan_content)
     has_backend, has_frontend = _determine_scope(section_3)
-    print(f"\n[2/4] Scope detection:")
+    print(f"\n[2/5] Scope detection:")
     print(f"      Backend: {has_backend}")
     print(f"      Frontend: {has_frontend}")
 
@@ -256,25 +256,25 @@ def run_execution(task_id: str) -> dict:
 
     # ── Run backend engineer first ────────────────────────────────────────────
     if has_backend:
-        print(f"\n[3/4] Running Backend Engineer for {task_id}...")
+        print(f"\n[3/5] Running Backend Engineer for {task_id}...")
         be_result = be_agent.run(task_id=task_id, plan_content=plan_content)
         be_ok = be_result.get("success", False)
         be_files = be_result.get("files_modified", [])
         print(f"      BE result: {'OK' if be_ok else 'FAILED'}")
         print(f"      BE files: {len(be_files)} modified")
     else:
-        print("\n[3/4] Backend Engineer: skipped (no backend scope)")
+        print("\n[3/5] Backend Engineer: skipped (no backend scope)")
 
     # ── Run frontend engineer ─────────────────────────────────────────────────
     if has_frontend:
-        print(f"\n[3/4] Running Frontend Engineer for {task_id}...")
+        print(f"\n[4/5] Running Frontend Engineer for {task_id}...")
         fe_result = fe_agent.run(task_id=task_id, plan_content=plan_content)
         fe_ok = fe_result.get("success", False)
         fe_files = fe_result.get("files_modified", [])
         print(f"      FE result: {'OK' if fe_ok else 'FAILED'}")
         print(f"      FE files: {len(fe_files)} modified")
     else:
-        print("\n[3/4] Frontend Engineer: skipped (no frontend scope)")
+        print("\n[4/5] Frontend Engineer: skipped (no frontend scope)")
 
     # ── Assemble summary ──────────────────────────────────────────────────────
     all_files = (
@@ -285,7 +285,7 @@ def run_execution(task_id: str) -> dict:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # ── Write execution report ─────────────────────────────────────────────────
-    print(f"\n[4/4] Writing execution report...")
+    print(f"\n[5/5] Writing execution report...")
     report_content = _build_execution_report(
         task_id=task_id,
         be_result=be_result,

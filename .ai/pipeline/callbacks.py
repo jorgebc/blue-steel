@@ -77,7 +77,8 @@ class PipelineConsoleCallback(BaseCallbackHandler):
         self.logger.info(
             f"{MARKER_OK} Phase completed ({elapsed_str})", extra={"role": role}
         )
-        print_separator()
+        # Separator is drawn by on_chain_start of the next phase; printing here
+        # would produce two consecutive separators.
 
     # ── node error ────────────────────────────────────────────────────────────
 

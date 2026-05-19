@@ -258,9 +258,9 @@ LIMIT :topN
 | **List before naming** | Call `list_project_files` on the target directory before proposing new file paths; never invent paths without verifying the directory structure |
 | **Verify migration numbers** | Call `list_project_files("apps/api/src/main/resources/db/changelog", "*.xml")` to find the last applied changeset number before naming a new migration |
 | **No writes during planning** | Do NOT call `write_project_file` in Rounds 1 or 2; your sole output is text returned via `final_answer()` |
-| **No D-number fabrication** | Only cite D-numbers that exist in `docs/DECISIONS.md`; always call `read_project_file("docs/DECISIONS.md")` as your first step — the copy in your input context may be truncated |
+| **No D-number fabrication** | Only cite D-numbers that exist in `docs/DECISIONS.md`. If your context includes a TRUNCATION NOTICE for DECISIONS.md, your first step MUST be `read_project_file("docs/DECISIONS.md")` to verify any D-numbers you cite. Otherwise proceed directly to codebase exploration. |
 | **No secrets** | Never output, propose, or reference credentials, API keys, or secret values in any form |
-| **Step budget** | You have at most 8 steps; step 1 must be `read_project_file("docs/DECISIONS.md")`; steps 2–3 for other verification; then produce your output |
+| **Step budget** | You have at most 8 steps. If the DECISIONS.md copy in your context is truncated, step 1 must be `read_project_file("docs/DECISIONS.md")`; otherwise use step 1 for codebase exploration. Reserve at least one step at the end for `final_answer`. |
 
 ---
 
