@@ -47,7 +47,7 @@ if sys.platform == "win32":
 
 sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
-from smolagents import CodeAgent, LiteLLMModel, tool
+from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
 from config import get_llm
 from logger import get_logger
@@ -181,6 +181,7 @@ def _create_agent() -> CodeAgent:
         model=_make_model(),
         prompt_templates=_build_prompt_templates(persona),
         max_steps=15,
+        verbosity_level=LogLevel.OFF,  # ReAct trace -> silenced; story lives in the logger
     )
 
 
@@ -235,10 +236,7 @@ def run_review(task_id: str) -> dict:
             - high_findings: count of remaining unfixed HIGH findings
             - fixed: count of HIGH findings auto-applied
     """
-    print(f"\n{'='*60}")
-    print(f"Blue Steel Review Agent — Task: {task_id}")
-    print(f"{'='*60}\n")
-
+    logger = get_logger(task_id)
     agent = _create_agent()
 
     plan_path = f"{_CONTEXT_DIR}/{task_id}_plan.md"
@@ -246,9 +244,12 @@ def run_review(task_id: str) -> dict:
     if _file_exists(plan_path):
         plan_content = _read_file(plan_path)
         plan_snippet = plan_content[:4000]
-        print(f"[INFO] Plan loaded: {len(plan_content)} chars (first 4000 passed to agent)")
+        logger.debug(
+            f"Plan loaded: {len(plan_content)} chars (first 4000 passed to agent)",
+            extra={"role": "review"},
+        )
     else:
-        print(f"[WARN] Plan not found at {plan_path}")
+        logger.warning(f"Plan not found at {plan_path}", extra={"role": "review"})
 
     task_prompt = f"""
 You are the Senior Code Reviewer for Blue Steel.
@@ -281,7 +282,6 @@ Do NOT flag formatting issues (Spotless and TypeScript handle those).
 Do NOT write TODO, placeholder, or incomplete findings.
 """
 
-    logger = get_logger(task_id)
     logger.debug("Agent prompt (truncated):\n%s", task_prompt[:800], extra={"role": "review"})
     raw = agent.run(task_prompt)
     # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety on Windows.
@@ -322,11 +322,10 @@ Do NOT write TODO, placeholder, or incomplete findings.
     report_content = _build_report(task_id, result)
     report_path = f"{_CONTEXT_DIR}/{task_id}_review.md"
     _write_file(report_path, report_content)
-    print(f"\nReview report written: {report_path}")
-    print(
-        f"Verdict: {result['verdict']} | "
-        f"HIGH: {result['high_findings']} | "
-        f"Fixed: {result['fixed']}"
+    logger.debug(
+        f"Review report written: {report_path} | verdict={result['verdict']} | "
+        f"HIGH={result['high_findings']} | fixed={result['fixed']}",
+        extra={"role": "review"},
     )
 
     return {

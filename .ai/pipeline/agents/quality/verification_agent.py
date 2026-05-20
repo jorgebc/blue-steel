@@ -54,7 +54,7 @@ if sys.platform == "win32":
 
 sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
-from smolagents import CodeAgent, LiteLLMModel, tool
+from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
 from config import get_llm
 from logger import get_logger
@@ -238,6 +238,7 @@ def _run_auto_fix_agent(check_name: str, error_output: str, task_id: str | None 
         tools=[read_source_file, write_source_file, list_modified_source_files],
         model=_make_model(),
         max_steps=8,
+        verbosity_level=LogLevel.OFF,  # ReAct trace -> silenced; story lives in the logger
     )
     persona = _load_persona(check_name)
     persona_block = (
@@ -306,9 +307,10 @@ final_answer(result)
 
 def _check_spotless(task_id: str) -> dict:
     """Spotless has a deterministic auto-fix (spotless:apply). Retry up to 3x."""
+    logger = get_logger(task_id)
     error_output = ""
     for attempt in range(1, 4):
-        print(f"    [spotless] Attempt {attempt}/3...")
+        logger.debug(f"[spotless] attempt {attempt}/3...", extra={"role": "verification"})
         result = _run_linter()
 
         if _is_tool_missing(result):
@@ -326,7 +328,7 @@ def _check_spotless(task_id: str) -> dict:
         ).strip()
 
         if attempt < 3:
-            print(f"    [spotless] FAIL — running spotless:apply...")
+            logger.debug("[spotless] FAIL — running spotless:apply...", extra={"role": "verification"})
             apply = _run_command(
                 "mvn spotless:apply",
                 cwd=str(_API_ROOT),
@@ -344,9 +346,10 @@ def _check_spotless(task_id: str) -> dict:
 
 def _check_with_llm_fix(task_id: str, name: str, run_fn, max_attempts: int = 3) -> dict:
     """Run a check with LLM-powered auto-fix, retrying up to max_attempts times."""
+    logger = get_logger(task_id)
     error_output = ""
     for attempt in range(1, max_attempts + 1):
-        print(f"    [{name}] Attempt {attempt}/{max_attempts}...")
+        logger.debug(f"[{name}] attempt {attempt}/{max_attempts}...", extra={"role": "verification"})
         result = run_fn()
 
         if _is_tool_missing(result):
@@ -362,19 +365,22 @@ def _check_with_llm_fix(task_id: str, name: str, run_fn, max_attempts: int = 3) 
         error_output = (
             (result.get("stdout") or "") + "\n" + (result.get("stderr") or "")
         ).strip()
-        print(f"    [{name}] FAIL (rc={result.get('returncode', '?')})")
+        logger.debug(f"[{name}] FAIL (rc={result.get('returncode', '?')})", extra={"role": "verification"})
 
         if attempt < max_attempts:
-            print(f"    [{name}] Attempting LLM auto-fix ({attempt}/{max_attempts - 1})...")
+            logger.debug(
+                f"[{name}] attempting LLM auto-fix ({attempt}/{max_attempts - 1})...",
+                extra={"role": "verification"},
+            )
             fix_summary = _run_auto_fix_agent(name, error_output, task_id=task_id)
-            print(f"    [{name}] Fix: {fix_summary[:120]}")
+            logger.debug(f"[{name}] fix: {fix_summary[:120]}", extra={"role": "verification"})
 
     return {"status": "BLOCKED", "attempts": max_attempts, "error_output": error_output}
 
 
 def _check_once_no_fix(task_id: str, name: str, run_fn) -> dict:
     """Run a check once without auto-fix; FAIL on failure (not BLOCKED)."""
-    print(f"    [{name}] Running (no auto-fix)...")
+    get_logger(task_id).debug(f"[{name}] running (no auto-fix)...", extra={"role": "verification"})
     result = run_fn()
 
     if _is_tool_missing(result):
@@ -395,7 +401,7 @@ def _check_once_no_fix(task_id: str, name: str, run_fn) -> dict:
 
 def _check_block_on_fail(task_id: str, name: str, run_fn) -> dict:
     """Run a check once; BLOCKED on failure (fix requires human intervention)."""
-    print(f"    [{name}] Running (block on failure)...")
+    get_logger(task_id).debug(f"[{name}] running (block on failure)...", extra={"role": "verification"})
     result = run_fn()
 
     if _is_tool_missing(result):
@@ -477,9 +483,7 @@ def run_verification(task_id: str) -> dict:
             - blocked: True if any check is BLOCKED
             - summary: plain-English result summary
     """
-    print(f"\n{'='*60}")
-    print(f"Blue Steel Verification Agent — Task: {task_id}")
-    print(f"{'='*60}\n")
+    logger = get_logger(task_id)
 
     run_integration = (
         os.environ.get("PIPELINE_RUN_INTEGRATION", "false").lower() == "true"
@@ -487,21 +491,24 @@ def run_verification(task_id: str) -> dict:
     checks: dict[str, dict] = {}
 
     # 1. Spotless (backend formatting — deterministic fix via spotless:apply)
-    print("[1/6] spotless:check (backend formatting)...")
+    logger.debug("[1/6] spotless:check (backend formatting)...", extra={"role": "verification"})
     checks["spotless"] = _check_spotless(task_id)
 
     # 2. mvn test (unit + ArchUnit — LLM auto-fix on source files)
-    print("\n[2/6] mvn test (unit + ArchUnit)...")
+    logger.debug("[2/6] mvn test (unit + ArchUnit)...", extra={"role": "verification"})
     checks["mvn_test"] = _check_with_llm_fix(task_id, "mvn_test", _run_tests_be)
 
     # 3. mvn verify (integration tests — infra-dependent, no auto-fix)
     if run_integration:
-        print("\n[3/6] mvn verify (integration tests via Testcontainers)...")
+        logger.debug("[3/6] mvn verify (integration tests via Testcontainers)...", extra={"role": "verification"})
         checks["mvn_verify"] = _check_once_no_fix(
             task_id, "mvn_verify", _run_tests_integration
         )
     else:
-        print("\n[3/6] mvn verify — SKIPPED (set PIPELINE_RUN_INTEGRATION=true to enable)")
+        logger.debug(
+            "[3/6] mvn verify — SKIPPED (set PIPELINE_RUN_INTEGRATION=true to enable)",
+            extra={"role": "verification"},
+        )
         checks["mvn_verify"] = {
             "status": "SKIPPED",
             "attempts": 0,
@@ -509,24 +516,24 @@ def run_verification(task_id: str) -> dict:
         }
 
     # 4. npm type-check (TypeScript — LLM auto-fix on .ts/.tsx source files)
-    print("\n[4/6] npm run type-check (TypeScript)...")
+    logger.debug("[4/6] npm run type-check (TypeScript)...", extra={"role": "verification"})
     checks["npm_typecheck"] = _check_with_llm_fix(
         task_id, "npm_typecheck", _run_typecheck
     )
 
     # 5. npm test (Vitest — LLM auto-fix on source files, not test files)
-    print("\n[5/6] npm test (Vitest)...")
+    logger.debug("[5/6] npm test (Vitest)...", extra={"role": "verification"})
     checks["npm_test"] = _check_with_llm_fix(task_id, "npm_test", _run_tests_fe)
 
     # 6. npm audit (CVE scan — BLOCKED on failure, cannot auto-fix without package.json)
-    print("\n[6/6] npm audit (production CVE scan)...")
+    logger.debug("[6/6] npm audit (production CVE scan)...", extra={"role": "verification"})
     checks["npm_audit"] = _check_block_on_fail(task_id, "npm_audit", _run_audit)
 
     # Write report
     report_content = _build_report(task_id, checks)
     report_path = f"{_CONTEXT_DIR}/{task_id}_verification.md"
     _write_file(report_path, report_content)
-    print(f"\nVerification report written: {report_path}")
+    logger.debug(f"Verification report written: {report_path}", extra={"role": "verification"})
 
     # Compute overall result
     blocked = any(c["status"] == "BLOCKED" for c in checks.values())
@@ -540,5 +547,8 @@ def run_verification(task_id: str) -> dict:
         f"{'PASSED' if passed else 'FAILED'} | {statuses}"
     )
 
-    print(f"\nResult: passed={passed}, blocked={blocked}")
+    logger.debug(
+        f"Verification result: passed={passed}, blocked={blocked} | {statuses}",
+        extra={"role": "verification"},
+    )
     return {"passed": passed, "blocked": blocked, "summary": summary}

@@ -39,6 +39,25 @@ for _p in [
         sys.path.insert(0, _p)
 
 
+# ── Env: load .env.local (then .env) from the repo root, like the test runners ──
+# run_task.py reads secrets (SONAR_TOKEN, ANTHROPIC_API_KEY, ...) from the process
+# environment. Without this, those vars would have to be exported by hand. Existing
+# environment values win — load_dotenv does not override them by default.
+def _load_env() -> None:
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return  # python-dotenv not installed; rely on the ambient environment
+    for _env_file in (".env.local", ".env"):
+        _candidate = _REPO_ROOT / _env_file
+        if _candidate.exists():
+            load_dotenv(_candidate)
+            break
+
+
+_load_env()
+
+
 # ── Box helpers ───────────────────────────────────────────────────────────────
 
 _BOX_WIDTH = 58
@@ -112,65 +131,71 @@ def _overall_verdict(result: dict) -> str:
 
 # ── Individual phase runners ──────────────────────────────────────────────────
 
+def _run_single_phase(task_id: str, node: str, runner) -> None:
+    """Run one phase with the same banner + spinner + done-line as the full pipeline.
+
+    *runner* is a no-arg callable returning the phase result; *node* is its
+    ``PHASE_META`` key (planning / execution / quality).
+    """
+    from logger import MARKER_FAIL, get_logger
+    from progress import phase_progress
+
+    logger = get_logger(task_id)  # ensure the log file is open before the phase starts
+    t0 = time.time()
+    try:
+        with phase_progress(node, task_id):
+            runner()
+        _print_report_table(task_id)
+        _print_footer_ok(task_id, time.time() - t0)
+    except Exception as exc:
+        logger.error(
+            f"{MARKER_FAIL} {node} phase failed: {type(exc).__name__}: {exc}",
+            extra={"role": "pipeline"},
+            exc_info=True,
+        )
+        _print_footer_blocked(task_id, str(exc))
+        raise
+
+
 def _run_phase_1(task_id: str) -> None:
     """Planning phase: PO + Architect conversation -> _plan.md."""
     from agents.planning.planning_crew import run_planning
-    from logger import get_logger
 
-    get_logger(task_id)  # ensure log file is open before phase starts
-    t0 = time.time()
-    try:
-        plan_path = run_planning(task_id)
-        elapsed = time.time() - t0
-        click.echo(f"\nPhase 1 complete in {elapsed:.1f}s")
-        click.echo(f"Plan: {plan_path}")
-        _print_report_table(task_id)
-        _print_footer_ok(task_id, elapsed)
-    except Exception as exc:
-        elapsed = time.time() - t0
-        _print_footer_blocked(task_id, str(exc))
-        raise
+    _run_single_phase(task_id, "planning", lambda: run_planning(task_id))
 
 
 def _run_phase_2(task_id: str) -> None:
     """Execution phase: BE + FE engineer agents -> _execution.md."""
     from agents.engineers.execution_crew import run_execution
-    from logger import get_logger
 
-    get_logger(task_id)
-    t0 = time.time()
-    try:
-        summary = run_execution(task_id)
-        elapsed = time.time() - t0
-        click.echo(f"\nPhase 2 complete in {elapsed:.1f}s")
-        click.echo(f"Report: {summary.get('report_path')}")
-        _print_report_table(task_id)
-        _print_footer_ok(task_id, elapsed)
-    except Exception as exc:
-        _print_footer_blocked(task_id, str(exc))
-        raise
+    _run_single_phase(task_id, "execution", lambda: run_execution(task_id))
 
 
 def _run_phase_3(task_id: str) -> None:
     """Quality phase: verification + review + secops -> three reports."""
     from agents.quality.quality_pipeline import run_quality
-    from logger import get_logger
 
-    get_logger(task_id)
-    t0 = time.time()
-    try:
-        result = run_quality(task_id)
-        elapsed = time.time() - t0
-        click.echo(f"\nPhase 3 complete in {elapsed:.1f}s")
-        click.echo(f"  Verification : {result.get('verification_verdict')}")
-        click.echo(f"  Review       : {result.get('review_verdict')}")
-        click.echo(f"  SecOps       : {result.get('secops_verdict')}")
-        click.echo(f"  Passed       : {result.get('passed')}")
-        _print_report_table(task_id)
-        _print_footer_ok(task_id, elapsed)
-    except Exception as exc:
-        _print_footer_blocked(task_id, str(exc))
-        raise
+    _run_single_phase(task_id, "quality", lambda: run_quality(task_id))
+
+
+def _print_phase_recap(result: dict) -> None:
+    """Print a compact phase | duration | verdict table for the run."""
+    from progress import PHASE_META, fmt_duration, read_durations
+
+    durations = read_durations()
+    verdicts = {
+        "planning":     "done" if result.get("plan_path") else "—",
+        "execution":    "done" if result.get("execution_summary") else "—",
+        "quality": (
+            f"verification={'PASSED' if result.get('quality_passed') else 'N/A'}, "
+            f"secops={result.get('secops_verdict', 'N/A')}"
+        ),
+        "final_review": result.get("review_verdict", "—"),
+    }
+    click.echo("\n--- Phase recap ---")
+    for node, (label, _, _) in PHASE_META.items():
+        dur = fmt_duration(durations[node]) if node in durations else "—"
+        click.echo(f"  {label:<14} {dur:>8}   {verdicts.get(node, '')}")
 
 
 def _run_full_pipeline(task_id: str, resume: bool) -> None:
@@ -180,6 +205,8 @@ def _run_full_pipeline(task_id: str, resume: bool) -> None:
     t0 = time.time()
     result = run_pipeline(task_id, resume=resume)
     elapsed = time.time() - t0
+
+    _print_phase_recap(result)
 
     if result.get("blocked"):
         reason = result.get("blocked_reason", "see error report")

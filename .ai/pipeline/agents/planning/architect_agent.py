@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
-from smolagents import CodeAgent, LiteLLMModel, tool
+from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
 from config import get_llm
 from logger import get_logger
@@ -174,6 +174,7 @@ def _create_agent() -> CodeAgent:
         model=_make_model(),
         prompt_templates=_build_prompt_templates(persona),
         max_steps=8,
+        verbosity_level=LogLevel.OFF,  # ReAct trace -> silenced; story lives in the logger
     )
 
 

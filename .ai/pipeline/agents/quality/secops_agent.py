@@ -53,7 +53,7 @@ if sys.platform == "win32":
 
 sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
-from smolagents import CodeAgent, LiteLLMModel, tool
+from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
 from config import get_llm
 from logger import get_logger
@@ -185,6 +185,7 @@ def _create_agent() -> CodeAgent:
         model=_make_model(),
         prompt_templates=_build_prompt_templates(persona),
         max_steps=15,
+        verbosity_level=LogLevel.OFF,  # ReAct trace -> silenced; story lives in the logger
     )
 
 
@@ -244,10 +245,7 @@ def run_secops(task_id: str) -> dict:
             - high: count of unresolved HIGH findings
             - resolved: count of CRITICAL/HIGH findings auto-remediated
     """
-    print(f"\n{'='*60}")
-    print(f"Blue Steel SecOps Agent — Task: {task_id}")
-    print(f"{'='*60}\n")
-
+    logger = get_logger(task_id)
     agent = _create_agent()
 
     task_prompt = f"""
@@ -279,7 +277,6 @@ You are the SecOps agent for Blue Steel.
 6. Return the result dict. Do NOT write TODO, placeholder, or incomplete findings.
 """
 
-    logger = get_logger(task_id)
     logger.debug("Agent prompt (truncated):\n%s", task_prompt[:800], extra={"role": "secops"})
     raw = agent.run(task_prompt)
     # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety on Windows.
@@ -341,12 +338,10 @@ You are the SecOps agent for Blue Steel.
     report_content = _build_report(task_id, result, audit_output)
     report_path = f"{_CONTEXT_DIR}/{task_id}_secops.md"
     _write_file(report_path, report_content)
-    print(f"\nSecOps report written: {report_path}")
-    print(
-        f"Verdict: {result['verdict']} | "
-        f"CRITICAL: {result['critical']} | "
-        f"HIGH: {result['high']} | "
-        f"Resolved: {result['resolved']}"
+    logger.debug(
+        f"SecOps report written: {report_path} | verdict={result['verdict']} | "
+        f"CRITICAL={result['critical']} | HIGH={result['high']} | resolved={result['resolved']}",
+        extra={"role": "secops"},
     )
 
     return {

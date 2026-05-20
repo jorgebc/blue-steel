@@ -21,6 +21,22 @@ Phases: Planning (PO + Architect) -> Execution (BE + FE engineers) -> Quality (v
   have a single model loaded, expect Ollama to swap weights between phases, which
   adds 20–60 s per swap.
 
+- **Podman (or Docker)** — required by the SonarQube quality gate (below) and by the
+  optional integration-test check (`PIPELINE_RUN_INTEGRATION=true`).
+
+- **SonarQube `sonarqube-local` container** — required for any task with **backend
+  scope**. The BE engineer phase runs a Sonar scan via `run_sonar_backend`, which
+  **fails the phase if `SONAR_TOKEN` is unset or the container is not running**.
+  Front-end-only tasks do not need it. One-time setup (see root `CLAUDE.md` §6 for
+  the canonical version):
+
+  ```bash
+  podman start sonarqube-local          # server at http://localhost:9000, project key blue-steel-api
+  # SonarQube UI → My Account → Security → Generate Token, then export it (see below)
+  ```
+
+  The backend `pom.xml` must include `sonar-maven-plugin` (already configured).
+
 ## Setup
 
 ```bash
@@ -28,13 +44,30 @@ Phases: Planning (PO + Architect) -> Execution (BE + FE engineers) -> Quality (v
 pip install -r .ai/requirements.txt
 ```
 
-**Required env vars:**
+**Environment variables.** On startup `run_task.py` auto-loads `.env.local` (then
+`.env`) from the repo root, so the simplest path is to drop your secrets there
+(both files are gitignored — D-050). Variables already set in your shell take
+precedence, so you can also export them instead:
+
+```bash
+# .env.local at the repo root
+SONAR_TOKEN=<token>          # backend tasks
+ANTHROPIC_API_KEY=<key>      # --mode cloud only
+```
+
+```powershell
+# …or export into the current shell (PowerShell)
+$env:SONAR_TOKEN = "<token>"
+$env:ANTHROPIC_API_KEY = "<key>"
+```
 
 | Var | When needed |
 |---|---|
+| `SONAR_TOKEN` | Any **backend** task (Sonar gate in BE engineer phase). Never commit (D-050). |
 | `ANTHROPIC_API_KEY` | `--mode cloud` only |
 
-For local mode (default) no API keys are required — Ollama must be running.
+For local mode (default) no LLM API keys are required — Ollama must be running. A
+backend task still needs `SONAR_TOKEN` + the `sonarqube-local` container in either mode.
 
 ---
 
@@ -106,6 +139,24 @@ All reports land in `.ai/context/tasks/` and are gitignored.
 | `SETUP_NOTES.md` | Quality | Cumulative log of missing-tool gaps discovered during verification runs (shared across tasks) |
 
 Checkpoint databases are stored in `.ai/logs/` (also gitignored).
+
+## Observing a run
+
+The **console** shows a phase-by-phase timeline only — a start banner, a live spinner
+with elapsed/estimated time while the phase works, and a timed done-line. Prompts, LLM
+results and agent reasoning are intentionally kept off the console.
+
+The full detail goes to a per-task log file:
+
+```bash
+.ai/logs/{task_id}.log        # prompts, agent outputs, router decisions, full tracebacks
+                              # (ANSI-stripped, secrets scrubbed — tail it while the run works)
+.ai/logs/_phase_durations.json # learned per-phase durations; drives the console time estimates
+```
+
+Errors always surface on the console in red (`[FAIL]`/`[BLOCKED]`); their full
+traceback is written to the log file. When stdout is redirected (CI / piped), the
+spinner and colors are disabled automatically and only the timeline lines are emitted.
 
 ---
 

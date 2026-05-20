@@ -27,7 +27,6 @@ for _p in [
         sys.path.insert(0, _p)
 
 import litellm
-from colorama import Fore, Style
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
@@ -35,8 +34,8 @@ from agents.engineers.execution_crew import run_execution
 from agents.planning.planning_crew import run_planning
 from agents.quality.quality_pipeline import run_quality
 from callbacks import PipelineConsoleCallback
-from config import get_llm, should_stream
-from logger import MARKER_FAIL, MARKER_INFO, MARKER_OK, ROLE_COLORS, get_logger
+from config import get_llm
+from logger import MARKER_FAIL, MARKER_INFO, MARKER_OK, get_logger
 from state import PipelineState
 from tools.filesystem import read_file, write_file
 
@@ -59,7 +58,11 @@ def _planning_node(state: PipelineState) -> dict:
             "log": [f"Planning complete: {plan_path}"],
         }
     except Exception as exc:
-        logger.error(f"{MARKER_FAIL} Planning failed: {exc}", extra={"role": "planning"})
+        logger.error(
+            f"{MARKER_FAIL} Planning failed: {type(exc).__name__}: {exc}",
+            extra={"role": "planning"},
+            exc_info=True,
+        )
         return {
             "blocked": True,
             "blocked_reason": f"Planning failed: {exc}",
@@ -88,7 +91,11 @@ def _execution_node(state: PipelineState) -> dict:
             "log": [f"Execution complete (iter {iteration + 1}): {summary.get('report_path')}"],
         }
     except Exception as exc:
-        logger.error(f"{MARKER_FAIL} Execution failed: {exc}", extra={"role": "execution"})
+        logger.error(
+            f"{MARKER_FAIL} Execution failed: {type(exc).__name__}: {exc}",
+            extra={"role": "execution"},
+            exc_info=True,
+        )
         return {
             "blocked": True,
             "blocked_reason": f"Execution failed: {exc}",
@@ -132,8 +139,9 @@ def _quality_node(state: PipelineState) -> dict:
         return updates
     except Exception as exc:
         logger.error(
-            f"{MARKER_FAIL} Quality pipeline raised exception: {exc}",
+            f"{MARKER_FAIL} Quality pipeline raised exception: {type(exc).__name__}: {exc}",
             extra={"role": "quality"},
+            exc_info=True,
         )
         return {
             "blocked": True,
@@ -177,25 +185,16 @@ def _final_review_node(state: PipelineState) -> dict:
             f"Begin your response with APPROVED or REQUIRES_CHANGES."
         )
 
-        stream = should_stream()
+        # Never stream tokens to the console — the spinner conveys liveness and the
+        # full response is archived in the log file below.
         response = litellm.completion(
             **llm_params,
             messages=[{"role": "user", "content": prompt}],
             timeout=120,
-            stream=stream,
+            stream=False,
         )
-
-        if stream:
-            color = ROLE_COLORS.get("final", Fore.WHITE)
-            print(f"{color}final        ", end="", flush=True)
-            verdict_text = ""
-            for chunk in response:
-                delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
-                verdict_text += delta
-                print(delta, end="", flush=True)
-            print(Style.RESET_ALL)
-        else:
-            verdict_text = response.choices[0].message.content.strip()
+        verdict_text = response.choices[0].message.content.strip()
+        logger.debug(f"Final review response:\n{verdict_text}", extra={"role": "final"})
 
         verdict = (
             "APPROVED"
@@ -212,8 +211,9 @@ def _final_review_node(state: PipelineState) -> dict:
         # If the LLM is unreachable, mark with a sentinel so the done report can warn the user
         # instead of falsely advertising an APPROVED outcome.
         logger.warning(
-            f"Final review error ({exc}) — marking ERROR_DEFAULTED_APPROVED",
+            f"Final review error ({type(exc).__name__}: {exc}) — marking ERROR_DEFAULTED_APPROVED",
             extra={"role": "final"},
+            exc_info=True,
         )
         return {
             "review_verdict": "ERROR_DEFAULTED_APPROVED",

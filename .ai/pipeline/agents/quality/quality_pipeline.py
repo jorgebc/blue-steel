@@ -62,6 +62,7 @@ if sys.platform == "win32":
 sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
 from tools.filesystem import write_file as _write_file
+from logger import MARKER_BLOCKED, MARKER_FAIL, MARKER_INFO, MARKER_OK, get_logger
 
 import verification_agent
 import review_agent
@@ -120,9 +121,7 @@ def run_quality(task_id: str) -> dict:
             - review_report: path to review report file
             - secops_report: path to secops report file
     """
-    print(f"\n{'='*60}")
-    print(f"Blue Steel Quality Pipeline — Task: {task_id}")
-    print(f"{'='*60}\n")
+    logger = get_logger(task_id)
 
     paths = _report_paths(task_id)
     state: dict = {
@@ -136,7 +135,7 @@ def run_quality(task_id: str) -> dict:
     }
 
     # ── Phase 1: Verification ──────────────────────────────────────────────────
-    print("\n[QUALITY] Phase 1/3: Verification")
+    logger.info(f"{MARKER_INFO} Verification (1/3) starting", extra={"role": "verification"})
     v_result = verification_agent.run_verification(task_id)
     state["verification_verdict"] = (
         "PASSED" if v_result["passed"] else
@@ -146,9 +145,10 @@ def run_quality(task_id: str) -> dict:
 
     # Router: blocked -> stop immediately
     if v_result["blocked"]:
-        print(
-            "\n[ROUTER] Verification BLOCKED — stopping pipeline. "
-            "Human intervention required."
+        logger.error(
+            f"{MARKER_BLOCKED} Verification BLOCKED — stopping pipeline. "
+            "Human intervention required.",
+            extra={"role": "verification"},
         )
         blocker_path = _write_blocker_report(
             task_id,
@@ -161,8 +161,9 @@ def run_quality(task_id: str) -> dict:
 
     # Router: not passed (FAIL status on some checks) -> retry once
     if not v_result["passed"]:
-        print(
-            "\n[ROUTER] Verification FAILED (not blocked) — retrying once..."
+        logger.warning(
+            f"{MARKER_INFO} Verification FAILED (not blocked) — retrying once...",
+            extra={"role": "verification"},
         )
         v_result = verification_agent.run_verification(task_id)
         state["verification_verdict"] = (
@@ -172,8 +173,9 @@ def run_quality(task_id: str) -> dict:
         )
 
         if v_result["blocked"]:
-            print(
-                "\n[ROUTER] Verification BLOCKED on retry — stopping pipeline."
+            logger.error(
+                f"{MARKER_BLOCKED} Verification BLOCKED on retry — stopping pipeline.",
+                extra={"role": "verification"},
             )
             _write_blocker_report(
                 task_id,
@@ -185,8 +187,9 @@ def run_quality(task_id: str) -> dict:
             return state
 
         if not v_result["passed"]:
-            print(
-                "\n[ROUTER] Verification still FAILING after retry — stopping pipeline."
+            logger.error(
+                f"{MARKER_FAIL} Verification still FAILING after retry — stopping pipeline.",
+                extra={"role": "verification"},
             )
             _write_blocker_report(
                 task_id,
@@ -197,18 +200,19 @@ def run_quality(task_id: str) -> dict:
             state["stopped_at"] = "verification"
             return state
 
-    print("\n[ROUTER] Verification PASSED — proceeding to review.")
+    logger.info(f"{MARKER_OK} Verification PASSED", extra={"role": "verification"})
 
     # ── Phase 2: Code Review ───────────────────────────────────────────────────
-    print("\n[QUALITY] Phase 2/3: Code Review")
+    logger.info(f"{MARKER_INFO} Code Review (2/3) starting", extra={"role": "review"})
     r_result = review_agent.run_review(task_id)
     state["review_verdict"] = r_result["verdict"]
 
     # Router: REQUIRES_CHANGES with high findings -> re-run verification after fixes
     if r_result["verdict"] == "REQUIRES_CHANGES" and r_result["high_findings"] > 0:
-        print(
-            f"\n[ROUTER] Review found {r_result['high_findings']} unfixed HIGH finding(s). "
-            f"Re-running verification after auto-fixes..."
+        logger.warning(
+            f"{MARKER_INFO} Review found {r_result['high_findings']} unfixed HIGH finding(s) — "
+            f"re-running verification after auto-fixes...",
+            extra={"role": "review"},
         )
         v_result = verification_agent.run_verification(task_id)
         state["verification_verdict"] = (
@@ -218,8 +222,9 @@ def run_quality(task_id: str) -> dict:
         )
 
         if v_result["blocked"] or not v_result["passed"]:
-            print(
-                "\n[ROUTER] Verification failed after review fixes — stopping pipeline."
+            logger.error(
+                f"{MARKER_FAIL} Verification failed after review fixes — stopping pipeline.",
+                extra={"role": "review"},
             )
             _write_blocker_report(
                 task_id,
@@ -233,22 +238,23 @@ def run_quality(task_id: str) -> dict:
             state["stopped_at"] = "review"
             return state
 
-    print(
-        f"\n[ROUTER] Review verdict: {r_result['verdict']} — "
-        f"proceeding to SecOps."
+    logger.info(
+        f"{MARKER_OK} Review verdict: {r_result['verdict']}",
+        extra={"role": "review"},
     )
 
     # ── Phase 3: SecOps ────────────────────────────────────────────────────────
-    print("\n[QUALITY] Phase 3/3: SecOps")
+    logger.info(f"{MARKER_INFO} SecOps (3/3) starting", extra={"role": "secops"})
     s_result = secops_agent.run_secops(task_id)
     state["secops_verdict"] = s_result["verdict"]
 
     # Router: BLOCKED -> stop, require human intervention
     if s_result["verdict"] == "BLOCKED":
-        print(
-            f"\n[ROUTER] SecOps BLOCKED — {s_result.get('critical', 0)} CRITICAL, "
+        logger.error(
+            f"{MARKER_BLOCKED} SecOps BLOCKED — {s_result.get('critical', 0)} CRITICAL, "
             f"{s_result.get('high', 0)} HIGH unresolved. "
-            f"Human intervention required."
+            f"Human intervention required.",
+            extra={"role": "secops"},
         )
         _write_blocker_report(
             task_id,
@@ -262,34 +268,18 @@ def run_quality(task_id: str) -> dict:
         state["stopped_at"] = "secops"
         return state
 
-    print("\n[ROUTER] SecOps APPROVED — quality pipeline complete.")
+    logger.info(f"{MARKER_OK} SecOps APPROVED — quality pipeline complete.", extra={"role": "secops"})
     state["passed"] = True
     state["stopped_at"] = None
 
-    _print_summary(task_id, state, v_result, r_result, s_result)
+    # Per-verdict detail lands in the file; the run-level recap is printed by run_task.py.
+    logger.debug(
+        f"Quality verdicts — verification={state['verification_verdict']}, "
+        f"review={state['review_verdict']} "
+        f"(high={r_result['high_findings']}, fixed={r_result['fixed']}), "
+        f"secops={state['secops_verdict']} "
+        f"(critical={s_result.get('critical', 0)}, high={s_result.get('high', 0)}, "
+        f"resolved={s_result.get('resolved', 0)})",
+        extra={"role": "quality"},
+    )
     return state
-
-
-def _print_summary(
-    task_id: str,
-    state: dict,
-    v_result: dict,
-    r_result: dict,
-    s_result: dict,
-) -> None:
-    print(f"\n{'='*60}")
-    print(f"Quality Pipeline Complete — Task: {task_id}")
-    print(f"{'='*60}")
-    print(f"  Verification : {state['verification_verdict']}")
-    print(
-        f"  Review       : {state['review_verdict']} "
-        f"(high={r_result['high_findings']}, fixed={r_result['fixed']})"
-    )
-    print(
-        f"  SecOps       : {state['secops_verdict']} "
-        f"(critical={s_result.get('critical', 0)}, "
-        f"high={s_result.get('high', 0)}, "
-        f"resolved={s_result.get('resolved', 0)})"
-    )
-    print(f"  Overall      : {'PASSED' if state['passed'] else 'FAILED'}")
-    print(f"{'='*60}\n")

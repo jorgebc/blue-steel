@@ -41,6 +41,7 @@ if sys.platform == "win32":
 sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
 from tools.filesystem import read_file, write_file, REPO_ROOT
+from logger import MARKER_FAIL, MARKER_INFO, MARKER_OK, get_logger
 
 import be_agent
 import fe_agent
@@ -234,47 +235,56 @@ def run_execution(task_id: str) -> dict:
             - fe_success: bool
             - report_path: path to the written execution report
     """
-    print(f"\n{'='*60}")
-    print(f"Blue Steel Execution Crew — Task: {task_id}")
-    print(f"{'='*60}\n")
+    logger = get_logger(task_id)
 
     # ── Load plan ─────────────────────────────────────────────────────────────
     plan_path = f"{_PLAN_DIR}/{task_id}_plan.md"
-    print(f"[1/5] Loading plan: {plan_path}")
     plan_content = read_file(plan_path)
-    print(f"      Plan loaded: {len(plan_content)} chars")
+    logger.debug(
+        f"Plan loaded: {plan_path} ({len(plan_content)} chars)",
+        extra={"role": "execution"},
+    )
 
     # ── Determine scope from section 3 ────────────────────────────────────────
     section_3 = _extract_section_3(plan_content)
     has_backend, has_frontend = _determine_scope(section_3)
-    print(f"\n[2/5] Scope detection:")
-    print(f"      Backend: {has_backend}")
-    print(f"      Frontend: {has_frontend}")
+    logger.info(
+        f"{MARKER_INFO} Scope: backend={has_backend}, frontend={has_frontend}",
+        extra={"role": "execution"},
+    )
 
     be_result: dict | None = None
     fe_result: dict | None = None
 
     # ── Run backend engineer first ────────────────────────────────────────────
     if has_backend:
-        print(f"\n[3/5] Running Backend Engineer for {task_id}...")
+        logger.info(f"{MARKER_INFO} Backend Engineer working...", extra={"role": "be_engineer"})
         be_result = be_agent.run(task_id=task_id, plan_content=plan_content)
         be_ok = be_result.get("success", False)
         be_files = be_result.get("files_modified", [])
-        print(f"      BE result: {'OK' if be_ok else 'FAILED'}")
-        print(f"      BE files: {len(be_files)} modified")
+        marker = MARKER_OK if be_ok else MARKER_FAIL
+        logger.info(
+            f"{marker} Backend Engineer: {'OK' if be_ok else 'FAILED'} "
+            f"({len(be_files)} file(s) modified)",
+            extra={"role": "be_engineer"},
+        )
     else:
-        print("\n[3/5] Backend Engineer: skipped (no backend scope)")
+        logger.info(f"{MARKER_INFO} Backend Engineer: skipped (no backend scope)", extra={"role": "be_engineer"})
 
     # ── Run frontend engineer ─────────────────────────────────────────────────
     if has_frontend:
-        print(f"\n[4/5] Running Frontend Engineer for {task_id}...")
+        logger.info(f"{MARKER_INFO} Frontend Engineer working...", extra={"role": "fe_engineer"})
         fe_result = fe_agent.run(task_id=task_id, plan_content=plan_content)
         fe_ok = fe_result.get("success", False)
         fe_files = fe_result.get("files_modified", [])
-        print(f"      FE result: {'OK' if fe_ok else 'FAILED'}")
-        print(f"      FE files: {len(fe_files)} modified")
+        marker = MARKER_OK if fe_ok else MARKER_FAIL
+        logger.info(
+            f"{marker} Frontend Engineer: {'OK' if fe_ok else 'FAILED'} "
+            f"({len(fe_files)} file(s) modified)",
+            extra={"role": "fe_engineer"},
+        )
     else:
-        print("\n[4/5] Frontend Engineer: skipped (no frontend scope)")
+        logger.info(f"{MARKER_INFO} Frontend Engineer: skipped (no frontend scope)", extra={"role": "fe_engineer"})
 
     # ── Assemble summary ──────────────────────────────────────────────────────
     all_files = (
@@ -285,7 +295,6 @@ def run_execution(task_id: str) -> dict:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # ── Write execution report ─────────────────────────────────────────────────
-    print(f"\n[5/5] Writing execution report...")
     report_content = _build_execution_report(
         task_id=task_id,
         be_result=be_result,
@@ -295,7 +304,7 @@ def run_execution(task_id: str) -> dict:
     )
     report_path = f"{_EXECUTION_DIR}/{task_id}_execution.md"
     write_file(report_path, report_content)
-    print(f"      Report written: {report_path}")
+    logger.debug(f"Execution report written: {report_path}", extra={"role": "execution"})
 
     be_files = be_result.get("files_modified", []) if be_result else []
     fe_files = fe_result.get("files_modified", []) if fe_result else []
@@ -309,5 +318,4 @@ def run_execution(task_id: str) -> dict:
         "report_path": report_path,
     }
 
-    print(f"\nDone. Execution report: {report_path}")
     return summary

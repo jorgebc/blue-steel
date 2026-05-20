@@ -65,20 +65,44 @@ def _scrub_secrets(text: str) -> str:
     return text
 
 
-_SEPARATOR   = "-" * 58
 _LOGS_DIR    = Path(__file__).parent.parent / "logs"
 
 _LOGGERS: dict[str, logging.Logger] = {}
 
 
+def is_tty() -> bool:
+    """True when the real stdout is an interactive terminal.
+
+    Checked against ``sys.__stdout__`` so that a colorama proxy wrapping
+    ``sys.stdout`` cannot mask a redirected/CI stream. Drives both console
+    coloring here and the spinner in ``progress.py``.
+    """
+    stream = sys.__stdout__
+    try:
+        return bool(stream) and stream.isatty()
+    except (ValueError, AttributeError):
+        return False
+
+
+_USE_COLOR = is_tty()
+
+
 class _ColoredConsoleFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         role  = getattr(record, "role", "pipeline")
-        color = ROLE_COLORS.get(role, Fore.WHITE)
         ts    = datetime.fromtimestamp(record.created).strftime("%H:%M:%S")
         col   = role.ljust(12)
         msg   = record.getMessage()
-        return f"{color}{ts}  {col} {msg}{Style.RESET_ALL}"
+        line  = f"{ts}  {col} {msg}"
+        if not _USE_COLOR:
+            return line
+        color = ROLE_COLORS.get(role, Fore.WHITE)
+        # Errors/warnings always render red so failures stand out from the story.
+        if record.levelno >= logging.ERROR:
+            color = Fore.RED
+        elif record.levelno >= logging.WARNING:
+            color = Fore.LIGHTRED_EX
+        return f"{color}{line}{Style.RESET_ALL}"
 
 
 class _PlainFileFormatter(logging.Formatter):
@@ -91,9 +115,27 @@ class _PlainFileFormatter(logging.Formatter):
         return f"{ts} [{level}] {role} - {msg}"
 
 
-def print_separator() -> None:
-    """Print a phase separator to stdout only (never to the log file)."""
-    print(_SEPARATOR)
+class _SpinnerAwareConsoleHandler(logging.StreamHandler):
+    """Console handler that cooperates with the ``progress`` spinner.
+
+    Before writing a record it clears the live spinner line (under the shared
+    ``console_lock``) so the log line is never garbled by carriage-return
+    output; the spinner redraws on its next tick. On an ERROR record the
+    spinner is deactivated so a failure is not overwritten or visually mixed
+    with progress animation.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            import progress
+        except Exception:
+            super().emit(record)
+            return
+        with progress.console_lock:
+            progress.spinner.clear_line_locked()
+            super().emit(record)
+            if record.levelno >= logging.ERROR:
+                progress.spinner.deactivate_locked()
 
 
 def get_logger(task_id: str) -> logging.Logger:
@@ -110,8 +152,8 @@ def get_logger(task_id: str) -> logging.Logger:
     logger.propagate = False
     logger.handlers.clear()
 
-    console = logging.StreamHandler(sys.stdout)
-    console.setLevel(logging.DEBUG)
+    console = _SpinnerAwareConsoleHandler(sys.stdout)
+    console.setLevel(logging.INFO)
     console.setFormatter(_ColoredConsoleFormatter())
     logger.addHandler(console)
 
