@@ -84,6 +84,39 @@ def _execution_node(state: PipelineState) -> dict:
             f"{MARKER_OK} Execution complete: {summary.get('report_path')}",
             extra={"role": "execution"},
         )
+
+        # An engineer that self-reports failure is a hard stop. The objective
+        # quality gate would catch broken output anyway, but failing fast here
+        # avoids wasting the (long) quality phase and removes the contradictory
+        # "FE FAILED" / "task completed" signal that motivated this fix.
+        failed = [
+            role
+            for role, ok in (
+                ("Backend Engineer", summary.get("be_success", True)),
+                ("Frontend Engineer", summary.get("fe_success", True)),
+            )
+            if not ok
+        ]
+        if failed:
+            reason = (
+                f"{' and '.join(failed)} reported FAILED during execution "
+                f"(backend files: {len(summary.get('be_files', []))}, "
+                f"frontend files: {len(summary.get('fe_files', []))}). "
+                f"See the execution report for details: {summary.get('report_path')}"
+            )
+            logger.error(
+                f"{MARKER_FAIL} {reason}",
+                extra={"role": "execution"},
+            )
+            return {
+                "execution_summary": summary,
+                "iteration_count": iteration + 1,
+                "phase": 2,
+                "blocked": True,
+                "blocked_reason": reason,
+                "log": [f"Execution failed (iter {iteration + 1}): {reason}"],
+            }
+
         return {
             "execution_summary": summary,
             "iteration_count": iteration + 1,

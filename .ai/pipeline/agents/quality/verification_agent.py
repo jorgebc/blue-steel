@@ -6,14 +6,20 @@ Runs quality checks in order:
 
 For each failing check (except npm audit and mvn verify), attempts up to 3
 LLM-powered auto-fix iterations on source code only. Never touches test files
-or config files. After 3 failed attempts, marks the check BLOCKED.
+or config files. After 3 failed attempts, marks the check BLOCKED. If the
+auto-fixer determines the root cause is a protected config file or a dependency
+change, it stops early and marks the check BLOCKED (no point burning retries).
 
 npm audit failures are BLOCKED immediately (CVEs require human intervention).
 mvn verify failures are marked FAIL (infra-dependent, not auto-fixable).
-Missing tools are SKIPPED and documented in .ai/context/tasks/SETUP_NOTES.md.
+A genuinely missing tool is BLOCKED (and documented in SETUP_NOTES.md) so it
+fails the run loudly instead of silently passing — detection scans stderr only,
+so a compiler's own "cannot find ..." diagnostics are never misread as missing.
+The ONLY pass-neutral skip is mvn verify when PIPELINE_RUN_INTEGRATION is unset
+(marked intentional=True); any other SKIPPED does not count as PASS.
 
 Output: .ai/context/tasks/{task_id}_verification.md
-Statuses: PASS | FAIL | BLOCKED | SKIPPED
+Statuses: PASS | FAIL | BLOCKED | SKIPPED (SKIPPED only when intentional)
 """
 
 import os
@@ -57,7 +63,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
 from config import get_llm
-from logger import get_logger
+from logger import MARKER_BLOCKED, get_logger
 from tools.filesystem import (
     REPO_ROOT,
     get_modified_files as _get_modified_files,
@@ -103,13 +109,22 @@ _CONFIG_SUBSTRINGS = (
     ".env",
 )
 
-# Phrases indicating the command binary is not installed
+# Sentinel the auto-fix agent returns when the root cause is unfixable in source
+# (lives in a protected config file or needs a dependency change). Lets the check
+# stop after a single attempt instead of burning all retries on an impossible fix.
+_BLOCKED_CONFIG_SENTINEL = "BLOCKED_PROTECTED_CONFIG:"
+
+# Phrases that mean the shell could not launch the binary at all — i.e. the
+# tool is genuinely not installed / not on PATH. These are emitted by the shell
+# (cmd / pwsh / POSIX sh), NOT by the tool itself. We deliberately exclude
+# generic substrings like "not found" / "cannot find" because compilers emit
+# them as legitimate diagnostics (e.g. tsc's "Cannot find module 'axios'",
+# "Cannot find name 'process'") — matching those misreads a real check failure
+# as a missing tool. See SETUP_NOTES.md history for the regression this caused.
 _MISSING_TOOL_PHRASES = (
-    "is not recognized",
-    "command not found",
-    "no such file or directory",
-    "not found",
-    "cannot find",
+    "is not recognized",  # Windows cmd: 'npm' is not recognized as an internal...
+    "command not found",  # POSIX sh: npm: command not found
+    "no such file or directory",  # exec failure when the binary path is wrong
 )
 
 
@@ -122,11 +137,31 @@ def _is_protected_path(path: str) -> bool:
     return False
 
 
+def _aggregate_verdict(checks: dict[str, dict]) -> tuple[bool, bool]:
+    """Reduce per-check results to (passed, blocked).
+
+    A check passes only if it is PASS or an *explicitly intentional* skip
+    (currently just mvn_verify when integration tests are disabled). A plain
+    SKIPPED no longer counts as PASS — a genuinely missing tool is BLOCKED (see
+    the check runners), so it correctly fails the run instead of masking it.
+    """
+    blocked = any(c["status"] == "BLOCKED" for c in checks.values())
+    passed = all(
+        c["status"] == "PASS" or c.get("intentional") for c in checks.values()
+    )
+    return passed, blocked
+
+
 def _is_tool_missing(result: dict) -> bool:
-    combined = (
-        (result.get("stdout") or "") + " " + (result.get("stderr") or "")
-    ).lower()
-    return any(phrase in combined for phrase in _MISSING_TOOL_PHRASES)
+    """True only when the shell could not launch the tool (genuinely missing).
+
+    Scans stderr ONLY: a missing executable is reported by the shell on stderr,
+    whereas tools write their own diagnostics to stdout (tsc) or prefixed stderr
+    lines like "npm error code 2". Scanning stdout here is what caused real
+    compiler errors to be misclassified as a missing tool.
+    """
+    stderr = (result.get("stderr") or "").lower()
+    return any(phrase in stderr for phrase in _MISSING_TOOL_PHRASES)
 
 
 def _document_missing_tool(task_id: str, check_name: str, error: str) -> None:
@@ -267,11 +302,20 @@ Hard constraints — NEVER modify:
 - Liquibase changelogs: any path containing db/changelog/
 - shadcn/ui components: apps/web/src/components/ui/
 
-Return a brief summary of what you fixed, or "No fix applied" if the issue is
-not in source code (e.g., infrastructure not available).
+If the root cause is NOT fixable in source code — because the real fix would
+require editing a protected config file (package.json, tsconfig*, vite.config,
+pom.xml, *.yml, *.xml, .env) or adding/removing a dependency — do NOT attempt a
+workaround. Return exactly one line starting with the sentinel below, naming the
+file(s) and the precise reason, so the pipeline can stop and report it:
+
+    BLOCKED_PROTECTED_CONFIG: <which protected file/dependency and why it must change>
+
+Example: `BLOCKED_PROTECTED_CONFIG: apps/web/tsconfig.json is invalid JSON (orphaned "types" key); src/api/client.ts imports 'axios' which is not a declared dependency.`
+
+Otherwise, return a brief summary of what you fixed, or "No fix applied: <reason>".
 
 ```python
-result = "Brief description of what was fixed, or 'No fix applied: <reason>'."
+result = "Brief description of what was fixed, or 'No fix applied: <reason>', or 'BLOCKED_PROTECTED_CONFIG: <reason>'."
 final_answer(result)
 ```
 """
@@ -318,7 +362,15 @@ def _check_spotless(task_id: str) -> dict:
                 (result.get("stdout") or "") + (result.get("stderr") or "")
             ).strip()
             _document_missing_tool(task_id, "spotless (mvn)", error)
-            return {"status": "SKIPPED", "attempts": 0, "error_output": "Tool not available: mvn"}
+            return {
+                "status": "BLOCKED",
+                "attempts": 0,
+                "error_output": (
+                    "Tool not available: mvn is not installed or not on PATH. "
+                    "The spotless check could not run — install Maven and re-run. "
+                    "(See .ai/context/tasks/SETUP_NOTES.md.)"
+                ),
+            }
 
         if result["success"]:
             return {"status": "PASS", "attempts": attempt, "error_output": ""}
@@ -357,7 +409,15 @@ def _check_with_llm_fix(task_id: str, name: str, run_fn, max_attempts: int = 3) 
                 (result.get("stdout") or "") + (result.get("stderr") or "")
             ).strip()
             _document_missing_tool(task_id, name, error)
-            return {"status": "SKIPPED", "attempts": 0, "error_output": "Tool not available: " + name}
+            return {
+                "status": "BLOCKED",
+                "attempts": 0,
+                "error_output": (
+                    f"Tool not available: the '{name}' check could not run because "
+                    "its tool is not installed or not on PATH. Install it and "
+                    "re-run. (See .ai/context/tasks/SETUP_NOTES.md.)"
+                ),
+            }
 
         if result["success"]:
             return {"status": "PASS", "attempts": attempt, "error_output": ""}
@@ -375,6 +435,25 @@ def _check_with_llm_fix(task_id: str, name: str, run_fn, max_attempts: int = 3) 
             fix_summary = _run_auto_fix_agent(name, error_output, task_id=task_id)
             logger.debug(f"[{name}] fix: {fix_summary[:120]}", extra={"role": "verification"})
 
+            # Root cause is unfixable in source (protected config / dependency).
+            # No point re-running run_fn or burning the remaining attempts.
+            if fix_summary.lstrip().startswith(_BLOCKED_CONFIG_SENTINEL):
+                reason = fix_summary.lstrip()[len(_BLOCKED_CONFIG_SENTINEL):].strip()
+                logger.info(
+                    f"{MARKER_BLOCKED} [{name}] root cause in protected config — "
+                    "stopping early (auto-fix cannot touch config files).",
+                    extra={"role": "verification"},
+                )
+                return {
+                    "status": "BLOCKED",
+                    "attempts": attempt,
+                    "error_output": (
+                        f"Root cause is in a protected config file — auto-fix "
+                        f"cannot modify it. {reason}\n\n"
+                        f"--- Original check output ---\n{error_output}"
+                    ),
+                }
+
     return {"status": "BLOCKED", "attempts": max_attempts, "error_output": error_output}
 
 
@@ -388,7 +467,15 @@ def _check_once_no_fix(task_id: str, name: str, run_fn) -> dict:
             (result.get("stdout") or "") + (result.get("stderr") or "")
         ).strip()
         _document_missing_tool(task_id, name, error)
-        return {"status": "SKIPPED", "attempts": 0, "error_output": "Tool not available: " + name}
+        return {
+            "status": "BLOCKED",
+            "attempts": 0,
+            "error_output": (
+                f"Tool not available: the '{name}' check could not run because "
+                "its tool is not installed or not on PATH. Install it and "
+                "re-run. (See .ai/context/tasks/SETUP_NOTES.md.)"
+            ),
+        }
 
     if result["success"]:
         return {"status": "PASS", "attempts": 1, "error_output": ""}
@@ -409,7 +496,15 @@ def _check_block_on_fail(task_id: str, name: str, run_fn) -> dict:
             (result.get("stdout") or "") + (result.get("stderr") or "")
         ).strip()
         _document_missing_tool(task_id, name, error)
-        return {"status": "SKIPPED", "attempts": 0, "error_output": "Tool not available: " + name}
+        return {
+            "status": "BLOCKED",
+            "attempts": 0,
+            "error_output": (
+                f"Tool not available: the '{name}' check could not run because "
+                "its tool is not installed or not on PATH. Install it and "
+                "re-run. (See .ai/context/tasks/SETUP_NOTES.md.)"
+            ),
+        }
 
     if result["success"]:
         return {"status": "PASS", "attempts": 1, "error_output": ""}
@@ -513,6 +608,9 @@ def run_verification(task_id: str) -> dict:
             "status": "SKIPPED",
             "attempts": 0,
             "error_output": "",
+            # The ONLY benign, pass-neutral skip: integration tests are opt-in.
+            # Every other SKIPPED/BLOCKED counts against the verdict (see below).
+            "intentional": True,
         }
 
     # 4. npm type-check (TypeScript — LLM auto-fix on .ts/.tsx source files)
@@ -535,9 +633,8 @@ def run_verification(task_id: str) -> dict:
     _write_file(report_path, report_content)
     logger.debug(f"Verification report written: {report_path}", extra={"role": "verification"})
 
-    # Compute overall result
-    blocked = any(c["status"] == "BLOCKED" for c in checks.values())
-    passed = all(c["status"] in ("PASS", "SKIPPED") for c in checks.values())
+    # Compute overall result (see _aggregate_verdict for the PASS/SKIPPED rules).
+    passed, blocked = _aggregate_verdict(checks)
 
     statuses = " | ".join(
         f"{k}={v['status']}" for k, v in checks.items()
