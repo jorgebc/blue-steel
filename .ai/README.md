@@ -3,6 +3,9 @@
 Multi-agent development pipeline that autonomously implements roadmap tasks.
 Phases: Planning (PO + Architect) -> Execution (BE + FE engineers) -> Quality (verification + review + secops) -> Final Review -> Done.
 
+> This README is the operator guide (setup, commands, recovery). For the system
+> architecture and how the pipeline is structured, see [`AGENTS.md`](AGENTS.md).
+
 ---
 
 ## Prerequisites
