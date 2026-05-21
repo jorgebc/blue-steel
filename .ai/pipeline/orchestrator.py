@@ -341,6 +341,12 @@ def _route_after_planning(state: PipelineState) -> str:
     return "execution"
 
 
+def _route_after_execution(state: PipelineState) -> str:
+    if state.get("blocked") or not state.get("execution_summary"):
+        return "error"
+    return "quality"
+
+
 def _route_after_quality(state: PipelineState) -> str:
     if state.get("blocked") or not state.get("quality_passed"):
         return "error"
@@ -373,7 +379,11 @@ def _build_graph(checkpointer=None):
         _route_after_planning,
         {"execution": "execution", "error": "error"},
     )
-    builder.add_edge("execution", "quality")
+    builder.add_conditional_edges(
+        "execution",
+        _route_after_execution,
+        {"quality": "quality", "error": "error"},
+    )
     builder.add_conditional_edges(
         "quality",
         _route_after_quality,

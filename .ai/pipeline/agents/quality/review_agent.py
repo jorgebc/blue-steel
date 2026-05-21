@@ -87,8 +87,15 @@ def _build_prompt_templates(persona_content: str) -> dict:
         .joinpath("code_agent.yaml")
         .read_text()
     )
+    # Persona is static markdown that may contain literal braces (e.g. JSX
+    # `style={{}}`). Wrap it in a Jinja2 raw block so smolagents' StrictUndefined
+    # template renderer treats those braces as text, not template syntax.
     default["system_prompt"] = (
-        f"{persona_content}\n\n---\n\n{default['system_prompt']}"
+        "{% raw %}\n"
+        f"{persona_content}\n"
+        "{% endraw %}\n\n"
+        "---\n\n"
+        f"{default['system_prompt']}"
     )
     return default
 
