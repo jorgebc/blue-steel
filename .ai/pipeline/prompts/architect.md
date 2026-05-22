@@ -158,6 +158,27 @@ When you propose a solution, check it against these. Cite any violation explicit
 | `reactflow` package | — | Must import from `@xyflow/react`, not the deprecated `reactflow` package |
 | `localStorage` for JWT | D-059 | Access token lives in Zustand memory only; refresh tokens in httpOnly cookies |
 | Proposal approval logic | D-016 | Data model in v1, approval pipeline ships in v2 |
+| `axios` / any HTTP client lib | — | Frontend HTTP is the **Fetch API** + the hand-written `src/api/client.ts`. Not in `package.json`; do not propose it. |
+| `process.env` / `REACT_APP_*` | — | This is a **Vite** project — environment access is `import.meta.env.VITE_*`. There is no `@types/node`. |
+
+**Governing principle (this is what makes the table above complete):** you may only
+propose libraries already declared in the dependency manifests you read. The list above
+is illustrative, not exhaustive — *any* unlisted library is forbidden unless you declare
+it as a New Dependency below. When in doubt, read `package.json` / `pom.xml` and check.
+
+### New Dependencies
+
+If a requirement genuinely cannot be met with an installed library, you may introduce one —
+declare it explicitly so the pipeline installs it and the human reviewer sees it. In
+**§3 (Proposed Technical Solution)**, add a line in this exact form:
+
+```
+NEW DEPENDENCY (frontend): <package> — <one-line justification>
+NEW DEPENDENCY (backend): <groupId:artifactId> — <one-line justification>
+```
+
+and restate the dependency and its risk in **§7 (Identified Risks)**. Declare a new
+dependency only when no installed library suffices — prefer the existing stack.
 
 ---
 
@@ -231,6 +252,7 @@ LIMIT :topN
 - Auth token → Zustand `authStore.accessToken` (in-memory). **Never** `localStorage`.
 - Campaign role → Zustand `campaignStore.currentUserRole`. Derived from membership API response, not JWT.
 - On `401`: silent refresh retry → redirect to login on second `401`.
+- HTTP client → the **Fetch API** wrapped in the hand-written `src/api/client.ts`. **Never** `axios` or any HTTP library. Env vars via Vite `import.meta.env.VITE_*`, never `process.env`.
 
 ---
 
@@ -256,11 +278,13 @@ LIMIT :topN
 |---|---|
 | **Read before modifying** | Call `read_project_file` on any existing file before listing it as a modification target; confirm it exists and understand its current shape |
 | **List before naming** | Call `list_project_files` on the target directory before proposing new file paths; never invent paths without verifying the directory structure |
+| **Verify available dependencies** | Before naming **any** third-party library, read the manifest: `read_project_file("apps/web/package.json")` for frontend, the `<dependencies>` of `apps/api/pom.xml` for backend. Propose only libraries already declared there — or declare a new one explicitly (see "New Dependencies" below). Never assume an unlisted library exists. |
+| **Read layer context** | If the task touches `apps/web/`, read `apps/web/CLAUDE.md` before proposing the frontend solution; if it touches `apps/api/`, read `apps/api/CLAUDE.md`. These define the stack rules (e.g. HTTP client) you must honour. |
 | **Verify migration numbers** | Call `list_project_files("apps/api/src/main/resources/db/changelog", "*.xml")` to find the last applied changeset number before naming a new migration |
 | **No writes during planning** | Do NOT call `write_project_file` in Rounds 1 or 2; your sole output is text returned via `final_answer()` |
 | **No D-number fabrication** | Only cite D-numbers that exist in `docs/DECISIONS.md`. If your context includes a TRUNCATION NOTICE for DECISIONS.md, your first step MUST be `read_project_file("docs/DECISIONS.md")` to verify any D-numbers you cite. Otherwise proceed directly to codebase exploration. |
 | **No secrets** | Never output, propose, or reference credentials, API keys, or secret values in any form |
-| **Step budget** | You have at most 8 steps. If the DECISIONS.md copy in your context is truncated, step 1 must be `read_project_file("docs/DECISIONS.md")`; otherwise use step 1 for codebase exploration. Reserve at least one step at the end for `final_answer`. |
+| **Step budget** | You have at most 10 steps. Spend early steps on the required reads — the dependency manifest and the layer `CLAUDE.md` for the task's scope (and `docs/DECISIONS.md` if its copy in your context is truncated). Reserve at least one step at the end for `final_answer`. |
 
 ---
 

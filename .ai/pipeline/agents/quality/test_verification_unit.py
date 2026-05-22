@@ -27,7 +27,7 @@ def _check(label: str, got, want) -> bool:
     return ok
 
 
-def test_is_tool_missing() -> list[str]:
+def _is_tool_missing_failures() -> list[str]:
     """tsc diagnostics on stdout are NOT a missing tool; shell launch errors are."""
     failures: list[str] = []
 
@@ -87,7 +87,7 @@ def test_is_tool_missing() -> list[str]:
     return failures
 
 
-def test_aggregate_verdict() -> list[str]:
+def _aggregate_verdict_failures() -> list[str]:
     """SKIPPED != PASS; only an intentional skip is pass-neutral."""
     failures: list[str] = []
 
@@ -122,11 +122,23 @@ def test_aggregate_verdict() -> list[str]:
     return failures
 
 
+# pytest entrypoints — these must assert, not return, or pytest silently ignores the
+# result and the checks never actually fail the suite.
+def test_is_tool_missing() -> None:
+    failures = _is_tool_missing_failures()
+    assert not failures, f"_is_tool_missing failures: {failures}"
+
+
+def test_aggregate_verdict() -> None:
+    failures = _aggregate_verdict_failures()
+    assert not failures, f"_aggregate_verdict failures: {failures}"
+
+
 def main() -> int:
     print("test_is_tool_missing:")
-    failures = test_is_tool_missing()
+    failures = _is_tool_missing_failures()
     print("test_aggregate_verdict:")
-    failures += test_aggregate_verdict()
+    failures += _aggregate_verdict_failures()
 
     print()
     if failures:

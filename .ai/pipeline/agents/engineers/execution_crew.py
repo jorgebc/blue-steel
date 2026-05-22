@@ -7,6 +7,7 @@ writes a structured execution report.
 Output: .ai/context/tasks/{task_id}_execution.md
 """
 
+import json
 import re
 import sys
 from datetime import datetime, timezone
@@ -41,6 +42,7 @@ if sys.platform == "win32":
 sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
 from tools.filesystem import read_file, write_file, REPO_ROOT
+from tools.shell_runner import install_frontend_dependencies
 from logger import MARKER_FAIL, MARKER_INFO, MARKER_OK, get_logger
 
 import be_agent
@@ -100,12 +102,111 @@ def _extract_migration_filename(files: list[str]) -> str | None:
     return None
 
 
+# Plans declare a genuinely-needed new library with a parseable line:
+#   NEW DEPENDENCY (frontend): axios — justification...
+# The pipeline never commits, so a human reviews every dependency before merge;
+# we therefore install declared frontend deps autonomously rather than stopping.
+_NEW_DEP_RE = re.compile(
+    r"NEW DEPENDENCY\s*\(\s*(frontend|backend)\s*\)\s*:\s*(\S+)",
+    re.IGNORECASE,
+)
+
+
+def _parse_new_dependencies(plan_content: str) -> dict[str, list[str]]:
+    """Return declared new dependencies grouped by scope: {'frontend': [...], 'backend': [...]}."""
+    deps: dict[str, list[str]] = {"frontend": [], "backend": []}
+    for match in _NEW_DEP_RE.finditer(plan_content):
+        scope = match.group(1).lower()
+        pkg = match.group(2).strip().strip("`'\".,;")
+        if pkg and pkg not in deps[scope]:
+            deps[scope].append(pkg)
+    return deps
+
+
+def _pkg_name(spec: str) -> str:
+    """Strip a version range from an npm spec: 'react@^19' -> 'react', '@scope/x@1' -> '@scope/x'."""
+    if spec.startswith("@"):
+        scope_name, sep, _version = spec[1:].partition("@")
+        return f"@{scope_name}" if sep else spec
+    return spec.split("@", 1)[0]
+
+
+def _missing_frontend_deps(declared: list[str]) -> list[str]:
+    """Return the declared frontend specs whose package is absent from apps/web/package.json."""
+    if not declared:
+        return []
+    try:
+        pkg_json = json.loads(read_file("apps/web/package.json"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return list(declared)
+    installed = set(pkg_json.get("dependencies", {})) | set(
+        pkg_json.get("devDependencies", {})
+    )
+    return [spec for spec in declared if _pkg_name(spec) not in installed]
+
+
+def _install_declared_frontend_deps(declared: list[str], logger) -> list[str]:
+    """Pre-flight: install any declared frontend dep missing from package.json.
+
+    Returns the specs actually installed (for the execution report). Logged but
+    non-fatal on failure — if the install fails, the engineer's circuit breaker
+    catches the resulting missing-module error with concrete output.
+    """
+    missing = _missing_frontend_deps(declared)
+    if not missing:
+        return []
+    logger.info(
+        f"{MARKER_INFO} Installing plan-declared frontend dependencies: {missing}",
+        extra={"role": "fe_engineer"},
+    )
+    result = install_frontend_dependencies(missing)
+    installed = result.get("installed", [])
+    if result.get("success"):
+        logger.info(
+            f"{MARKER_OK} Installed: {installed}", extra={"role": "fe_engineer"}
+        )
+    else:
+        logger.error(
+            f"{MARKER_FAIL} Dependency install failed (rc={result.get('returncode')}): "
+            f"{result.get('stderr', '').strip()[:500]}",
+            extra={"role": "fe_engineer"},
+        )
+    return installed
+
+
+def _engineer_section(title: str, role: str, result: dict | None, skip_note: str) -> list[str]:
+    """Build one engineer's report section, including Failure Diagnostics when it failed."""
+    if result is None:
+        return [f"## {title}", "", f"**Status:** {skip_note}", ""]
+
+    success = result.get("success", False)
+    files = result.get("files_modified", [])
+    notes = result.get("notes", "")
+    lines = [
+        f"## {title}",
+        "",
+        f"**Status:** {'SUCCESS' if success else 'FAILED'}",
+        "",
+        "### Files Created / Modified",
+        "",
+    ]
+    lines += [f"- `{f}`" for f in files] if files else ["_(none)_"]
+    lines += ["", "### Notes", "", notes or "_(no notes)_", ""]
+
+    # Concrete check output — the real tsc/eslint/mvn failure, not the LLM's prose.
+    diagnostics = result.get("diagnostics")
+    if not success and diagnostics:
+        lines += ["### Failure Diagnostics", "", diagnostics, ""]
+    return lines
+
+
 def _build_execution_report(
     task_id: str,
     be_result: dict | None,
     fe_result: dict | None,
     migration_filename: str | None,
     timestamp: str,
+    installed_deps: list[str] | None = None,
 ) -> str:
     """Assemble the execution report markdown."""
     lines = [
@@ -118,73 +219,34 @@ def _build_execution_report(
         "",
     ]
 
-    # Backend section
-    if be_result is not None:
-        be_success = be_result.get("success", False)
-        be_files = be_result.get("files_modified", [])
-        be_notes = be_result.get("notes", "")
-        lines += [
-            "## Backend Engineer",
-            "",
-            f"**Status:** {'SUCCESS' if be_success else 'FAILED'}",
-            "",
-            "### Files Created / Modified",
-            "",
-        ]
-        if be_files:
-            for f in be_files:
-                lines.append(f"- `{f}`")
-        else:
-            lines.append("_(none)_")
-        lines += [
-            "",
-            "### Notes",
-            "",
-            be_notes or "_(no notes)_",
-            "",
-        ]
-    else:
-        lines += [
-            "## Backend Engineer",
-            "",
-            "**Status:** SKIPPED (no backend scope detected in plan section 3)",
-            "",
-        ]
-
+    lines += _engineer_section(
+        "Backend Engineer",
+        "be_engineer",
+        be_result,
+        "SKIPPED (no backend scope detected in plan section 3)",
+    )
     lines += ["---", ""]
 
-    # Frontend section
-    if fe_result is not None:
-        fe_success = fe_result.get("success", False)
-        fe_files = fe_result.get("files_modified", [])
-        fe_notes = fe_result.get("notes", "")
-        lines += [
-            "## Frontend Engineer",
-            "",
-            f"**Status:** {'SUCCESS' if fe_success else 'FAILED'}",
-            "",
-            "### Files Created / Modified",
-            "",
-        ]
-        if fe_files:
-            for f in fe_files:
-                lines.append(f"- `{f}`")
-        else:
-            lines.append("_(none)_")
+    lines += _engineer_section(
+        "Frontend Engineer",
+        "fe_engineer",
+        fe_result,
+        "SKIPPED (no frontend scope detected in plan section 3)",
+    )
+    lines += ["---", ""]
+
+    # Installed dependencies — the review point for any new library introduced.
+    lines += ["## Installed Dependencies", ""]
+    if installed_deps:
+        lines += [f"- `{dep}`" for dep in installed_deps]
         lines += [
             "",
-            "### Notes",
-            "",
-            fe_notes or "_(no notes)_",
+            "_Declared as NEW DEPENDENCY in the plan and installed during the "
+            "pre-flight. Review before commit._",
             "",
         ]
     else:
-        lines += [
-            "## Frontend Engineer",
-            "",
-            "**Status:** SKIPPED (no frontend scope detected in plan section 3)",
-            "",
-        ]
+        lines += ["_None_", ""]
 
     lines += ["---", ""]
 
@@ -253,6 +315,15 @@ def run_execution(task_id: str) -> dict:
         extra={"role": "execution"},
     )
 
+    # ── New-dependency pre-flight ─────────────────────────────────────────────
+    # Install plan-declared frontend dependencies before the engineer runs, so a
+    # genuinely-needed new library does not surface as an unrecoverable
+    # missing-module error. Backend deps are added to pom.xml by the BE engineer.
+    new_deps = _parse_new_dependencies(plan_content)
+    installed_deps: list[str] = []
+    if has_frontend:
+        installed_deps = _install_declared_frontend_deps(new_deps["frontend"], logger)
+
     be_result: dict | None = None
     fe_result: dict | None = None
 
@@ -301,6 +372,7 @@ def run_execution(task_id: str) -> dict:
         fe_result=fe_result,
         migration_filename=migration_filename,
         timestamp=timestamp,
+        installed_deps=installed_deps,
     )
     report_path = f"{_EXECUTION_DIR}/{task_id}_execution.md"
     write_file(report_path, report_content)
@@ -309,12 +381,21 @@ def run_execution(task_id: str) -> dict:
     be_files = be_result.get("files_modified", []) if be_result else []
     fe_files = fe_result.get("files_modified", []) if fe_result else []
 
+    # Concrete failure output from whichever engineer failed — surfaced up to the
+    # orchestrator so error.md names the real error, not just file counts.
+    failure_diagnostics = ""
+    for result in (be_result, fe_result):
+        if result and not result.get("success", True) and result.get("diagnostics"):
+            failure_diagnostics = result["diagnostics"]
+
     summary = {
         "be_files": be_files,
         "fe_files": fe_files,
         "migration_filename": migration_filename,
         "be_success": be_result.get("success", True) if be_result else True,
         "fe_success": fe_result.get("success", True) if fe_result else True,
+        "installed_deps": installed_deps,
+        "failure_diagnostics": failure_diagnostics,
         "report_path": report_path,
     }
 

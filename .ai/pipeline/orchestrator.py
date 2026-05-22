@@ -104,6 +104,11 @@ def _execution_node(state: PipelineState) -> dict:
                 f"frontend files: {len(summary.get('fe_files', []))}). "
                 f"See the execution report for details: {summary.get('report_path')}"
             )
+            # Name the concrete failure (real tsc/eslint/mvn output) in the reason
+            # so error.md is actionable, not just file counts. Tail-bounded.
+            diagnostics = summary.get("failure_diagnostics")
+            if diagnostics:
+                reason += f"\n\nConcrete error:\n{diagnostics[:1500]}"
             logger.error(
                 f"{MARKER_FAIL} {reason}",
                 extra={"role": "execution"},

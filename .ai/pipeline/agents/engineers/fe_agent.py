@@ -29,6 +29,7 @@ from tools.shell_runner import (
     run_lint_frontend as _run_lint,
 )
 from agents.engineers._result import normalize_result
+from agents.engineers import _checks
 
 _PROMPTS_DIR = Path(__file__).parents[2] / "prompts"
 
@@ -154,7 +155,7 @@ def run_typecheck_frontend() -> dict:
         Dict with keys: stdout, stderr, returncode, success.
         If success is False, fix type errors and rewrite the affected files.
     """
-    return _run_typecheck()
+    return _checks.record_and_log("run_typecheck_frontend", _run_typecheck())
 
 
 @tool
@@ -165,7 +166,7 @@ def run_lint_frontend() -> dict:
     Returns:
         Dict with keys: stdout, stderr, returncode, success.
     """
-    return _run_lint()
+    return _checks.record_and_log("run_lint_frontend", _run_lint())
 
 
 @tool
@@ -175,7 +176,7 @@ def run_tests_frontend() -> dict:
     Returns:
         Dict with keys: stdout, stderr, returncode, success.
     """
-    return _run_tests()
+    return _checks.record_and_log("run_tests_frontend", _run_tests())
 
 
 # Sole authoritative source for the final_answer output format. The persona
@@ -220,6 +221,7 @@ def _create_agent() -> CodeAgent:
         prompt_templates=_build_prompt_templates(persona),
         max_steps=35,
         verbosity_level=LogLevel.OFF,  # ReAct trace -> silenced; story lives in the logger
+        step_callbacks=[_checks.abort_step_callback],  # circuit breaker -> early stop
     )
 
 
@@ -271,7 +273,10 @@ Constraints:
 - No modals (D-082): use FocusedOverlay from components/domain/.
 - No toasts (D-083): use InlineBanner from components/domain/.
 - No spinners in primary content (D-086): use skeletons derived from TypeScript DTOs.
-- Never install npm packages not listed in the plan.
+- Never install npm packages. Packages declared as `NEW DEPENDENCY (frontend)` in the plan are
+  installed for you before you start; never use a package that is neither installed nor declared.
+  If the plan names an undeclared, uninstalled package (e.g. axios), implement with the existing
+  stack (Fetch API) instead and note the deviation.
 - Never use `dangerouslySetInnerHTML` for LLM output.
 - Import React Flow from @xyflow/react, NOT reactflow.
 """
@@ -279,10 +284,32 @@ Constraints:
     logger = get_logger(task_id)
     logger.debug("Agent prompt (truncated):\n%s", task_prompt[:800], extra={"role": "fe_engineer"})
     reset_write_tracker()
-    raw = agent.run(task_prompt)
-    # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety on Windows.
-    logger.debug("Agent raw output: %s", ascii(raw)[:500], extra={"role": "fe_engineer"})
+    _checks.reset(task_id, role="fe_engineer")
+    try:
+        raw = agent.run(task_prompt)
+        # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety on Windows.
+        logger.debug("Agent raw output: %s", ascii(raw)[:500], extra={"role": "fe_engineer"})
+    except Exception as exc:
+        # The circuit breaker interrupts via agent.interrupt() (raises here), and a
+        # model/runtime crash lands here too. Either way, turn it into a structured
+        # failure carrying the concrete check output instead of an opaque traceback.
+        logger.warning(
+            "Agent run stopped early: %s: %s",
+            type(exc).__name__,
+            exc,
+            extra={"role": "fe_engineer"},
+            exc_info=True,
+        )
+        raw = f"Agent run stopped early ({type(exc).__name__}: {exc})."
 
     # Files actually written are the source of truth; the LLM's final_answer is only
     # trusted for an explicit success flag (see _result.normalize_result).
-    return normalize_result(raw)
+    result = normalize_result(raw)
+
+    # An engineer that ends on a red check did not finish, regardless of its claim.
+    if _checks.last_check_failed():
+        result["success"] = False
+    diagnostics = _checks.last_failure_diagnostics()
+    if diagnostics:
+        result["diagnostics"] = diagnostics
+    return result

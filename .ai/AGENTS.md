@@ -156,8 +156,15 @@ All tools live in `pipeline/tools/` and are the only modules that cause side eff
   Also exposes `get_modified_files` (branch diff vs. `main`).
 - **`shell_runner.py`** — wraps build/quality commands as `{stdout, stderr, returncode,
   success}` results: backend tests/lint/integration, frontend tests/type-check/lint/
-  npm-audit, and `run_sonar_backend` (local SonarQube quality gate, filtered to
-  changed files; hard-fails if `SONAR_TOKEN` or the container is missing).
+  npm-audit, `run_sonar_backend` (local SonarQube quality gate, filtered to
+  changed files; hard-fails if `SONAR_TOKEN` or the container is missing), and
+  `install_frontend_dependencies` (allowlist-scoped `npm install` used by the
+  execution pre-flight for plan-declared new dependencies).
+- **`agents/engineers/_checks.py`** — shared check-result capture for the engineers:
+  logs every `tsc`/`eslint`/`mvn`/sonar result to the task log at DEBUG, renders the
+  last failure as a concrete diagnostics block for the execution report, and runs a
+  circuit breaker (`abort_step_callback`) that interrupts the agent early on an
+  unrecoverable error (missing module/type) or a fix loop repeating the same failure.
 - **`git_tools.py`** — branch/stage/commit helpers that are **intentionally not wired**
   into the orchestrator. The pipeline never auto-commits; these exist as a foundation
   for a possible future phase only.
@@ -196,6 +203,12 @@ All tools live in `pipeline/tools/` and are the only modules that cause side eff
 - **ROADMAP is marked complete only on a validated `APPROVED`** final review;
   `REQUIRES_CHANGES` after max iterations leaves the task in-progress.
 - **Side effects stay in tools**; orchestration routing stays deterministic.
+- **New dependencies are autonomous, not gated.** The architect may introduce a library only by
+  declaring it in the plan as `NEW DEPENDENCY (frontend|backend): <pkg> — <justification>`. The
+  execution pre-flight installs declared frontend packages (allowlist-scoped `npm install`); the BE
+  engineer adds declared backend packages to `pom.xml`. Every installed dependency is listed in the
+  execution report — the pipeline never blocks on it because a human reviews all changes before commit.
+  An *undeclared*, uninstalled package is a mistake and trips the engineer circuit breaker instead.
 - Generated reports, logs, and checkpoints are gitignored.
 
 ---

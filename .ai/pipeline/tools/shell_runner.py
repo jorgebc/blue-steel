@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -8,6 +9,18 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .filesystem import get_modified_files
+
+# A plausible npm package spec: optional @scope/, name, optional @version-range.
+# Deliberately strict — these names originate in an LLM-authored plan and are
+# interpolated into a shell command, so anything containing whitespace or shell
+# metacharacters ($, ;, &, |, backticks, ...) is rejected to prevent injection.
+_NPM_PKG_SPEC = re.compile(
+    r"^@?[a-z0-9][a-z0-9._-]*(/[a-z0-9._-]+)?(@[A-Za-z0-9.^~*><=\-]+)?$"
+)
+
+
+def _is_safe_pkg_spec(spec: str) -> bool:
+    return bool(_NPM_PKG_SPEC.match(spec))
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 API_ROOT = REPO_ROOT / "apps" / "api"
@@ -80,6 +93,42 @@ def run_typecheck_frontend() -> dict:
 def run_lint_frontend() -> dict:
     """Run ESLint on the frontend source (npm run lint from apps/web/)."""
     return run_command("npm run lint", cwd=str(WEB_ROOT), timeout=120)
+
+
+def install_frontend_dependencies(packages: list[str]) -> dict:
+    """Install the given npm packages into apps/web (`npm install <pkg> ...`).
+
+    Intended for the execution pre-flight: `packages` must be the allowlist of
+    `NEW DEPENDENCY (frontend)` specs declared in the plan — never arbitrary input.
+    Each spec is validated against `_NPM_PKG_SPEC`; unsafe specs are dropped and
+    reported in `stderr` rather than executed.
+
+    Returns the standard `{stdout, stderr, returncode, success}` dict, extended
+    with `installed` (the specs actually passed to npm).
+    """
+    safe = [p for p in packages if _is_safe_pkg_spec(p)]
+    rejected = [p for p in packages if not _is_safe_pkg_spec(p)]
+    if not safe:
+        return {
+            "stdout": "",
+            "stderr": (
+                f"No valid package specs to install (rejected: {rejected})."
+                if rejected
+                else "No packages requested."
+            ),
+            "returncode": 0 if not packages else 1,
+            "success": not packages,
+            "installed": [],
+        }
+    result = run_command(
+        "npm install " + " ".join(safe), cwd=str(WEB_ROOT), timeout=300
+    )
+    result["installed"] = safe
+    if rejected:
+        result["stderr"] = (
+            f"{result.get('stderr', '')}\nRejected unsafe package specs: {rejected}"
+        ).strip()
+    return result
 
 
 def run_security_audit_frontend() -> dict:

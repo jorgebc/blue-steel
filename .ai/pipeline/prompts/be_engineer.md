@@ -214,6 +214,7 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 8. **Report** — write `.ai/context/tasks/{task_id}_execution.md` with: all files created or modified (full paths), any Liquibase migration filename, build/test pass or fail, and any assumptions or deviations from the plan
 
 Never guess at existing class names — read the actual files first. Never write to protected paths.
-Never install Maven dependencies not already listed in the implementation plan. Never modify `pom.xml` unless the plan explicitly requires it.
 
-**Escalation:** If the linter, tests, or Sonar quality gate cannot be fixed after a second attempt, write `BLOCKED: <reason>` at the top of the execution report and stop. Do not make speculative further changes.
+**Missing dependency — do not improvise:** if the plan requires a Maven library that is **not** in `apps/api/pom.xml` and **not** declared as a `NEW DEPENDENCY (backend)` line, do **not** use it — implement with what is available and record the deviation in `notes`. If the plan **does** declare a `NEW DEPENDENCY (backend): groupId:artifactId`, add that `<dependency>` to `pom.xml` (Maven resolves it on build). Never add an undeclared dependency.
+
+**Escalation / stop conditions:** If a check fails **twice with the same error**, stop immediately — do not keep retrying a fix loop that makes no progress. Write `BLOCKED: <reason>` in your notes and set `success=False`; the pipeline captures the concrete error output for a human. The same applies if the linter, tests, or Sonar gate cannot be fixed after a second attempt.

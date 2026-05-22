@@ -179,6 +179,14 @@ This happens when:
 3. Resume: `python run_task.py --task {id} --phase all --resume`
    - Or restart from the failing phase: `--phase 2` or `--phase 3`
 
+**Diagnosing an execution failure.** When an engineer fails, `{task_id}_execution.md` includes a
+**Failure Diagnostics** section with the real `tsc`/`eslint`/`mvn` output (not just the agent's
+prose), and `{task_id}_error.md`'s Reason line names the concrete error. The full per-check output
+is also in `.ai/logs/{task_id}.log` at DEBUG. Engineers now stop early (a circuit breaker) instead
+of looping on an unrecoverable error, so a failure surfaces in minutes, not after the full step
+budget. The report's **Installed Dependencies** section lists any library the plan declared as a
+`NEW DEPENDENCY` and the pre-flight installed — review these before committing.
+
 ---
 
 ## Protected paths — agents must never modify

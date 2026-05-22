@@ -29,6 +29,7 @@ from tools.shell_runner import (
     run_tests_backend as _run_tests,
 )
 from agents.engineers._result import normalize_result
+from agents.engineers import _checks
 
 _PROMPTS_DIR = Path(__file__).parents[2] / "prompts"
 
@@ -147,7 +148,7 @@ def run_linter_backend() -> dict:
         Dict with keys: stdout, stderr, returncode, success.
         If success is False, fix formatting issues and rewrite the affected files.
     """
-    return _run_linter()
+    return _checks.record_and_log("run_linter_backend", _run_linter())
 
 
 @tool
@@ -158,7 +159,7 @@ def run_tests_backend() -> dict:
         Dict with keys: stdout, stderr, returncode, success.
         A failing ArchUnit test means a layer violation in production code — fix the code, not the rule.
     """
-    return _run_tests()
+    return _checks.record_and_log("run_tests_backend", _run_tests())
 
 
 @tool
@@ -178,7 +179,7 @@ def run_sonar_backend() -> dict:
         On infra failure (missing token, podman, boot timeout): success=False
         with an actionable stderr — surface as BLOCKED in the execution report.
     """
-    return _run_sonar()
+    return _checks.record_and_log("run_sonar_backend", _run_sonar())
 
 
 _CODE_FORMAT_GUIDANCE = """
@@ -221,6 +222,7 @@ def _create_agent() -> CodeAgent:
         prompt_templates=_build_prompt_templates(persona),
         max_steps=35,
         verbosity_level=LogLevel.OFF,  # ReAct trace -> silenced; story lives in the logger
+        step_callbacks=[_checks.abort_step_callback],  # circuit breaker -> early stop
     )
 
 
@@ -274,7 +276,8 @@ Constraints:
 - Only implement backend files (apps/api/) — skip any frontend files listed in the plan.
 - Never write to apps/web/ or to apps/web/src/components/ui/.
 - Never modify an existing Liquibase changeset file.
-- Never install Maven dependencies not listed in the plan.
+- Never add Maven dependencies unless declared as `NEW DEPENDENCY (backend)` in the plan; for a
+  declared one, add the `<dependency>` to pom.xml. Never use an undeclared, absent dependency.
 - Every @Test method must have a @DisplayName.
 - All Java code must follow google-java-format (Spotless enforces this).
 """
@@ -282,10 +285,32 @@ Constraints:
     logger = get_logger(task_id)
     logger.debug("Agent prompt (truncated):\n%s", task_prompt[:800], extra={"role": "be_engineer"})
     reset_write_tracker()
-    raw = agent.run(task_prompt)
-    # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety on Windows.
-    logger.debug("Agent raw output: %s", ascii(raw)[:500], extra={"role": "be_engineer"})
+    _checks.reset(task_id, role="be_engineer")
+    try:
+        raw = agent.run(task_prompt)
+        # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety on Windows.
+        logger.debug("Agent raw output: %s", ascii(raw)[:500], extra={"role": "be_engineer"})
+    except Exception as exc:
+        # The circuit breaker interrupts via agent.interrupt() (raises here), and a
+        # model/runtime crash lands here too. Either way, turn it into a structured
+        # failure carrying the concrete check output instead of an opaque traceback.
+        logger.warning(
+            "Agent run stopped early: %s: %s",
+            type(exc).__name__,
+            exc,
+            extra={"role": "be_engineer"},
+            exc_info=True,
+        )
+        raw = f"Agent run stopped early ({type(exc).__name__}: {exc})."
 
     # Files actually written are the source of truth; the LLM's final_answer is only
     # trusted for an explicit success flag (see _result.normalize_result).
-    return normalize_result(raw)
+    result = normalize_result(raw)
+
+    # An engineer that ends on a red check did not finish, regardless of its claim.
+    if _checks.last_check_failed():
+        result["success"] = False
+    diagnostics = _checks.last_failure_diagnostics()
+    if diagnostics:
+        result["diagnostics"] = diagnostics
+    return result

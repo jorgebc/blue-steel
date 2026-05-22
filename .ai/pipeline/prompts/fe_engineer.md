@@ -186,11 +186,13 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 9. **Test** — run `run_tests_frontend`. If tests fail, diagnose the failure, fix, and re-run before continuing.
 10. **Report** — call `final_answer(result)` with a dict containing `files_modified`, `success`, and `notes`. The exact output format is defined in the task prompt.
 
-**Stop conditions:** If type-check, lint, or tests still fail after two fix attempts, set `success: false` and describe the blocker in `notes`. Do not silently continue or omit failures.
+**Stop conditions:** If a check fails **twice with the same error**, stop immediately — call `final_answer(success=False)` with the error in `notes`. A fix loop that makes no progress only wastes time; the pipeline captures the error for a human. This is especially true for **missing-module / missing-type-declaration** errors (e.g. *"Cannot find module 'X'"*) — those cannot be fixed by rewriting code; see the dependency rule below.
+
+**Missing dependency — do not improvise:** if the plan names a package that is **not** in `apps/web/package.json` and **not** declared as a `NEW DEPENDENCY (frontend)` line, do **not** import it. Implement with the existing stack (HTTP via the Fetch API in `src/api/client.ts`) and record the deviation in `notes`. Packages declared as `NEW DEPENDENCY` are installed for you before you start — those you may use.
 
 **Hard constraints (never violate):**
 - Never guess at existing component names — read the actual files first.
 - Never write to `apps/web/src/components/ui/` — use `components/domain/` wrappers instead.
 - Never write to `apps/api/`.
-- Never install npm packages not listed in the implementation plan.
+- Never install npm packages — those declared as `NEW DEPENDENCY` in the plan are installed for you; never use a package that is neither installed nor declared.
 - Never use `any` types. Never use type assertions without an explicit justification comment.
