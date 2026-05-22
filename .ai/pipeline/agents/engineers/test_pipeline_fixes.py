@@ -70,6 +70,60 @@ def test_last_check_failed_reflects_most_recent():
     assert _checks.last_check_failed() is False
 
 
+# ── _checks: batched checks must not mask an earlier failure (the FE-hang bug) ──
+
+
+def test_should_abort_trips_when_failing_check_followed_by_passing_check():
+    # The exact shape that hung F1.7: typecheck fails with an unrecoverable
+    # import, then a trivially-passing tests run lands last in the same step.
+    _checks.reset("", "fe_engineer")
+    _checks.record_and_log(
+        "run_typecheck_frontend",
+        _fail(stderr="src/main.tsx(3,27): error TS2307: Cannot find module 'next/router'."),
+    )
+    _checks.record_and_log("run_tests_frontend", _ok())  # passes with --passWithNoTests
+    abort, reason = _checks.should_abort()
+    assert abort is True
+    assert "cannot find module" in reason.lower()
+
+
+def test_should_abort_trips_on_repeated_failure_interleaved_with_pass():
+    # Even without an unrecoverable signature, an identical failure repeating
+    # across rounds must trip — despite a passing check between the failures.
+    _checks.reset("", "fe_engineer")
+    same = "src/store/authStore.ts(10,48): error TS6133: 'set' is declared but never used."
+    _checks.record_and_log("run_typecheck_frontend", _fail(stderr=same))
+    _checks.record_and_log("run_tests_frontend", _ok())
+    assert _checks.should_abort()[0] is False  # only one failure so far
+    _checks.record_and_log("run_typecheck_frontend", _fail(stderr=same))
+    _checks.record_and_log("run_tests_frontend", _ok())
+    abort, reason = _checks.should_abort()
+    assert abort is True
+    assert "twice" in reason
+
+
+def test_last_check_failed_true_when_earlier_check_unresolved():
+    _checks.reset("", "fe_engineer")
+    _checks.record_and_log("run_typecheck_frontend", _fail())
+    _checks.record_and_log("run_tests_frontend", _ok())
+    # tests passed last, but typecheck is still red -> engineer did not finish.
+    assert _checks.last_check_failed() is True
+
+
+def test_last_failure_diagnostics_prefers_unrecoverable_over_trailing_failure():
+    _checks.reset("", "fe_engineer")
+    _checks.record_and_log(
+        "run_typecheck_frontend",
+        _fail(stderr="src/main.tsx(3,27): error TS2307: Cannot find module 'next/router'."),
+    )
+    _checks.record_and_log(
+        "run_lint_frontend", _fail(stderr="eslint: 'set' is assigned but never used")
+    )
+    diag = _checks.last_failure_diagnostics()
+    assert "run_typecheck_frontend" in diag
+    assert "next/router" in diag
+
+
 def test_last_failure_diagnostics_renders_concrete_output():
     _checks.reset("", "fe_engineer")
     _checks.record_and_log(

@@ -87,48 +87,85 @@ def record_and_log(tool_name: str, result: dict) -> dict:
     return result
 
 
+def _latest_by_tool() -> dict[str, dict]:
+    """Map each tool name to its most recent recorded result.
+
+    The breaker reasons per-tool rather than off `_history[-1]`: agents batch
+    several checks into one step (e.g. typecheck -> lint -> tests), so the last
+    entry is often a trivially-passing check (`tests` exits 0 with no test files)
+    that would otherwise mask a still-failing typecheck/lint earlier in the step.
+    """
+    latest: dict[str, dict] = {}
+    for entry in _history:
+        latest[entry["tool"]] = entry
+    return latest
+
+
+def _unresolved_checks() -> list[dict]:
+    """The checks whose most recent run failed (unresolved), in tool-call order."""
+    return [e for e in _latest_by_tool().values() if not e["success"]]
+
+
 def last_check_failed() -> bool:
-    """True if the most recent check the agent ran was a failure.
+    """True if any check the agent ran is still unresolved (its latest run failed).
 
     An engineer that ends on a red check did not finish cleanly, regardless of what
     its `final_answer` claims — used to override an over-optimistic success flag.
+    Evaluated per-tool so a trailing, trivially-passing `tests` run does not hide a
+    still-failing typecheck or lint from the same step.
     """
-    return bool(_history) and not _history[-1]["success"]
+    return bool(_unresolved_checks())
 
 
 def should_abort() -> tuple[bool, str]:
     """Whether the run should stop early, with a human-readable reason.
 
-    Trips on (a) a known-unrecoverable error signature, or (b) the same check
-    failing twice in a row with the same first error line (a fix loop going nowhere).
+    Trips on (a) a known-unrecoverable error signature in any unresolved check, or
+    (b) the same check failing twice with the same first error line (a fix loop
+    going nowhere). Both conditions are evaluated against the latest result per
+    tool, so a passing check later in the same step cannot mask an earlier failure.
     """
-    if not _history:
-        return False, ""
-    last = _history[-1]
-    if last["success"]:
+    unresolved = _unresolved_checks()
+    if not unresolved:
         return False, ""
 
-    blob = f"{last['stderr_tail']}\n{last['stdout_tail']}".lower()
-    for signature in _UNRECOVERABLE_SIGNATURES:
-        if signature in blob:
-            return True, f"unrecoverable error: '{signature}'"
+    # (a) Unrecoverable signature in any still-failing check.
+    for entry in unresolved:
+        blob = f"{entry['stderr_tail']}\n{entry['stdout_tail']}".lower()
+        for signature in _UNRECOVERABLE_SIGNATURES:
+            if signature in blob:
+                return True, f"unrecoverable error in {entry['tool']}: '{signature}'"
 
-    same_tool_failures = [
-        e for e in _history if e["tool"] == last["tool"] and not e["success"]
-    ]
-    if len(same_tool_failures) >= 2:
-        recent_lines = {_first_error_line(e) for e in same_tool_failures[-2:]}
-        if len(recent_lines) == 1:
-            return True, f"'{last['tool']}' failed twice with the same error"
+    # (b) A still-failing check that has failed twice with the same first error line.
+    for entry in unresolved:
+        tool_failures = [
+            e for e in _history if e["tool"] == entry["tool"] and not e["success"]
+        ]
+        if len(tool_failures) >= 2:
+            recent_lines = {_first_error_line(e) for e in tool_failures[-2:]}
+            if len(recent_lines) == 1:
+                return True, f"'{entry['tool']}' failed twice with the same error"
     return False, ""
 
 
 def last_failure_diagnostics() -> str:
-    """Render the most recent failing check as a concrete markdown block, or ''."""
+    """Render a still-failing check as a concrete markdown block, or ''.
+
+    Prefers an unresolved check whose output matches an unrecoverable signature
+    (the real blocker, e.g. a missing module) over later, more cosmetic failures;
+    falls back to the most recent failing check otherwise.
+    """
     failures = [e for e in _history if not e["success"]]
     if not failures:
         return ""
-    last = failures[-1]
+    last = None
+    for entry in _unresolved_checks():
+        blob = f"{entry['stderr_tail']}\n{entry['stdout_tail']}".lower()
+        if any(sig in blob for sig in _UNRECOVERABLE_SIGNATURES):
+            last = entry
+            break
+    if last is None:
+        last = failures[-1]
     parts = [
         f"Check `{last['tool']}` failed (returncode {last['returncode']}).",
         "",

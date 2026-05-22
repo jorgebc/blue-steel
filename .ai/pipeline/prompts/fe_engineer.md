@@ -59,6 +59,12 @@ apps/web/src/
 - **Auth token, active campaign, UI flags** → Zustand stores
 - Never put API-fetched data in Zustand. Never fetch data outside TanStack Query hooks.
 
+### Routing — this is a Vite + React Router app, NOT Next.js
+- Route with **`react-router-dom`**: `BrowserRouter`, `Routes`/`Route`, `useNavigate`, `Link`, `Navigate`.
+- **Never import from `next/*`** — there is no Next.js here. `next/router`, `next/link`, and
+  `next/navigation` do not exist and will fail type-check with "Cannot find module".
+- For programmatic navigation use `const navigate = useNavigate()`, not a `next/router` `useRouter`.
+
 ### Auth Token
 - JWT access token lives in memory (Zustand `authStore`) — **never `localStorage`** (D-059)
 - Refresh tokens are `httpOnly` cookies. Frontend never reads them.
