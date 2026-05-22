@@ -16,5 +16,6 @@ class PipelineState(TypedDict, total=False):
     iteration_count: int
     blocked: bool
     blocked_reason: str | None
+    blocked_detail: str | None
     completed: bool
     log: Annotated[list[str], operator.add]

@@ -24,6 +24,7 @@ from tools.filesystem import (
     reset_write_tracker,
 )
 from tools.shell_runner import (
+    run_format_backend as _run_format,
     run_linter_backend as _run_linter,
     run_sonar_backend as _run_sonar,
     run_tests_backend as _run_tests,
@@ -142,12 +143,18 @@ def get_git_diff(base: str = "main") -> str:
 
 @tool
 def run_linter_backend() -> dict:
-    """Run the backend Spotless format check (mvn spotless:check from apps/api/).
+    """Auto-format backend Java with Spotless, then verify (apply + check from apps/api/).
+
+    This tool first runs `mvn spotless:apply` to fix google-java-format violations
+    mechanically, then runs `mvn spotless:check` and returns the check result. You
+    do NOT need to hand-format Java — formatting is deterministic and handled here.
 
     Returns:
         Dict with keys: stdout, stderr, returncode, success.
-        If success is False, fix formatting issues and rewrite the affected files.
+        success is True once formatting is clean. If success is still False, the
+        failure is not cosmetic (e.g. mvn could not run) — read stderr/stdout.
     """
+    _run_format()
     return _checks.record_and_log("run_linter_backend", _run_linter())
 
 

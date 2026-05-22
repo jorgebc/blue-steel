@@ -80,6 +80,16 @@ def run_linter_backend() -> dict:
     return run_command("mvn spotless:check", cwd=str(API_ROOT), timeout=120)
 
 
+def run_format_backend() -> dict:
+    """Auto-format backend Java with Spotless/google-java-format (mvn spotless:apply).
+
+    Deterministic counterpart to `run_linter_backend`: rewrites source files in
+    place to satisfy the formatter. Intended to run before the check so a purely
+    cosmetic violation is fixed mechanically instead of by an LLM hand-edit.
+    """
+    return run_command("mvn spotless:apply", cwd=str(API_ROOT), timeout=120)
+
+
 def run_tests_frontend() -> dict:
     """Run frontend tests in CI mode (npm test from apps/web/)."""
     return run_command("npm test", cwd=str(WEB_ROOT), timeout=300)

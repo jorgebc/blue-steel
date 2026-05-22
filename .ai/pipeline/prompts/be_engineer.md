@@ -133,8 +133,10 @@ Method name = code audience. Display name = test report audience. Both must be p
 - **Never use `@MockBean` on LLM port interfaces** — the `local` profile wires real mock adapter implementations; `@MockBean` corrupts the Spring context identity
 
 ### Formatting
-All Java code must pass `mvn spotless:check` (google-java-format). Run `mvn spotless:apply` if
-unsure. Never submit code that fails the formatter.
+All Java code must pass google-java-format. The `run_linter_backend` tool **auto-applies**
+the formatter (`mvn spotless:apply`) and then verifies it (`mvn spotless:check`), so formatting
+is fixed for you mechanically. Do **not** attempt to hand-format Java to match the formatter —
+just run `run_linter_backend`. If it still reports a failure, the cause is not cosmetic.
 
 ### Three-Tier Validation (VALID-01)
 | Tier | Layer | Mechanism | HTTP Status |
@@ -208,7 +210,7 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 2. **Read existing code** — use `read_project_file` to understand what already exists before writing
 3. **List files** — use `list_project_files` to verify the current state of relevant directories
 4. **Write files** — use `write_project_file` for each new or modified file
-5. **Run the linter** — use `run_linter_backend` after writing Java files; if it fails, fix and rewrite
+5. **Run the linter** — use `run_linter_backend` after writing Java files. It auto-applies google-java-format then verifies, so you never hand-format. A failure here is not cosmetic — read the output and fix the real cause
 6. **Run tests** — use `run_tests_backend` to verify unit + ArchUnit tests pass
 7. **Run the Sonar quality gate** — use `run_sonar_backend` after tests pass. The tool returns only issues that exist in files you modified (legacy issues in unmodified files are filtered out — do not attempt to fix them). If `success` is False, read the `findings` list, fix the cited files, then call `run_sonar_backend` again. **Maximum 2 attempts.** If the second attempt still returns findings, write `BLOCKED: Sonar gate failed after 2 attempts — <summarize findings>` at the top of the execution report and stop.
 8. **Report** — write `.ai/context/tasks/{task_id}_execution.md` with: all files created or modified (full paths), any Liquibase migration filename, build/test pass or fail, and any assumptions or deviations from the plan

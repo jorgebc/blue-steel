@@ -50,8 +50,7 @@ def _planning_node(state: PipelineState) -> dict:
     logger = get_logger(task_id)
     logger.info(f"{MARKER_INFO} Starting planning phase", extra={"role": "planning"})
     try:
-        plan_path = run_planning(task_id)
-        logger.info(f"{MARKER_OK} Plan written: {plan_path}", extra={"role": "planning"})
+        plan_path = run_planning(task_id)  # run_planning already logs "[OK] Plan written: ..."
         return {
             "plan_path": plan_path,
             "phase": 1,
@@ -98,17 +97,17 @@ def _execution_node(state: PipelineState) -> dict:
             if not ok
         ]
         if failed:
+            # Console/banner reason stays concise — one line. The concrete
+            # tsc/eslint/mvn output is carried separately in blocked_detail so
+            # error.md can stay actionable without the full block being echoed
+            # three times across the execution node, error node, and footer.
             reason = (
                 f"{' and '.join(failed)} reported FAILED during execution "
                 f"(backend files: {len(summary.get('be_files', []))}, "
                 f"frontend files: {len(summary.get('fe_files', []))}). "
                 f"See the execution report for details: {summary.get('report_path')}"
             )
-            # Name the concrete failure (real tsc/eslint/mvn output) in the reason
-            # so error.md is actionable, not just file counts. Tail-bounded.
-            diagnostics = summary.get("failure_diagnostics")
-            if diagnostics:
-                reason += f"\n\nConcrete error:\n{diagnostics[:1500]}"
+            detail = (summary.get("failure_diagnostics") or "")[:1500]
             logger.error(
                 f"{MARKER_FAIL} {reason}",
                 extra={"role": "execution"},
@@ -119,6 +118,7 @@ def _execution_node(state: PipelineState) -> dict:
                 "phase": 2,
                 "blocked": True,
                 "blocked_reason": reason,
+                "blocked_detail": detail,
                 "log": [f"Execution failed (iter {iteration + 1}): {reason}"],
             }
 
@@ -328,14 +328,19 @@ def _done_node(state: PipelineState) -> dict:
 def _error_node(state: PipelineState) -> dict:
     task_id = state["task_id"]
     reason = state.get("blocked_reason") or "Unknown error"
+    detail = state.get("blocked_detail") or ""
     logger = get_logger(task_id)
+    # Console gets only the concise reason; the full concrete error (if any) goes
+    # to error.md and the log file, never echoed across three console surfaces.
     logger.error(f"{MARKER_FAIL} Pipeline error: {reason}", extra={"role": "pipeline"})
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    concrete_error = f"## Concrete Error\n\n{detail}\n\n" if detail.strip() else ""
     content = (
         f"# Pipeline Error: {task_id}\n\n"
         f"**Generated:** {ts}\n"
         f"**Reason:** {reason}\n\n"
+        f"{concrete_error}"
         f"## Action Required\n\n"
         f"The pipeline stopped with an unrecoverable error.\n"
         f"Review the reason above and restart after fixing the underlying issue.\n\n"
@@ -499,6 +504,7 @@ def _fresh_state(task_id: str) -> PipelineState:
         "iteration_count": 0,
         "blocked": False,
         "blocked_reason": None,
+        "blocked_detail": None,
         "completed": False,
         "log": [],
     }
