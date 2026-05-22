@@ -26,6 +26,35 @@ def should_stream() -> bool:
     return os.environ.get("PIPELINE_MODE", "cloud") == "local"
 
 
+# Ollama's default context window (commonly 2048–4096 tokens) is far smaller than
+# our prompts — persona + smolagents scaffold + full plan run ~6–10k tokens — so the
+# window silently drops the oldest tokens (the persona and plan), a major driver of
+# hallucinated APIs. We pass an explicit large num_ctx for local runs. 16384 fits a
+# 14B Q4 model (~9 GB) plus KV cache inside a 12 GB GPU; drop to 8192 if VRAM is tight.
+_LOCAL_NUM_CTX = 16384
+
+
+def get_model_options(phase: str = "planning") -> dict:
+    """Return generation/runtime options (sampling + context window) for a phase.
+
+    Code generation wants near-greedy decoding, so the execution phase uses the
+    lowest temperature; reasoning phases use a slightly higher (still low) value.
+    For local (Ollama) runs we also send an explicit large ``num_ctx`` so the model
+    actually sees the persona and plan instead of a silently truncated window.
+
+    The returned dict is spread into ``LiteLLMModel(...)`` (forwarded to
+    ``litellm.completion``) or merged into a direct ``litellm.completion`` call.
+    ``litellm_settings.drop_params: true`` makes any provider-unsupported key
+    (e.g. ``num_ctx`` on Anthropic) a safe no-op.
+    """
+    mode = os.environ.get("PIPELINE_MODE", "cloud")
+    options: dict = {"temperature": 0.1 if phase == "execution" else 0.2}
+    if mode == "local":
+        options["top_p"] = 0.9
+        options["num_ctx"] = _LOCAL_NUM_CTX
+    return options
+
+
 def get_llm(phase: str = "planning") -> dict:
     """Return the litellm model params for the active PIPELINE_MODE and phase.
 

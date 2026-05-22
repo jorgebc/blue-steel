@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
 from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
-from config import get_llm
+from config import get_llm, get_model_options
 from logger import get_logger
 from tools.filesystem import (
     read_file as _read_file,
@@ -54,6 +54,10 @@ def _make_model() -> LiteLLMModel:
         api_key=api_key,
         api_base=api_base,
         timeout=1800,  # 30 min — local models can be slow
+        # Large context window + near-greedy sampling — see config.get_model_options.
+        # Without an explicit num_ctx, Ollama truncates the persona/plan and the model
+        # hallucinates APIs it can no longer see.
+        **get_model_options(phase="execution"),
     )
 
 
@@ -290,6 +294,7 @@ Constraints:
 """
 
     logger = get_logger(task_id)
+    logger.debug("Resolved model options: %s", get_model_options(phase="execution"), extra={"role": "be_engineer"})
     logger.debug("Agent prompt (truncated):\n%s", task_prompt[:800], extra={"role": "be_engineer"})
     reset_write_tracker()
     _checks.reset(task_id, role="be_engineer")

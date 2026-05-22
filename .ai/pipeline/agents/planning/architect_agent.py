@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
 from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
-from config import get_llm
+from config import get_llm, get_model_options
 from logger import get_logger
 from tools.filesystem import (
     read_file as _read_file,
@@ -44,6 +44,8 @@ def _make_model() -> LiteLLMModel:
         api_key=api_key,
         api_base=api_base,
         timeout=1800,  # 30 min — local models (qwen3:14b) can take 5-10 min per step
+        # Large context window + low temperature — see config.get_model_options.
+        **get_model_options(phase="planning"),
     )
 
 

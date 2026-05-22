@@ -186,7 +186,7 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 3. **Consult skill files** — for each UX pattern in your task (overlay, banner, skeleton, sidebar/navigation), read the corresponding skill file in `skills/` before writing code. Do not implement these patterns from memory.
 4. **Read existing code** — use `read_project_file` on every file you will modify or depend on. Never guess at existing component names, hook signatures, or store shape.
 5. **List files** — use `list_project_files` to confirm what already exists in relevant directories before creating new files.
-6. **Write files** — use `write_project_file` for each new or modified file.
+6. **Verify every import, then write** — before writing a file, list every external symbol it will import (components, hooks, store methods/fields, types, helpers) and the exact module each comes from. For each symbol, confirm by **reading that module** that: (a) the symbol is actually exported, (b) whether it is a **default** export (`import X from "..."`) or a **named** export (`import { X } from "..."`), and (c) for store methods/fields and component props, that the exact name exists. **Never invent** an export, a component prop, a store method, or a type. If you cannot confirm a symbol by reading its source, do not use it. Only then call `write_project_file`.
 7. **Type-check** — run `run_typecheck_frontend`. If `success` is `false`, fix **all** reported errors and re-run. Do not proceed to the next step with failing type errors.
 8. **Lint** — run `run_lint_frontend`. If `success` is `false`, fix all lint errors and re-run before continuing.
 9. **Test** — run `run_tests_frontend`. If tests fail, diagnose the failure, fix, and re-run before continuing.

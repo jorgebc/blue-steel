@@ -34,7 +34,7 @@ from agents.engineers.execution_crew import run_execution
 from agents.planning.planning_crew import run_planning
 from agents.quality.quality_pipeline import run_quality
 from callbacks import PipelineConsoleCallback
-from config import get_llm
+from config import get_llm, get_model_options
 from logger import MARKER_FAIL, MARKER_INFO, MARKER_OK, get_logger
 from state import PipelineState
 from tools.filesystem import read_file, write_file
@@ -224,9 +224,11 @@ def _final_review_node(state: PipelineState) -> dict:
         )
 
         # Never stream tokens to the console — the spinner conveys liveness and the
-        # full response is archived in the log file below.
+        # full response is archived in the log file below. Large num_ctx + low temp
+        # for local runs (see config.get_model_options) so the plan/exec excerpts fit.
         response = litellm.completion(
             **llm_params,
+            **get_model_options("final"),
             messages=[{"role": "user", "content": prompt}],
             timeout=120,
             stream=False,
