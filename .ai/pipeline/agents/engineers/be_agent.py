@@ -21,12 +21,14 @@ from tools.filesystem import (
     write_file as _write_file,
     list_files as _list_files,
     get_git_diff as _get_git_diff,
+    reset_write_tracker,
 )
 from tools.shell_runner import (
     run_linter_backend as _run_linter,
     run_sonar_backend as _run_sonar,
     run_tests_backend as _run_tests,
 )
+from agents.engineers._result import normalize_result
 
 _PROMPTS_DIR = Path(__file__).parents[2] / "prompts"
 
@@ -217,7 +219,7 @@ def _create_agent() -> CodeAgent:
         ],
         model=_make_model(),
         prompt_templates=_build_prompt_templates(persona),
-        max_steps=25,
+        max_steps=35,
         verbosity_level=LogLevel.OFF,  # ReAct trace -> silenced; story lives in the logger
     )
 
@@ -279,15 +281,11 @@ Constraints:
 
     logger = get_logger(task_id)
     logger.debug("Agent prompt (truncated):\n%s", task_prompt[:800], extra={"role": "be_engineer"})
+    reset_write_tracker()
     raw = agent.run(task_prompt)
     # ascii() escapes non-ASCII chars (e.g. agent-emitted '→') for cp1252 console safety on Windows.
     logger.debug("Agent raw output: %s", ascii(raw)[:500], extra={"role": "be_engineer"})
 
-    # Normalize: if the agent returned a string instead of a dict, wrap it
-    if isinstance(raw, dict):
-        return raw
-    return {
-        "files_modified": [],
-        "success": False,
-        "notes": str(raw),
-    }
+    # Files actually written are the source of truth; the LLM's final_answer is only
+    # trusted for an explicit success flag (see _result.normalize_result).
+    return normalize_result(raw)

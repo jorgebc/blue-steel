@@ -8,6 +8,28 @@ PROTECTED_WRITE_PATHS = [
     "apps/api/src/main/resources/db/changelog/",
 ]
 
+# Ground-truth record of files written during the current engineer run. The
+# execution crew resets this before each engineer and reads it afterwards, so the
+# reported file list reflects what was actually written — independent of how (or
+# whether) the LLM phrases its final_answer. See engineers/_result.py.
+_WRITE_TRACKER: list[str] = []
+
+
+def reset_write_tracker() -> None:
+    """Clear the write tracker. Call immediately before running an engineer agent."""
+    _WRITE_TRACKER.clear()
+
+
+def get_tracked_writes() -> list[str]:
+    """Return repo-relative paths written since the last reset (de-duplicated, ordered)."""
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for path in _WRITE_TRACKER:
+        if path not in seen:
+            seen.add(path)
+            ordered.append(path)
+    return ordered
+
 
 def _resolve(path: str) -> Path:
     p = Path(path)
@@ -56,6 +78,7 @@ def write_file(path: str, content: str) -> bool:
 
     resolved.parent.mkdir(parents=True, exist_ok=True)
     resolved.write_text(content, encoding="utf-8")
+    _WRITE_TRACKER.append(rel)
     return True
 
 
