@@ -51,6 +51,14 @@
 | F1.7.9 | Frontend: /status round-trip health page (skeleton loading) | 🔲 |
 | F1.7.10 | Frontend: app wiring (routes + providers) + Vercel config | 🔲 |
 | F1.8 | Campaign creation + membership API | 🔲 |
+| F1.8.1 | Backend: Campaign + CampaignMember domain + CampaignNotFoundException | 🔲 |
+| F1.8.2 | Backend: campaign driven ports + command/read-model records | 🔲 |
+| F1.8.3 | Backend: CreateCampaignUseCase + service (admin-only, atomic GM) | 🔲 |
+| F1.8.4 | Backend: GetCampaignUseCase + service (member-or-admin) | 🔲 |
+| F1.8.5 | Backend: ListCampaignsUseCase + service (caller's campaigns; admin all) | 🔲 |
+| F1.8.6 | Backend: campaign persistence adapter (JPA + Testcontainers IT) | 🔲 |
+| F1.8.7 | Backend: campaign membership persistence adapter + CampaignMembershipPort | 🔲 |
+| F1.8.8 | Backend: CampaignController + DTOs + 404 mapping | 🔲 |
 | F1.9 | Campaign-scoped invitation + role enforcement | 🔲 |
 
 ---
@@ -439,22 +447,13 @@ npx shadcn@latest add button input label form card
 
 #### F1.8 — Campaign creation + membership API
 
+> **Umbrella task — run the F1.8.N sub-tasks below, not this.**
+> No human SETUP step: the `campaigns` + `campaign_members` schema already exists (migrations
+> 0003/0004, F1.4). F1.8 writes no Liquibase changesets.
+
 **Goal:** Admin creates campaigns with an atomic GM assignment. Users retrieve campaigns they belong to. Establishes `CampaignMembershipPort` — the canonical authorization check used by all subsequent features.
 
-**Scope (in):**
-
-*Domain:* `Campaign` aggregate; invariant: exactly one GM at creation
-
-*Application:*
-- `CreateCampaignUseCase`: admin-only; inserts `campaigns` + `campaign_members` (GM row) in one `@Transactional` call (D-061)
-- `GetCampaignUseCase`: returns campaign if caller is a member; 403 otherwise
-- `ListCampaignsUseCase`: returns campaigns the caller belongs to (admin sees all)
-- `CampaignMembershipPort` driven port: `Optional<CampaignRole> resolveRole(UUID campaignId, UUID userId)` — the canonical authorization check for every campaign-scoped use case (D-043)
-- `CampaignRepository`, `CampaignMembershipRepository` driven ports
-
-*Adapters:* JPA entities + repositories for `campaigns`, `campaign_members`; `CampaignMembershipAdapter` implements `CampaignMembershipPort`
-
-*API:*
+**API surface (delivered across the sub-tasks):**
 - `POST /api/v1/campaigns` — admin only; `{ "name": "...", "gmUserId": "..." }` → 201
 - `GET /api/v1/campaigns` — returns campaigns where caller is a member (admin: all)
 - `GET /api/v1/campaigns/{id}` — returns campaign + caller's role; 404/403 if not a member
@@ -464,6 +463,126 @@ npx shadcn@latest add button input label form card
 **Skills:** `backend-endpoint`, `backend-domain-model`  
 **Decisions:** D-024, D-025, D-043, D-061  
 **Dependencies:** F1.6
+
+---
+
+#### F1.8.1 — Campaign + CampaignMember domain
+
+**Goal:** Pure-Java domain for the campaign aggregate and a membership value object, plus the not-found exception the read services raise. Name must be non-blank (mirrors `User`'s invariant).
+
+**Scope (in):**
+- `domain/campaign/Campaign.java` (+ `domain/campaign/CampaignTest.java`) — fields `id, name, createdBy, createdAt`; static `create(...)`; constructor rejects blank `name`
+- `domain/campaign/CampaignMember.java` (+ its test) — `id, campaignId, userId, role (CampaignRole), joinedAt`; rejects null `role`
+- `domain/exception/CampaignNotFoundException.java` — own exception type (mapped to 404 in F1.8.8, not the 422 `DomainException` default)
+
+**Scope (out):** Persistence/JPA (F1.8.6/7). Use-case orchestration (F1.8.3–5). The "exactly one GM" rule is enforced atomically by the create service (F1.8.3) + the existing DB singleton-GM index, not in the domain constructor.
+
+**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-061  **Dependencies:** F1.6
+
+---
+
+#### F1.8.2 — Campaign driven ports + command/read-model records
+
+**Goal:** The application boundary for campaigns — driven-port interfaces and the command/read-model value types every later sub-task imports. Declaration-only; verified by `mvn compile` + ArchUnit.
+
+**Scope (in):**
+- `application/port/out/campaign/CampaignRepository.java` — `void save(Campaign)`, `Optional<Campaign> findById(UUID)`, `List<Campaign> findAll()`, `List<Campaign> findAllByMemberId(UUID userId)`
+- `application/port/out/campaign/CampaignMembershipRepository.java` — `void save(CampaignMember)`
+- `application/port/out/campaign/CampaignMembershipPort.java` — `Optional<CampaignRole> resolveRole(UUID campaignId, UUID userId)` (the canonical authz check, D-043)
+- `application/model/campaign/CreateCampaignCommand.java` — `record(UUID callerId, boolean callerIsAdmin, String name, UUID gmUserId)`
+- `application/model/campaign/CampaignView.java` — `record(UUID id, String name, UUID createdBy, Instant createdAt, CampaignRole role)`; `role` nullable (null when admin lists a campaign they are not a member of)
+
+**Scope (out):** Implementations (services F1.8.3–5; adapters F1.8.6/7). No test — interfaces and records carry no logic; ArchUnit (ARCH-07/08) guards their placement.
+
+**Skills:** `backend-endpoint`, `auth`  **Decisions:** D-043  **Dependencies:** F1.6, F1.8.1
+
+---
+
+#### F1.8.3 — CreateCampaignUseCase + service
+
+**Goal:** Admin-only campaign creation that inserts the `campaigns` row and the GM `campaign_members` row in one `@Transactional` call (D-061). Validates `gmUserId` resolves to a real user.
+
+**Scope (in):**
+- `application/port/in/campaign/CreateCampaignUseCase.java` — `CampaignView create(CreateCampaignCommand)`
+- `application/service/campaign/CreateCampaignService.java` (+ its test, mocked ports) — throws `UnauthorizedException` when `!command.callerIsAdmin()`; verifies `gmUserId` via `UserRepository` (else a not-found/domain error); builds `Campaign` + GM `CampaignMember`; saves both; returns `CampaignView` with `role = GM`
+
+**Scope (out):** Read use cases (F1.8.4/5). Real persistence (F1.8.6/7) — the service test mocks `CampaignRepository`, `CampaignMembershipRepository`, `UserRepository`. HTTP/controller (F1.8.8).
+
+**Skills:** `backend-endpoint`, `backend-testing`, `auth`  **Decisions:** D-024, D-025, D-061  **Dependencies:** F1.6, F1.8.1, F1.8.2
+
+---
+
+#### F1.8.4 — GetCampaignUseCase + service
+
+**Goal:** Return one campaign with the caller's role. Members and admins succeed; non-members get 403; a missing campaign gives 404.
+
+**Scope (in):**
+- `application/port/in/campaign/GetCampaignUseCase.java` — `CampaignView get(UUID campaignId, UUID callerId, boolean callerIsAdmin)`
+- `application/service/campaign/GetCampaignService.java` (+ its test, mocked ports) — load campaign or throw `CampaignNotFoundException` (404); resolve role via `CampaignMembershipPort`; non-admin non-member → `UnauthorizedException` (403); admin gets `role` = resolved-or-null
+
+**Scope (out):** List (F1.8.5). Create (F1.8.3). Persistence (F1.8.6/7). Controller (F1.8.8).
+
+**Skills:** `backend-endpoint`, `backend-testing`, `auth`  **Decisions:** D-043  **Dependencies:** F1.6, F1.8.1, F1.8.2
+
+---
+
+#### F1.8.5 — ListCampaignsUseCase + service
+
+**Goal:** Return the campaigns the caller belongs to; an admin caller gets all campaigns.
+
+**Scope (in):**
+- `application/port/in/campaign/ListCampaignsUseCase.java` — `List<CampaignView> list(UUID callerId, boolean callerIsAdmin)`
+- `application/service/campaign/ListCampaignsService.java` (+ its test, mocked ports) — admin → `CampaignRepository.findAll()` (role per item resolved or null); else `findAllByMemberId(callerId)` with each item's role from `CampaignMembershipPort`
+
+**Scope (out):** Single-campaign get (F1.8.4). Create (F1.8.3). Persistence (F1.8.6/7). Controller (F1.8.8).
+
+**Skills:** `backend-endpoint`, `backend-testing`, `auth`  **Decisions:** D-024, D-043  **Dependencies:** F1.6, F1.8.1, F1.8.2
+
+---
+
+#### F1.8.6 — Campaign persistence adapter
+
+**Goal:** JPA-backed `CampaignRepository` over the existing `campaigns` table, verified with a Testcontainers integration test.
+
+**Scope (in):**
+- `adapters/out/persistence/campaign/CampaignJpaEntity.java` — `@Entity @Table(name="campaigns")`, package-private, mirroring `UserJpaEntity` style
+- `adapters/out/persistence/campaign/CampaignJpaRepository.java` — `extends JpaRepository<…, UUID>`; derived query (or `@Query` joining `campaign_members`) backing `findAllByMemberId`
+- `adapters/out/persistence/campaign/CampaignPersistenceAdapter.java` (+ Testcontainers IT extending `TestcontainersPostgresBaseIT`) — implements `CampaignRepository`; `toDomain`/`toEntity` mappers
+
+**Scope (out):** Membership table mapping + `CampaignMembershipPort` (F1.8.7). No new migration — schema is from F1.4.
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-024  **Dependencies:** F1.6, F1.8.1, F1.8.2
+
+---
+
+#### F1.8.7 — Campaign membership persistence adapter
+
+**Goal:** JPA-backed `CampaignMembershipRepository` + `CampaignMembershipPort` over the existing `campaign_members` table — the canonical DB-resolved authz check (D-043).
+
+**Scope (in):**
+- `adapters/out/persistence/campaign/CampaignMemberJpaEntity.java` — `@Entity @Table(name="campaign_members")`; `role` persisted as the lowercase text the CHECK constraint expects
+- `adapters/out/persistence/campaign/CampaignMemberJpaRepository.java` — `extends JpaRepository`; `Optional<…> findByCampaignIdAndUserId(UUID, UUID)`
+- `adapters/out/persistence/campaign/CampaignMembershipAdapter.java` (+ Testcontainers IT) — implements both `CampaignMembershipRepository` (`save`) and `CampaignMembershipPort` (`resolveRole`, mapping stored role text to `CampaignRole`); IT asserts the MATCH/empty outcomes
+
+**Scope (out):** Campaign-table mapping (F1.8.6). Member add/remove/role-change (F1.9).
+
+**Skills:** `backend-endpoint`, `backend-testing`, `auth`  **Decisions:** D-043, D-061  **Dependencies:** F1.6, F1.8.1, F1.8.2
+
+---
+
+#### F1.8.8 — CampaignController + DTOs
+
+**Goal:** REST surface for campaign create/get/list, plus the 404 mapping for a missing campaign.
+
+**Scope (in):**
+- `adapters/in/web/campaign/CampaignController.java` (+ `@WebMvcTest`) — `POST /api/v1/campaigns` (`@PreAuthorize("hasRole('ADMIN')")`, `callerId` from `SecurityContextHolder`, → 201); `GET /api/v1/campaigns` (→ 200 list); `GET /api/v1/campaigns/{id}` (→ 200; 403/404 surfaced from the service); calls `port/in` use cases only (ARCH-05)
+- `adapters/in/web/campaign/CreateCampaignRequest.java` — `record(@NotBlank String name, @NotNull UUID gmUserId)`
+- `adapters/in/web/campaign/CampaignResponse.java` — `record(UUID id, String name, UUID createdBy, Instant createdAt, String role)` (role lowercased; null when absent), built from `CampaignView`
+- `adapters/in/web/GlobalExceptionHandler.java` — **edit existing**: add `@ExceptionHandler(CampaignNotFoundException.class)` → 404 `CAMPAIGN_NOT_FOUND`
+
+**Scope (out):** Invitation/member endpoints (F1.9). Frontend campaign UI (deferred). Service logic (F1.8.3–5).
+
+**Skills:** `backend-endpoint`, `backend-testing`, `error-handling`  **Decisions:** D-024, D-043, D-061, D-064  **Dependencies:** F1.6, F1.8.3, F1.8.4, F1.8.5
 
 ---
 
