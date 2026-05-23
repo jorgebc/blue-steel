@@ -60,6 +60,15 @@
 | F1.8.7 | Backend: campaign membership persistence adapter + CampaignMembershipPort | 🔲 |
 | F1.8.8 | Backend: CampaignController + DTOs + 404 mapping | 🔲 |
 | F1.9 | Campaign-scoped invitation + role enforcement | 🔲 |
+| F1.9.1 | Backend: CampaignMember.withRole + membership exceptions (CANNOT_REMOVE_GM, ALREADY_CAMPAIGN_MEMBER) | 🔲 |
+| F1.9.2 | Backend: extend CampaignMembershipRepository + adapter (find/delete/existsByRole) | 🔲 |
+| F1.9.3 | Backend: TemporaryPasswordGenerator shared component (de-duplicate invite flows) | 🔲 |
+| F1.9.4 | Backend: InviteCampaignMemberUseCase + service (GM-only, create-or-add, 409 if member) | 🔲 |
+| F1.9.5 | Backend: ChangeMemberRoleUseCase + service (GM-only, GM role protected) | 🔲 |
+| F1.9.6 | Backend: RemoveMemberUseCase + service (GM-only, 422 CANNOT_REMOVE_GM) | 🔲 |
+| F1.9.7 | Backend: SearchUsersUseCase + service (admin or GM-anywhere; search by email) | 🔲 |
+| F1.9.8 | Backend: CampaignMembershipController + DTOs + 409/422 handler mappings | 🔲 |
+| F1.9.9 | Backend: UserSearchController + DTO (GET /api/v1/users?email=) | 🔲 |
 
 ---
 
@@ -588,28 +597,159 @@ npx shadcn@latest add button input label form card
 
 #### F1.9 — Campaign-scoped invitation + role enforcement
 
+> **Umbrella task — run the F1.9.N sub-tasks below, not this.**
+> **No human SETUP step:** the `campaign_members` schema already exists (migrations
+> 0003/0004, F1.4); `EmailPort` + `PasswordEncoder` + the temp-password / create-or-refresh
+> pattern already exist (F1.6, `InvitePlatformUserService`). F1.9 writes no Liquibase changesets.
+
 **Goal:** GM manages campaign membership: invites members, changes roles, removes members. Role enforcement via `CampaignMembershipPort` applied to all campaign-scoped use cases.
 
-**Scope (in):**
-
-*Application:*
-- `InviteCampaignMemberUseCase`: GM-only; generates temp password; creates user account if email is new, or resets credentials if account exists; adds to `campaign_members` with specified role atomically; sends email via `EmailPort`; returns 409 if user is already a campaign member (D-064)
-- `ChangeMemberRoleUseCase`: GM-only; changes role for any non-GM member; cannot change GM's own role
-- `RemoveMemberUseCase`: GM-only; removes non-GM member; returns 422 `CANNOT_REMOVE_GM` if target is GM
-- `GET /api/v1/users` — admin + GM; search by email; used by GM to find existing platform users
-
-*API:*
+**API surface (delivered across the sub-tasks):**
 - `POST /api/v1/campaigns/{id}/invitations` — GM-only; `{ "email": "...", "role": "editor"|"player" }` → 201 (new user created) or 200 (existing user added to campaign); 409 if already a member (D-064)
 - `PATCH /api/v1/campaigns/{id}/members/{uid}` — GM-only; `{ "role": "editor"|"player" }` → 200
-- `DELETE /api/v1/campaigns/{id}/members/{uid}` — GM-only; 422 if target is GM → 200
+- `DELETE /api/v1/campaigns/{id}/members/{uid}` — GM-only; 422 if target is GM, else → 200
+- `GET /api/v1/users?email=...` — admin + GM; search existing platform users by email
 
-*Role enforcement:* `CampaignMembershipPort.resolveRole` called at the use-case boundary in all campaign-scoped services from F1.8 onward. Pattern: `resolveRole(campaignId, callerId).orElseThrow(UnauthorizedException::new)` then assert the resolved role meets the minimum required.
+**Role enforcement (realized inside each new service, not a separate retrofit):** the F1.8 read services already self-authorize, so F1.9 applies the canonical pattern only to its own GM-only services — `resolveRole(campaignId, callerId).orElseThrow(UnauthorizedException::new)` then assert the resolved role is `GM` (D-043).
 
 **Scope (out):** Frontend campaign management UI (deferred — out of Phase 1 scope).
 
 **Skills:** `auth`, `backend-endpoint`  
 **Decisions:** D-015, D-043, D-061, D-064, D-075, D-077  
 **Dependencies:** F1.8
+
+---
+
+#### F1.9.1 — CampaignMember.withRole + membership exceptions
+
+**Goal:** Add the domain mutation method and the two signal exceptions the membership services raise.
+
+**Scope (in):**
+- `domain/campaign/CampaignMember.java` (edit, F1.8.1; + update `CampaignMemberTest`) — add `CampaignMember withRole(CampaignRole newRole)` returning a copy with the changed role (same `id`/`campaignId`/`userId`/`joinedAt`)
+- `domain/exception/CannotRemoveGmException.java` (new) — raised by the remove/role-change services; mapped to 422 `CANNOT_REMOVE_GM` in F1.9.8
+- `domain/exception/AlreadyCampaignMemberException.java` (new) — raised by the invite service; mapped to 409 `ALREADY_CAMPAIGN_MEMBER` in F1.9.8 (D-064)
+
+**Scope (out):** Persistence (F1.9.2). Handler → HTTP mapping (F1.9.8). Service orchestration (F1.9.4–6).
+
+**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-064  **Dependencies:** F1.8.1
+
+---
+
+#### F1.9.2 — Extend CampaignMembershipRepository + adapter
+
+**Goal:** Give the membership persistence port the read/delete/role-existence operations the mutation services (F1.9.4–6) and the user-search authz (F1.9.7) need, over the existing `campaign_members` table.
+
+**Scope (in):**
+- `application/port/out/campaign/CampaignMembershipRepository.java` (edit, F1.8.2) — add `Optional<CampaignMember> findByCampaignIdAndUserId(UUID campaignId, UUID userId)`, `void deleteByCampaignIdAndUserId(UUID campaignId, UUID userId)`, `boolean existsByUserIdAndRole(UUID userId, CampaignRole role)`
+- `adapters/out/persistence/campaign/CampaignMemberJpaRepository.java` (edit, F1.8.7) — add the derived `deleteByCampaignIdAndUserId` + `existsByUserIdAndRole` queries (reuse the existing `findByCampaignIdAndUserId`)
+- `adapters/out/persistence/campaign/CampaignMembershipAdapter.java` (edit, F1.8.7; + extend its Testcontainers IT) — implement the three new port methods; IT asserts the find/delete/exists outcomes
+
+**Scope (out):** `resolveRole` / `save` (already F1.8.2 / F1.8.7). Domain method (F1.9.1).
+
+**Skills:** `backend-endpoint`, `backend-testing`, `auth`  **Decisions:** D-043  **Dependencies:** F1.9.1, F1.8.2, F1.8.7
+
+---
+
+#### F1.9.3 — TemporaryPasswordGenerator shared component
+
+**Goal:** Extract the `SecureRandom` temp-password generation duplicated by the platform invite into one reusable component, so the campaign invite (F1.9.4) reuses it instead of copying the block (keeps the Sonar duplication gate green).
+
+**Scope (in):**
+- `application/service/user/TemporaryPasswordGenerator.java` (new, `@Component`; + its test) — `String generate()` (16 chars, `SecureRandom`), lifted verbatim from `InvitePlatformUserService`
+- `application/service/user/InvitePlatformUserService.java` (edit, F1.6) — inject and delegate to the generator; remove the inline `generateTemporaryPassword` method + the char/length constants
+
+**Scope (out):** The campaign invite service itself (F1.9.4). Per-service email body templating (stays where it is).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-077  **Dependencies:** F1.8
+
+---
+
+#### F1.9.4 — InviteCampaignMemberUseCase + service
+
+**Goal:** GM invites a member by email: create the account if new (force-password-change) or refresh credentials if it exists, then add them to `campaign_members` with the requested role — all in one transaction; email the temp password; 409 if the user is already a member of this campaign (D-064).
+
+**Scope (in):**
+- `application/port/in/campaign/InviteCampaignMemberUseCase.java` — `boolean invite(InviteCampaignMemberCommand)` (`true` when a new account was created → controller maps to 201, else 200)
+- `application/model/campaign/InviteCampaignMemberCommand.java` — `record(UUID campaignId, UUID callerId, String email, CampaignRole role)`
+- `application/service/campaign/InviteCampaignMemberService.java` (+ test, mocked ports) — `@Transactional`; `resolveRole(campaignId, callerId)` must be `GM` else `UnauthorizedException`; find user by email → create (via `User.create`) or refresh (`withRefreshedInvitation`) using `TemporaryPasswordGenerator` + `PasswordEncoder`; if `findByCampaignIdAndUserId` is present → `AlreadyCampaignMemberException`; save the `CampaignMember` with the role; `emailPort.send(...)`
+
+**Scope (out):** REST/controller (F1.9.8). Role change / removal (F1.9.5/6). `role == GM` rejection is enforced at the adapter in F1.9.8 (invitable roles are editor/player only).
+
+**Skills:** `auth`, `backend-endpoint`, `backend-testing`  **Decisions:** D-015, D-064, D-075, D-077  **Dependencies:** F1.9.1, F1.9.2, F1.9.3, F1.8.2
+
+---
+
+#### F1.9.5 — ChangeMemberRoleUseCase + service
+
+**Goal:** GM changes a non-GM member's role within their campaign. A GM's role cannot be changed.
+
+**Scope (in):**
+- `application/port/in/campaign/ChangeMemberRoleUseCase.java` — `void change(ChangeMemberRoleCommand)`
+- `application/model/campaign/ChangeMemberRoleCommand.java` — `record(UUID campaignId, UUID callerId, UUID targetUserId, CampaignRole newRole)`
+- `application/service/campaign/ChangeMemberRoleService.java` (+ test, mocked ports) — caller must resolve to `GM` (else `UnauthorizedException`); load target via `findByCampaignIdAndUserId` (else `CampaignNotFoundException`, 404 per F1.8.1); if the target's current role is `GM` → `CannotRemoveGmException` (422); else save `member.withRole(newRole)`
+
+**Scope (out):** Invite (F1.9.4). Remove (F1.9.6). Controller (F1.9.8).
+
+**Skills:** `auth`, `backend-endpoint`, `backend-testing`  **Decisions:** D-015, D-043  **Dependencies:** F1.9.1, F1.9.2, F1.8.2
+
+---
+
+#### F1.9.6 — RemoveMemberUseCase + service
+
+**Goal:** GM removes a non-GM member from their campaign; removing the GM is rejected with 422.
+
+**Scope (in):**
+- `application/port/in/campaign/RemoveMemberUseCase.java` — `void remove(RemoveMemberCommand)`
+- `application/model/campaign/RemoveMemberCommand.java` — `record(UUID campaignId, UUID callerId, UUID targetUserId)`
+- `application/service/campaign/RemoveMemberService.java` (+ test, mocked ports) — caller must resolve to `GM` (else `UnauthorizedException`); load target via `findByCampaignIdAndUserId`; if the target's role is `GM` → `CannotRemoveGmException` (422 `CANNOT_REMOVE_GM`); else `deleteByCampaignIdAndUserId(campaignId, targetUserId)`
+
+**Scope (out):** Invite (F1.9.4). Role change (F1.9.5). Controller (F1.9.8).
+
+**Skills:** `auth`, `backend-endpoint`, `backend-testing`  **Decisions:** D-043, D-061  **Dependencies:** F1.9.1, F1.9.2, F1.8.2
+
+---
+
+#### F1.9.7 — SearchUsersUseCase + service
+
+**Goal:** Let an admin, or any user who is a GM of at least one campaign, look up existing platform users by email (so a GM can invite an existing account). Reuses the `UserProfile` read model.
+
+**Scope (in):**
+- `application/port/in/user/SearchUsersUseCase.java` — `List<UserProfile> searchByEmail(String email, UUID callerId, boolean callerIsAdmin)`
+- `application/service/user/SearchUsersService.java` (+ test, mocked ports) — authorize when `callerIsAdmin || campaignMembershipRepository.existsByUserIdAndRole(callerId, GM)`, else `UnauthorizedException`; `userRepository.findByEmail(email)` → 0/1 `UserProfile` (empty list if none)
+
+**Scope (out):** Controller/DTO (F1.9.9). Partial/fuzzy search (exact email match only in v1).
+
+**Skills:** `auth`, `backend-endpoint`, `backend-testing`  **Decisions:** D-043, D-064  **Dependencies:** F1.9.2, F1.8.2
+
+---
+
+#### F1.9.8 — CampaignMembershipController + DTOs + handler mappings
+
+**Goal:** REST surface for campaign-scoped invitation, role change, and removal, plus the new exception → HTTP mappings.
+
+**Scope (in):**
+- `adapters/in/web/campaign/CampaignMembershipController.java` (+ `@WebMvcTest`) — `POST /api/v1/campaigns/{id}/invitations` (201 new / 200 existing), `PATCH /api/v1/campaigns/{id}/members/{uid}` (200), `DELETE /api/v1/campaigns/{id}/members/{uid}` (200); `callerId` from `SecurityContextHolder`; calls `port/in` use cases only (ARCH-05); no `@PreAuthorize` (GM authz is in-service)
+- `adapters/in/web/campaign/InviteCampaignMemberRequest.java` — `record(@NotBlank @Email String email, @NotNull CampaignRole role)`; reject `role == GM` (Bean Validation `@AssertTrue`) so only editor/player are invitable
+- `adapters/in/web/campaign/ChangeMemberRoleRequest.java` — `record(@NotNull CampaignRole role)`
+- `adapters/in/web/GlobalExceptionHandler.java` (edit existing) — add `@ExceptionHandler(AlreadyCampaignMemberException.class)` → 409 `ALREADY_CAMPAIGN_MEMBER` and `@ExceptionHandler(CannotRemoveGmException.class)` → 422 `CANNOT_REMOVE_GM`
+
+**Scope (out):** `GET /api/v1/users` (F1.9.9). Service logic (F1.9.4–6). Frontend UI (deferred).
+
+**Skills:** `backend-endpoint`, `backend-testing`, `error-handling`  **Decisions:** D-015, D-064  **Dependencies:** F1.9.1, F1.9.4, F1.9.5, F1.9.6
+
+---
+
+#### F1.9.9 — UserSearchController + DTO
+
+**Goal:** Expose `GET /api/v1/users?email=` for admin/GM user lookup, separate from the existing `/api/v1/users/me` controller.
+
+**Scope (in):**
+- `adapters/in/web/user/UserSearchController.java` (+ `@WebMvcTest`) — `@RequestMapping("/api/v1/users")`, `@GetMapping(params = "email")`; resolves `callerId` + `callerIsAdmin` (from authentication authorities, e.g. `ROLE_ADMIN`); delegates to `SearchUsersUseCase`; no `@PreAuthorize` (admin-or-GM authz is in-service)
+- `adapters/in/web/user/UserSearchResponse.java` — `record(UUID id, String email)` built from `UserProfile`
+
+**Scope (out):** Membership endpoints (F1.9.8). Service logic (F1.9.7).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-064  **Dependencies:** F1.9.7
 
 ---
 
