@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
 from config import get_llm, get_model_options
+from llm_timeout import build_chat_model
 from logger import get_logger
 from tools.filesystem import read_file as _read_file, write_file as _write_file
 
@@ -22,28 +23,8 @@ _PROMPTS_DIR = Path(__file__).parents[2] / "prompts"
 
 
 def _make_model() -> LiteLLMModel:
-    """Build a LiteLLMModel from pipeline config, resolving litellm env-var notation."""
-    llm_params = get_llm(phase="planning")
-    model_id: str = llm_params["model"]
-    api_key_raw: str = llm_params.get("api_key", "")
-    api_base: str | None = llm_params.get("api_base")
-
-    # litellm uses "os.environ/VAR_NAME" as a config-file convention
-    api_key: str | None = None
-    if isinstance(api_key_raw, str) and api_key_raw.startswith("os.environ/"):
-        env_var = api_key_raw.split("/", 1)[1]
-        api_key = os.environ.get(env_var)
-    elif api_key_raw:
-        api_key = api_key_raw
-
-    return LiteLLMModel(
-        model_id=model_id,
-        api_key=api_key,
-        api_base=api_base,
-        timeout=1800,  # 30 min — local models (qwen3:14b) can take 5-10 min per step
-        # Large context window + low temperature — see config.get_model_options.
-        **get_model_options(phase="planning"),
-    )
+    """Build the PO model via the shared factory (config + per-call wall-clock guard)."""
+    return build_chat_model(phase="planning")
 
 
 def _build_prompt_templates(persona_content: str) -> dict:

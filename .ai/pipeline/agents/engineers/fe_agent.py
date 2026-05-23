@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
 from config import get_llm, get_model_options
+from llm_timeout import build_chat_model
 from logger import get_logger
 from tools.filesystem import (
     read_file as _read_file,
@@ -36,29 +37,8 @@ _PROMPTS_DIR = Path(__file__).parents[2] / "prompts"
 
 
 def _make_model() -> LiteLLMModel:
-    """Build a LiteLLMModel from pipeline config for the execution phase."""
-    llm_params = get_llm(phase="execution")
-    model_id: str = llm_params["model"]
-    api_key_raw: str = llm_params.get("api_key", "")
-    api_base: str | None = llm_params.get("api_base")
-
-    api_key: str | None = None
-    if isinstance(api_key_raw, str) and api_key_raw.startswith("os.environ/"):
-        env_var = api_key_raw.split("/", 1)[1]
-        api_key = os.environ.get(env_var)
-    elif api_key_raw:
-        api_key = api_key_raw
-
-    return LiteLLMModel(
-        model_id=model_id,
-        api_key=api_key,
-        api_base=api_base,
-        timeout=1800,  # 30 min — local models can be slow
-        # Large context window + near-greedy sampling — see config.get_model_options.
-        # Without an explicit num_ctx, Ollama truncates the persona/plan and the model
-        # hallucinates APIs it can no longer see.
-        **get_model_options(phase="execution"),
-    )
+    """Build the FE engineer model via the shared factory (config + per-call wall-clock guard)."""
+    return build_chat_model(phase="execution")
 
 
 def _build_prompt_templates(persona_content: str) -> dict:

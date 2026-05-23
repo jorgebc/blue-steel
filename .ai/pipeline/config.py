@@ -33,6 +33,14 @@ def should_stream() -> bool:
 # 14B Q4 model (~9 GB) plus KV cache inside a 12 GB GPU; drop to 8192 if VRAM is tight.
 _LOCAL_NUM_CTX = 16384
 
+# Hard wall-clock budget for a single LLM call (one agent step), enforced by
+# llm_timeout.TimeoutLiteLLMModel. litellm's own ``timeout`` is unreliable against a
+# stalled Ollama generation (a run was observed hung >60 min past a 30-min timeout),
+# and smolagents' interrupt only fires between steps — so without this, one wedged
+# call stalls the whole pipeline forever. A legit local step is ~1–10 min (plus
+# model-swap overhead), so 20 min is generous headroom while still bounding a hang.
+LLM_CALL_TIMEOUT_S = 1200
+
 
 def get_model_options(phase: str = "planning") -> dict:
     """Return generation/runtime options (sampling + context window) for a phase.

@@ -63,6 +63,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
 from config import get_llm, get_model_options
+from llm_timeout import build_chat_model
 from logger import MARKER_BLOCKED, get_logger
 from tools.filesystem import (
     REPO_ROOT,
@@ -184,26 +185,7 @@ def _document_missing_tool(task_id: str, check_name: str, error: str) -> None:
 def _make_model() -> LiteLLMModel:
     # Auto-fix needs root-cause diagnosis, not just code transcription — use the
     # reasoning model rather than the code-completion model.
-    llm_params = get_llm(phase="review")
-    model_id: str = llm_params["model"]
-    api_key_raw: str = llm_params.get("api_key", "")
-    api_base: str | None = llm_params.get("api_base")
-    api_key: str | None = None
-    if isinstance(api_key_raw, str) and api_key_raw.startswith("os.environ/"):
-        env_var = api_key_raw.split("/", 1)[1]
-        api_key = os.environ.get(env_var)
-    elif api_key_raw:
-        api_key = api_key_raw
-    return LiteLLMModel(
-        model_id=model_id,
-        api_key=api_key,
-        api_base=api_base,
-        timeout=1800,
-        # Large context window + low temperature — see config.get_model_options.
-        # Without an explicit num_ctx the agent runs at Ollama's small default window
-        # and silently drops the persona and error output it diagnoses.
-        **get_model_options(phase="review"),
-    )
+    return build_chat_model(phase="review")
 
 
 _PROMPTS_DIR = Path(__file__).parents[2] / "prompts"

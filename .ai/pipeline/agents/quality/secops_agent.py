@@ -56,6 +56,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
 from config import get_llm, get_model_options
+from llm_timeout import build_chat_model
 from logger import get_logger
 from tools.filesystem import (
     get_git_diff as _get_git_diff,
@@ -69,26 +70,8 @@ _CONTEXT_DIR = ".ai/context/tasks"
 
 
 def _make_model() -> LiteLLMModel:
-    llm_params = get_llm(phase="secops")
-    model_id: str = llm_params["model"]
-    api_key_raw: str = llm_params.get("api_key", "")
-    api_base: str | None = llm_params.get("api_base")
-    api_key: str | None = None
-    if isinstance(api_key_raw, str) and api_key_raw.startswith("os.environ/"):
-        env_var = api_key_raw.split("/", 1)[1]
-        api_key = os.environ.get(env_var)
-    elif api_key_raw:
-        api_key = api_key_raw
-    return LiteLLMModel(
-        model_id=model_id,
-        api_key=api_key,
-        api_base=api_base,
-        timeout=1800,
-        # Large context window + low temperature — see config.get_model_options.
-        # Without an explicit num_ctx the agent runs at Ollama's small default window
-        # and silently drops the persona/diff/audit output it is meant to review.
-        **get_model_options(phase="secops"),
-    )
+    """Build the SecOps model via the shared factory (config + per-call wall-clock guard)."""
+    return build_chat_model(phase="secops")
 
 
 def _build_prompt_templates(persona_content: str) -> dict:
