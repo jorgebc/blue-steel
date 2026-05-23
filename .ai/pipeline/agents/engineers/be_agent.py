@@ -31,6 +31,7 @@ from tools.shell_runner import (
 )
 from agents.engineers._result import normalize_result
 from agents.engineers import _checks
+from agents.engineers._context_grounding import build_grounding_block
 
 _PROMPTS_DIR = Path(__file__).parents[2] / "prompts"
 
@@ -252,6 +253,12 @@ def run(task_id: str, plan_content: str) -> dict:
     """
     agent = _create_agent()
 
+    # Ground truth (layer guide + real exports/signatures of files the plan touches)
+    # so the model copies real symbols instead of inventing them. "" when nothing
+    # resolves — the section then collapses to a blank line.
+    grounding = build_grounding_block(plan_content, scope="backend")
+    grounding_section = f"\n{grounding}\n" if grounding else ""
+
     task_prompt = f"""
 You are acting as the Backend Engineer for Blue Steel.
 {_CODE_FORMAT_GUIDANCE}
@@ -261,7 +268,7 @@ You are acting as the Backend Engineer for Blue Steel.
 
 ## Implementation Plan
 {plan_content}
-
+{grounding_section}
 ## Your Job
 
 Implement the **backend** portion of the plan above (Section 3 — files under apps/api/).
