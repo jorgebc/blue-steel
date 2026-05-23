@@ -28,6 +28,17 @@ record the skip in your notes.
 
 ---
 
+## Engineering Principles
+
+These govern every change you make:
+
+- **Think before coding.** Don't assume; surface tradeoffs. Where the plan is ambiguous or names something that doesn't exist, implement the simplest reasonable interpretation and record the assumption or deviation in your notes — you can't ask a human mid-run, so name the choice rather than picking silently.
+- **Simplicity first.** Write the minimum code that satisfies the plan's acceptance criteria. No speculative features, single-use abstractions, configurability nobody asked for, or error handling for impossible cases. If it could be half the size, rewrite it.
+- **Surgical changes.** Touch only the files the plan assigns. Don't "improve" adjacent code, comments, or formatting; don't refactor what isn't broken; match the existing style. Remove only the imports/symbols your own change orphaned — note pre-existing dead code, don't delete it. Every changed line must trace to the plan.
+- **Goal-driven execution.** The acceptance criteria are your success bar: loop `run_linter_backend` → `run_tests_backend` → `run_sonar_backend` until green. A check that fails twice with the same error is a stop condition, not a loop (see Escalation).
+
+---
+
 ## Architecture — Hexagonal (Ports & Adapters)
 
 Dependency flow: **`adapter/in → port/in → application/service → port/out → adapter/out`**
@@ -104,15 +115,11 @@ apps/api/src/main/java/com/bluesteel/
 ## Code Quality Rules
 
 ### Javadoc
-Add Javadoc to every public class/interface/enum whose purpose is not obvious from its name and
-annotations. Public methods where the name does not convey the contract. Factory methods. Non-trivial
-return contracts.
-
-Do NOT add Javadoc to: Spring Boot main classes, simple record components, `@Override`
-implementations when the interface already documents the contract.
-
-One sentence is enough. Never paraphrase the method name — add context the name cannot carry.
-No `@param`/`@return` tags unless the semantics are ambiguous.
+Add Javadoc to public classes/interfaces/enums whose purpose isn't obvious from the name, to public
+methods whose name doesn't convey the contract, to factory methods, and to non-trivial return
+contracts. Skip Spring Boot main classes, simple record components, and `@Override`s already
+documented by the interface. One sentence suffices — add context the name can't carry; no
+`@param`/`@return` unless the semantics are ambiguous.
 
 ### Tests
 Every `@Test` method **must** have a `@DisplayName` that describes the scenario in plain language:
@@ -209,13 +216,11 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 1. **Read the plan** — load and parse `.ai/context/tasks/{task_id}_plan.md`
 2. **Read existing code** — use `read_project_file` to understand what already exists before writing
 3. **List files** — use `list_project_files` to verify the current state of relevant directories
-4. **Verify every import, then write** — before writing a file, list every type, class, interface, method, or constant it references from existing code and the exact package/class each comes from. For each, confirm by **reading that source** that the symbol exists with that exact name and signature (a method on a port, a field on a record, a use-case method, an enum value). **Never invent** a class, method, field, package, or Maven dependency. If you cannot confirm a symbol by reading its source, do not use it. Only then call `write_project_file`.
+4. **Verify every import, then write** — for every external symbol a file references (class, method, field, enum value, package, Maven dependency), confirm by **reading its source** that it exists with that exact name and signature. **Never invent** one; if you cannot confirm a symbol, do not use it. Only then call `write_project_file`.
 5. **Run the linter** — use `run_linter_backend` after writing Java files. It auto-applies google-java-format then verifies, so you never hand-format. A failure here is not cosmetic — read the output and fix the real cause
 6. **Run tests** — use `run_tests_backend` to verify unit + ArchUnit tests pass
 7. **Run the Sonar quality gate** — use `run_sonar_backend` after tests pass. The tool returns only issues that exist in files you modified (legacy issues in unmodified files are filtered out — do not attempt to fix them). If `success` is False, read the `findings` list, fix the cited files, then call `run_sonar_backend` again. **Maximum 2 attempts.** If the second attempt still returns findings, write `BLOCKED: Sonar gate failed after 2 attempts — <summarize findings>` at the top of the execution report and stop.
 8. **Report** — write `.ai/context/tasks/{task_id}_execution.md` with: all files created or modified (full paths), any Liquibase migration filename, build/test pass or fail, and any assumptions or deviations from the plan
-
-Never guess at existing class names — read the actual files first. Never write to protected paths.
 
 **Missing dependency — do not improvise:** if the plan requires a Maven library that is **not** in `apps/api/pom.xml` and **not** declared as a `NEW DEPENDENCY (backend)` line, do **not** use it — implement with what is available and record the deviation in `notes`. If the plan **does** declare a `NEW DEPENDENCY (backend): groupId:artifactId`, add that `<dependency>` to `pom.xml` (Maven resolves it on build). Never add an undeclared dependency.
 

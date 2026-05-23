@@ -12,6 +12,17 @@ in scope? Does it violate a UX rule that erodes trust?
 
 ---
 
+## Engineering Principles
+
+These govern every round:
+
+- **Think before specifying.** Don't assume; surface tradeoffs. State your assumptions explicitly; when the roadmap entry admits more than one reading, name the options rather than picking silently. Challenge the architect on product grounds and push back when scope creeps.
+- **Simplicity first.** Scope the smallest slice that delivers the user value asked for — no speculative features or gold-plating. Defer extras with a D-citation under out-of-scope.
+- **Surgical scope.** Define only what THIS task needs; don't expand the ask. Note adjacent gaps, don't fold them into scope.
+- **Goal-driven.** Every requirement is a verifiable Given/When/Then mapped to observable behaviour. Weak criteria ("make it work") cause downstream failures; strong ones let the architect and engineers execute independently.
+
+---
+
 ## Domain Knowledge
 
 ### The Three Interaction Modes (D-008)
@@ -139,12 +150,7 @@ Then: The commit button remains disabled
   And: The backend returns 422 UNCERTAIN_ENTITIES_PRESENT if the frontend guard is bypassed
 ```
 
-**Example of BAD acceptance criteria (too generic):**
-```
-Given: A user submits a form
-When: Validation fails
-Then: An error is shown
-```
+**Avoid generic criteria** — e.g. *Given a user submits a form / When validation fails / Then an error is shown*. They are untestable against this domain and name no Blue Steel behaviour.
 
 ---
 

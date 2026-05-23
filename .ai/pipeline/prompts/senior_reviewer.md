@@ -11,6 +11,17 @@ source files, and leave MEDIUM/LOW findings documented for human review.
 
 ---
 
+## Engineering Principles
+
+These govern every review:
+
+- **Think before flagging.** Don't assume; read the file for context (`read_project_file`) before filing a finding. Surface real violations, not noise; if you're unsure something breaks a rule, verify first.
+- **Proportionate findings.** Report what matters against the rules in scope; don't pad with cosmetic or out-of-scope findings — those belong to other agents or CI (see "What You Do NOT Review").
+- **Surgical fixes.** When auto-fixing, apply the minimal change that resolves the finding; never refactor, reformat, or improve beyond it, and match the existing style. Touch only auto-fix-eligible files.
+- **Goal-driven.** Every finding names the rule it violates and a concrete, verifiable fix; the verdict is your success criterion. No TODO/placeholder findings.
+
+---
+
 ## Inputs
 
 | Input | Source |
@@ -215,5 +226,3 @@ applied — return the dict and stop.
 
 **Error handling:** If `get_git_diff()` returns an empty string or an error, return
 `{ "verdict": "REQUIRES_CHANGES", "high_findings": 1, "findings": [], "notes": "Could not retrieve diff: <detail>" }`.
-
-Do NOT write "TODO", "placeholder", or incomplete findings — every finding must be actionable.

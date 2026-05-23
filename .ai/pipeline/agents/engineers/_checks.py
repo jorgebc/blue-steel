@@ -19,6 +19,7 @@ The active task id and role are set per run via `reset()`; the `@tool` wrappers 
 `fe_agent`/`be_agent` do not carry that context themselves.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -29,16 +30,37 @@ from logger import MARKER_INFO, get_logger
 # Bound the captured output so a runaway log line never blows up the file or the report.
 _TAIL_CHARS = 2000
 
-# Error signatures that no amount of code rewriting will resolve — they need a new
-# dependency or a different approach. Looping on these only burns wall-clock time,
-# so the circuit breaker trips on the first occurrence. (Frontend/TypeScript
-# oriented; harmless no-ops against Java/Maven output.)
+# Error signatures that no amount of code rewriting will resolve regardless of context —
+# they always need a new dependency / @types package. Looping on these only burns
+# wall-clock time, so the circuit breaker trips on the first occurrence. (Frontend/
+# TypeScript oriented; harmless no-ops against Java/Maven output.)
+#
+# Note what is deliberately NOT here:
+# - "cannot find module" is handled separately (see `_has_missing_package`): it is only
+#   unrecoverable for *bare* (package) specifiers. A *relative* specifier names a project
+#   file the engineer simply hasn't written yet — recoverable by creating it.
+# - "cannot find name 'process'/'require'" (node globals) are recoverable enough — the agent
+#   can relocate/remove the offending file — that they don't warrant a first-occurrence trip;
+#   the no-progress guard (condition (b)) still catches them if a real retry makes no headway.
 _UNRECOVERABLE_SIGNATURES = (
-    "cannot find module",
     "could not find a declaration file for module",
-    "cannot find name 'process'",
-    "cannot find name 'require'",
 )
+
+# Pulls the module specifier out of a `Cannot find module 'X'` (TS2307) diagnostic.
+_CANNOT_FIND_MODULE_RE = re.compile(r"cannot find module ['\"]([^'\"]+)['\"]", re.IGNORECASE)
+
+
+def _has_missing_package(blob: str) -> bool:
+    """True if `blob` reports a missing *bare* (package) module — the unrecoverable case.
+
+    A bare specifier (`axios`, `next/router`, `@scope/pkg`) needs an npm install or a declared
+    NEW DEPENDENCY and cannot be fixed by rewriting code. Relative specifiers (`./`, `../`, `/`)
+    name a project file the engineer is expected to create, so they are excluded.
+    """
+    for specifier in _CANNOT_FIND_MODULE_RE.findall(blob):
+        if specifier and specifier[0] not in "./":
+            return True
+    return False
 
 _active_task_id: str | None = None
 _active_role: str = "execution"
@@ -120,10 +142,12 @@ def last_check_failed() -> bool:
 def should_abort() -> tuple[bool, str]:
     """Whether the run should stop early, with a human-readable reason.
 
-    Trips on (a) a known-unrecoverable error signature in any unresolved check, or
-    (b) the same check failing twice with the same first error line (a fix loop
-    going nowhere). Both conditions are evaluated against the latest result per
-    tool, so a passing check later in the same step cannot mask an earlier failure.
+    Trips on (a) a genuinely-unrecoverable error in any unresolved check — a known
+    signature or a missing *bare* (package) module, but never a missing relative module
+    the engineer can still create — or (b) the same check failing twice with the same
+    first error line (a fix loop going nowhere). Both conditions are evaluated against
+    the latest result per tool, so a passing check later in the same step cannot mask an
+    earlier failure.
     """
     unresolved = _unresolved_checks()
     if not unresolved:
@@ -135,6 +159,10 @@ def should_abort() -> tuple[bool, str]:
         for signature in _UNRECOVERABLE_SIGNATURES:
             if signature in blob:
                 return True, f"unrecoverable error in {entry['tool']}: '{signature}'"
+        # A missing *bare* (package) module is unrecoverable; a missing relative module is
+        # just a file the engineer hasn't written yet, so it must not trip the breaker.
+        if _has_missing_package(blob):
+            return True, f"unrecoverable error in {entry['tool']}: missing package (cannot find module)"
 
     # (b) A still-failing check that has failed twice with the same first error line.
     for entry in unresolved:
@@ -161,7 +189,7 @@ def last_failure_diagnostics() -> str:
     last = None
     for entry in _unresolved_checks():
         blob = f"{entry['stderr_tail']}\n{entry['stdout_tail']}".lower()
-        if any(sig in blob for sig in _UNRECOVERABLE_SIGNATURES):
+        if any(sig in blob for sig in _UNRECOVERABLE_SIGNATURES) or _has_missing_package(blob):
             last = entry
             break
     if last is None:

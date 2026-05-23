@@ -28,6 +28,17 @@ in `components/domain/` instead.
 
 ---
 
+## Engineering Principles
+
+These govern every change you make:
+
+- **Think before coding.** Don't assume; surface tradeoffs. Where the plan is ambiguous or names something that doesn't exist, implement the simplest reasonable interpretation and record the assumption or deviation in your notes — you can't ask a human mid-run, so name the choice rather than picking silently.
+- **Simplicity first.** Write the minimum code that satisfies the plan's acceptance criteria. No speculative features, single-use abstractions, configurability nobody asked for, or error handling for impossible cases. If it could be half the size, rewrite it.
+- **Surgical changes.** Touch only the files the plan assigns. Don't "improve" adjacent code, comments, or formatting; don't refactor what isn't broken; match the existing style. Remove only the imports/symbols your own change orphaned — note pre-existing dead code, don't delete it. Every changed line must trace to the plan.
+- **Goal-driven execution.** The acceptance criteria are your success bar: loop `run_typecheck_frontend` → `run_lint_frontend` → `run_tests_frontend` until green. A check that fails twice with the same error — or a missing *package* — is a stop condition, not a loop (see Stop conditions).
+
+---
+
 ## Directory Structure
 
 ```
@@ -186,13 +197,15 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 3. **Consult skill files** — for each UX pattern in your task (overlay, banner, skeleton, sidebar/navigation), read the corresponding skill file in `skills/` before writing code. Do not implement these patterns from memory.
 4. **Read existing code** — use `read_project_file` on every file you will modify or depend on. Never guess at existing component names, hook signatures, or store shape.
 5. **List files** — use `list_project_files` to confirm what already exists in relevant directories before creating new files.
-6. **Verify every import, then write** — before writing a file, list every external symbol it will import (components, hooks, store methods/fields, types, helpers) and the exact module each comes from. For each symbol, confirm by **reading that module** that: (a) the symbol is actually exported, (b) whether it is a **default** export (`import X from "..."`) or a **named** export (`import { X } from "..."`), and (c) for store methods/fields and component props, that the exact name exists. **Never invent** an export, a component prop, a store method, or a type. If you cannot confirm a symbol by reading its source, do not use it. Only then call `write_project_file`.
-7. **Type-check** — run `run_typecheck_frontend`. If `success` is `false`, fix **all** reported errors and re-run. Do not proceed to the next step with failing type errors.
+6. **Verify every import, then write** — for every external symbol a file imports (component, hook, store method/field, type, helper), confirm by **reading its module** that it is exported, whether it is a **default** (`import X from "..."`) or **named** (`import { X } from "..."`) export, and that the exact name exists. **Never invent** an export, prop, store method, or type. If you cannot confirm a symbol, do not use it. Only then call `write_project_file`.
+7. **Type-check** — run `run_typecheck_frontend`. If `success` is `false`, fix **all** reported errors and re-run. Do not proceed to the next step with failing type errors. A `Cannot find module './...'` / `'../...'` (relative path) error means **you have not written that file yet** — create it (it is part of this task's scaffold) or correct the import path; it is **not** a stop condition.
 8. **Lint** — run `run_lint_frontend`. If `success` is `false`, fix all lint errors and re-run before continuing.
 9. **Test** — run `run_tests_frontend`. If tests fail, diagnose the failure, fix, and re-run before continuing.
 10. **Report** — call `final_answer(result)` with a dict containing `files_modified`, `success`, and `notes`. The exact output format is defined in the task prompt.
 
-**Stop conditions:** If a check fails **twice with the same error**, stop immediately — call `final_answer(success=False)` with the error in `notes`. A fix loop that makes no progress only wastes time; the pipeline captures the error for a human. This is especially true for **missing-module / missing-type-declaration** errors (e.g. *"Cannot find module 'X'"*) — those cannot be fixed by rewriting code; see the dependency rule below.
+**Stop conditions:** If a check fails **twice with the same error**, stop immediately — call `final_answer(success=False)` with the error in `notes`. A fix loop that makes no progress only wastes time; the pipeline captures the error for a human. This applies to a **missing *package* / missing-type-declaration** error — e.g. *"Cannot find module 'axios'"* or *"Cannot find module 'next/router'"*, a **bare** specifier that names an uninstalled npm package — which cannot be fixed by rewriting code; see the dependency rule below.
+
+**Not a stop condition:** a `Cannot find module` error whose specifier is a **relative path** (`'./...'`, `'../...'`) names a project file you are responsible for creating in this task. Create the missing file (store, component, hook, type) or fix the import — do **not** call `final_answer(success=False)` over your own not-yet-written modules.
 
 **Missing dependency — do not improvise:** if the plan names a package that is **not** in `apps/web/package.json` and **not** declared as a `NEW DEPENDENCY (frontend)` line, do **not** import it. Implement with the existing stack (HTTP via the Fetch API in `src/api/client.ts`) and record the deviation in `notes`. Packages declared as `NEW DEPENDENCY` are installed for you before you start — those you may use.
 
