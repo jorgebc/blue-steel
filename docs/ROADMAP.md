@@ -39,6 +39,17 @@
 | F1.5 | Admin bootstrap + platform invitation + password change | ✅ |
 | F1.6 | Login + JWT issuance + refresh token rotation + logout | ✅ |
 | F1.7 | Frontend: walking skeleton + auth scaffold | 🔲 |
+| F1.7-SETUP | Frontend scaffolding — Vite alias, Tailwind v4 + theme, shadcn/ui, Vitest setup (human step) | 👤 |
+| F1.7.1 | Frontend: shared API envelope + auth + health TypeScript types | 🔲 |
+| F1.7.2 | Frontend: Zustand auth + campaign stores | 🔲 |
+| F1.7.3 | Frontend: base HTTP client with silent-refresh on 401 | 🔲 |
+| F1.7.4 | Frontend: auth + user API resource hooks | 🔲 |
+| F1.7.5 | Frontend: RequireAuth route guard (+ forced-password-change redirect) | 🔲 |
+| F1.7.6 | Frontend: InlineBanner feedback component (no-toast) | 🔲 |
+| F1.7.7 | Frontend: LoginPage form | 🔲 |
+| F1.7.8 | Frontend: ChangePasswordPage form | 🔲 |
+| F1.7.9 | Frontend: /status round-trip health page (skeleton loading) | 🔲 |
+| F1.7.10 | Frontend: app wiring (routes + providers) + Vercel config | 🔲 |
 | F1.8 | Campaign creation + membership API | 🔲 |
 | F1.9 | Campaign-scoped invitation + role enforcement | 🔲 |
 
@@ -213,33 +224,216 @@
 
 #### F1.7 — Frontend: walking skeleton + auth scaffold
 
-**Goal:** Minimal React app deployed to Vercel that completes the round-trip (browser → Spring Boot → Neon). Full auth UI including login, forced password change, and route guards. The definition of done for the walking skeleton.
+> **Umbrella task — run the F1.7.N sub-tasks below, not this.**
 
-**Scope (in):**
-
-*Scaffold:*
-- `main.tsx`: React root, `QueryClientProvider`, `BrowserRouter`, React Router routes
-- Zustand auth store (`store/authStore.ts`): `accessToken` (in-memory only — never `localStorage`), `currentUser` (`id`, `email`, `isAdmin`, `forcePasswordChange`)
-- Zustand campaign store (`store/campaignStore.ts`): `activeCampaignId`, `activeRole` (empty for now)
-- Base HTTP client (`api/client.ts`): attaches `Authorization: Bearer`, handles 401 → silent refresh retry → redirect to login on second 401
-- TypeScript types: `ApiEnvelope<T>`, `AuthLoginResponse`, `UserMeResponse`
-
-*Auth UI:*
-- `features/auth/LoginPage.tsx`: React Hook Form + shadcn/ui `Form`; submit to `POST /auth/login`; on success store token, check `forcePasswordChange` → redirect to change-password or campaign list
-- `features/auth/ChangePasswordPage.tsx`: React Hook Form; submit to `PATCH /users/me/password`; on success redirect to campaign list; route guard: redirect here if `forcePasswordChange = true`
-- `components/domain/RequireAuth.tsx`: redirects to `/login` if no access token in auth store
-
-*Health check:*
-- `/status` page: calls `GET /api/v1/health`, renders `"db": "UP"` — completes the round-trip proof
-
-*Vercel:*
-- `vercel.json` with SPA rewrite rule; `VITE_API_BASE_URL` documented in README as a required Vercel env var
+**Goal:** Minimal React app deployed to Vercel that completes the round-trip (browser → Spring Boot → Neon). Full auth UI including login, forced password change, and route guards. The definition of done for the walking skeleton. The original scope is split across `F1.7-SETUP` (human scaffolding) and the ordered `F1.7.1`–`F1.7.10` sub-tasks.
 
 **Scope (out):** Campaign list page. Any feature beyond auth.
 
 **Skills:** `auth`, `frontend-api-resource`, `frontend-testing`  
 **Decisions:** D-030, D-043, D-045, D-067, D-068, D-077  
 **Dependencies:** F1.6
+
+---
+
+#### F1.7-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** A checklist of exact, deterministic commands. All
+> sub-tasks assume this is done and import the **real** generated symbols
+> (`@/components/ui/button`, `@/lib/utils`, etc.) — never a hallucinated `@shadcn/ui` package.
+
+```bash
+cd apps/web
+npm install                                   # deps already declared in package.json
+
+# 1. '@/' path alias  — edit apps/web/tsconfig.app.json compilerOptions:
+#      "baseUrl": ".",  "paths": { "@/*": ["./src/*"] }
+#    and apps/web/vite.config.ts: add  resolve: { alias: { '@': path.resolve(__dirname, './src') } }
+#    (import path from 'node:path')
+
+# 2. Tailwind v4 Vite plugin (not yet installed)
+npm install -D @tailwindcss/vite
+#    vite.config.ts: add tailwindcss() to plugins
+
+# 3. shadcn/ui  (New York style, Slate base, CSS variables)
+npx shadcn@latest init                        # creates components.json, src/lib/utils.ts (cn),
+                                              #   src/index.css, wires tailwind + index.css import
+npx shadcn@latest add button input label form card
+#    -> installs @hookform/resolvers, zod, @radix-ui/react-label, @radix-ui/react-slot
+#       and writes src/components/ui/{button,input,label,form,card}.tsx
+
+# 4. Blue Steel theme — merge the EXACT @theme block from docs/UX_CONSTITUTION.md §8
+#    into the shadcn-generated apps/web/src/index.css (keep shadcn base layer; add the
+#    Blue Steel colour/radius/shadow/font tokens). Ensure main.tsx imports './index.css'.
+
+# 5. Vitest setup file  (installed accessibility lib is vitest-axe@0.1.0, NOT jest-axe)
+#    create apps/web/src/test/setup.ts  — matcher registration is TWO parts; the
+#    extend-expect import is types-only / a RUNTIME NO-OP in this version:
+#       import '@testing-library/jest-dom';
+#       import 'vitest-axe/extend-expect';            // TS: adds toHaveNoViolations to expect's types
+#       import * as axeMatchers from 'vitest-axe/matchers';
+#       import { expect } from 'vitest';
+#       expect.extend(axeMatchers);                   // registers the matcher at RUNTIME
+#    vite.config.ts: set  test.setupFiles: ['./src/test/setup.ts']
+#    Tests import `{ axe } from 'vitest-axe'` and assert
+#       expect(await axe(container)).toHaveNoViolations().
+```
+
+> **Note for all sub-tasks:** the `frontend-testing` skill shows `jest-axe` / `configureAxe` —
+> the repo actually installs **`vitest-axe`** (`0.1.0`). Runtime matcher registration requires
+> `import * as matchers from 'vitest-axe/matchers'; expect.extend(matchers)` (see SETUP step 5) —
+> `import 'vitest-axe/extend-expect'` alone is a **runtime no-op** (TypeScript types only).
+> Installed stack is React 19 / `react-router-dom` v7 / Tailwind v4 / Vitest v4 (package.json is
+> authoritative over the "React 18 / Router v6" text in `apps/web/CLAUDE.md`).
+
+> **Backend contract (verified against `apps/api`) — every response uses the envelope
+> `{ data, meta, errors: [{ code, message, field }] }`:**
+> - `POST /api/v1/auth/login` `{ email, password }` → `data: { accessToken, forcePasswordChange }` (**no** userId/isAdmin)
+> - `POST /api/v1/auth/refresh` (httpOnly cookie) → `data: { accessToken }`
+> - `POST /api/v1/auth/logout` → `data: null`
+> - `GET  /api/v1/users/me` → `data: { id, email, isAdmin, forcePasswordChange }`
+> - `PATCH /api/v1/users/me/password` `{ currentPassword, newPassword }` → `data: null` (newPassword 12–128 chars)
+> - `GET  /api/v1/health` → `data: { status: "UP"|"DEGRADED", db: "UP"|"DOWN" }` (only unauthenticated endpoint)
+>
+> Because login returns only `{ accessToken, forcePasswordChange }`, `currentUser` is populated
+> by calling `GET /users/me` **after** login — not from the login response.
+
+---
+
+#### F1.7.1 — Shared API, auth, and health types
+
+**Goal:** Hand-written TypeScript mirrors of the backend DTOs so every later sub-task imports real, compiling symbols. No runtime logic.
+
+**Scope (in):**
+- `apps/web/src/types/api.ts` — `ApiEnvelope<T>` (`{ data: T; meta: unknown; errors: ApiError[] }`), `ApiError` (`{ code: string; message: string; field: string | null }`)
+- `apps/web/src/types/auth.ts` — `AuthLoginResponse` (`{ accessToken; forcePasswordChange }`), `RefreshResponse` (`{ accessToken }`), `UserMeResponse` (`{ id; email; isAdmin; forcePasswordChange }`), `CurrentUser`
+- `apps/web/src/types/health.ts` — `OverallStatus` (`'UP'|'DEGRADED'`), `ComponentStatus` (`'UP'|'DOWN'`), `HealthResponse` (`{ status; db }`)
+
+**Scope (out):** No fetch logic, hooks, or components. Campaign/session/actor types (later phases). No runtime test — `npm run type-check` is the verification for this types-only sub-task.
+
+**Skills:** `frontend-api-resource`  **Decisions:** D-030  **Dependencies:** F1.7-SETUP
+
+---
+
+#### F1.7.2 — Zustand auth + campaign stores
+
+**Goal:** In-memory client-state stores. Access token never touches `localStorage` (D-030).
+
+**Scope (in):**
+- `apps/web/src/store/authStore.ts` (+ `authStore.test.ts`) — `accessToken: string | null`; `currentUser: CurrentUser | null`; `setAccessToken`, `setCurrentUser`, `logout`
+- `apps/web/src/store/campaignStore.ts` (+ `campaignStore.test.ts`) — `activeCampaignId: string | null`; `activeRole: CampaignRole | null` (empty for now); `setCampaign`, `clearCampaign`
+
+**Scope (out):** No fetching, no persistence middleware. `uiStore` (later). Role is never read from the JWT.
+
+**Skills:** `auth`, `frontend-testing`  **Decisions:** D-030, D-043  **Dependencies:** F1.7-SETUP, F1.7.1
+
+---
+
+#### F1.7.3 — Base HTTP client with silent refresh
+
+**Goal:** Single `fetch` wrapper that attaches `Authorization: Bearer`, parses the `{ data, meta, errors }` envelope (throwing on `errors`), and on `401` does one silent `POST /auth/refresh` → retry → on second `401` calls `authStore.logout()` and redirects to `/login`. Concurrent 401s deduped to a single refresh.
+
+**Scope (in):**
+- `apps/web/src/api/client.ts` (+ `client.test.ts`) — exports `apiClient.get<T>()`, `apiClient.post<T>()`, `apiClient.patch<T>()`; base URL from `import.meta.env.VITE_API_BASE_URL`; `credentials: 'include'`
+
+**Scope (out):** Per-resource fetch functions and hooks (F1.7.4). Component-facing error UI.
+
+**Skills:** `frontend-api-resource`, `auth`, `frontend-testing`  **Decisions:** D-030, D-043  **Dependencies:** F1.7-SETUP, F1.7.1, F1.7.2
+
+---
+
+#### F1.7.4 — Auth + user API resource hooks
+
+**Goal:** Typed fetch functions + TanStack Query hooks for the auth/user endpoints. Login flow fetches `GET /users/me` after token storage to populate `currentUser` (login response lacks it).
+
+**Scope (in):**
+- `apps/web/src/api/auth.ts` (+ `auth.test.ts`) — `login({email,password})`, `logout()`, `getCurrentUser()`; hooks `useLogin` (on success: `setAccessToken` → `getCurrentUser` → `setCurrentUser`), `useLogout`
+- `apps/web/src/api/users.ts` (+ `users.test.ts`) — `changePassword({currentPassword,newPassword})`; hook `useChangePassword`
+
+**Scope (out):** `api/health.ts` (lives with F1.7.9). `api/campaigns.ts` (F1.8). Form/UI.
+
+**Skills:** `frontend-api-resource`, `auth`, `frontend-testing`  **Decisions:** D-030, D-043, D-077  **Dependencies:** F1.7-SETUP, F1.7.1, F1.7.3
+
+---
+
+#### F1.7.5 — RequireAuth route guard
+
+**Goal:** Guard component: redirect to `/login` if no `accessToken`; additionally redirect to `/change-password` when `currentUser.forcePasswordChange === true` and not already there (D-077).
+
+**Scope (in):**
+- `apps/web/src/components/domain/RequireAuth.tsx` (+ `RequireAuth.test.tsx`, incl. axe assertion)
+
+**Scope (out):** `RequireAdmin` (later, when admin routes exist). Role-based gating. Page content.
+
+**Skills:** `auth`, `frontend-testing`  **Decisions:** D-043, D-077  **Dependencies:** F1.7-SETUP, F1.7.2
+
+---
+
+#### F1.7.6 — InlineBanner feedback component (no-toast)
+
+**Goal:** Shared `components/domain/` banner for all form/system feedback per UX Constitution §5 (toasts forbidden, D-083). Four variants (`success|warning|error|info`) with the exact token classes from §5; `success/warning/info` auto-clear after 8s, `error` never auto-clears; `role="alert"` + `aria-live="polite"`; enter animation `slide-in-from-top-2 duration-200`.
+
+**Scope (in):**
+- `apps/web/src/components/domain/InlineBanner.tsx` (+ `InlineBanner.test.tsx`, incl. axe assertion + auto-clear/dismiss behavior)
+
+**Scope (out):** `FocusedOverlay`, skeletons (separate concerns/skills). Page wiring.
+
+**Skills:** `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-083, D-087  **Dependencies:** F1.7-SETUP
+
+---
+
+#### F1.7.7 — LoginPage
+
+**Goal:** Email/password form (React Hook Form + shadcn `Form`/`Input`/`Button`, in a `rounded-2xl` card). Submit via `useLogin`; map `400` field errors with `setError`; surface auth failure through `InlineBanner` (error variant); submit button shows in-button `Loader2` while pending. On success redirect to `/change-password` if `forcePasswordChange`, else `/status` (campaign list deferred — F1.8).
+
+**Scope (in):**
+- `apps/web/src/features/auth/LoginPage.tsx` (+ `LoginPage.test.tsx`, incl. axe assertion)
+
+**Scope (out):** ChangePasswordPage (F1.7.8). Route registration (F1.7.10).
+
+**Skills:** `react-hook-form`, `frontend-api-resource`, `auth`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-067, D-077, D-083, D-087  **Dependencies:** F1.7-SETUP, F1.7.1, F1.7.2, F1.7.4, F1.7.6
+
+---
+
+#### F1.7.8 — ChangePasswordPage
+
+**Goal:** Forced/voluntary password-change form (RHF + shadcn, card layout). `newPassword` client-validated to min 12 chars (mirrors backend); submit via `useChangePassword`; `InlineBanner` for success/error; in-button `Loader2` while pending. On success clear `forcePasswordChange` in `currentUser` and redirect to `/status`.
+
+**Scope (in):**
+- `apps/web/src/features/auth/ChangePasswordPage.tsx` (+ `ChangePasswordPage.test.tsx`, incl. axe assertion)
+
+**Scope (out):** The redirect-here guard logic (in F1.7.5). Route registration (F1.7.10).
+
+**Skills:** `react-hook-form`, `frontend-api-resource`, `auth`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-067, D-077, D-083, D-087  **Dependencies:** F1.7-SETUP, F1.7.2, F1.7.4, F1.7.6
+
+---
+
+#### F1.7.9 — `/status` round-trip health page (skeleton loading)
+
+**Goal:** Public page that calls `GET /api/v1/health` and renders `db: "UP"` — the walking skeleton's browser → Spring Boot → Neon round-trip proof. Loading state is a DTO-derived **skeleton** (no spinner, D-086); fetch failure surfaces via `InlineBanner` error variant.
+
+**Scope (in):**
+- `apps/web/src/api/health.ts` — `getHealth()` + `useHealth` query hook
+- `apps/web/src/features/status/StatusPage.tsx` (+ `StatusPage.test.tsx`, incl. axe assertion)
+
+**Scope (out):** Auth gating (this route is public — health is the only unauthenticated endpoint). Skeleton-crafting polish beyond the health DTO.
+
+**Skills:** `frontend-api-resource`, `ux-skeleton-crafting`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-030, D-086, D-087  **Dependencies:** F1.7-SETUP, F1.7.1, F1.7.3, F1.7.6
+
+---
+
+#### F1.7.10 — App wiring + Vercel config
+
+**Goal:** Compose everything: `QueryClientProvider` + `BrowserRouter` + routes (`/login`, `/change-password`, and `/` behind `RequireAuth`; `/status` public). Add Vercel SPA rewrite and document `VITE_API_BASE_URL`.
+
+**Scope (in):**
+- `apps/web/src/main.tsx` — replace the placeholder `<div>` with providers + `<Routes>`
+- `apps/web/vercel.json` — SPA rewrite (`/(.*) → /index.html`)
+- `apps/web/README.md` — document `VITE_API_BASE_URL` as a required Vercel env var
+
+**Scope (out):** Campaign list / dashboard routes (F1.8+). CI deploy step (Vercel GitHub integration handles it, D-045).
+
+**Skills:** `frontend-api-resource`, `auth`  **Decisions:** D-030, D-045  **Dependencies:** F1.7-SETUP, F1.7.2, F1.7.5, F1.7.7, F1.7.8, F1.7.9
 
 ---
 
