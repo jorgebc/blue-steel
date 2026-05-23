@@ -62,7 +62,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
 from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
-from config import get_llm
+from config import get_llm, get_model_options
 from logger import MARKER_BLOCKED, get_logger
 from tools.filesystem import (
     REPO_ROOT,
@@ -199,6 +199,10 @@ def _make_model() -> LiteLLMModel:
         api_key=api_key,
         api_base=api_base,
         timeout=1800,
+        # Large context window + low temperature — see config.get_model_options.
+        # Without an explicit num_ctx the agent runs at Ollama's small default window
+        # and silently drops the persona and error output it diagnoses.
+        **get_model_options(phase="review"),
     )
 
 

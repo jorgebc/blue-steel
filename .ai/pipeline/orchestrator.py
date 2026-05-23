@@ -194,18 +194,21 @@ def _final_review_node(state: PipelineState) -> dict:
     logger.info(f"{MARKER_INFO} Running final coherence review", extra={"role": "final"})
 
     try:
+        # Single completion with no tool diff competing for the window, so the budget
+        # is comfortable: pass the full plan + execution report (generously bounded)
+        # so the coherence check isn't judging plan-vs-impl against a quarter of each.
         plan_path = state.get("plan_path") or f"{_CONTEXT_DIR}/{task_id}_plan.md"
-        plan_content = read_file(plan_path)[:3000]
+        plan_content = read_file(plan_path)[:12000]
 
         decisions_content = ""
         try:
-            decisions_content = read_file("docs/DECISIONS.md")[:2000]
+            decisions_content = read_file("docs/DECISIONS.md")[:4000]
         except Exception:
             pass
 
         exec_content = ""
         try:
-            exec_content = read_file(f"{_CONTEXT_DIR}/{task_id}_execution.md")[:2000]
+            exec_content = read_file(f"{_CONTEXT_DIR}/{task_id}_execution.md")[:8000]
         except Exception:
             pass
 

@@ -310,6 +310,24 @@ def run_execution(task_id: str) -> dict:
     # ── Determine scope from section 3 ────────────────────────────────────────
     section_3 = _extract_section_3(plan_content)
     has_backend, has_frontend = _determine_scope(section_3)
+    if not has_backend and not has_frontend:
+        # Section 3 may be malformed/empty (e.g. nested duplicate headings made
+        # _extract_section_3 capture an empty stub) — scan the whole plan as a
+        # fallback so a wording slip in the plan doesn't silently skip both engineers.
+        has_backend, has_frontend = _determine_scope(plan_content)
+        if not has_backend and not has_frontend:
+            # Genuinely nothing to build. Fail loudly: the orchestrator turns this
+            # into a blocked stop with an actionable reason, instead of three silent
+            # no-op iterations that still report SUCCESS.
+            raise ValueError(
+                "No backend or frontend scope detected in the plan — section 3 is "
+                "likely malformed or empty. Re-run planning (--phase 1)."
+            )
+        logger.warning(
+            f"{MARKER_INFO} Section 3 scope was empty; used whole-plan fallback "
+            "(plan section 3 may be malformed).",
+            extra={"role": "execution"},
+        )
     logger.info(
         f"{MARKER_INFO} Scope: backend={has_backend}, frontend={has_frontend}",
         extra={"role": "execution"},

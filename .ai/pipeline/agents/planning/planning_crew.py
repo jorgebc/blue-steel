@@ -107,6 +107,29 @@ _PLAN_SECTIONS = [
     "## 8. Explicitly Out of Scope",
 ]
 
+# A numbered section heading: "## 3." / "##  3.  Proposed ...". The architect
+# reliably emits the eight *numbers* but its title wording drifts (e.g. "## 4.
+# Dependencies on Existing Code" instead of "...Existing Blue Steel Code"). We key
+# structure detection on the number, not the title text, and rewrite titles to
+# canonical so downstream parsers (_extract_section_3, _determine_scope) are stable.
+_HEADING_RE = re.compile(r"^##\s*([1-8])\.[^\n]*", re.MULTILINE)
+
+
+def _normalize_section_titles(text: str) -> str:
+    """Rewrite every '## N. <anything>' heading to the canonical _PLAN_SECTIONS title."""
+    return _HEADING_RE.sub(lambda m: _PLAN_SECTIONS[int(m.group(1)) - 1], text)
+
+
+def _planning_conversation(arch_output_1: str, po_output_2: str) -> str:
+    """The appendix capturing the PO <-> Architect exchange, appended to every plan."""
+    return (
+        "## Planning Conversation\n\n"
+        "### Architect — Initial Proposal\n\n"
+        f"{arch_output_1}\n\n---\n\n"
+        "### PO — Challenge\n\n"
+        f"{po_output_2}\n"
+    )
+
 
 def _load_docs() -> dict[str, str]:
     """Load all four reference documents into memory."""
@@ -194,18 +217,19 @@ def run_planning(task_id: str) -> str:
     # Sanitize content for Windows console safety — arrows and emojis crash cp1252
     safe_description = _ascii_safe(task_description)
     safe_roadmap_entry = _ascii_safe(roadmap_entry)
-    # Trim long docs to keep context manageable for local models.
-    # Architecture and Decisions are large; local models (qwen3:14b) time out
-    # with >15K tokens — keep each reference doc under 5K chars.
+    # Trim long docs to keep context manageable. With the 16K num_ctx now set for
+    # local runs (config.get_model_options), the architect can plan against fuller
+    # docs and name real symbols in section 4 — so local matches cloud caps. If
+    # qwen3:14b planning starts timing out, fall back to 6K/7K/4K.
     pipeline_mode = os.environ.get("PIPELINE_MODE", "local").lower()
     if pipeline_mode == "cloud":
         safe_prd = _ascii_safe(docs["prd"])[:8000]
         safe_architecture = _ascii_safe(docs["architecture"])[:10000]
         safe_decisions = _ascii_safe(docs["decisions"])[:6000]
     else:
-        safe_prd = _ascii_safe(docs["prd"])[:4000]
-        safe_architecture = _ascii_safe(docs["architecture"])[:5000]
-        safe_decisions = _ascii_safe(docs["decisions"])[:3000]
+        safe_prd = _ascii_safe(docs["prd"])[:8000]
+        safe_architecture = _ascii_safe(docs["architecture"])[:10000]
+        safe_decisions = _ascii_safe(docs["decisions"])[:6000]
 
     _TRUNCATION_NOTICE = (
         '\n\n[TRUNCATED — this is a partial snapshot. '
@@ -214,8 +238,8 @@ def run_planning(task_id: str) -> str:
     )
     raw_decisions = _ascii_safe(docs["decisions"])
     raw_architecture = _ascii_safe(docs["architecture"])
-    decisions_limit = 6000 if pipeline_mode == "cloud" else 3000
-    architecture_limit = 10000 if pipeline_mode == "cloud" else 5000
+    decisions_limit = 6000
+    architecture_limit = 10000
     if len(raw_decisions) > decisions_limit:
         safe_decisions += _TRUNCATION_NOTICE
     if len(raw_architecture) > architecture_limit:
@@ -273,19 +297,22 @@ def run_planning(task_id: str) -> str:
     # ── Assemble and write plan ───────────────────────────────────────────
     header = _assemble_plan_header(task_id, task_description)
 
-    # Check if architect's output already contains the plan sections;
-    # if so use it directly, otherwise wrap with all context
-    has_all_sections = all(
-        section.lower() in arch_output_2.lower() for section in _PLAN_SECTIONS
-    )
-
-    if has_all_sections:
-        plan_content = header + arch_output_2
+    # The architect's round-2 output is normally a full 8-section plan. Detect that
+    # by heading *number* (titles drift) and use it directly, normalizing titles to
+    # canonical. Wrapping it under a "## 3." heading is only safe when it has no
+    # numbered headings of its own — otherwise we'd nest "## 1." inside "## 3." and
+    # _extract_section_3 would capture an empty Section 3, silently zeroing out scope
+    # detection (the F1.7 failure). So any numbered output is used as-is.
+    if _HEADING_RE.search(arch_output_2):
+        plan_content = (
+            header
+            + _normalize_section_titles(arch_output_2)
+            + "\n\n"
+            + _planning_conversation(arch_output_1, po_output_2)
+        )
     else:
-        # Architect did not produce a fully structured plan; assemble from all outputs.
-        # The architect's final output is placed under "## 3. Proposed Technical Solution"
-        # so that downstream parsers (_extract_section_3, _determine_scope) can locate
-        # the BE/FE indicators in the expected heading.
+        # Unstructured prose only — safe to place under "## 3. Proposed Technical
+        # Solution" so downstream parsers find the BE/FE indicators there.
         plan_content = (
             header
             + "## 1. Executive Summary\n\n"
@@ -296,13 +323,7 @@ def run_planning(task_id: str) -> str:
             + "## 3. Proposed Technical Solution\n\n"
             + arch_output_2
             + "\n\n"
-            + "## Planning Conversation\n\n"
-            + "### Architect — Initial Proposal\n\n"
-            + arch_output_1
-            + "\n\n---\n\n"
-            + "### PO — Challenge\n\n"
-            + po_output_2
-            + "\n"
+            + _planning_conversation(arch_output_1, po_output_2)
         )
 
     if len(plan_content.strip()) <= 200:

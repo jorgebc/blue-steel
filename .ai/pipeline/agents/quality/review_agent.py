@@ -49,7 +49,7 @@ sys.path.insert(0, str(Path(__file__).parents[2]))  # adds .ai/pipeline/ to path
 
 from smolagents import CodeAgent, LiteLLMModel, LogLevel, tool
 
-from config import get_llm
+from config import get_llm, get_model_options
 from logger import get_logger
 from tools.filesystem import (
     file_exists as _file_exists,
@@ -78,6 +78,10 @@ def _make_model() -> LiteLLMModel:
         api_key=api_key,
         api_base=api_base,
         timeout=1800,
+        # Large context window + low temperature — see config.get_model_options.
+        # Without an explicit num_ctx the reviewer runs at Ollama's small default
+        # window and silently drops the persona/plan/diff it is meant to review.
+        **get_model_options(phase="review"),
     )
 
 
@@ -250,9 +254,13 @@ def run_review(task_id: str) -> dict:
     plan_snippet = "(plan not available — reviewing diff only)"
     if _file_exists(plan_path):
         plan_content = _read_file(plan_path)
-        plan_snippet = plan_content[:4000]
+        # Generous bound, not a third of the plan: ~10k chars (~2.8k tokens) fits the
+        # full 8-section plan while leaving room in the 16k window for the persona,
+        # scaffold, and the (untruncated) git diff the agent fetches via get_git_diff.
+        plan_snippet = plan_content[:10000]
         logger.debug(
-            f"Plan loaded: {len(plan_content)} chars (first 4000 passed to agent)",
+            f"Plan loaded: {len(plan_content)} chars "
+            f"({min(len(plan_content), 10000)} passed to agent)",
             extra={"role": "review"},
         )
     else:
@@ -265,7 +273,7 @@ You are the Senior Code Reviewer for Blue Steel.
 ## Task ID
 {task_id}
 
-## Implementation Plan (first 4000 chars for context)
+## Implementation Plan (for context)
 {plan_snippet}
 
 ## Your Job
