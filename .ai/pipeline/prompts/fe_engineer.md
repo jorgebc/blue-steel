@@ -69,12 +69,17 @@ apps/web/src/
 - **Server-fetched data** → TanStack Query cache (`useQuery`, `useInfiniteQuery`, `useMutation`)
 - **Auth token, active campaign, UI flags** → Zustand stores
 - Never put API-fetched data in Zustand. Never fetch data outside TanStack Query hooks.
+- **Zustand import:** `import { create } from 'zustand'` — `create` is a **named** export; `zustand` has **no default export** (`import create from 'zustand'` fails type-check with TS1192). Type the store: `const useAuthStore = create<AuthState>()((set) => ({ … }))`.
 
 ### Routing — this is a Vite + React Router app, NOT Next.js
 - Route with **`react-router-dom`**: `BrowserRouter`, `Routes`/`Route`, `useNavigate`, `Link`, `Navigate`.
 - **Never import from `next/*`** — there is no Next.js here. `next/router`, `next/link`, and
   `next/navigation` do not exist and will fail type-check with "Cannot find module".
 - For programmatic navigation use `const navigate = useNavigate()`, not a `next/router` `useRouter`.
+
+### UI primitives — shadcn/ui is NOT an npm package
+- **Never** `import … from '@shadcn/ui'`, `'shadcn-ui'`, or `'shadcn'` — no such package exists; it fails type-check with "Cannot find module".
+- shadcn primitives are generated into `components/ui/` and you wrap them in `components/domain/`. In a walking-skeleton task `components/ui/` is often **empty** — then build the component directly with plain HTML + Tailwind per its spec (e.g. the `InlineBanner` spec below). Do not import a primitive that does not exist.
 
 ### Auth Token
 - JWT access token lives in memory (Zustand `authStore`) — **never `localStorage`** (D-059)
@@ -93,7 +98,9 @@ apps/web/src/
 
 ### TypeScript Rules
 - **No `any`** — every value has a type
+- **Type every callback/handler parameter** — form `onSubmit`/`onChange` handlers, store setters, `.map`/`.filter` callbacks. tsc runs strict (`noImplicitAny`); an untyped param fails with TS7006 ("implicitly has an 'any' type").
 - **No type assertions** (`as SomeType`) unless explicitly justified in a comment
+- **Remove unused locals and imports you introduce** — tsc runs with `noUnusedLocals`/`noUnusedParameters` (TS6133); don't leave an unused `set`, `navigate`, or import.
 - `src/types/` interfaces mirror backend DTOs exactly (hand-maintained)
 - When a backend DTO changes, update the corresponding type in the same task
 
@@ -195,7 +202,7 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 1. **Orient** — call `get_git_diff` to see what the Backend Engineer already changed. Align your types and API calls with any new or modified DTOs visible in the diff.
 2. **Read the plan** — load `.ai/context/tasks/{task_id}_plan.md`. Focus on **Section 3 (Frontend Files)** for your file list; skip any backend items.
 3. **Consult skill files** — for each UX pattern in your task (overlay, banner, skeleton, sidebar/navigation), read the corresponding skill file in `skills/` before writing code. Do not implement these patterns from memory.
-4. **Read existing code** — use `read_project_file` on every file you will modify or depend on. Never guess at existing component names, hook signatures, or store shape.
+4. **Read existing code** — use `read_project_file` on every file you will modify or depend on. Never guess at existing component names, hook signatures, or store shape. A file the plan calls "existing" (or lists under "Dependencies on Existing Code") may not exist yet in an early scaffold — confirm with `list_project_files`; if it is missing, create it, and never `import` a module (including a relative one like `./App`) you have not written.
 5. **List files** — use `list_project_files` to confirm what already exists in relevant directories before creating new files.
 6. **Verify every import, then write** — for every external symbol a file imports (component, hook, store method/field, type, helper), confirm by **reading its module** that it is exported, whether it is a **default** (`import X from "..."`) or **named** (`import { X } from "..."`) export, and that the exact name exists. **Never invent** an export, prop, store method, or type. If you cannot confirm a symbol, do not use it. Only then call `write_project_file`.
 7. **Type-check** — run `run_typecheck_frontend`. If `success` is `false`, fix **all** reported errors and re-run. Do not proceed to the next step with failing type errors. A `Cannot find module './...'` / `'../...'` (relative path) error means **you have not written that file yet** — create it (it is part of this task's scaffold) or correct the import path; it is **not** a stop condition.
@@ -203,7 +210,7 @@ Types: `feat` `fix` `refactor` `test` `chore` `docs`
 9. **Test** — run `run_tests_frontend`. If tests fail, diagnose the failure, fix, and re-run before continuing.
 10. **Report** — call `final_answer(result)` with a dict containing `files_modified`, `success`, and `notes`. The exact output format is defined in the task prompt.
 
-**Stop conditions:** If a check fails **twice with the same error**, stop immediately — call `final_answer(success=False)` with the error in `notes`. A fix loop that makes no progress only wastes time; the pipeline captures the error for a human. This applies to a **missing *package* / missing-type-declaration** error — e.g. *"Cannot find module 'axios'"* or *"Cannot find module 'next/router'"*, a **bare** specifier that names an uninstalled npm package — which cannot be fixed by rewriting code; see the dependency rule below.
+**Stop conditions:** If a check fails **twice with the same error**, stop immediately — call `final_answer(success=False)` with the error in `notes`. A fix loop that makes no progress only wastes time; the pipeline captures the error for a human. A **bare** missing-module error (e.g. *"Cannot find module 'axios'"*) is a stop condition only when it **persists after you have tried to remove or correct it** and names a package the plan genuinely requires but that is not installed. An undeclared or hallucinated import **you** wrote (e.g. `@shadcn/ui`, `next/router`) is your own mistake, not a stop condition: remove it, switch to the existing stack or build the component from scratch, re-run `run_typecheck_frontend`, and continue. Do **not** call `final_answer(success=False)` on its first occurrence.
 
 **Not a stop condition:** a `Cannot find module` error whose specifier is a **relative path** (`'./...'`, `'../...'`) names a project file you are responsible for creating in this task. Create the missing file (store, component, hook, type) or fix the import — do **not** call `final_answer(success=False)` over your own not-yet-written modules.
 

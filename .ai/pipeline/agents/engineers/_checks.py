@@ -36,9 +36,12 @@ _TAIL_CHARS = 2000
 # TypeScript oriented; harmless no-ops against Java/Maven output.)
 #
 # Note what is deliberately NOT here:
-# - "cannot find module" is handled separately (see `_has_missing_package`): it is only
-#   unrecoverable for *bare* (package) specifiers. A *relative* specifier names a project
-#   file the engineer simply hasn't written yet — recoverable by creating it.
+# - "cannot find module" is handled separately (see `_has_missing_package` /
+#   `_bare_missing_specifiers`): a *relative* specifier names a project file the engineer
+#   simply hasn't written yet (recoverable by creating it), and a *bare* specifier is no
+#   longer an instant trip — a hallucinated/undeclared import (e.g. `@shadcn/ui`) is the
+#   engineer's own removable mistake, so it gets ONE fix attempt and only trips if the same
+#   bare module is still missing on the next run of the same check (see `should_abort`).
 # - "cannot find name 'process'/'require'" (node globals) are recoverable enough — the agent
 #   can relocate/remove the offending file — that they don't warrant a first-occurrence trip;
 #   the no-progress guard (condition (b)) still catches them if a real retry makes no headway.
@@ -51,16 +54,29 @@ _CANNOT_FIND_MODULE_RE = re.compile(r"cannot find module ['\"]([^'\"]+)['\"]", r
 
 
 def _has_missing_package(blob: str) -> bool:
-    """True if `blob` reports a missing *bare* (package) module — the unrecoverable case.
+    """True if `blob` reports a missing *bare* (package) module.
 
-    A bare specifier (`axios`, `next/router`, `@scope/pkg`) needs an npm install or a declared
-    NEW DEPENDENCY and cannot be fixed by rewriting code. Relative specifiers (`./`, `../`, `/`)
-    name a project file the engineer is expected to create, so they are excluded.
+    A bare specifier (`axios`, `next/router`, `@scope/pkg`) needs an npm install / declared
+    NEW DEPENDENCY, or is a hallucinated import the engineer must remove. Relative specifiers
+    (`./`, `../`, `/`) name a project file the engineer is expected to create, so they are
+    excluded. Used to prioritise diagnostics; the abort decision uses persistence across runs
+    (see `should_abort`), not this first-occurrence check.
     """
-    for specifier in _CANNOT_FIND_MODULE_RE.findall(blob):
-        if specifier and specifier[0] not in "./":
-            return True
-    return False
+    return bool(_bare_missing_specifiers(blob))
+
+
+def _bare_missing_specifiers(blob: str) -> set[str]:
+    """Bare (package) module specifiers reported missing in `blob`; relative ones excluded."""
+    return {
+        specifier
+        for specifier in _CANNOT_FIND_MODULE_RE.findall(blob)
+        if specifier and specifier[0] not in "./"
+    }
+
+
+def _entry_bare_missing(entry: dict) -> set[str]:
+    """Bare missing-module specifiers from a recorded check entry's output tails."""
+    return _bare_missing_specifiers(f"{entry.get('stderr_tail', '')}\n{entry.get('stdout_tail', '')}")
 
 _active_task_id: str | None = None
 _active_role: str = "execution"
@@ -142,37 +158,44 @@ def last_check_failed() -> bool:
 def should_abort() -> tuple[bool, str]:
     """Whether the run should stop early, with a human-readable reason.
 
-    Trips on (a) a genuinely-unrecoverable error in any unresolved check — a known
-    signature or a missing *bare* (package) module, but never a missing relative module
-    the engineer can still create — or (b) the same check failing twice with the same
-    first error line (a fix loop going nowhere). Both conditions are evaluated against
-    the latest result per tool, so a passing check later in the same step cannot mask an
-    earlier failure.
+    Trips on (a) a known genuinely-unrecoverable signature in any unresolved check
+    (first occurrence), or (b) a still-failing check that made no progress on retry —
+    either the same first error line twice, or the same *bare* missing module still
+    absent across its last two failing runs. A missing bare module therefore gets ONE
+    fix attempt (a hallucinated/undeclared import like `@shadcn/ui` is removable; a
+    genuinely-missing package persists and trips on the second run). Relative missing
+    modules never trip — they are files the engineer is expected to create. All
+    conditions use the latest result per tool, so a passing check later in the same step
+    cannot mask an earlier failure.
     """
     unresolved = _unresolved_checks()
     if not unresolved:
         return False, ""
 
-    # (a) Unrecoverable signature in any still-failing check.
+    # (a) Known-unrecoverable signature in any still-failing check (first occurrence).
     for entry in unresolved:
         blob = f"{entry['stderr_tail']}\n{entry['stdout_tail']}".lower()
         for signature in _UNRECOVERABLE_SIGNATURES:
             if signature in blob:
                 return True, f"unrecoverable error in {entry['tool']}: '{signature}'"
-        # A missing *bare* (package) module is unrecoverable; a missing relative module is
-        # just a file the engineer hasn't written yet, so it must not trip the breaker.
-        if _has_missing_package(blob):
-            return True, f"unrecoverable error in {entry['tool']}: missing package (cannot find module)"
 
-    # (b) A still-failing check that has failed twice with the same first error line.
+    # (b) A still-failing check that made no progress across its last two failing runs.
     for entry in unresolved:
         tool_failures = [
             e for e in _history if e["tool"] == entry["tool"] and not e["success"]
         ]
         if len(tool_failures) >= 2:
-            recent_lines = {_first_error_line(e) for e in tool_failures[-2:]}
-            if len(recent_lines) == 1:
+            last_two = tool_failures[-2:]
+            # Same first error line twice — a fix loop going nowhere.
+            if len({_first_error_line(e) for e in last_two}) == 1:
                 return True, f"'{entry['tool']}' failed twice with the same error"
+            # The same bare (package) module is still missing after a fix attempt —
+            # either a hallucinated import the engineer won't drop or a genuinely
+            # uninstalled package; neither is fixable by further looping.
+            persisted = _entry_bare_missing(last_two[0]) & _entry_bare_missing(last_two[1])
+            if persisted:
+                spec = sorted(persisted)[0]
+                return True, f"missing package persisted across retries in {entry['tool']}: '{spec}'"
     return False, ""
 
 
