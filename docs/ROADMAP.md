@@ -806,6 +806,10 @@ npx shadcn@latest add button input label form card
 | F2.5.4 | EntityResolutionService (two-stage orchestration) | 🔲 |
 | F2.5.5 | Wire resolution into SessionIngestionEventListener | 🔲 |
 | F2.6 | Conflict detection pipeline | 🔲 |
+| F2.6.1 | Real SpringAiEmbeddingAdapter (fills F2.2.6 stub; enables real embeddings) | 🔲 |
+| F2.6.2 | Real SpringAiConflictDetectionAdapter (LLM call 3, replaces F2.2.5 stub) | 🔲 |
+| F2.6.3 | ConflictDetectionService (MATCH-scoped pgvector context + LLM call) | 🔲 |
+| F2.6.4 | Wire conflict detection into SessionIngestionEventListener | 🔲 |
 | F2.7 | Diff generation + draft API | 🔲 |
 | F2.8 | Commit endpoint | 🔲 |
 | F2.9 | Frontend: Input Mode — session submission + status polling | 🔲 |
@@ -1476,21 +1480,83 @@ npx shadcn@latest add button input label form card
 
 #### F2.6 — Conflict detection pipeline
 
+> **Umbrella task — run the F2.6.N sub-tasks below, not this.**
+>
+> **No SETUP required** — ports/value models/mocks (F2.2), the shared LLM infra + `llm-real` config
+> (F2.4), and the similarity-search port (F2.5.1) are produced by the cited dependencies; no new
+> dependency or tooling is introduced.
+>
+> **Scope reconciliation (real `EmbeddingPort`):** F2.2.6 defers the real `SpringAiEmbeddingAdapter`
+> to *"(F2.6/D-063)"* and F2.5/F2.6/F2.8 all call `EmbeddingPort`, but F2.6's prose listed only the
+> conflict pieces. F2.6.1 below implements that real adapter (the first task to turn on real
+> embeddings); the **async post-commit generation** that *writes* `entity_embeddings` rows stays in
+> F2.8 (`EmbeddingGenerationListener`, D-063), and the **Ollama** embedding bean is F2.12.
+
 **Goal:** LLM Call 3. Compare extracted facts against current world state for hard contradictions. Produces non-blocking `ConflictWarning` cards (D-033).
 
-**Scope (in):**
-
-*Application:*
-- `ConflictDetectionService` (internal): assembles `EntityContext` for MATCH-resolved entities only via `EntitySimilaritySearchPort` (embed `narrativeSummaryHeader` → top-N relevant snapshots); calls `ConflictDetectionPort`; if no MATCH entities: skip LLM call, return empty list
-- `SpringAiConflictDetectionAdapter` (`@Profile("llm-real | llm-ollama")`): provider-neutral `ChatClient`, pgvector context-scoped LLM call 3; structured output: `List<ConflictWarning>`; logs MDC `stage = "conflict_detection"` (D-088)
-
-*`SessionIngestionEventListener` extended:* calls conflict detection after entity resolution; passes `List<ConflictWarning>` to next stage.
-
-**Scope (out):** Diff generation (F2.7).
+**Scope (out):** Diff generation (F2.7). Async post-commit embedding generation (F2.8, D-063). Ollama embedding bean (F2.12).
 
 **Skills:** `session-ingestion-pipeline`  
 **Decisions:** D-033, D-034, D-062, D-088  
 **Dependencies:** F2.5
+
+---
+
+#### F2.6.1 — Real SpringAiEmbeddingAdapter
+
+**Goal:** Replace the F2.2.6 stub with the real embedding implementation — the first task to enable real embeddings (used by Stage-1 resolution, conflict-context retrieval, and post-commit generation). Provider-neutral: OpenAI `text-embedding-3-small`@1536 under `llm-real`, Ollama `bge-m3`@1024 under `llm-ollama` (D-040, D-088).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiEmbeddingAdapter.java` (**replace the stub body**, F2.2.6) — `@Component @Profile("llm-real | llm-ollama")`; inject the Spring AI `EmbeddingModel` (auto-configured from `spring.ai.openai.api-key` set in `application-llm-real.properties`, F2.4.2); `float[] embed(String content)` → `embeddingModel.embed(content)`; ERROR-log + rethrow on provider failure (LOG-02); never log `content`.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/SpringAiEmbeddingAdapterTest.java` — mock `EmbeddingModel`; assert `embed` delegates and returns the model's vector.
+
+**Scope (out):** Async post-commit generation into `entity_embeddings` (F2.8, D-063); the Ollama `EmbeddingModel` bean selection (F2.12); similarity *search* (F2.5.2).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-040, D-063, D-088  **Dependencies:** F2.2.6, F2.4.2
+
+---
+
+#### F2.6.2 — Real SpringAiConflictDetectionAdapter (LLM call 3)
+
+**Goal:** Replace the F2.2.5 stub with the real bounded LLM call-3: compare the extraction against the supplied world-state context and return non-blocking `ConflictWarning`s (D-033).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiConflictDetectionAdapter.java` (**replace the stub body**, F2.2.5) — `@Component @Profile("llm-real | llm-ollama")`; inject `ChatClient` + `LlmCostLogger`; `@Value("${blue-steel.llm.conflict-max-tokens}")`; `TokenEstimator` budget check on serialized extraction+context → `TokenBudgetExceededException`; `chatClient.prompt().system(<conflict prompt>).user(<extraction + relevant context>).call()` → read `ChatResponse` usage; `.entity(...)` → `List<ConflictWarning>`; `LlmCostLogger.logLlmCall("conflict_detection", …)` (MDC `stage="conflict_detection"`, D-088); never log raw response (LOG-01).
+- `apps/api/src/main/resources/application.properties` (**edit**) + `.env.example` (**edit**) — add `blue-steel.llm.conflict-max-tokens=${BLUE_STEEL_LLM_CONFLICT_MAX_TOKENS:3000}` (D-034 envelope).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/SpringAiConflictDetectionAdapterTest.java` — stubbed `ChatClient` fluent chain returns canned warnings; assert mapping to `List<ConflictWarning>` and `TokenBudgetExceededException` on oversize input.
+
+**Scope (out):** MATCH scoping + context assembly + the skip-when-no-MATCH rule (F2.6.3); the `ChatClient` bean (F2.4.2).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-033, D-034, D-072, D-088  **Dependencies:** F2.2.1, F2.2.5, F2.4.1
+
+---
+
+#### F2.6.3 — ConflictDetectionService (MATCH-scoped context + LLM call)
+
+**Goal:** Orchestrate conflict detection: only when there are MATCH-resolved entities, retrieve bounded world-state context via pgvector and call the conflict port; otherwise skip the LLM call and return an empty list (D-033, D-034 bounding).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/ConflictDetectionService.java` — internal `@Service`; `List<ConflictWarning> run(UUID campaignId, ExtractionResult extraction, List<ResolvedEntity> resolved)`: if no `ResolvedEntity` has outcome `MATCH` → return `List.of()` (no LLM call); else `EmbeddingPort.embed(extraction.narrativeSummaryHeader())` → `EntitySimilaritySearchPort.search(vector, campaignId, …, topN)` per relevant type → map `SimilarityResult`s to `EntityContext` (use case assembles context, ARCHITECTURE §6.2) → `ConflictDetectionPort.detect(extraction, relevantContext)`; INFO entry/exit (LOG-02).
+- `apps/api/src/main/resources/application.properties` (**edit**) + `.env.example` (**edit**) — add `blue-steel.conflict.context-top-n=${BLUE_STEEL_CONFLICT_CONTEXT_TOP_N:5}`.
+- `apps/api/src/test/java/com/bluesteel/application/session/ConflictDetectionServiceTest.java` — mocked `EmbeddingPort` + `EntitySimilaritySearchPort` + `ConflictDetectionPort`; asserts no-MATCH → empty list with **no** port calls, and the MATCH path embeds + searches + forwards context to the conflict port.
+
+**Scope (out):** The real adapters (F2.6.1/F2.6.2 — tests use mocks); listener wiring (F2.6.4); diff generation (F2.7).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-033, D-062  **Dependencies:** F2.2.1, F2.2.2, F2.2.5, F2.2.6, F2.5.1
+
+---
+
+#### F2.6.4 — Wire conflict detection into SessionIngestionEventListener
+
+**Goal:** Extend the listener so a session runs conflict detection after resolution, holding the `List<ConflictWarning>` in-memory for diff generation (F2.7).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/SessionIngestionEventListener.java` (**edit**, F2.5.5) — after `EntityResolutionService.run(...)` returns the `List<ResolvedEntity>`, call `ConflictDetectionService.run(campaignId, extractionResult, resolved)`; the listener exits after conflict detection (extraction + resolved + warnings are passed to diff generation in F2.7).
+- `apps/api/src/test/java/com/bluesteel/application/session/SessionIngestionEventListenerTest.java` (**update**, F2.5.5) — mock the three stage services; assert conflict detection is invoked with the extraction + resolved outputs after resolution.
+
+**Scope (out):** Diff generation + the `draft` transition (F2.7).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-033  **Dependencies:** F2.5.5, F2.6.3
 
 ---
 
