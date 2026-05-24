@@ -1799,4 +1799,32 @@ Cross-refs: D-032 (provider-agnostic by design), D-040 (embedding model), D-049 
 
 ---
 
+### D-089 — World-state commit write uses native SQL, not JPA
+
+**Date:** 2026-05-24
+**Status:** Active
+
+**Decision:**
+The world-state write performed at commit (`CommitService` → `WorldStatePort` → `WorldStateAdapter`, F2.8) is implemented with native `JdbcTemplate` SQL, **not** JPA entities/repositories. A single `WorldStateAdapter` writes across the four head/version table-pairs (`actors`/`actor_versions`, `spaces`/`space_versions`, `events`/`event_versions`, `relations`/`relation_versions`), selecting the target pair from a **whitelisted** `entity_type` enum (never string-interpolated caller input). The new `version_number` is computed `COALESCE(MAX(version_number),0)+1` per head inside the commit `@Transactional`; `changed_fields`/`full_snapshot` are bound as `?::jsonb`.
+
+This refines DB-01 ("JPA for standard CRUD; native SQL for all pgvector queries") at one boundary: the world-state *write* is native even though it is not a pgvector query.
+
+**Reason:**
+- The write is **insert-only append** (D-001/D-003: version history is never updated or deleted; head rows are inserted once). JPA's core value — dirty checking, entity lifecycle, lazy loading, relationship graphs — is wasted on insert-only tables.
+- The four entity types are **structurally identical** head/version pairs differing only by table name. JPA cannot collapse four separate tables into one entity, so it forces ~8 near-duplicate `@Entity` classes plus repositories; native models the runtime `entity_type` routing in one whitelist.
+- **Read/write consistency:** the read path over these same tables is already native (`EntitySimilaritySearchAdapter`, F2.5.2, joins `*_versions`/heads in a pgvector distance query). A native write keeps one mental model for this table family. The existing `SessionRecoveryAdapter` establishes the `@Lazy JdbcTemplate` precedent.
+
+**Scope boundary (so this is not over-applied):**
+- pgvector tables (`entity_embeddings`) stay native per **D-062** (read F2.5.2; write F2.8.6).
+- The world-state head/version write is native per this decision.
+- **All other CRUD stays JPA per DB-01** (`User`, `Session`, `NarrativeBlock`, `RefreshToken`, campaign membership, etc.).
+- The choice is documented in `WorldStateAdapter`'s class Javadoc (cites D-089).
+
+**Alternatives considered:**
+- JPA entities + repositories (the literal DB-01 / original F2.8-prose reading) — rejected; ~8 near-duplicate entities for four identical table-pairs, JPA lifecycle machinery wasted on append-only inserts, and a mixed JPA-write/native-read model on one table family. The only wins (convention-literalism, persistence-layer uniformity) do not outweigh the file-count and consistency costs.
+
+Cross-refs: D-001/D-003 (append-only versioning), D-062 (native pgvector), D-069 (sequence_number at commit), DB-01 (apps/api/CLAUDE.md §7).
+
+---
+
 *Entries are added as decisions are made. See PRD.md and ARCHITECTURE.md for context.*

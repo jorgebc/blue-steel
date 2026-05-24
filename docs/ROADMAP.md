@@ -818,6 +818,16 @@ npx shadcn@latest add button input label form card
 | F2.7.5 | GetSessionDiffUseCase + service (draft-only read) | 🔲 |
 | F2.7.6 | Diff retrieval endpoint (GET .../diff) | 🔲 |
 | F2.8 | Commit endpoint | 🔲 |
+| F2.8.1 | Commit application model (CommitPayload + nested records, camelCase) | 🔲 |
+| F2.8.2 | Session.commit(sequenceNumber) domain transition | 🔲 |
+| F2.8.3 | Session sequence-number assignment query (port + adapter + IT) | 🔲 |
+| F2.8.4 | World-state write contract (WorldStatePort + command/result records) | 🔲 |
+| F2.8.5 | WorldStateAdapter (native-SQL head+version write, D-089) + IT | 🔲 |
+| F2.8.6 | EntityEmbeddingWritePort + write adapter (native INSERT) + IT | 🔲 |
+| F2.8.7 | CommitPayloadValidator (8 checks) + CommitValidationException | 🔲 |
+| F2.8.8 | CommitService + CommitSessionUseCase + command + SessionCommittedEvent | 🔲 |
+| F2.8.9 | EmbeddingGenerationListener (async post-commit, D-063) | 🔲 |
+| F2.8.10 | Commit endpoint (controller + request DTO + 422 mapping) | 🔲 |
 | F2.9 | Frontend: Input Mode — session submission + status polling | 🔲 |
 | F2.10 | Frontend: Input Mode — diff review screen | 🔲 |
 | F2.11 | Frontend: Input Mode — commit flow + draft recovery | 🔲 |
@@ -1682,24 +1692,200 @@ npx shadcn@latest add button input label form card
 
 #### F2.8 — Commit endpoint
 
-**Goal:** Validate commit payload, write world state synchronously, assign `sequence_number`, trigger async embedding generation. Returns 200 immediately.
+> **Umbrella task — run the F2.8.N sub-tasks below, not this.**
+>
+> **No SETUP required** — Spring async (`@EnableAsync` on `config/ApplicationConfig`), Jackson, and
+> Liquibase are already wired; the world-state tables (F2.1.2/F2.1.3), `entity_embeddings`
+> (F2.1.4), the `Session` aggregate + repository (F2.3), the diff model (F2.7), and `EmbeddingPort`
+> (F2.2.6/F2.6.1) are produced by the cited dependencies. No new dependency or tooling.
+>
+> **Scheduler reconciliation:** the D-074 scheduled stuck-`processing` TTL check is **already**
+> built by **F2.3.9** (`recoverTimedOutSessions`) + **F2.3.10** (`SessionTimeoutRecoveryScheduler`
+> + `@EnableScheduling`). F2.8 does **not** recreate it.
+>
+> **World-state write persistence (D-089):** the write across the four head/version table-pairs uses
+> native `JdbcTemplate` (whitelisted `entity_type` routing), **not** JPA — append-only inserts over
+> four structurally-identical table-pairs, consistent with the F2.5.2 read path. See D-089.
+>
+> **Payload contract:** `CommitPayload` is the camelCase schema in ARCHITECTURE §7.6 (D-076) — plain
+> records, no `@JsonProperty`. It is a *derived* shape, distinct from the read-only `DiffPayload`.
+
+**Goal:** Validate the reviewed commit payload against the stored diff (8 checks, D-078–D-081),
+write world state synchronously, assign `sequence_number` (D-069), transition the session to
+`committed`, and trigger async post-commit embedding generation (D-063). Returns 200 immediately.
+
+**Skills:** `session-ingestion-pipeline`, `backend-domain-model`, `backend-endpoint`, `backend-testing`, `database-migration`  
+**Decisions:** D-001, D-002, D-033, D-042, D-053, D-063, D-069, D-076, D-078, D-079, D-080, D-081, D-089  
+**Dependencies:** F2.7
+
+---
+
+#### F2.8.1 — Commit application model
+
+**Goal:** The camelCase `CommitPayload` record family the validator and service consume, mirroring
+ARCHITECTURE §7.6 exactly (D-076). Plain records — no `@JsonProperty`.
 
 **Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/commit/CommitPayload.java` — `record(List<CardDecision> cardDecisions, List<UncertainResolution> uncertainResolutions, List<AcknowledgedConflict> acknowledgedConflicts)`.
+- `apps/api/src/main/java/com/bluesteel/application/model/commit/CardDecision.java` — `record(UUID cardId, CardAction action, Map<String,Object> editedFields)` (`editedFields` nullable).
+- `apps/api/src/main/java/com/bluesteel/application/model/commit/UncertainResolution.java` — `record(UUID cardId, ResolutionType resolution, UUID matchedEntityId)` (`matchedEntityId` nullable).
+- `apps/api/src/main/java/com/bluesteel/application/model/commit/AcknowledgedConflict.java` — `record(UUID conflictId)`.
+- `apps/api/src/main/java/com/bluesteel/application/model/commit/CardAction.java` — `enum {ACCEPT, EDIT, DELETE}` with lowercase JSON mapping (`@JsonValue`/`@JsonCreator` → `accept|edit|delete`).
+- `apps/api/src/main/java/com/bluesteel/application/model/commit/ResolutionType.java` — `enum {MATCH, NEW}` (uppercase, serializes as-is).
+- `apps/api/src/test/java/com/bluesteel/application/model/commit/CommitPayloadTest.java` — Jackson round-trip via the project `ObjectMapper`: camelCase keys, lowercase `action`, uppercase `resolution`.
 
-*Application:*
-- `CommitSessionUseCase` (driving port): validates zero UNCERTAIN entities in payload (422 `UNCERTAIN_ENTITIES_PRESENT`, D-042); validates `acknowledgedConflicts` covers all detected conflicts (422 `CONFLICTS_NOT_ACKNOWLEDGED`, D-033); for each card: ACCEPT → create/update entity + append version row; EDIT → same with user-edited fields; DELETE → no world state change; assigns `sequence_number` (`MAX(sequence_number) + 1` inside `@Transactional` with lock, D-069); transitions session → `committed`; clears `diff_payload`; publishes `SessionCommittedEvent`
-- `EmbeddingGenerationListener` (`@EventListener + @Async`): handles `SessionCommittedEvent`; for each committed entity version: calls `EmbeddingPort`; inserts row into `entity_embeddings`; failure per entity is logged at ERROR and swallowed — does not fail the listener (D-063)
-- `WorldStateRepository` driven port; `WorldStateAdapter` in `adapters.out.persistence` (JPA entities + repositories for all versioned entity tables)
+**Scope (out):** Adapter request DTO + Bean Validation (F2.8.10); validation logic (F2.8.7).
 
-*Scheduled stuck-session TTL check* (D-074): wire `@Scheduled` task here since session + world state schema is now fully in place.
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-053, D-076  **Dependencies:** F2.7.2
 
-*API:* `POST /api/v1/campaigns/{id}/sessions/{sid}/commit` — `gm|editor`; commit payload per formal schema (D-076); 422 on validation failure; 200 on success
+---
 
-**Scope (out):** Embedding correctness tests (async — use mock `EmbeddingPort` in integration tests or wait for completion with a test spy).
+#### F2.8.2 — Session.commit(sequenceNumber) domain transition
 
-**Skills:** `session-ingestion-pipeline`, `backend-domain-model`  
-**Decisions:** D-001, D-002, D-033, D-042, D-063, D-069, D-076  
-**Dependencies:** F2.7
+**Goal:** Extend the `Session` aggregate so commit records the assigned `sequence_number` (D-069),
+stamps `committedAt`, and clears `diffPayload` as part of the draft→committed transition.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/domain/session/Session.java` (**edit**, F2.3.1) — replace the no-arg `commit()` with `commit(int sequenceNumber)`: guard `draft → committed` (else `InvalidSessionStateTransitionException`); set `sequenceNumber`, `committedAt = now`, `status = COMMITTED`, clear `diffPayload`.
+- `apps/api/src/test/java/com/bluesteel/domain/session/SessionTest.java` (**edit**, F2.3.1) — assert commit from `draft` sets all three fields + clears diff; commit from any non-`draft` status throws.
+
+**Scope (out):** Computing the number (F2.8.3); persistence (F2.8.8 saves via repository).
+
+**Skills:** `backend-domain-model`  **Decisions:** D-069  **Dependencies:** F2.3.1
+
+---
+
+#### F2.8.3 — Session sequence-number assignment query
+
+**Goal:** `MAX(sequence_number) + 1` across the campaign's `committed` sessions (D-069), evaluated in
+the commit transaction. Extends the existing session port + adapter.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/session/SessionRepository.java` (**edit**, F2.3.3) — add `int nextSequenceNumber(UUID campaignId)`; Javadoc: next ordinal across `committed` sessions; called inside the commit `@Transactional` (D-069).
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/SessionJpaRepository.java` (**edit**, F2.3.4) — `@Query` `SELECT COALESCE(MAX(s.sequenceNumber),0)+1 FROM SessionJpaEntity s WHERE s.campaignId = ?1 AND s.status = 'committed'`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/SessionPersistenceAdapter.java` (**edit**, F2.3.4) — implement `nextSequenceNumber` delegating to the query.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/session/SessionPersistenceAdapterIT.java` (**extend**, F2.3.4) — seed N committed + a non-committed session; assert next = N+1 and non-committed states are ignored.
+
+**Scope (out):** Domain transition (F2.8.2); the use case calling this (F2.8.8). Atomicity rests on the one-active-draft rule (D-054) serializing commits per campaign.
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-069  **Dependencies:** F2.1.1, F2.3.3, F2.3.4
+
+---
+
+#### F2.8.4 — World-state write contract
+
+**Goal:** Declare the driven port + value records for the world-state write. Compile-only (interface
++ records; ArchUnit covers placement).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/worldstate/WorldStatePort.java` — `CommittedEntityVersion writeEntity(EntityWriteCommand cmd)` (create head + v1 when `existingEntityId` null, else append next version); `boolean existsInCampaign(String entityType, UUID entityId, UUID campaignId)` (backs the D-079 INVALID_ENTITY_REFERENCE check).
+- `apps/api/src/main/java/com/bluesteel/application/model/worldstate/EntityWriteCommand.java` — `record(String entityType, UUID existingEntityId, UUID campaignId, UUID ownerId, String name, Map<String,Object> changedFields, Map<String,Object> fullSnapshot, UUID sessionId)`.
+- `apps/api/src/main/java/com/bluesteel/application/model/worldstate/CommittedEntityVersion.java` — `record(String entityType, UUID entityId, UUID entityVersionId, int versionNumber, String contentToEmbed, String contentHash)` (carried by the commit event so the async listener embeds without re-reading).
+
+**Scope (out):** The native-SQL implementation (F2.8.5); consumers (F2.8.7/F2.8.8/F2.8.9).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-001, D-079  **Dependencies:** F2.1.2, F2.1.3
+
+---
+
+#### F2.8.5 — WorldStateAdapter (native-SQL head + version write)
+
+**Goal:** Implement `WorldStatePort` as native `JdbcTemplate` SQL over the four head/version
+table-pairs (D-089), mirroring `SessionRecoveryAdapter`/F2.5.2: whitelisted `entity_type` → table
+routing, `MAX(version_number)+1` per head in-transaction (D-001), JSONB via `?::jsonb`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/worldstate/WorldStateAdapter.java` — `@Component`, `@Lazy JdbcTemplate`; private whitelist enum mapping `actor|space|event|relation` → (`<t>s`, `<t>_versions`) (never interpolate caller input); NEW → INSERT head (`campaign_id, owner_id, name, created_at, created_in_session_id`) + INSERT version at `version_number=1`; EXISTING → `SELECT COALESCE(MAX(version_number),0)+1` for the head, INSERT version; serialize `changedFields`/`fullSnapshot` to JSON and bind `?::jsonb`; derive `contentToEmbed` (name + snapshot prose) + `contentHash` (SHA-256); return `CommittedEntityVersion`; `existsInCampaign` via `SELECT EXISTS(... WHERE id=? AND campaign_id=?)`. **Class Javadoc documents why native SQL is used here and cites D-089** (the recorded persistence decision).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/worldstate/WorldStateAdapterIT.java` — extends `TestcontainersPostgresBaseIT`; NEW inserts head + version 1; a second write to the same head appends version 2 (MAX+1); JSONB round-trips; `existsInCampaign` is true only within the owning campaign; entity_type whitelist rejects an unknown type.
+
+**Scope (out):** The port/records (F2.8.4); embedding rows (F2.8.6).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`, `database-migration`  **Decisions:** D-001, D-003, D-089  **Dependencies:** F2.8.4, F2.1.2, F2.1.3
+
+---
+
+#### F2.8.6 — EntityEmbeddingWritePort + write adapter
+
+**Goal:** The insert path the async listener uses to persist one `entity_embeddings` row per
+committed entity version (D-063). Native INSERT, `float[]`→`::vector` literal (mirror F2.5.2).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/embedding/EntityEmbeddingWritePort.java` — `void insert(EntityEmbeddingRow row)`.
+- `apps/api/src/main/java/com/bluesteel/application/model/embedding/EntityEmbeddingRow.java` — `record(String entityType, UUID entityId, UUID entityVersionId, UUID sessionId, float[] embedding, String contentHash)`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/embedding/EntityEmbeddingWriteAdapter.java` — `@Component`, `@Lazy JdbcTemplate`; `INSERT INTO entity_embeddings (id, entity_type, entity_id, entity_version_id, session_id, embedding, content_hash, created_at) VALUES (?, ?, ?, ?, ?, ?::vector, ?, now())`; reuse the F2.5.2 `float[]`→pgvector-literal rendering.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/embedding/EntityEmbeddingWriteAdapterIT.java` — extends `TestcontainersPostgresBaseIT`; seed session + actor head/version, insert an embedding row, assert it is present with the right `entity_type` and dimension.
+
+**Scope (out):** Reading/searching embeddings (F2.5.2); the listener that calls this (F2.8.9).
+
+**Skills:** `session-ingestion-pipeline`, `database-migration`, `backend-testing`  **Decisions:** D-040, D-062, D-063  **Dependencies:** F2.1.4
+
+---
+
+#### F2.8.7 — CommitPayloadValidator + CommitValidationException
+
+**Goal:** The application-layer gatekeeper (D-081): all 8 commit checks against the stored
+`DiffPayload`, throwing before any world-state write. One parameterized 422 exception.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/domain/exception/CommitValidationException.java` — extends `DomainException`; carries `code()` ∈ {`UNKNOWN_CARD_ID`, `DUPLICATE_CARD_DECISION`, `INCOMPLETE_CARD_DECISIONS`, `UNCERTAIN_ENTITIES_PRESENT`, `CONFLICTS_NOT_ACKNOWLEDGED`, `INVALID_ENTITY_REFERENCE`, `UNSUPPORTED_ACTION`} (mirrors `RefreshTokenException.code()`).
+- `apps/api/src/main/java/com/bluesteel/application/service/session/CommitPayloadValidator.java` — `@Component`; `validate(DiffPayload storedDiff, CommitPayload payload, UUID campaignId)`: cardId-existence + no-duplicates (D-076); every non-UNCERTAIN card has a decision (D-080); every UNCERTAIN card resolved (D-042); every conflict acknowledged (D-033); `action == add` → UNSUPPORTED_ACTION (D-053); for MATCH resolutions, `WorldStatePort.existsInCampaign(...)` false → INVALID_ENTITY_REFERENCE (D-079, app tier).
+- `apps/api/src/test/java/com/bluesteel/application/session/CommitPayloadValidatorTest.java` — one failing case per code + a passing case; this is the D-081-mandated suite proving each precondition is checked.
+
+**Scope (out):** Orchestration / world-state write (F2.8.8); the 400 cross-field checks (F2.8.10, adapter Bean Validation).
+
+**Skills:** `session-ingestion-pipeline`, `error-handling`  **Decisions:** D-033, D-042, D-053, D-076, D-078, D-079, D-080, D-081  **Dependencies:** F2.8.1, F2.7.1, F2.7.2, F2.8.4
+
+---
+
+#### F2.8.8 — CommitService + driving port + commit event
+
+**Goal:** Orchestrate the commit: authorize `gm|editor`, deserialize the stored diff, validate
+(F2.8.7), write world state (F2.8.5), assign `sequence_number` (F2.8.3), transition the session
+(F2.8.2), and publish the post-commit event. Validation runs strictly before any write (D-081).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/session/CommitSessionUseCase.java` — `void commit(CommitSessionCommand command)`.
+- `apps/api/src/main/java/com/bluesteel/application/model/session/CommitSessionCommand.java` — `record(UUID callerId, UUID campaignId, UUID sessionId, CommitPayload payload)`.
+- `apps/api/src/main/java/com/bluesteel/application/event/SessionCommittedEvent.java` — `record(UUID sessionId, UUID campaignId, List<CommittedEntityVersion> committedVersions)`.
+- `apps/api/src/main/java/com/bluesteel/application/service/session/CommitService.java` — `@Service`, `@Transactional`; resolve role via `CampaignMembershipPort` (non-`gm|editor` → `UnauthorizedException` 403); load session or `SessionNotFoundException` (404); require `draft` (else `InvalidSessionStateTransitionException` 409); deserialize `diff_payload`→`DiffPayload` (injected `ObjectMapper`); `CommitPayloadValidator.validate(...)`; per `cardDecision`: ACCEPT/EDIT → `WorldStatePort.writeEntity(...)` (EDIT merges `editedFields`), DELETE → skip; apply `uncertainResolutions` (MATCH → write vs `matchedEntityId`, NEW → create); `int seq = sessionRepository.nextSequenceNumber(campaignId)`; `session.commit(seq)`; `sessionRepository.save(session)`; publish `SessionCommittedEvent`; INFO entry/exit (LOG-02).
+- `apps/api/src/test/java/com/bluesteel/application/session/CommitServiceTest.java` — mocked ports; D-081 suite: validator invoked before any `WorldStatePort` call; happy path writes versions, assigns seq, transitions `committed`/clears diff, publishes event; authz 403, 404, non-draft 409.
+
+**Scope (out):** HTTP/DTO/Bean Validation (F2.8.10); async embedding (F2.8.9).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-002, D-063, D-069, D-081  **Dependencies:** F2.8.1, F2.8.2, F2.8.3, F2.8.4, F2.8.7, F2.7.2, F2.3.3, F1.8.7
+
+---
+
+#### F2.8.9 — EmbeddingGenerationListener (async post-commit)
+
+**Goal:** After the commit transaction commits (D-063), embed each committed entity version and
+insert its `entity_embeddings` row asynchronously; per-entity failures are logged and swallowed so
+one failure never aborts the rest or the listener.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/EmbeddingGenerationListener.java` — `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async` on `SessionCommittedEvent` (`@EnableAsync` already on `ApplicationConfig`); for each `CommittedEntityVersion`: `EmbeddingPort.embed(contentToEmbed)` → `EntityEmbeddingWritePort.insert(...)`; wrap each in try/catch — ERROR-log with `session_id`/entity ids and continue (D-063); never log raw content (LOG-01).
+- `apps/api/src/test/java/com/bluesteel/application/session/EmbeddingGenerationListenerTest.java` — mocked `EmbeddingPort` + `EntityEmbeddingWritePort`; asserts one insert per version, and that a thrown `embed` for one version is swallowed while the others still insert.
+
+**Scope (out):** Real embedding provider wiring (F2.6.1 / F2.12); the write adapter (F2.8.6).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-063  **Dependencies:** F2.2.6, F2.8.6, F2.8.8
+
+---
+
+#### F2.8.10 — Commit endpoint (controller + request DTO + 422 mapping)
+
+**Goal:** Expose `POST .../commit`, validate request format (400 cross-field per D-076/D-079), map
+to `CommitPayload`, delegate to the use case, and map `CommitValidationException` → 422 with its code.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/session/CommitSessionRequest.java` — request DTO + nested `CardDecisionRequest`/`UncertainResolutionRequest`/`AcknowledgedConflictRequest`; Bean Validation: `@NotEmpty cardDecisions`; `@AssertTrue` cross-field — `editedFields` non-empty when `action == edit` (D-076), `matchedEntityId` non-null when `resolution == MATCH` (D-079) → both **400**.
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/session/SessionController.java` (**edit**, F2.3.11/F2.7.6) — add `POST /api/v1/campaigns/{id}/sessions/{sid}/commit`; `@Valid CommitSessionRequest`; caller via `UUID.fromString(auth.getName())`; map request → `CommitPayload`; delegate to `CommitSessionUseCase`; return `200` `ApiResponse` (role/draft/business rules enforced in the service).
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/GlobalExceptionHandler.java` (**edit**) — add `@ExceptionHandler(CommitValidationException.class)` → 422 `ApiError.of(ex.code(), ex.getMessage())` (mirrors the `RefreshTokenException` arm).
+- `apps/api/src/test/java/com/bluesteel/adapters/in/web/session/SessionControllerTest.java` (**update**, F2.3.11) — `@WebMvcTest` mocked `CommitSessionUseCase`; assert 200 happy path, 400 on each cross-field violation, 422 with code when the use case throws `CommitValidationException`.
+
+**Scope (out):** Frontend commit flow (F2.11).
+
+**Skills:** `backend-endpoint`, `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-076, D-079, D-081  **Dependencies:** F2.3.11, F2.7.6, F2.8.1, F2.8.7, F2.8.8
 
 ---
 
