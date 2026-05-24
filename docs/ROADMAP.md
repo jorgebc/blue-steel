@@ -811,6 +811,12 @@ npx shadcn@latest add button input label form card
 | F2.6.3 | ConflictDetectionService (MATCH-scoped pgvector context + LLM call) | 🔲 |
 | F2.6.4 | Wire conflict detection into SessionIngestionEventListener | 🔲 |
 | F2.7 | Diff generation + draft API | 🔲 |
+| F2.7.1 | DiffCard sealed interface + EXISTING/NEW/UNCERTAIN card records | 🔲 |
+| F2.7.2 | ConflictCard + DiffPayload aggregate record | 🔲 |
+| F2.7.3 | DiffGenerationService (assemble + persist diff_payload + draft transition) | 🔲 |
+| F2.7.4 | Wire diff generation into SessionIngestionEventListener (final stage) | 🔲 |
+| F2.7.5 | GetSessionDiffUseCase + service (draft-only read) | 🔲 |
+| F2.7.6 | Diff retrieval endpoint (GET .../diff) | 🔲 |
 | F2.8 | Commit endpoint | 🔲 |
 | F2.9 | Frontend: Input Mode — session submission + status polling | 🔲 |
 | F2.10 | Frontend: Input Mode — diff review screen | 🔲 |
@@ -1562,23 +1568,115 @@ npx shadcn@latest add button input label form card
 
 #### F2.7 — Diff generation + draft API
 
+> **Umbrella task — run the F2.7.N sub-tasks below, not this.**
+>
+> **No SETUP required** — the pipeline-stage outputs (F2.4–F2.6), the `Session` aggregate +
+> repository (F2.3), and the `SessionController` (F2.3.11) are produced by the cited dependencies;
+> no new dependency or tooling is introduced.
+>
+> **Schema authority:** `DiffPayload` is the formal contract in ARCHITECTURE §7.6 (D-076) — snake_case
+> keys, `card_type`-discriminated `DiffCard` union (EXISTING/NEW/UNCERTAIN) + `ConflictCard`. The
+> backend records and `apps/web/src/types/sessions.ts` must mirror it exactly; it is read-only to the
+> client (the commit payload, F2.8, is a separate derived shape).
+
 **Goal:** Assemble the structured diff from pipeline outputs, persist as `diff_payload` JSONB, transition session to `draft`, expose the diff retrieval endpoint. Output: a browser-renderable diff conforming to the formal schema in ARCHITECTURE.md §7.6.
-
-**Scope (in):**
-
-*Application:*
-- `DiffGenerationService` (internal): assembles `DiffPayload` from `ExtractionResult` + `List<ResolvedEntity>` + `List<ConflictWarning>`; MATCH → `ExistingEntityCard` (delta only, D-006); NEW → `NewEntityCard` (full profile, D-007); UNCERTAIN → `UncertainEntityCard`; conflicts → `ConflictWarningCard`; serializes to JSON; persists to `sessions.diff_payload`; transitions session → `draft`
-- `GetSessionDiffUseCase` (driving port): validates `draft` status; deserializes and returns `DiffPayload`
-
-*`SessionIngestionEventListener` completed:* calls diff generation as final stage; session transitions to `draft`.
-
-*API:* `GET /api/v1/campaigns/{id}/sessions/{sid}/diff` — `gm|editor`; 404 if not `draft`; returns `DiffPayload` per formal schema (D-076)
 
 **Scope (out):** Commit (F2.8). User-edited fields are in the commit payload — not persisted to `diff_payload`.
 
 **Skills:** `session-ingestion-pipeline`  
 **Decisions:** D-004, D-005, D-006, D-007, D-042, D-076  
 **Dependencies:** F2.6
+
+---
+
+#### F2.7.1 — DiffCard sealed interface + entity card variants
+
+**Goal:** Model the three `DiffCard` variants as a `card_type`-discriminated union per ARCHITECTURE §7.6 (D-076), with Jackson polymorphism + snake_case mapping so the payload round-trips through JSONB and the API unchanged.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/DiffCard.java` — `sealed interface` permitting the three records; `@JsonTypeInfo(use = NAME, property = "card_type")` + `@JsonSubTypes` mapping `EXISTING`/`NEW`/`UNCERTAIN`.
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/ExistingEntityCard.java` — `card_id, entity_id, entity_type, name, changed_fields (Map<String,Object>)` (delta only, D-006).
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/NewEntityCard.java` — `card_id, entity_type, name, full_profile (Map<String,Object>)` (full profile, D-007).
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/UncertainEntityCard.java` — `card_id, entity_type, extracted_mention, candidate_entity_id, candidate_entity_name` (D-042).
+- `apps/api/src/test/java/com/bluesteel/application/model/diff/DiffCardTest.java` — Jackson round-trip per variant asserting the `card_type` discriminator + snake_case keys (use the project `ObjectMapper`).
+
+> All field names map to the snake_case JSON keys via `@JsonProperty` (the schema is snake_case even though the rest of the API is camelCase — D-076 is authoritative for this contract).
+
+**Scope (out):** `ConflictCard` + `DiffPayload` aggregate (F2.7.2); assembly logic (F2.7.3).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-006, D-007, D-042, D-076  **Dependencies:** F2.6
+
+---
+
+#### F2.7.2 — ConflictCard + DiffPayload aggregate
+
+**Goal:** Model the conflict card and the top-level `DiffPayload` envelope that holds the typed card arrays + conflicts, completing the §7.6 contract.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/ConflictCard.java` — `conflict_id, entity_id, entity_type, description, extracted_fact, existing_fact` (non-blocking, D-033).
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/DiffPayload.java` — `record DiffPayload(String narrativeSummaryHeader, List<DiffCard> actors, List<DiffCard> spaces, List<DiffCard> events, List<DiffCard> relations, List<ConflictCard> detectedConflicts)` with snake_case `@JsonProperty` keys (`narrative_summary_header`, `detected_conflicts`).
+- `apps/api/src/test/java/com/bluesteel/application/model/diff/DiffPayloadTest.java` — full-payload Jackson round-trip with a mix of card variants + a conflict.
+
+**Scope (out):** Assembly from pipeline outputs (F2.7.3); persistence (F2.7.3 stores the serialized string on the session).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-005, D-033, D-076  **Dependencies:** F2.7.1
+
+---
+
+#### F2.7.3 — DiffGenerationService
+
+**Goal:** Assemble the `DiffPayload` from the three in-memory pipeline outputs, serialize it, attach it to the session, and transition the session to `draft`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/DiffGenerationService.java` — internal `@Service`; `void run(Session session, ExtractionResult extraction, List<ResolvedEntity> resolved, List<ConflictWarning> conflicts)`: set `narrativeSummaryHeader` from the extraction; per resolved mention → MATCH ⇒ `ExistingEntityCard` (delta), NEW ⇒ `NewEntityCard` (full profile), UNCERTAIN ⇒ `UncertainEntityCard`; map `ConflictWarning`s → `ConflictCard`s; mint a `card_id`/`conflict_id` (`UUID`) per card; serialize the `DiffPayload` via the injected Jackson `ObjectMapper`; attach the JSON to the session and transition it to `draft` (the `Session` aggregate stores `diff_payload` and exposes the draft transition, F2.3.1); `SessionRepository.save`; INFO entry/exit (LOG-02).
+- `apps/api/src/test/java/com/bluesteel/application/session/DiffGenerationServiceTest.java` — mocked `SessionRepository` (+ real `ObjectMapper`); asserts each outcome → the right card variant, conflicts mapped, session ends `draft` with a non-null `diff_payload`.
+
+**Scope (out):** The async listener wiring (F2.7.4); the read endpoint (F2.7.5/F2.7.6); commit + user edits (F2.8 — not persisted to `diff_payload`).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-004, D-005, D-006, D-007, D-042, D-076  **Dependencies:** F2.7.2, F2.2.1, F2.2.2, F2.2.5, F2.3.1, F2.3.3
+
+---
+
+#### F2.7.4 — Wire diff generation into SessionIngestionEventListener (final stage)
+
+**Goal:** Complete the ingestion pipeline: after conflict detection, generate the diff and leave the session in `draft` (ready for review).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/SessionIngestionEventListener.java` (**edit**, F2.6.4) — after `ConflictDetectionService.run(...)` returns the `List<ConflictWarning>`, call `DiffGenerationService.run(session, extraction, resolved, conflicts)`; this is the final stage — the session transitions `processing → draft` and the listener completes.
+- `apps/api/src/test/java/com/bluesteel/application/session/SessionIngestionEventListenerTest.java` (**update**, F2.6.4) — mock the four stage services; assert diff generation runs last and the happy path ends in `draft` (not `processing`).
+
+**Scope (out):** The diff read API (F2.7.5/F2.7.6); commit (F2.8).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-005, D-076  **Dependencies:** F2.6.4, F2.7.3
+
+---
+
+#### F2.7.5 — GetSessionDiffUseCase + service
+
+**Goal:** Read the persisted draft diff for review: authorize `gm|editor`, require `draft` status, deserialize `diff_payload` → `DiffPayload`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/session/GetSessionDiffUseCase.java` — `DiffPayload getDiff(UUID callerId, UUID campaignId, UUID sessionId)`.
+- `apps/api/src/main/java/com/bluesteel/application/service/session/GetSessionDiffService.java` — resolve role via `CampaignMembershipPort`, require `gm|editor` (else `UnauthorizedException`); load session or `SessionNotFoundException` (404); if status != `draft` (or `diff_payload` null) → 404 (the draft diff resource does not exist outside `draft`); deserialize `diff_payload` via the injected `ObjectMapper` → `DiffPayload`.
+- `apps/api/src/test/java/com/bluesteel/application/session/GetSessionDiffServiceTest.java` — mocked `SessionRepository` + `CampaignMembershipPort` (+ real `ObjectMapper`); covers authz, not-found/not-draft → 404, and the happy-path deserialization.
+
+**Scope (out):** The controller/HTTP mapping (F2.7.6); diff generation (F2.7.3); commit (F2.8).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-076  **Dependencies:** F2.7.2, F2.3.1, F2.3.3, F1.8.7
+
+---
+
+#### F2.7.6 — Diff retrieval endpoint (GET .../diff)
+
+**Goal:** Expose the draft diff over HTTP, mirroring the §7.6 schema.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/session/SessionController.java` (**edit**, F2.3.11) — add `GET /api/v1/campaigns/{id}/sessions/{sid}/diff`; caller via `UUID.fromString(auth.getName())`; delegates to `GetSessionDiffUseCase`; returns `ApiResponse<DiffPayload>` (200); role + draft enforcement live in the service; not-draft/not-found → 404 (existing `SessionNotFoundException` mapping, F2.3.11).
+- `apps/api/src/test/java/com/bluesteel/adapters/in/web/session/SessionControllerTest.java` (**update**, F2.3.11) — `@WebMvcTest` with a mocked `GetSessionDiffUseCase`; assert 200 returns the payload envelope and the 404 path.
+
+**Scope (out):** Commit endpoint (F2.8); frontend diff review (F2.10).
+
+**Skills:** `session-ingestion-pipeline`, `backend-endpoint`  **Decisions:** D-076  **Dependencies:** F2.3.11, F2.7.5
 
 ---
 
