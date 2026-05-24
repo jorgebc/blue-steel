@@ -781,6 +781,17 @@ npx shadcn@latest add button input label form card
 | F2.2.7 | Query-answering port + mock + llm-real stub | 🔲 |
 | F2.2.8 | AiConfig + local-profile mock-adapter wiring IT | 🔲 |
 | F2.3 | Session submission + status machine | 🔲 |
+| F2.3.1 | Session aggregate + status state machine + InvalidSessionStateTransitionException | 🔲 |
+| F2.3.2 | NarrativeBlock write-once domain entity | 🔲 |
+| F2.3.3 | Session driven ports + SessionSubmittedEvent + timeout-recovery port method | 🔲 |
+| F2.3.4 | Session persistence adapter (JPA entity + repo + adapter) | 🔲 |
+| F2.3.5 | NarrativeBlock persistence adapter (JPA entity + repo + adapter) | 🔲 |
+| F2.3.6 | SubmitSessionUseCase + service (token budget, 409, role, publish event) | 🔲 |
+| F2.3.7 | GetSessionStatus + DiscardSession use cases + services | 🔲 |
+| F2.3.8 | SessionIngestionEventListener stub (@EventListener + @Async) | 🔲 |
+| F2.3.9 | Timeout-recovery query — extend SessionRecoveryAdapter (PIPELINE_TIMEOUT) | 🔲 |
+| F2.3.10 | Scheduled stuck-processing TTL checker (@Scheduled + @EnableScheduling) | 🔲 |
+| F2.3.11 | SessionController + DTOs + GlobalExceptionHandler mappings | 🔲 |
 | F2.4 | Knowledge extraction pipeline | 🔲 |
 | F2.5 | Entity resolution pipeline | 🔲 |
 | F2.6 | Conflict detection pipeline | 🔲 |
@@ -1058,31 +1069,194 @@ npx shadcn@latest add button input label form card
 
 #### F2.3 — Session submission + status machine
 
+> **Umbrella task — run the F2.3.N sub-tasks below, not this.**
+>
+> **No SETUP required** — Spring async (`@EnableAsync` on `config/ApplicationConfig`) and the `local`
+> profile already exist; the `sessions`/`narrative_blocks` schema (F2.1.1) and `CampaignMembershipPort`
+> (F1.8.7) are produced by their cited dependencies; no new dependency or tooling is introduced. The
+> startup half of D-074 already exists (`SessionRecoveryPort.recoverStuckSessions` →
+> `PIPELINE_INTERRUPTED`, wired in `AdminBootstrapService`) — F2.3 adds only the scheduled TTL half.
+
 **Goal:** Intake API for new sessions. Narrative block stored immutably. Async pipeline triggered. Status polling exposed. Stuck-processing TTL check wired.
-
-**Scope (in):**
-
-*Domain:* `Session` aggregate — state machine (`pending → processing → draft → committed | failed | discarded`); all transitions are methods with guard clauses; invalid transitions throw `InvalidSessionStateTransitionException`. `NarrativeBlock` entity (write-once invariant enforced in domain).
-
-*Application:*
-- `SubmitSessionUseCase`: `gm|editor` required; token budget check first (`400 SUMMARY_TOO_LARGE` if over `blue-steel.ingestion.max-tokens`, default 8000); 409 if another session is `processing|draft` for the campaign (D-054); store `NarrativeBlock`; create `Session` in `pending`; publish `SessionSubmittedEvent`; return `{ sessionId, status: "pending" }`
-- `GetSessionStatusUseCase`: any campaign member; returns `{ sessionId, status, failureReason?, message? }`
-- `DiscardSessionUseCase`: GM-only; from `draft` only → `discarded`; clears `diff_payload`
-- `SessionSubmittedEvent` ApplicationEvent record
-- `SessionIngestionEventListener` stub (`@EventListener + @Async`): transitions session `pending → processing`; immediately transitions to `failed` with `failureReason = 'PIPELINE_NOT_IMPLEMENTED'` — enables full submission + polling + failure path to be tested before the pipeline exists
-
-*Stuck-processing recovery* (D-074): `@Scheduled(fixedDelayString = "${blue-steel.ingestion.processing-timeout-check-interval-ms:300000}")` — every 5 minutes; finds sessions in `processing` for longer than `blue-steel.ingestion.processing-timeout-minutes` (default 10); bulk-transitions to `failed` with `failure_reason = 'PIPELINE_TIMEOUT'`; logs at WARN per session
-
-*API:*
-- `POST /api/v1/campaigns/{id}/sessions` — `gm|editor`; body: `{ "summaryText": "..." }` → 202 with `{ sessionId, status }`; 409 `ACTIVE_SESSION_EXISTS` (response includes `existingSessionId`)
-- `GET /api/v1/campaigns/{id}/sessions/{sid}/status` — any member → `{ sessionId, status, failureReason?, message? }`
-- `POST /api/v1/campaigns/{id}/sessions/{sid}/discard` — GM-only → 200; 409 if not `draft`
 
 **Scope (out):** The real pipeline logic (F2.4+). The `SessionIngestionEventListener` stub is replaced incrementally in F2.4–F2.7.
 
 **Skills:** `session-ingestion-pipeline`, `backend-domain-model`  
 **Decisions:** D-002, D-054, D-069, D-074  
 **Dependencies:** F2.2
+
+---
+
+#### F2.3.1 — Session domain aggregate + status state machine
+
+**Goal:** Pure-Java `Session` aggregate with a guarded status state machine (`pending → processing → draft → committed | failed | discarded`); invalid transitions throw a domain exception. No persistence, no Spring (ARCH-01).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/domain/session/SessionStatus.java` — enum `PENDING, PROCESSING, DRAFT, COMMITTED, FAILED, DISCARDED`.
+- `apps/api/src/main/java/com/bluesteel/domain/session/Session.java` — fields `id, campaignId, ownerId, status, sequenceNumber (nullable), failureReason (nullable), diffPayload (nullable), committedAt (nullable), createdAt, updatedAt`; static `create(...)` starting in `PENDING`; transition methods with guard clauses — `startProcessing()` (pending→processing), `toDraft()` (processing→draft), `markFailed(String reason)` (pending|processing→failed), `discard()` (draft→discarded, clears `diffPayload`), `commit()` (draft→committed); each invalid transition throws `InvalidSessionStateTransitionException`.
+- `apps/api/src/main/java/com/bluesteel/domain/exception/InvalidSessionStateTransitionException.java` — extends `DomainException`.
+- `apps/api/src/test/java/com/bluesteel/domain/session/SessionTest.java` — asserts each legal transition and that every illegal transition throws.
+
+**Scope (out):** `NarrativeBlock` (F2.3.2); persistence (F2.3.4); `sequence_number` assignment at commit (F2.8, D-069 — left nullable here).
+
+**Skills:** `backend-domain-model`  **Decisions:** D-054, D-069, D-074  **Dependencies:** F2.2
+
+---
+
+#### F2.3.2 — NarrativeBlock domain entity
+
+**Goal:** Pure-Java write-once `NarrativeBlock` holding the raw submitted summary and its token count. Mirrors `User`'s non-blank invariant style; no mutators (write-once).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/domain/session/NarrativeBlock.java` — fields `id, sessionId, rawSummaryText, tokenCount, createdAt`; static `create(...)`; rejects blank `rawSummaryText` and negative `tokenCount`; no setters / no copy-with methods (write-once invariant).
+- `apps/api/src/test/java/com/bluesteel/domain/session/NarrativeBlockTest.java`.
+
+**Scope (out):** Token estimation logic (F2.3.6); persistence (F2.3.5).
+
+**Skills:** `backend-domain-model`  **Decisions:** D-054  **Dependencies:** F2.2
+
+---
+
+#### F2.3.3 — Session driven ports + submitted event + timeout-recovery contract
+
+**Goal:** Declare the application contract surface the session use-cases and adapters depend on. Compile-only — interfaces and a record; no behaviour, no test (ArchUnit covers placement).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/session/SessionRepository.java` — `void save(Session)`, `Optional<Session> findById(UUID)`, `Optional<Session> findActiveByCampaignId(UUID)` (returns the session in `processing|draft` if any — backs the D-054 409 check).
+- `apps/api/src/main/java/com/bluesteel/application/port/out/session/NarrativeBlockRepository.java` — `void save(NarrativeBlock)`.
+- `apps/api/src/main/java/com/bluesteel/application/event/SessionSubmittedEvent.java` — record `(UUID sessionId, UUID campaignId)`.
+- `apps/api/src/main/java/com/bluesteel/application/port/out/session/SessionRecoveryPort.java` (**edit** — exists for the startup path) — add `int recoverTimedOutSessions(int timeoutMinutes)`; Javadoc contrasts it (`PIPELINE_TIMEOUT`, scheduled) with the existing `recoverStuckSessions` (`PIPELINE_INTERRUPTED`, startup).
+
+**Scope (out):** Implementations (F2.3.4/F2.3.5/F2.3.9); driving ports + commands/results (declared with their services, F2.3.6/F2.3.7).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-054, D-074  **Dependencies:** F2.3.1, F2.3.2
+
+---
+
+#### F2.3.4 — Session persistence adapter
+
+**Goal:** JPA-backed `SessionRepository` over the existing `sessions` table (F2.1.1). Translates the single-active-session partial-unique-index violation (D-054) so the service can return 409 even under a TOCTOU race.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/SessionJpaEntity.java` — `@Entity @Table(name="sessions")`; `status` persisted as the lowercase text the CHECK constraint expects; `sequenceNumber`, `failureReason`, `diffPayload`, `committedAt` nullable.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/SessionJpaRepository.java` — `extends JpaRepository<SessionJpaEntity, UUID>`; derived/`@Query` method for the active (`processing`,`draft`) session of a campaign.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/SessionPersistenceAdapter.java` — `@Component`, `@Lazy` repo (mirrors `UserPersistenceAdapter`); `toDomain`/`toEntity`; `findActiveByCampaignId`; on `save`, lets `DataIntegrityViolationException` from the partial unique index propagate (service maps to 409).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/session/SessionPersistenceAdapterIT.java` — extends `TestcontainersPostgresBaseIT`; round-trips a session and asserts `findActiveByCampaignId` and the active-session uniqueness behaviour.
+
+**Scope (out):** NarrativeBlock persistence (F2.3.5); the timeout-recovery query (F2.3.9, edits `SessionRecoveryAdapter`).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-054, D-069  **Dependencies:** F2.1.1, F2.3.1, F2.3.3
+
+---
+
+#### F2.3.5 — NarrativeBlock persistence adapter
+
+**Goal:** JPA-backed `NarrativeBlockRepository` over the existing `narrative_blocks` table (F2.1.1).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/NarrativeBlockJpaEntity.java` — `@Entity @Table(name="narrative_blocks")`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/NarrativeBlockJpaRepository.java` — `extends JpaRepository<NarrativeBlockJpaEntity, UUID>`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/NarrativeBlockPersistenceAdapter.java` — `@Component` implementing `NarrativeBlockRepository`; `toEntity` mapping.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/session/NarrativeBlockPersistenceAdapterIT.java` — extends `TestcontainersPostgresBaseIT`; persists a block against a saved session (FK).
+
+**Scope (out):** Session persistence (F2.3.4).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-054  **Dependencies:** F2.1.1, F2.3.2, F2.3.3
+
+---
+
+#### F2.3.6 — Submit session use case
+
+**Goal:** `POST` intake logic: authorize `gm|editor`, enforce token budget and the single-active-session rule, persist the narrative block + a `PENDING` session in one transaction, and publish `SessionSubmittedEvent`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/session/SubmitSessionUseCase.java` — `SubmitSessionResult submit(SubmitSessionCommand)`.
+- `apps/api/src/main/java/com/bluesteel/application/model/session/SubmitSessionCommand.java` (`UUID callerId, UUID campaignId, String summaryText`) + `SubmitSessionResult.java` (`UUID sessionId, SessionStatus status`).
+- `apps/api/src/main/java/com/bluesteel/application/service/session/SubmitSessionService.java` — resolve role via `CampaignMembershipPort.resolveRole` (F1.8.7); non-`gm|editor` → `UnauthorizedException` (403); estimate token count (simple heuristic — a real tokenizer is out of scope under mock profiles); `> blue-steel.ingestion.max-tokens` → `SummaryTooLargeException` (400); `findActiveByCampaignId` present (or a caught unique-index violation from F2.3.4) → `ActiveSessionExistsException` carrying `existingSessionId` (409); `@Transactional` save `NarrativeBlock` + `Session.create(...PENDING)`; publish `SessionSubmittedEvent`; INFO on entry/exit (LOG-02).
+- `apps/api/src/main/java/com/bluesteel/domain/exception/SummaryTooLargeException.java` + `apps/api/src/main/java/com/bluesteel/domain/exception/ActiveSessionExistsException.java` (extend `DomainException`; the latter exposes `existingSessionId()`).
+- `apps/api/src/main/resources/application.properties` (**edit**) + `.env.example` (**edit**) — add `blue-steel.ingestion.max-tokens=${BLUE_STEEL_INGESTION_MAX_TOKENS:8000}`.
+- `apps/api/src/test/java/com/bluesteel/application/session/SubmitSessionServiceTest.java` — mocked ports; covers role denial, oversize, active-draft 409, and the happy path (event published, both saves).
+
+**Scope (out):** Status/discard use cases (F2.3.7); the async pipeline (F2.3.8); HTTP/controller + exception→envelope mapping (F2.3.11).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-002, D-054  **Dependencies:** F2.3.3, F2.3.4, F2.3.5, F1.8.7
+
+---
+
+#### F2.3.7 — Session status + discard use cases
+
+**Goal:** Read the status of a session (any campaign member) and discard a draft (GM-only). Both are thin single-session application services over `SessionRepository`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/session/GetSessionStatusUseCase.java` + `apps/api/src/main/java/com/bluesteel/application/service/session/GetSessionStatusService.java` — load session or `SessionNotFoundException` (404); require the caller resolves to any role for the campaign via `CampaignMembershipPort` (else `UnauthorizedException`); return `SessionStatusView`.
+- `apps/api/src/main/java/com/bluesteel/application/port/in/session/DiscardSessionUseCase.java` + `apps/api/src/main/java/com/bluesteel/application/service/session/DiscardSessionService.java` — GM-only via `CampaignMembershipPort`; load session or 404; call `session.discard()` (non-`draft` → `InvalidSessionStateTransitionException`, mapped to 409 in F2.3.11); save.
+- `apps/api/src/main/java/com/bluesteel/application/model/session/SessionStatusView.java` (`UUID sessionId, SessionStatus status, String failureReason (nullable), String message (nullable)`).
+- `apps/api/src/main/java/com/bluesteel/domain/exception/SessionNotFoundException.java` (404).
+- `apps/api/src/test/java/com/bluesteel/application/session/GetSessionStatusServiceTest.java` + `DiscardSessionServiceTest.java` — mocked ports; cover authz, not-found, and (discard) the non-draft rejection.
+
+**Scope (out):** The diff endpoint (F2.7); controller wiring (F2.3.11).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-054  **Dependencies:** F2.3.3, F2.3.4, F1.8.7
+
+---
+
+#### F2.3.8 — Session ingestion event listener (stub)
+
+**Goal:** Async listener that drives a submitted session through `processing` and immediately to `failed('PIPELINE_NOT_IMPLEMENTED')`, so the full submit → poll → failure path is testable before any real pipeline stage exists. Replaced incrementally in F2.4–F2.7.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/SessionIngestionEventListener.java` — `@EventListener` + `@Async` on `SessionSubmittedEvent`; load session via `SessionRepository`, `startProcessing()`, save, then `markFailed("PIPELINE_NOT_IMPLEMENTED")`, save; WARN log per failed session with `session_id` (LOG-02).
+- `apps/api/src/test/java/com/bluesteel/application/session/SessionIngestionEventListenerTest.java` — mocked `SessionRepository`; asserts the session ends `FAILED` with the stub reason.
+
+**Scope (out):** Real extraction/resolution/conflict/diff stages (F2.4–F2.7); `@EnableAsync` (already present on `ApplicationConfig`).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-074  **Dependencies:** F2.3.1, F2.3.3, F2.3.4
+
+---
+
+#### F2.3.9 — Timeout-recovery persistence query
+
+**Goal:** Implement the scheduled-TTL half of D-074 at the persistence layer by extending the existing `SessionRecoveryAdapter` with `recoverTimedOutSessions`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/SessionRecoveryAdapter.java` (**edit**) — implement `recoverTimedOutSessions(int timeoutMinutes)`: `UPDATE sessions SET status='failed', failure_reason='PIPELINE_TIMEOUT', updated_at=now() WHERE status='processing' AND updated_at < now() - make_interval(mins => ?)`; reuse the existing `@Transactional(REQUIRES_NEW)` + `BadSqlGrammarException` "table not present" guard pattern.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/session/SessionRecoveryAdapterIT.java` — extends `TestcontainersPostgresBaseIT`; asserts an old `processing` session is failed with `PIPELINE_TIMEOUT` while a recent one is untouched. (New IT, or extend an existing recovery IT if present.)
+
+**Scope (out):** The `@Scheduled` trigger + `@EnableScheduling` (F2.3.10); the startup `recoverStuckSessions` path (already implemented).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-074  **Dependencies:** F2.3.3
+
+---
+
+#### F2.3.10 — Scheduled stuck-processing TTL checker
+
+**Goal:** Periodically fail sessions stuck in `processing` past the timeout (D-074, second mechanism). Activates scheduling app-wide.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/SessionTimeoutRecoveryScheduler.java` — `@Scheduled(fixedDelayString="${blue-steel.ingestion.processing-timeout-check-interval-ms:300000}")`; reads `blue-steel.ingestion.processing-timeout-minutes` (`@Value`, default 10 — already in `application.properties`); calls `SessionRecoveryPort.recoverTimedOutSessions(timeoutMinutes)`; WARN log when rows > 0.
+- `apps/api/src/main/java/com/bluesteel/config/ApplicationConfig.java` (**edit**) — add `@EnableScheduling` alongside the existing `@EnableAsync`.
+- `apps/api/src/main/resources/application.properties` (**edit**) + `.env.example` (**edit**) — add `blue-steel.ingestion.processing-timeout-check-interval-ms=${BLUE_STEEL_INGESTION_PROCESSING_TIMEOUT_CHECK_INTERVAL_MS:300000}`.
+- `apps/api/src/test/java/com/bluesteel/application/session/SessionTimeoutRecoverySchedulerTest.java` — mocked `SessionRecoveryPort`; asserts it delegates with the configured timeout.
+
+**Scope (out):** The recovery SQL itself (F2.3.9); startup recovery (already wired in `AdminBootstrapService`).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-074  **Dependencies:** F2.3.3, F2.3.9
+
+---
+
+#### F2.3.11 — Session REST controller + DTOs + exception mappings
+
+**Goal:** Expose the three session endpoints and map the new session exceptions to the standard error envelope. Caller identity from the JWT principal; campaign role enforced inside the services (not `@PreAuthorize`, since campaign role is not in the JWT — AUTH-01).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/session/SessionController.java` — `@RequestMapping("/api/v1/campaigns/{id}/sessions")`; `POST` (`@Valid` body, 202 `{ sessionId, status }`), `GET /{sid}/status` (`{ sessionId, status, failureReason?, message? }`), `DELETE /{sid}` (discard draft, 200 — soft-delete per ARCHITECTURE §7.5 / D-054); caller via `UUID.fromString(SecurityContextHolder...getName())` (mirrors `InvitationController`); responses wrapped in `ApiResponse`.
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/session/SubmitSessionRequest.java` (`@NotBlank summaryText`), `SessionAcceptedResponse.java` (`sessionId, status`), `SessionStatusResponse.java` (`sessionId, status, failureReason, message`).
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/GlobalExceptionHandler.java` (**edit**) — map `SummaryTooLargeException` → 400 `SUMMARY_TOO_LARGE`; `ActiveSessionExistsException` → 409 `ACTIVE_SESSION_EXISTS` (message/payload includes `existingSessionId`); `InvalidSessionStateTransitionException` → 409 `INVALID_SESSION_STATE` (dedicated handler — overrides the generic 422 `DomainException` mapping); `SessionNotFoundException` → 404 `SESSION_NOT_FOUND`.
+- `apps/api/src/test/java/com/bluesteel/adapters/in/web/session/SessionControllerTest.java` — `@WebMvcTest` with mocked use-case ports; asserts 202/200 happy paths and the 400/409/404 envelope mappings.
+
+**Scope (out):** Diff retrieval (F2.7) and commit (F2.8) endpoints; frontend (F2.9–F2.11).
+
+**Skills:** `session-ingestion-pipeline`, `backend-endpoint`  **Decisions:** D-054, D-074  **Dependencies:** F2.3.6, F2.3.7
 
 ---
 
@@ -1239,9 +1413,9 @@ npx shadcn@latest add button input label form card
 - `api/sessions.ts` extended: `POST /sessions/{id}/commit` → `useCommitSession` mutation; commit payload builder (pure function: card decisions + UNCERTAIN resolutions + conflict acknowledgments → `CommitPayload` per ARCHITECTURE.md §7.6 formal schema, D-076)
 - `DiffReviewPage` extended: Commit button → assemble payload → call `useCommitSession`; spinner while in-flight; on success: invalidate all campaign query keys; navigate to campaign home
 - 422 error handling: `UNCERTAIN_ENTITIES_PRESENT` and `CONFLICTS_NOT_ACKNOWLEDGED` → UI notification (treated as UI bug, not user error); log to console
-- Discard button: GM-only (from `campaignStore.activeRole`); confirmation dialog; calls `POST /sessions/{sid}/discard`; navigates to `/sessions/new` on success
+- Discard button: GM-only (from `campaignStore.activeRole`); confirmation dialog; calls `DELETE /sessions/{sid}`; navigates to `/sessions/new` on success
 - Draft recovery: on `/sessions/new`, check for existing draft; if found → show banner "You have an unfinished review" with link to `/sessions/{id}/diff`; uses the `existingSessionId` from the `409` response of `useSubmitSession`
-- `api/sessions.ts` extended: `POST /sessions/{sid}/discard` → `useDiscardSession` mutation
+- `api/sessions.ts` extended: `DELETE /sessions/{sid}` → `useDiscardSession` mutation
 
 **Scope (out):** World state exploration (Phase 4).
 

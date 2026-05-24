@@ -1041,7 +1041,7 @@ The "add" action requires a distinct frontend flow (a creation form embedded in 
 **Status:** Active
 
 **Decision:**
-At most one session per campaign may be in `processing` or `draft` state at any time. A new session submission is rejected with `409 DRAFT_IN_PROGRESS` if another session is currently in one of those states. The GM may explicitly discard a draft session (`DELETE /api/v1/campaigns/{id}/sessions/{sid}`, GM role required, only valid when status is `draft`). Discarding sets `status = 'discarded'` and clears `diff_payload`. The session row and `narrative_blocks` record are both preserved — no physical deletion occurs. `discarded` is a terminal status; a discarded session cannot be reactivated.
+At most one session per campaign may be in `processing` or `draft` state at any time. A new session submission is rejected with `409 ACTIVE_SESSION_EXISTS` (response includes `existingSessionId`) if another session is currently in one of those states. The GM may explicitly discard a draft session (`DELETE /api/v1/campaigns/{id}/sessions/{sid}`, GM role required, only valid when status is `draft`). Discarding sets `status = 'discarded'` and clears `diff_payload`. The session row and `narrative_blocks` record are both preserved — no physical deletion occurs. `discarded` is a terminal status; a discarded session cannot be reactivated.
 
 **Reason:**
 Allowing concurrent drafts would require conflict resolution between two uncommitted world state modifications touching the same entities. The session pipeline is designed around a linear, sequential ingestion model (D-001 — world state is cumulative). Preventing concurrent drafts enforces this linearity at the API boundary. GMs need a clean path to abandon a draft that was submitted in error without having to commit incorrect data.
@@ -1058,7 +1058,10 @@ ON sessions (campaign_id)
 WHERE status IN ('processing', 'draft');
 ```
 
-This makes it physically impossible for two rows with the same `campaign_id` to simultaneously hold a status in the active set. A concurrent duplicate insert fails with a unique constraint violation, which the application layer catches and converts to `409 DRAFT_IN_PROGRESS`. The index is defined in the Liquibase migration for the `sessions` table.
+This makes it physically impossible for two rows with the same `campaign_id` to simultaneously hold a status in the active set. A concurrent duplicate insert fails with a unique constraint violation, which the application layer catches and converts to `409 ACTIVE_SESSION_EXISTS`. The index is defined in the Liquibase migration for the `sessions` table.
+
+**Amendment rationale (2026-05-24) — error-code name:**
+The 409 error code is `ACTIVE_SESSION_EXISTS`, not the originally-drafted `DRAFT_IN_PROGRESS`. The block fires when another session is in `processing` *or* `draft`, so "active session" describes the trigger accurately where "draft in progress" misleads. This aligns the decision with the canonical name already used by the F2.3 roadmap spec, the F2.9 frontend spec, and the `.ai/pipeline` product-owner reference. The response includes `existingSessionId` so the client can link to the blocking session.
 
 **Alternatives considered:**
 - Allow multiple concurrent drafts — rejected; would require ordering guarantees, concurrent entity resolution conflicts, and a merge step that adds significant complexity for no clear benefit.
