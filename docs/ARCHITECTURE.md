@@ -367,7 +367,7 @@ entity_embeddings
   entity_id UUID
   entity_version_id UUID FK
   session_id UUID FK
-  embedding vector(1536)      ← dimension matches chosen embedding model
+  embedding vector(1536)      ← dimension matches chosen embedding model; per-profile (1536 OpenAI prod / 1024 Ollama local) via a Liquibase parameter (D-088)
   content_hash TEXT           ← detect unchanged content, skip re-embedding
   created_at TIMESTAMP
 ```
@@ -443,6 +443,8 @@ Blue Steel uses two LLM providers with distinct responsibilities. Both are behin
 | Embeddings (entity vectorisation, similarity retrieval) | OpenAI | `text-embedding-3-small`, 1536 dimensions |
 
 **Why two providers:** Anthropic does not provide an embedding API — Claude models are generative only. The embedding provider is necessarily separate from the generation provider. This is not a compromise; it is how the ecosystem works. The `EmbeddingPort` abstraction means the application layer is unaware of which provider handles embeddings.
+
+**Local development provider (D-088):** a third wiring — the `llm-ollama` Spring profile — runs both concerns against local models served by Ollama (chat via `OllamaChatModel`, embeddings via Ollama, default `bge-m3`) for fully offline, zero-cost development, including real semantic Query Mode. Provider selection is purely a matter of which `ChatModel`/`EmbeddingModel` bean is active (`AiConfig`); the `SpringAi*` adapters are provider-neutral. The embedding **dimension is a per-profile setting** — OpenAI@1536 in production, Ollama `bge-m3`@1024 locally (§5.5). Embeddings from different models occupy different vector spaces and are never cross-comparable, so any one database uses exactly one embedding model; a local Ollama database is its own island, never mixed with production.
 
 Spring AI is used for two concerns only: `ChatClient` (text generation) and `EmbeddingModel` (vector generation). Spring AI's `VectorStore` abstraction is **not used** — it provides a generic flat similarity search interface that cannot express the domain-specific retrieval queries this system requires (filtering by `entity_type`, joining through `entity_versions → sessions`, scoping by `campaign_id`). All pgvector similarity searches are written as native PostgreSQL queries via Spring Data JPA or `JdbcTemplate`, giving full control over query shape and index usage. See D-062.
 

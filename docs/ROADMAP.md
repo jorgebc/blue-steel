@@ -765,7 +765,21 @@ npx shadcn@latest add button input label form card
 | # | Feature | Status |
 |---|---|---|
 | F2.1 | World state + session schema migrations | 🔲 |
+| F2.1.1 | Session + narrative-block schema migrations (0006–0007) | 🔲 |
+| F2.1.2 | Actor + space versioned-table migrations (0008–0011) | 🔲 |
+| F2.1.3 | Event + relation versioned-table migrations (0012–0015) | 🔲 |
+| F2.1.4 | Entity-embeddings migration — vector(1536) + IVFFlat (0016) | 🔲 |
+| F2.1.5 | Annotations table migration (0017) | 🔲 |
+| F2.1.6 | Proposals + proposal-votes schema-only migrations (0018–0019) | 🔲 |
 | F2.2 | Mock LLM + Email adapters (local profile) | 🔲 |
+| F2.2.1 | AI value model — extraction + shared EntityContext | 🔲 |
+| F2.2.2 | AI value model — entity-resolution outcomes | 🔲 |
+| F2.2.3 | Narrative-extraction port + mock + llm-real stub | 🔲 |
+| F2.2.4 | Entity-resolution port + mock + llm-real stub | 🔲 |
+| F2.2.5 | Conflict-detection port + mock + llm-real stub | 🔲 |
+| F2.2.6 | Embedding port + mock + llm-real stub | 🔲 |
+| F2.2.7 | Query-answering port + mock + llm-real stub | 🔲 |
+| F2.2.8 | AiConfig + local-profile mock-adapter wiring IT | 🔲 |
 | F2.3 | Session submission + status machine | 🔲 |
 | F2.4 | Knowledge extraction pipeline | 🔲 |
 | F2.5 | Entity resolution pipeline | 🔲 |
@@ -775,57 +789,270 @@ npx shadcn@latest add button input label form card
 | F2.9 | Frontend: Input Mode — session submission + status polling | 🔲 |
 | F2.10 | Frontend: Input Mode — diff review screen | 🔲 |
 | F2.11 | Frontend: Input Mode — commit flow + draft recovery | 🔲 |
+| F2.12 | Local LLM via Ollama (offline real pipeline) | 🔲 |
+| F2.12-SETUP | Human: add Ollama starter, install Ollama, pull models | 🔲 |
+| F2.12.1 | Ollama profile config + AiConfig model-bean wiring | 🔲 |
+| F2.12.2 | Offline pipeline smoke test (env-gated, manual/local) | 🔲 |
 
 ---
 
 #### F2.1 — World state + session schema migrations
 
-**Goal:** Create all Phase 2 domain tables before any pipeline code is written. Entity resolution and conflict detection integration tests require `entity_embeddings` to exist.
+> **Umbrella task — run the F2.1.N sub-tasks below, not this.**
 
-**Scope (in):** Liquibase changesets:
-- `0006_create_sessions.xml` — `sessions` per ARCHITECTURE.md §5.3; partial unique index `WHERE status IN ('processing', 'draft')` (D-054); `sequence_number INTEGER NULL` (D-069)
-- `0007_create_narrative_blocks.xml` — `narrative_blocks` per §5.3
-- `0008_create_actors.xml` + `0009_create_actor_versions.xml` — versioning pattern per §5.4
-- `0010_create_spaces.xml` + `0011_create_space_versions.xml`
-- `0012_create_events.xml` + `0013_create_event_versions.xml`
-- `0014_create_relations.xml` + `0015_create_relation_versions.xml`
-- `0016_create_entity_embeddings.xml` — `vector(1536)` column; `USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)` index; `CHECK (entity_type IN ('actor', 'space', 'event', 'relation'))` (D-062)
-- `0017_create_annotations.xml` — `annotations` per §5.6
-- `0018_create_proposals.xml` + `0019_create_proposal_votes.xml` — schema-only; no application code touches these in v1 (D-016)
-- Testcontainers integration test: all changesets applied; all tables, indexes (including IVFFlat), and constraints verified
+**Goal:** Create all Phase 2 domain tables before any pipeline code is written. Entity resolution and conflict detection integration tests require `entity_embeddings` to exist.
 
 **Scope (out):** JPA entities, domain classes. Proposal approval logic is permanently out of scope for v1.
 
+> **No SETUP required.** Liquibase is already wired (`db.changelog-master.xml`, changesets 0001–0005, pgvector extension in 0001) and the Testcontainers harness exists (`TestcontainersPostgresBaseIT`). Each sub-task only appends new changeset files + `<include>` lines and adds one `*SchemaIT`.
+
 **Skills:** `database-migration`  
-**Decisions:** D-016, D-031, D-054, D-062, D-069  
-**Dependencies:** F1.9
+**Decisions:** D-016, D-031, D-054, D-062, D-069
+
+---
+
+#### F2.1.1 — Session + narrative-block schema
+
+**Goal:** Create the `sessions` and `narrative_blocks` tables per ARCHITECTURE.md §5.3, including the single-active-session partial index (D-054) and the nullable `sequence_number` with its committed-only uniqueness (D-069).
+
+**Scope (in):**
+- `apps/api/src/main/resources/db/changelog/0006_create_sessions.xml` — `sessions`: UUID PK; `campaign_id` FK→campaigns, `owner_id` FK→users; `sequence_number INTEGER` nullable; `status TEXT` + raw-SQL `CHECK (status IN ('pending','processing','draft','committed','failed','discarded'))`; `diff_payload JSONB` nullable; `failure_reason TEXT` nullable; `committed_at` nullable; `created_at`, `updated_at`; `UNIQUE (campaign_id, sequence_number)`; raw-SQL partial unique index `sessions_one_active_per_campaign ON sessions (campaign_id) WHERE status IN ('processing','draft')` (D-054); `<rollback>` for the raw-SQL items.
+- `apps/api/src/main/resources/db/changelog/0007_create_narrative_blocks.xml` — `narrative_blocks`: UUID PK; `session_id` FK→sessions; `raw_summary_text TEXT`; `token_count INTEGER`; `created_at`.
+- `apps/api/src/main/resources/db/changelog/db.changelog-master.xml` — append the two `<include>` lines (in order).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/SessionSchemaIT.java` — extends `TestcontainersPostgresBaseIT`; asserts both tables exist, the status CHECK rejects a bad value, the partial index blocks a 2nd `processing|draft` session for one campaign but allows it once the first is `committed`, and `sequence_number` nulls are not treated as duplicates.
+
+**Scope (out):** All versioned world-state tables (F2.1.2/3); embeddings (F2.1.4); JPA entities and the `Session` domain aggregate (F2.3).
+
+**Skills:** `database-migration`  **Decisions:** D-031, D-054, D-069  **Dependencies:** F1.9
+
+---
+
+#### F2.1.2 — Actor + space versioned tables
+
+**Goal:** Create the head + append-only version tables for actors and spaces using the D-035 two-table versioning pattern (ARCHITECTURE.md §5.4).
+
+**Scope (in):**
+- `apps/api/src/main/resources/db/changelog/0008_create_actors.xml` — `actors`: UUID PK; `campaign_id` FK, `owner_id` FK (D-021); `name TEXT NOT NULL`; `created_at`; `created_in_session_id` FK→sessions.
+- `apps/api/src/main/resources/db/changelog/0009_create_actor_versions.xml` — `actor_versions`: UUID PK; `actor_id` FK→actors; `session_id` FK→sessions; `version_number INTEGER`; `changed_fields JSONB`; `full_snapshot JSONB`; `created_at`; index on `actor_id`.
+- `apps/api/src/main/resources/db/changelog/0010_create_spaces.xml` — `spaces` (mirror of `actors`).
+- `apps/api/src/main/resources/db/changelog/0011_create_space_versions.xml` — `space_versions` (mirror of `actor_versions`, FK→spaces).
+- `apps/api/src/main/resources/db/changelog/db.changelog-master.xml` — append the four `<include>` lines.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/WorldStateActorSpaceSchemaIT.java` — asserts all four tables + the version FKs to `actors`/`spaces` and `sessions` exist, and that `campaign_id`/`owner_id` columns are present (D-021).
+
+**Scope (out):** Event/relation tables (F2.1.3); current-state/point-in-time read logic and JPA mappers (later phases).
+
+**Skills:** `database-migration`, `backend-domain-model`  **Decisions:** D-001, D-021, D-035  **Dependencies:** F2.1.1
+
+---
+
+#### F2.1.3 — Event + relation versioned tables
+
+**Goal:** Create the head + version tables for events and relations, completing the four versioned world-state entities (ARCHITECTURE.md §5.4).
+
+**Scope (in):**
+- `apps/api/src/main/resources/db/changelog/0012_create_events.xml` — `events` (versioning head: `campaign_id`, `owner_id`, `name`, `created_at`, `created_in_session_id` FK→sessions).
+- `apps/api/src/main/resources/db/changelog/0013_create_event_versions.xml` — `event_versions` (FK→events + sessions; `version_number`, `changed_fields JSONB`, `full_snapshot JSONB`).
+- `apps/api/src/main/resources/db/changelog/0014_create_relations.xml` — `relations` (head).
+- `apps/api/src/main/resources/db/changelog/0015_create_relation_versions.xml` — `relation_versions`.
+- `apps/api/src/main/resources/db/changelog/db.changelog-master.xml` — append the four `<include>` lines.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/WorldStateEventRelationSchemaIT.java` — asserts all four tables + their FKs and the versioning columns exist.
+
+**Scope (out):** entity_embeddings (F2.1.4); JPA mappers and read logic.
+
+**Skills:** `database-migration`, `backend-domain-model`  **Decisions:** D-001, D-021, D-035  **Dependencies:** F2.1.2
+
+---
+
+#### F2.1.4 — Entity-embeddings migration (pgvector + IVFFlat)
+
+**Goal:** Create `entity_embeddings` with a **configurable-dimension** `vector` column, the IVFFlat cosine index, and the `entity_type` CHECK constraint (ARCHITECTURE.md §5.5, D-062, D-088). The pgvector extension already exists (changeset 0001) — do NOT re-create it.
+
+**Scope (in):**
+- `apps/api/src/main/resources/db/changelog/0016_create_entity_embeddings.xml` — UUID PK; `entity_type TEXT` + raw-SQL `CHECK (entity_type IN ('actor','space','event','relation'))`; `entity_id UUID` (polymorphic — no FK); `entity_version_id UUID`; `session_id` FK→sessions; `embedding vector(${embeddingDimension})` NOT NULL (Liquibase parameter — 1536 for OpenAI `text-embedding-3-small` by default, 1024 under the `llm-ollama` profile; D-040, D-088); `content_hash TEXT`; `created_at`; raw-SQL index `USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)`; `<rollback>` for the raw-SQL items.
+- `apps/api/src/main/resources/application.properties` — add `spring.liquibase.parameters.embeddingDimension=${EMBEDDING_DIMENSION:1536}` (base default; per-profile override lives in F2.12).
+- `apps/api/src/main/resources/db/changelog/db.changelog-master.xml` — append the `<include>` line.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/EntityEmbeddingSchemaIT.java` — asserts the table exists, the `embedding` column type is `vector` (do NOT hard-assert the dimension — it is parameterized), the IVFFlat index exists (query `pg_indexes`/`pg_class` for `ivfflat`), and the `entity_type` CHECK rejects a bad value.
+
+**Scope (out):** Embedding generation / similarity queries (Phase 3 query pipeline). The `llm-ollama` profile override (dimension = 1024) is F2.12.
+
+**Skills:** `database-migration`  **Decisions:** D-031, D-040, D-062, D-088  **Dependencies:** F2.1.3
+
+---
+
+#### F2.1.5 — Annotations table
+
+**Goal:** Create the immutable `annotations` table per ARCHITECTURE.md §5.6 (no `updated_at`).
+
+**Scope (in):**
+- `apps/api/src/main/resources/db/changelog/0017_create_annotations.xml` — UUID PK; `campaign_id` FK→campaigns; `entity_type TEXT` + raw-SQL `CHECK (entity_type IN ('actor','space','relation','event'))`; `entity_id UUID` (polymorphic — no FK); `author_id` FK→users; `content TEXT`; `created_at` (deliberately no `updated_at` — annotations are immutable).
+- `apps/api/src/main/resources/db/changelog/db.changelog-master.xml` — append the `<include>` line.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/AnnotationSchemaIT.java` — asserts the table exists, has no `updated_at` column, and the `entity_type` CHECK rejects a bad value.
+
+**Scope (out):** Annotation REST API / use cases (later phases).
+
+**Skills:** `database-migration`  **Decisions:** D-021  **Dependencies:** F2.1.4
+
+---
+
+#### F2.1.6 — Proposals + proposal-votes (schema-only)
+
+**Goal:** Create the `proposals` and `proposal_votes` tables from day one per ARCHITECTURE.md §5.8 (D-016). Schema only — no application code touches these in v1.
+
+**Scope (in):**
+- `apps/api/src/main/resources/db/changelog/0018_create_proposals.xml` — UUID PK; `campaign_id` FK→campaigns; `target_entity_type TEXT` + CHECK; `target_entity_id UUID` (polymorphic); `author_id` FK→users; `proposed_delta JSONB`; `status TEXT` + raw-SQL `CHECK (status IN ('open','cosigned','approved','rejected','expired'))`; `created_at`; `expires_at` nullable (TTL enforced in v2, D-019).
+- `apps/api/src/main/resources/db/changelog/0019_create_proposal_votes.xml` — UUID PK; `proposal_id` FK→proposals; `voter_id` FK→users; `vote TEXT` + CHECK `IN ('cosign','approve','reject')`; `created_at`; `UNIQUE (proposal_id, voter_id)`.
+- `apps/api/src/main/resources/db/changelog/db.changelog-master.xml` — append the two `<include>` lines.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/ProposalSchemaIT.java` — asserts both tables exist, the FKs resolve, and the `UNIQUE (proposal_id, voter_id)` constraint is enforced (second identical vote throws `DataIntegrityViolationException`).
+
+**Scope (out):** Proposal approval pipeline — permanently out of scope for v1 (D-016).
+
+**Skills:** `database-migration`  **Decisions:** D-016  **Dependencies:** F2.1.5
 
 ---
 
 #### F2.2 — Mock LLM + Email adapters (local profile)
 
-**Goal:** All AI-driven port adapters return deterministic canned responses under the `local` profile. Zero API cost. Unblocks TDD on the full ingestion pipeline.
+> **Umbrella task — run the F2.2.N sub-tasks below, not this.**
+
+**Goal:** All AI-driven port adapters return deterministic canned responses under the `local` profile (zero API cost), unblocking TDD on the full ingestion pipeline (F2.3–F2.8).
+
+**Scope (out):** Real Spring AI adapters (F2.4–F2.6). `EmailPort` + mock already done in F1.5.
+
+> **No SETUP required.** Spring AI is already in `apps/api/pom.xml` (spring-ai-bom + anthropic + openai starters, D-032) and the `local` profile already exists. Mocks return canned data and stubs only throw, so no `ChatClient`/`EmbeddingModel` imports are needed until F2.4.
+>
+> **Port-signature note:** ARCHITECTURE §6.2 types `NarrativeExtractionPort.extract(NarrativeBlock)`, but the `NarrativeBlock` domain class is created in F2.3. Because F2.2 precedes it, the port takes `String rawSummaryText`; F2.4 passes `narrativeBlock.rawSummaryText()` when wiring the real pipeline.
+>
+> **Profile convention (D-088) — applies to every sub-task below:** there are three provider selections (mock / `llm-real` / `llm-ollama`). Mock adapters are `@Profile("!llm-real & !llm-ollama")` (active by default in dev; off whenever a real provider is selected). Real Spring AI adapters are provider-neutral (`SpringAi*` names) on `@Profile("llm-real | llm-ollama")` — the active `ChatModel`/`EmbeddingModel` bean is chosen per profile in `AiConfig` (F2.12 adds the Ollama beans). The F2.2 stub real adapters use these neutral names and profiles and simply throw until F2.4–F2.6 implement them.
+
+**Skills:** `session-ingestion-pipeline`, `spring-ai-llm-adapter`  **Decisions:** D-032, D-049, D-088
+
+---
+
+#### F2.2.1 — AI value model: extraction + shared EntityContext
+
+**Goal:** Define the shared, immutable value records the AI ports exchange, per ARCHITECTURE.md §6.2. These are plain records in `application.model` (ArchUnit Rule 7 keeps them out of port packages).
 
 **Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/ingestion/ExtractedMention.java` — `record ExtractedMention(String name, String description, String rawText)`.
+- `apps/api/src/main/java/com/bluesteel/application/model/ingestion/ExtractionResult.java` — `record ExtractionResult(String narrativeSummaryHeader, List<ExtractedMention> actors, List<ExtractedMention> spaces, List<ExtractedMention> events, List<ExtractedMention> relations)`.
+- `apps/api/src/main/java/com/bluesteel/application/model/ingestion/EntityContext.java` — `record EntityContext(UUID entityId, String entityType, String name, String stateSnapshot, UUID sessionId, int versionNumber)`.
+- `apps/api/src/test/java/com/bluesteel/application/model/ingestion/ExtractionResultTest.java` — unit test asserting record construction/accessors and (if compact constructors validate) that null lists/blank header are rejected.
 
-*Domain model records* (in `com.bluesteel.application.model`): `ExtractedMention`, `ExtractionResult` (includes `narrativeSummaryHeader`), `ResolvedEntity` (outcome: `MATCH|NEW|UNCERTAIN`), `ConflictWarning`, `QueryResponse`, `EntityContext` (per ARCHITECTURE.md §6.2)
+**Scope (out):** Resolution/conflict/query records (F2.2.2/5/7); any port or adapter.
 
-*Mock adapters* (all in `adapters.out.ai`, activated `@Profile("local")`):
-- `MockNarrativeExtractionAdapter`: returns canned `ExtractionResult` with 1 MATCH-candidate actor, 1 new actor, 1 space, 1 event, 1 relation, and a narrative summary header
-- `MockEntityResolutionAdapter`: deterministic outcomes based on mention name: "Mira" → MATCH, "Thornwick" → NEW, "Stranger" → UNCERTAIN
-- `MockConflictDetectionAdapter`: returns one `ConflictWarning` on first call; empty list thereafter
-- `MockEmbeddingAdapter`: returns deterministic `float[1536]` (zeros except index 0 = 1.0f)
-- `MockQueryAnsweringAdapter`: returns canned answer + one citation to `sequence_number = 1`
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-032  **Dependencies:** F2.1
 
-*Stub real adapters* (non-local profiles): throw `UnsupportedOperationException("Activate llm-real profile")` until F2.4-F2.6 wire real implementations.
+---
 
-`AiConfig.java` updated to register all mock beans under `local` profile.
+#### F2.2.2 — AI value model: entity-resolution outcomes
 
-**Scope (out):** Real Spring AI adapters (F2.4–F2.6). `EmailPort` mock already done in F1.5.
+**Goal:** Define the resolution-outcome value types consumed by `EntityResolutionPort`.
 
-**Skills:** `session-ingestion-pipeline`  
-**Decisions:** D-032, D-049  
-**Dependencies:** F2.1
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/ingestion/ResolutionOutcome.java` — `enum ResolutionOutcome { MATCH, NEW, UNCERTAIN }`.
+- `apps/api/src/main/java/com/bluesteel/application/model/ingestion/ResolvedEntity.java` — `record ResolvedEntity(ExtractedMention mention, ResolutionOutcome outcome, UUID matchedEntityId)` (`matchedEntityId` nullable; non-null only for `MATCH`).
+- `apps/api/src/test/java/com/bluesteel/application/model/ingestion/ResolvedEntityTest.java` — asserts construction and the MATCH/NEW/UNCERTAIN invariant if enforced in a compact constructor.
+
+**Scope (out):** The resolution port + adapters (F2.2.4).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-049  **Dependencies:** F2.2.1
+
+---
+
+#### F2.2.3 — Narrative-extraction port + mock + stub
+
+**Goal:** Define `NarrativeExtractionPort` and its `local` mock + `llm-real` stub. The mock returns a canned `ExtractionResult` (1 MATCH-candidate actor, 1 new actor, 1 space, 1 event, 1 relation, plus a narrative summary header).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/ingestion/NarrativeExtractionPort.java` — `ExtractionResult extract(String rawSummaryText)` (see umbrella port-signature note).
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/MockNarrativeExtractionAdapter.java` — `@Component @Profile("!llm-real & !llm-ollama")`; returns the canned result.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiNarrativeExtractionAdapter.java` — `@Component @Profile("llm-real | llm-ollama")`; stub that throws `UnsupportedOperationException("Real LLM adapter not implemented until F2.4")` (F2.4 fills in the real `ChatClient` logic).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/MockNarrativeExtractionAdapterTest.java` — asserts the canned counts (actors/spaces/events/relations) and non-blank header.
+
+**Scope (out):** Real Anthropic ChatClient logic (F2.4); AiConfig wiring (F2.2.8).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-032, D-049  **Dependencies:** F2.2.1
+
+---
+
+#### F2.2.4 — Entity-resolution port + mock + stub
+
+**Goal:** Define `EntityResolutionPort` and its mock + stub. Mock outcomes are deterministic by mention name: "Mira" → MATCH, "Thornwick" → NEW, "Stranger" → UNCERTAIN; all others → NEW.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/ingestion/EntityResolutionPort.java` — `List<ResolvedEntity> resolve(List<ExtractedMention> mentions, List<EntityContext> candidateContext)`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/MockEntityResolutionAdapter.java` — `@Component @Profile("!llm-real & !llm-ollama")`; name-based deterministic outcomes.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiEntityResolutionAdapter.java` — `@Component @Profile("llm-real | llm-ollama")`; stub that throws until F2.5.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/MockEntityResolutionAdapterTest.java` — asserts the three name → outcome mappings and the default.
+
+**Scope (out):** Stage-1 pgvector similarity search + real LLM resolution (F2.5).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-049  **Dependencies:** F2.2.1, F2.2.2
+
+---
+
+#### F2.2.5 — Conflict-detection port + mock + stub
+
+**Goal:** Define the `ConflictWarning` record, `ConflictDetectionPort`, and its mock + stub. Mock returns one `ConflictWarning` on the first call and an empty list thereafter (stateful counter).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/ingestion/ConflictWarning.java` — `record ConflictWarning(String entityName, String description)` (fields per ARCHITECTURE §6.3 diff warning card; keep minimal).
+- `apps/api/src/main/java/com/bluesteel/application/port/out/ingestion/ConflictDetectionPort.java` — `List<ConflictWarning> detect(ExtractionResult extraction, List<EntityContext> relevantContext)`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/MockConflictDetectionAdapter.java` — `@Component @Profile("!llm-real & !llm-ollama")`; first-call-only warning.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiConflictDetectionAdapter.java` — `@Component @Profile("llm-real | llm-ollama")`; stub that throws until F2.6.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/MockConflictDetectionAdapterTest.java` — asserts one warning on first call, empty on second.
+
+**Scope (out):** Real conflict LLM call + pgvector retrieval (F2.6).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-049  **Dependencies:** F2.2.1
+
+---
+
+#### F2.2.6 — Embedding port + mock + stub
+
+**Goal:** Define `EmbeddingPort` and its mock + stub. Mock returns a deterministic `float[1536]` (all zeros except index 0 = 1.0f).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/embedding/EmbeddingPort.java` — `float[] embed(String content)`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/MockEmbeddingAdapter.java` — `@Component @Profile("!llm-real & !llm-ollama")`; deterministic vector.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiEmbeddingAdapter.java` — `@Component @Profile("llm-real | llm-ollama")`; stub that throws until F2.6 (real impl injects Spring AI `EmbeddingModel` — OpenAI or Ollama per profile).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/MockEmbeddingAdapterTest.java` — asserts `length == 1536`, index 0 == 1.0f, rest 0.0f.
+
+**Scope (out):** Real OpenAI `EmbeddingModel` call + async post-commit generation (F2.6/D-063).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-040, D-049  **Dependencies:** F2.1
+
+---
+
+#### F2.2.7 — Query-answering port + mock + stub
+
+**Goal:** Define the `QueryResponse` + `Citation` records, `QueryAnsweringPort`, and its mock + stub. Mock returns a canned answer plus one citation to `sequenceNumber = 1`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/query/Citation.java` — `record Citation(UUID sessionId, int sequenceNumber, String snippet)` (grounding per D-003).
+- `apps/api/src/main/java/com/bluesteel/application/model/query/QueryResponse.java` — `record QueryResponse(String answer, List<Citation> citations)`.
+- `apps/api/src/main/java/com/bluesteel/application/port/out/query/QueryAnsweringPort.java` — `QueryResponse answer(String question, List<EntityContext> relevantContext)`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/MockQueryAnsweringAdapter.java` — `@Component @Profile("!llm-real & !llm-ollama")`; canned answer + one citation.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiQueryAnsweringAdapter.java` — `@Component @Profile("llm-real | llm-ollama")`; stub that throws until the Query Mode pipeline (Phase 3).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/MockQueryAnsweringAdapterTest.java` — asserts non-blank answer and exactly one citation with `sequenceNumber == 1`.
+
+**Scope (out):** Real query pipeline (Phase 3 / `query-pipeline` skill).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-049  **Dependencies:** F2.2.1
+
+---
+
+#### F2.2.8 — AiConfig + local-profile wiring IT
+
+**Goal:** Add the co-located `AiConfig` (home for future real-adapter bean wiring) and a Testcontainers IT proving the `local` Spring context starts with all five mock adapters wired.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/AiConfig.java` — `@Configuration` in `adapters.out.ai` (ArchUnit Rule 4). Documents the three-way profile split — mock (`!llm-real & !llm-ollama`) / `llm-real` (Anthropic+OpenAI) / `llm-ollama` (Ollama, F2.12) — and is the home for profile-selected `ChatClient`/`EmbeddingModel` beans; no real beans yet (deferred to F2.4/F2.12 to avoid requiring API keys at local startup).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/AiAdapterWiringIT.java` — extends `TestcontainersPostgresBaseIT` (already `@ActiveProfiles("local")`, i.e. no real provider profile); `@Autowired` the five ports and assert each resolves to its `Mock*` implementation.
+
+**Scope (out):** Real bean definitions and ChatClient/EmbeddingModel wiring (F2.4–F2.6; Ollama beans F2.12).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-049, D-088  **Dependencies:** F2.2.3, F2.2.4, F2.2.5, F2.2.6, F2.2.7
 
 ---
 
@@ -868,12 +1095,12 @@ npx shadcn@latest add button input label form card
 *Application:* `ExtractionPipelineService` (internal): calls `NarrativeExtractionPort`; transitions session `pending → processing` on start; on exception → transitions to `failed` with reason. `SessionIngestionEventListener` extended: calls extraction stage; passes `ExtractionResult` in-memory to the next stage (added in F2.5).
 
 *Adapters:*
-- `SpringAiNarrativeExtractionAdapter` (llm-real profile): `ChatClient` → Anthropic; structured output (`BeanOutputConverter`); produces `ExtractionResult`; logs tokens_in, tokens_out, cost_usd at INFO with MDC `stage = "extraction"` (LOG-01, D-072)
+- `SpringAiNarrativeExtractionAdapter` (`@Profile("llm-real | llm-ollama")`): provider-neutral — injects `ChatClient` (backed by Anthropic under `llm-real`, Ollama under `llm-ollama` per `AiConfig`, D-088); structured output (`BeanOutputConverter`); produces `ExtractionResult`; logs tokens_in, tokens_out, cost_usd at INFO with MDC `stage = "extraction"` (LOG-01, D-072)
 
 **Scope (out):** Entity resolution (F2.5). The listener exits after extraction in this feature.
 
 **Skills:** `session-ingestion-pipeline`  
-**Decisions:** D-005, D-032, D-034, D-049, D-072  
+**Decisions:** D-005, D-032, D-034, D-049, D-072, D-088  
 **Dependencies:** F2.3
 
 ---
@@ -888,14 +1115,14 @@ npx shadcn@latest add button input label form card
 - `EntityResolutionService` (internal): for each `ExtractedMention`; Stage 1: embed mention via `EmbeddingPort` → `EntitySimilaritySearchPort` → if max score < `blue-steel.resolution.similarity-floor` (default 0.75): classify NEW immediately (no LLM call); Stage 2: if score ≥ floor: call `EntityResolutionPort` with mention + top-3 `EntityContext` candidates → MATCH / NEW / UNCERTAIN
 - `EntitySimilaritySearchPort` driven port: `List<SimilarityResult> search(float[] vector, UUID campaignId, String entityType, int topN)`
 - `EntitySimilaritySearchAdapter`: native pgvector query `1 - (embedding <=> $1::vector) AS similarity ... WHERE campaign_id = $2 AND entity_type = $3 ORDER BY embedding <=> $1::vector LIMIT $4` (D-062, ARCH-04)
-- `SpringAiEntityResolutionAdapter` (llm-real): LLM call 2; structured output: outcome + matched entity ID; logs MDC `stage = "resolution"`
+- `SpringAiEntityResolutionAdapter` (`@Profile("llm-real | llm-ollama")`): provider-neutral `ChatClient`, LLM call 2; structured output: outcome + matched entity ID; logs MDC `stage = "resolution"` (D-088)
 
 *`SessionIngestionEventListener` extended:* calls entity resolution after extraction; passes `List<ResolvedEntity>` to next stage.
 
 **Scope (out):** Conflict detection (F2.6). Diff generation (F2.7).
 
 **Skills:** `session-ingestion-pipeline`  
-**Decisions:** D-041, D-042, D-062  
+**Decisions:** D-041, D-042, D-062, D-088  
 **Dependencies:** F2.4
 
 ---
@@ -908,14 +1135,14 @@ npx shadcn@latest add button input label form card
 
 *Application:*
 - `ConflictDetectionService` (internal): assembles `EntityContext` for MATCH-resolved entities only via `EntitySimilaritySearchPort` (embed `narrativeSummaryHeader` → top-N relevant snapshots); calls `ConflictDetectionPort`; if no MATCH entities: skip LLM call, return empty list
-- `SpringAiConflictDetectionAdapter` (llm-real): pgvector context-scoped LLM call 3; structured output: `List<ConflictWarning>`; logs MDC `stage = "conflict_detection"`
+- `SpringAiConflictDetectionAdapter` (`@Profile("llm-real | llm-ollama")`): provider-neutral `ChatClient`, pgvector context-scoped LLM call 3; structured output: `List<ConflictWarning>`; logs MDC `stage = "conflict_detection"` (D-088)
 
 *`SessionIngestionEventListener` extended:* calls conflict detection after entity resolution; passes `List<ConflictWarning>` to next stage.
 
 **Scope (out):** Diff generation (F2.7).
 
 **Skills:** `session-ingestion-pipeline`  
-**Decisions:** D-033, D-034, D-062  
+**Decisions:** D-033, D-034, D-062, D-088  
 **Dependencies:** F2.5
 
 ---
@@ -1021,6 +1248,54 @@ npx shadcn@latest add button input label form card
 **Skills:** `frontend-diff-review`, `frontend-testing`  
 **Decisions:** D-002, D-033, D-042, D-054, D-076  
 **Dependencies:** F2.10, F2.8
+
+---
+
+#### F2.12 — Local LLM via Ollama (offline real pipeline)
+
+> **Umbrella task — run the F2.12.N sub-tasks below, not this.**
+
+**Goal:** Add a third provider selection — the `llm-ollama` Spring profile — that runs the entire ingestion + Query Mode pipeline against local models served by Ollama, fully offline with no API keys and zero cost, including **real semantic Query Mode** (real local embeddings in pgvector). Prod stays OpenAI@1536; local becomes Ollama (`bge-m3`@1024 + `qwen2.5:7b`). See D-088.
+
+**Scope (out):** Any domain/application/adapter code change — the `SpringAi*` adapters are already provider-neutral (F2.4–F2.6) and gated `@Profile("llm-real | llm-ollama")`; this task only adds the Ollama starter, profile config, and the profile-selected model beans. Reversing the OpenAI@1536 production default (D-088 keeps it).
+
+> **Why small:** provider selection lives at the `ChatModel`/`EmbeddingModel` bean level in `AiConfig`, and the embedding dimension is already a Liquibase parameter (F2.1.4). Ollama is a configuration concern, not new adapters.
+
+#### F2.12-SETUP (human — run by hand before the sub-tasks)
+
+- [ ] `apps/api/pom.xml`: add `<dependency>` `org.springframework.ai:spring-ai-starter-model-ollama` (version managed by the existing Spring AI BOM).
+- [ ] Install Ollama (https://ollama.com) and start it (serves `http://localhost:11434`).
+- [ ] `ollama pull bge-m3` (embeddings, 1024 dims) and `ollama pull qwen2.5:7b` (chat).
+- [ ] (optional) `docker-compose.yml`: add an `ollama` service (`image: ollama/ollama`, port `11434`, named volume) for one-command bring-up.
+- [ ] Recreate the local DB when switching dimension: `docker compose down -v` then back up (the `entity_embeddings` column is created at 1024 under this profile).
+
+---
+
+#### F2.12.1 — Ollama profile config + AiConfig model-bean wiring
+
+**Goal:** Add the `llm-ollama` profile config and the profile-selected Ollama `ChatClient` + `EmbeddingModel` beans, so the existing provider-neutral adapters run against Ollama.
+
+**Scope (in):**
+- `apps/api/src/main/resources/application-llm-ollama.properties` — all env-overridable with defaults: `spring.ai.ollama.base-url=${OLLAMA_BASE_URL:http://localhost:11434}`; `spring.ai.ollama.chat.options.model=${OLLAMA_CHAT_MODEL:qwen2.5:7b}`; `spring.ai.ollama.embedding.options.model=${OLLAMA_EMBEDDING_MODEL:bge-m3}`; `spring.liquibase.parameters.embeddingDimension=${EMBEDDING_DIMENSION:1024}`; reuse the `local` datasource.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/AiConfig.java` (extend) — `@Profile("llm-ollama")` `@Bean`s exposing the active `ChatClient` (from `OllamaChatModel`) and `EmbeddingModel` (Ollama); ensure no bean ambiguity with the Anthropic/OpenAI auto-config (profile-gate the provider beans so exactly one `ChatModel`/`EmbeddingModel` is active).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/OllamaWiringTest.java` — verifies `AiConfig` produces a `ChatClient` + `EmbeddingModel` under `llm-ollama` using a mocked Ollama model (no live Ollama → CI-safe).
+
+**Scope (out):** Live end-to-end run (F2.12.2). Any adapter logic (already in F2.4–F2.6).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-032, D-040, D-088  **Dependencies:** F2.12-SETUP, F2.2.8, F2.8
+
+---
+
+#### F2.12.2 — Offline pipeline smoke test (env-gated, manual/local)
+
+**Goal:** Prove the full offline pipeline works end-to-end against a live Ollama: submit → extract → resolve → conflict → diff → commit → embed → query, with a real grounded Query Mode answer.
+
+**Scope (in):**
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/OllamaPipelineSmokeIT.java` — `@EnabledIfEnvironmentVariable` (e.g. `RUN_OLLAMA_IT=true`); runs under `local,llm-ollama` against a live Ollama + pgvector Testcontainer; submits a session, commits, then asks a Query Mode question and asserts a non-empty grounded answer with at least one citation. **Disabled by default** (CI has no Ollama) — documents the real offline check.
+
+**Scope (out):** CI wiring — CI stays on mock adapters (`local`). This IT is developer-run only.
+
+**Skills:** `spring-ai-llm-adapter`, `session-ingestion-pipeline`  **Decisions:** D-088  **Dependencies:** F2.12.1
 
 ---
 

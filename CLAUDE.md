@@ -40,7 +40,8 @@ git config core.hooksPath .githooks   # activates pre-push CI checks
 podman compose up -d        # or: docker compose up -d
 
 # Backend (from apps/api/)
-mvn spring-boot:run -Dspring-boot.run.profiles=local   # mocked LLMs, zero API cost
+mvn spring-boot:run -Dspring-boot.run.profiles=local              # mocked LLMs, zero API cost
+mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-ollama   # real LOCAL models via Ollama — offline, no API keys (D-088)
 mvn spotless:check    # format check
 mvn test              # unit + ArchUnit (fast)
 mvn verify            # + integration tests (Podman/Docker required)
@@ -59,6 +60,10 @@ npm test              # Vitest (CI mode)
 | `DATABASE_URL` | Neon PostgreSQL connection string |
 | `ANTHROPIC_API_KEY` | Claude (text gen) — `llm-real` profile only |
 | `OPENAI_API_KEY` | `text-embedding-3-small` — `llm-real` profile only |
+| `OLLAMA_BASE_URL` | Ollama server — `llm-ollama` profile (default `http://localhost:11434`; no key needed) (D-088) |
+| `OLLAMA_CHAT_MODEL` | Local chat model — `llm-ollama` (default `qwen2.5:7b`) |
+| `OLLAMA_EMBEDDING_MODEL` | Local embedding model — `llm-ollama` (default `bge-m3`, 1024 dims) |
+| `EMBEDDING_DIMENSION` | pgvector embedding column dimension (default 1536; set 1024 under `llm-ollama`) |
 | `JWT_SECRET` | HS256 symmetric secret (min 32 bytes) |
 | `EMAIL_API_KEY` | Transactional email (Resend) |
 | `VITE_API_BASE_URL` | Backend URL for frontend (e.g. `http://localhost:8080`) |

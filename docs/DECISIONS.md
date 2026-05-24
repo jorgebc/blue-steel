@@ -616,7 +616,7 @@ Polyglot persistence (dedicated vector database + relational database) introduce
 **Status:** Active
 
 **Decision:**  
-Anthropic (Claude) is the default LLM provider. Integration is provider-agnostic via Spring AI's abstraction layer. The LLM is an external actor behind a driven port. Additional providers (OpenAI, Google Gemini) are not implemented in v1.
+Anthropic (Claude) is the default LLM provider. Integration is provider-agnostic via Spring AI's abstraction layer. The LLM is an external actor behind a driven port. Additional providers (OpenAI, Google Gemini) are not implemented in v1. (A local-dev Ollama wiring — the `llm-ollama` profile — is added by D-088 as a configuration concern only, exactly as this decision's port design intends.)
 
 **Reason:**  
 Developer holds an active Anthropic subscription. Claude is well-suited to long-context narrative understanding and structured extraction tasks. Spring AI provides model-agnostic abstractions (`ChatClient`, `EmbeddingModel`) — swapping providers means replacing the adapter, not touching domain or application code. This is Cockburn's hexagonal pattern applied directly: the LLM is an external actor behind a port. Note: Spring AI's `VectorStore` is not used — pgvector retrieval uses native queries (D-062).
@@ -767,7 +767,7 @@ Configuration that belongs to an adapter should travel with that adapter. A shar
 ### D-040 — OQ-C resolved: Embedding model — OpenAI text-embedding-3-small
 
 **Date:** 2026-04-06  
-**Status:** Active
+**Status:** Active — embedding model/dimension made configurable per profile by D-088 (OpenAI@1536 remains the production default)
 
 **Decision:**  
 The embedding model is OpenAI `text-embedding-3-small` at 1536 dimensions. Embedding calls are routed through the `EmbeddingPort` abstraction via Spring AI — the application layer is unaware of the provider.
@@ -777,7 +777,7 @@ Anthropic does not provide an embedding API; Claude models are generative only. 
 
 **Alternatives considered:**  
 - OpenAI `text-embedding-3-large` (3072 dimensions) — rejected; marginally better quality, 6x more expensive, 2x larger vectors with slower similarity search. Quality delta does not justify cost and storage overhead for this domain.
-- Ollama local models (`nomic-embed-text`, `mxbai-embed-large`) — rejected; requires a running local service as an operational dependency, complicating deployment and making the project harder to run for others. Appropriate for experimentation, not for a portfolio project.
+- Ollama local models (`nomic-embed-text`, `mxbai-embed-large`) — rejected; requires a running local service as an operational dependency, complicating deployment and making the project harder to run for others. Appropriate for experimentation, not for a portfolio project. **(Revisited by D-088:** this concern applies to *production*; Ollama embeddings are now an opt-in **local-dev** option via the `llm-ollama` profile with a per-profile vector dimension — `bge-m3`@1024 — while OpenAI@1536 remains the production default.**)**
 
 ---
 
@@ -950,7 +950,7 @@ Path-filtered workflows avoid wasting CI minutes on unrelated changes. The two p
 **Decision:**
 In local development, all LLM-backed ports (`NarrativeExtractionPort`, `EntityResolutionPort`, `ConflictDetectionPort`, `QueryAnsweringPort`, `EmbeddingPort`) are implemented by in-memory mock adapters that return canned responses. The `local` Spring profile activates mocks by default.
 
-A separate `llm-real` Spring profile swaps in the real Anthropic and OpenAI adapters. Activated via `--spring.profiles.active=local,llm-real` when real pipeline testing is needed. Mock and real implementations coexist in `adapters.out.ai`.
+A separate `llm-real` Spring profile swaps in the real Anthropic and OpenAI adapters. Activated via `--spring.profiles.active=local,llm-real` when real pipeline testing is needed. Mock and real implementations coexist in `adapters.out.ai`. D-088 adds a third selection, the `llm-ollama` profile (real local models via Ollama, offline); mock adapters are gated `@Profile("!llm-real & !llm-ollama")` so exactly one provider set is ever active.
 
 **Reason:**
 Day-to-day development work (UI, domain logic, API endpoints, test writing) does not require real LLM calls. Mock adapters provide deterministic, fast, zero-cost feedback. The hexagonal port design makes this swap transparent — no domain code changes needed. Real APIs are available when the extraction or query pipelines need to be tested end-to-end, but this is the exception rather than the default.
@@ -1757,6 +1757,40 @@ Spinners cause layout shift (the spinner height rarely matches the content heigh
 
 **Reason:**
 Without a written design authority, visual decisions are made ad-hoc per component. This produces inconsistent spacing, mismatched elevation levels, and interaction patterns that vary by feature. The constitution makes the design system enforceable and explicit — especially important for an AI-agent-driven development workflow where each agent otherwise starts from its own priors.
+
+---
+
+### D-088 — Local LLM option via Ollama (`llm-ollama` profile) + configurable embedding dimension
+
+**Date:** 2026-05-24
+**Status:** Active
+
+**Decision:**
+A third LLM provider wiring is added for local development: the `llm-ollama` Spring profile runs the entire ingestion + Query Mode pipeline against local models served by Ollama — fully offline, no API keys, zero cost. It is layered on `local` like `llm-real` (e.g. `--spring.profiles.active=local,llm-ollama`).
+
+Provider selection follows a three-way profile convention; the Spring AI adapters are provider-neutral (`SpringAi*`) and the active `ChatModel`/`EmbeddingModel` beans are chosen per profile in `AiConfig`:
+- mock adapters → `@Profile("!llm-real & !llm-ollama")` (default in dev; off whenever a real provider is selected; off in prod)
+- real Spring AI adapters → `@Profile("llm-real | llm-ollama")`
+- `llm-real` → Anthropic `ChatClient` + OpenAI embeddings; `llm-ollama` → Ollama chat + Ollama embeddings
+
+All models are env-overridable properties (no hard-coding), so adopting a new Ollama model is a config change, never a code change: `OLLAMA_BASE_URL` (`spring.ai.ollama.base-url`, default `http://localhost:11434`), `OLLAMA_CHAT_MODEL` (`spring.ai.ollama.chat.options.model`, default `qwen2.5:7b`), `OLLAMA_EMBEDDING_MODEL` (`spring.ai.ollama.embedding.options.model`, default `bge-m3`).
+
+The embedding dimension becomes a per-profile Liquibase parameter: the `entity_embeddings.embedding` column is `vector(${embeddingDimension})`, set by `spring.liquibase.parameters.embeddingDimension` (`EMBEDDING_DIMENSION`, default 1536). Prod/`llm-real` stays OpenAI@1536; `llm-ollama` defaults to 1024 (bge-m3). Liquibase checksums the changeset *text* (the placeholder), not the resolved SQL, so the append-only history (DB-02) is intact; prod always resolves to 1536.
+
+**Coupling rule:** the embedding model and dimension are a pair. Changing `OLLAMA_EMBEDDING_MODEL` to a model of a different dimension requires updating `EMBEDDING_DIMENSION` and recreating the local DB (`docker compose down -v`) — a pgvector column's dimension is fixed at create time. The chat model has no such constraint. Embeddings from different models occupy different vector spaces and are never cross-comparable, so a single database must use exactly one embedding model; a local Ollama DB is its own island, never mixed with a prod (OpenAI) DB.
+
+**Reason:**
+Lets the project be run, demoed, and developed end-to-end with real extraction and real semantic Query Mode at zero cost, with no external dependency or network — valuable for offline work and for anyone running the project without API keys. The hexagonal port design (D-032) makes this a configuration concern: no domain, application, or adapter code changes — only a new Spring AI starter, a profile config file, and profile-selected model beans. This revisits the embedding portion of D-040 (which rejected Ollama on operational-dependency grounds): that concern applies to *production*, not to an opt-in local profile, and OpenAI@1536 remains the production default.
+
+**Caveat:**
+Local chat models (7–8B) are weaker than Claude at the strict structured-JSON output (`ChatClient.entity(...)`) the extraction/resolution/conflict stages require, so local extraction may hit the `EXTRACTION_FAILED` path more often. Embedding generation and Query Mode retrieval are robust locally. The chat model is tunable via `OLLAMA_CHAT_MODEL` to trade speed for reliability.
+
+**Alternatives considered:**
+- Text generation via Ollama but embeddings still OpenAI/mock — rejected; the goal is real semantic Query Mode locally, which requires real local embeddings stored in pgvector.
+- Force a 1536-dimension local embedding model to reuse the existing column — rejected; same-dimension vectors from different models are still not comparable, so reusing the column buys nothing and needlessly constrains model choice. A per-profile dimension is cleaner.
+- Reverse D-040 outright for production — rejected; OpenAI@1536 stays the production default. Ollama is a local-dev option only.
+
+Cross-refs: D-032 (provider-agnostic by design), D-040 (embedding model), D-049 (mock vs real profiles), D-062 (native pgvector).
 
 ---
 
