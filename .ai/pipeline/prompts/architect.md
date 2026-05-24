@@ -229,13 +229,13 @@ All pgvector queries are native SQL using the `<=>` distance operator (`@Query(n
 
 ### 6. Commit Validation — 8 Mandatory Checks (D-078–D-081)
 
-1. All `card_id` values exist in stored diff → `422 UNKNOWN_CARD_ID`
-2. No duplicate `card_id` entries → `422 DUPLICATE_CARD_DECISION`
+1. All `cardId` values exist in stored diff → `422 UNKNOWN_CARD_ID`
+2. No duplicate `cardId` entries → `422 DUPLICATE_CARD_DECISION`
 3. Every non-UNCERTAIN card has an explicit decision → `422 INCOMPLETE_CARD_DECISIONS`
 4. All UNCERTAIN cards resolved → `422 UNCERTAIN_ENTITIES_PRESENT`
 5. All ConflictCards acknowledged → `422 CONFLICTS_NOT_ACKNOWLEDGED`
-6. `matched_entity_id` non-null for MATCH (adapter Bean Validation) → `400`
-7. `matched_entity_id` belongs to same campaign → `422 INVALID_ENTITY_REFERENCE`
+6. `matchedEntityId` non-null for MATCH (adapter Bean Validation) → `400`
+7. `matchedEntityId` belongs to same campaign → `422 INVALID_ENTITY_REFERENCE`
 8. No `add` action in v1 → `422 UNSUPPORTED_ACTION`
 
 ### 7. Frontend State Rules

@@ -81,69 +81,69 @@ export type CardType = 'EXISTING' | 'NEW' | 'UNCERTAIN';
 
 // Base shape shared by EXISTING and NEW cards
 export interface ExistingDiffCard {
-  card_id: string;        // stable identifier; used in CommitPayload.card_decisions
-  card_type: 'EXISTING';
-  entity_id: string;      // world state entity this card refers to
-  entity_type: 'actor' | 'space' | 'event' | 'relation';
+  cardId: string;        // stable identifier; used in CommitPayload.cardDecisions
+  cardType: 'EXISTING';
+  entityId: string;      // world state entity this card refers to
+  entityType: 'actor' | 'space' | 'event' | 'relation';
   name: string;
-  changed_fields: Record<string, unknown>;  // delta only (D-006)
+  changedFields: Record<string, unknown>;  // delta only (D-006)
 }
 
 export interface NewDiffCard {
-  card_id: string;
-  card_type: 'NEW';
-  entity_type: 'actor' | 'space' | 'event' | 'relation';
+  cardId: string;
+  cardType: 'NEW';
+  entityType: 'actor' | 'space' | 'event' | 'relation';
   name: string;
-  full_profile: Record<string, unknown>;    // complete extracted profile (D-007)
+  fullProfile: Record<string, unknown>;    // complete extracted profile (D-007)
 }
 
 // UNCERTAIN: AI cannot determine match vs. new — user must resolve
 export interface UncertainDiffCard {
-  card_id: string;
-  card_type: 'UNCERTAIN';
-  entity_type: 'actor' | 'space' | 'event' | 'relation';
-  extracted_mention: string;          // raw text mention from the summary
-  candidate_entity_id: string;        // best candidate match in world state
-  candidate_entity_name: string;      // display name of candidate
+  cardId: string;
+  cardType: 'UNCERTAIN';
+  entityType: 'actor' | 'space' | 'event' | 'relation';
+  extractedMention: string;          // raw text mention from the summary
+  candidateEntityId: string;        // best candidate match in world state
+  candidateEntityName: string;      // display name of candidate
 }
 
 export type DiffCard = ExistingDiffCard | NewDiffCard | UncertainDiffCard;
 
 // ConflictCard — non-blocking; user must acknowledge before commit (D-033)
 export interface ConflictCard {
-  conflict_id: string;        // referenced in CommitPayload.acknowledged_conflicts
-  entity_id: string;
-  entity_type: 'actor' | 'space' | 'event' | 'relation';
+  conflictId: string;        // referenced in CommitPayload.acknowledgedConflicts
+  entityId: string;
+  entityType: 'actor' | 'space' | 'event' | 'relation';
   description: string;
-  extracted_fact: string;
-  existing_fact: string;
+  extractedFact: string;
+  existingFact: string;
 }
 
 export interface DiffPayload {
-  narrative_summary_header: string;   // D-005: AI-generated 1-3 sentence summary
+  narrativeSummaryHeader: string;   // D-005: AI-generated 1-3 sentence summary
   actors: DiffCard[];
   spaces: DiffCard[];
   events: DiffCard[];
   relations: DiffCard[];
-  detected_conflicts: ConflictCard[];
+  detectedConflicts: ConflictCard[];
 }
 ```
 
 ### 2. Manage card-level user decisions in state
 
-Each card's user decision is tracked in a state map keyed by `DiffCard.card_id`. Use a proper
+Each card's user decision is tracked in a state map keyed by `DiffCard.cardId`. Use a proper
 discriminated union — never use `as any` to access variant-specific fields.
 
 ```typescript
 // src/features/input/hooks/useDiffState.ts
 export type CardDecision =
   | { action: 'accept' }
-  | { action: 'edit'; edited_fields: Record<string, unknown> }
+  | { action: 'edit'; editedFields: Record<string, unknown> }
   | { action: 'delete' };
 
 export type UncertainResolution =
-  | { card_id: string; resolution: 'MATCH'; matched_entity_id: string }
-  | { card_id: string; resolution: 'NEW'; matched_entity_id: null };
+  | { cardId: string; resolution: 'MATCH'; matchedEntityId: string }
+  | { cardId: string; resolution: 'NEW'; matchedEntityId: null };
 
 // Type guards — use these to narrow the union safely
 export function isEdit(d: CardDecision): d is Extract<CardDecision, { action: 'edit' }> {
@@ -151,9 +151,9 @@ export function isEdit(d: CardDecision): d is Extract<CardDecision, { action: 'e
 }
 
 export interface DiffState {
-  decisions: Map<string, CardDecision>;           // keyed by card_id
-  uncertainResolutions: Map<string, UncertainResolution>;  // keyed by card_id
-  acknowledgedConflicts: Set<string>;             // conflict_ids
+  decisions: Map<string, CardDecision>;           // keyed by cardId
+  uncertainResolutions: Map<string, UncertainResolution>;  // keyed by cardId
+  acknowledgedConflicts: Set<string>;             // conflictIds
   setDecision: (cardId: string, decision: CardDecision) => void;
   resolveUncertain: (resolution: UncertainResolution) => void;
   acknowledgeConflict: (conflictId: string) => void;
@@ -185,15 +185,15 @@ export function UncertainCard({ card, onResolve }: Props) {
         <h3>Is this the same entity?</h3>
       </CardHeader>
       <CardContent>
-        <p>Extracted: <strong>{card.extracted_mention}</strong></p>
-        <p>Possible match: <strong>{card.candidate_entity_name}</strong></p>
+        <p>Extracted: <strong>{card.extractedMention}</strong></p>
+        <p>Possible match: <strong>{card.candidateEntityName}</strong></p>
       </CardContent>
       <CardFooter>
         <Button
           onClick={() => onResolve({
-            card_id: card.card_id,
+            cardId: card.cardId,
             resolution: 'MATCH',
-            matched_entity_id: card.candidate_entity_id,
+            matchedEntityId: card.candidateEntityId,
           })}
         >
           Same entity (link to existing)
@@ -201,9 +201,9 @@ export function UncertainCard({ card, onResolve }: Props) {
         <Button
           variant="outline"
           onClick={() => onResolve({
-            card_id: card.card_id,
+            cardId: card.cardId,
             resolution: 'NEW',
-            matched_entity_id: null,
+            matchedEntityId: null,
           })}
         >
           Different entity (create new)
@@ -246,55 +246,55 @@ Use the type guards defined in §2 — no `as any` casts.
 ```typescript
 // src/types/sessions.ts — CommitPayload (mirrors ARCHITECTURE.md §7.6)
 export interface CardDecisionPayload {
-  card_id: string;
+  cardId: string;
   action: 'accept' | 'edit' | 'delete';
-  edited_fields?: Record<string, unknown>;  // required + non-empty when action = 'edit'
+  editedFields?: Record<string, unknown>;  // required + non-empty when action = 'edit'
 }
 
 export interface UncertainResolutionPayload {
-  card_id: string;
+  cardId: string;
   resolution: 'MATCH' | 'NEW';
-  matched_entity_id: string | null;  // non-null when resolution = MATCH
+  matchedEntityId: string | null;  // non-null when resolution = MATCH
 }
 
 export interface CommitPayload {
-  card_decisions: CardDecisionPayload[];
-  uncertain_resolutions: UncertainResolutionPayload[];
-  acknowledged_conflicts: Array<{ conflict_id: string }>;
+  cardDecisions: CardDecisionPayload[];
+  uncertainResolutions: UncertainResolutionPayload[];
+  acknowledgedConflicts: Array<{ conflictId: string }>;
 }
 
 // src/features/input/hooks/useCommitPayload.ts
 export function buildCommitPayload(diff: DiffPayload, state: DiffState): CommitPayload {
-  // card_decisions: every non-UNCERTAIN card must have an explicit entry
+  // cardDecisions: every non-UNCERTAIN card must have an explicit entry
   const allNonUncertainCards = [
     ...diff.actors, ...diff.spaces, ...diff.events, ...diff.relations
-  ].filter((c): c is ExistingDiffCard | NewDiffCard => c.card_type !== 'UNCERTAIN');
+  ].filter((c): c is ExistingDiffCard | NewDiffCard => c.cardType !== 'UNCERTAIN');
 
-  const card_decisions: CardDecisionPayload[] = allNonUncertainCards.map(card => {
-    const decision = state.decisions.get(card.card_id) ?? { action: 'accept' as const };
+  const cardDecisions: CardDecisionPayload[] = allNonUncertainCards.map(card => {
+    const decision = state.decisions.get(card.cardId) ?? { action: 'accept' as const };
     return {
-      card_id: card.card_id,
+      cardId: card.cardId,
       action: decision.action,
-      ...(isEdit(decision) ? { edited_fields: decision.edited_fields } : {}),
+      ...(isEdit(decision) ? { editedFields: decision.editedFields } : {}),
     };
   });
 
-  const uncertain_resolutions: UncertainResolutionPayload[] =
+  const uncertainResolutions: UncertainResolutionPayload[] =
     [...state.uncertainResolutions.values()].map(r => ({
-      card_id: r.card_id,
+      cardId: r.cardId,
       resolution: r.resolution,
-      matched_entity_id: r.resolution === 'MATCH' ? r.matched_entity_id : null,
+      matchedEntityId: r.resolution === 'MATCH' ? r.matchedEntityId : null,
     }));
 
-  const acknowledged_conflicts = [...state.acknowledgedConflicts].map(id => ({
-    conflict_id: id,
+  const acknowledgedConflicts = [...state.acknowledgedConflicts].map(id => ({
+    conflictId: id,
   }));
 
-  return { card_decisions, uncertain_resolutions, acknowledged_conflicts };
+  return { cardDecisions, uncertainResolutions, acknowledgedConflicts };
 }
 ```
 
-**Important:** `acknowledged_conflicts` must be non-empty when conflicts exist. An empty array
+**Important:** `acknowledgedConflicts` must be non-empty when conflicts exist. An empty array
 `[]` is valid only when the diff had no conflicts. Sending `[]` when conflicts were detected
 triggers `422 CONFLICTS_NOT_ACKNOWLEDGED`.
 
@@ -350,7 +350,7 @@ Write `vitest-axe` assertions alongside every component test.
   render an "Add entity" affordance anywhere in the diff review screen in v1.
 
 - **Not collecting conflict acknowledgments separately.** Conflict acknowledgments are not part of
-  the per-card accept/edit/delete decisions — they are in `acknowledged_conflicts`. If you merge
+  the per-card accept/edit/delete decisions — they are in `acknowledgedConflicts`. If you merge
   them into the main decisions map, the payload builder will misformat the commit payload.
 
 - **Rendering the full existing entity profile on a `delta` card.** Delta cards show only

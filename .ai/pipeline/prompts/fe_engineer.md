@@ -170,7 +170,7 @@ Every overlay must satisfy **all** of the following:
 ### Input Mode — Diff Review & Commit
 - `DiffPayload` card types: `NEW` (full profile), `EXISTING` (delta only), `UNCERTAIN` (resolution required), `ConflictCard` (non-blocking, must acknowledge).
 - **UNCERTAIN cards block commit.** Disable the commit button until all UNCERTAIN cards are resolved. Backend enforces `422 UNCERTAIN_ENTITIES_PRESENT` as defence in depth (D-042).
-- `CommitPayload` fields: `card_decisions` + `uncertain_resolutions` + `acknowledged_conflicts`. Match `ARCHITECTURE.md §7.6` exactly.
+- `CommitPayload` fields: `cardDecisions` + `uncertainResolutions` + `acknowledgedConflicts`. Match `ARCHITECTURE.md §7.6` exactly.
 - **No `add` action in v1 (D-053).** Do not render an "Add entity" affordance.
 
 ### Session Ingestion Polling & Draft Recovery

@@ -41,7 +41,7 @@ These govern every round:
 | NarrativeBlock | The raw session text, immutable after storage |
 | DiffPayload | Structured output of the AI pipeline, awaiting user review |
 | DiffCard | One unit in the diff: `NEW` (full profile), `EXISTING` (delta only), `UNCERTAIN` (resolution required), `ConflictCard` (non-blocking warning) |
-| CommitPayload | The user's decisions: `card_decisions + uncertain_resolutions + acknowledged_conflicts` |
+| CommitPayload | The user's decisions: `cardDecisions + uncertainResolutions + acknowledgedConflicts` |
 | WorldState | Versioned, cumulative record of all entities (actors, spaces, events, relations) |
 | EntityContext | The value record passed to AI ports — assembled by use cases, never by adapters |
 | UNCERTAIN card | A DiffCard where the AI cannot determine if the extracted entity is new or matches an existing one — requires user resolution before commit |

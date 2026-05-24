@@ -170,7 +170,7 @@ public record UncertainResolutionRequest(
     @NotNull String resolution,
     String matchedEntityId
 ) {
-    @AssertTrue(message = "matched_entity_id is required when resolution is MATCH")
+    @AssertTrue(message = "matchedEntityId is required when resolution is MATCH")
     public boolean isMatchedEntityIdValidForResolution() {
         return !"MATCH".equals(resolution) || matchedEntityId != null;
     }
@@ -199,12 +199,12 @@ These error codes are referenced across skills and must be consistent:
 
 | Code | HTTP | When |
 |---|---|---|
-| `UNKNOWN_CARD_ID` | 422 | `card_id` in commit payload not found in stored diff |
-| `DUPLICATE_CARD_DECISION` | 422 | Duplicate `card_id` entries in `card_decisions` |
-| `INCOMPLETE_CARD_DECISIONS` | 422 | Non-UNCERTAIN card in diff has no entry in `card_decisions` |
-| `UNCERTAIN_ENTITIES_PRESENT` | 422 | UNCERTAIN cards not resolved in `uncertain_resolutions` |
+| `UNKNOWN_CARD_ID` | 422 | `cardId` in commit payload not found in stored diff |
+| `DUPLICATE_CARD_DECISION` | 422 | Duplicate `cardId` entries in `cardDecisions` |
+| `INCOMPLETE_CARD_DECISIONS` | 422 | Non-UNCERTAIN card in diff has no entry in `cardDecisions` |
+| `UNCERTAIN_ENTITIES_PRESENT` | 422 | UNCERTAIN cards not resolved in `uncertainResolutions` |
 | `CONFLICTS_NOT_ACKNOWLEDGED` | 422 | ConflictCards in diff not acknowledged |
-| `INVALID_ENTITY_REFERENCE` | 422 | `matched_entity_id` references entity from different campaign |
+| `INVALID_ENTITY_REFERENCE` | 422 | `matchedEntityId` references entity from different campaign |
 | `UNSUPPORTED_ACTION` | 422 | `add` action in commit payload (v1 restriction, D-053) |
 | `INVALID_SESSION_STATE` | 422 | Operation not valid for current session status |
 | `SUMMARY_TOO_LARGE` | 400 | Submitted summary exceeds token budget |
