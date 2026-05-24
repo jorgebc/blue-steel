@@ -800,6 +800,11 @@ npx shadcn@latest add button input label form card
 | F2.4.5 | ExtractionPipelineService (transitions + extract + MDC + fail handling) | 🔲 |
 | F2.4.6 | Wire extraction into SessionIngestionEventListener | 🔲 |
 | F2.5 | Entity resolution pipeline | 🔲 |
+| F2.5.1 | SimilarityResult model + EntitySimilaritySearchPort | 🔲 |
+| F2.5.2 | EntitySimilaritySearchAdapter (native pgvector retrieval) | 🔲 |
+| F2.5.3 | Real SpringAiEntityResolutionAdapter (LLM call 2, replaces F2.2.4 stub) | 🔲 |
+| F2.5.4 | EntityResolutionService (two-stage orchestration) | 🔲 |
+| F2.5.5 | Wire resolution into SessionIngestionEventListener | 🔲 |
 | F2.6 | Conflict detection pipeline | 🔲 |
 | F2.7 | Diff generation + draft API | 🔲 |
 | F2.8 | Commit endpoint | 🔲 |
@@ -1377,23 +1382,95 @@ npx shadcn@latest add button input label form card
 
 #### F2.5 — Entity resolution pipeline
 
+> **Umbrella task — run the F2.5.N sub-tasks below, not this.**
+>
+> **No SETUP required** — ports/value models/mocks (F2.2), the `entity_embeddings` table (F2.1.4),
+> the world-state version tables (F2.1.2/F2.1.3), and the shared LLM infra + extraction stage (F2.4)
+> are produced by the cited dependencies; no new dependency or tooling is introduced.
+>
+> **Incremental-order note:** Stage 1 embeds mentions via `EmbeddingPort`, whose **real** adapter
+> ships in F2.6 (F2.2.6 is a stub until then). F2.5 is built and tested against the **mock**
+> `EmbeddingPort` (CI runs the `local` profile); the real embedding path activates with F2.6.
+
 **Goal:** Two-stage entity resolution: pgvector similarity search (Stage 1) + LLM call 2 for borderline cases (Stage 2). Produces MATCH / NEW / UNCERTAIN outcomes (D-041, D-042).
-
-**Scope (in):**
-
-*Application:*
-- `EntityResolutionService` (internal): for each `ExtractedMention`; Stage 1: embed mention via `EmbeddingPort` → `EntitySimilaritySearchPort` → if max score < `blue-steel.resolution.similarity-floor` (default 0.75): classify NEW immediately (no LLM call); Stage 2: if score ≥ floor: call `EntityResolutionPort` with mention + top-3 `EntityContext` candidates → MATCH / NEW / UNCERTAIN
-- `EntitySimilaritySearchPort` driven port: `List<SimilarityResult> search(float[] vector, UUID campaignId, String entityType, int topN)`
-- `EntitySimilaritySearchAdapter`: native pgvector query `1 - (embedding <=> $1::vector) AS similarity ... WHERE campaign_id = $2 AND entity_type = $3 ORDER BY embedding <=> $1::vector LIMIT $4` (D-062, ARCH-04)
-- `SpringAiEntityResolutionAdapter` (`@Profile("llm-real | llm-ollama")`): provider-neutral `ChatClient`, LLM call 2; structured output: outcome + matched entity ID; logs MDC `stage = "resolution"` (D-088)
-
-*`SessionIngestionEventListener` extended:* calls entity resolution after extraction; passes `List<ResolvedEntity>` to next stage.
 
 **Scope (out):** Conflict detection (F2.6). Diff generation (F2.7).
 
 **Skills:** `session-ingestion-pipeline`  
 **Decisions:** D-041, D-042, D-062, D-088  
 **Dependencies:** F2.4
+
+---
+
+#### F2.5.1 — SimilarityResult model + EntitySimilaritySearchPort
+
+**Goal:** Define the driven port for Stage-1 retrieval and the flat result record it returns. Compile-only — an interface and a record; the `EntityResolutionService` (F2.5.4) builds `EntityContext` from these (ARCHITECTURE §6.2: context is assembled by the use case, never inside an adapter).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/ingestion/SimilarityResult.java` — `record SimilarityResult(UUID entityId, String entityType, String name, String stateSnapshot, UUID sessionId, int versionNumber, double similarity)` (the candidate's persistence projection + cosine similarity; the use case maps the non-`similarity` fields into an `EntityContext`).
+- `apps/api/src/main/java/com/bluesteel/application/port/out/ingestion/EntitySimilaritySearchPort.java` — `List<SimilarityResult> search(float[] queryVector, UUID campaignId, String entityType, int topN)`.
+
+**Scope (out):** The adapter implementation (F2.5.2); the use-case mapping to `EntityContext` (F2.5.4).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-041, D-062  **Dependencies:** F2.2.1
+
+---
+
+#### F2.5.2 — EntitySimilaritySearchAdapter (native pgvector retrieval)
+
+**Goal:** Implement `EntitySimilaritySearchPort` as a native pgvector query (no `VectorStore`, D-062/ARCH-04) joining `entity_embeddings` to the type-specific head + version tables to project the candidate snapshot.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/embedding/EntitySimilaritySearchAdapter.java` — `@Component` (`JdbcTemplate`, mirrors `SessionRecoveryAdapter`); native SQL `SELECT …, 1 - (e.embedding <=> ?::vector) AS similarity FROM entity_embeddings e JOIN <type>_versions v ON v.id = e.entity_version_id JOIN <type>s h ON h.id = e.entity_id WHERE e.entity_type = ? AND h.campaign_id = ? ORDER BY e.embedding <=> ?::vector LIMIT ?`; the `<type>` head/version table pair is chosen from a **whitelisted** `entity_type` (never string-interpolated input); derive the prose `stateSnapshot` from `v.full_snapshot`; render `float[]` → pgvector literal; map rows → `SimilarityResult`.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/embedding/EntitySimilaritySearchAdapterIT.java` — extends `TestcontainersPostgresBaseIT`; seeds a session + an actor head + `actor_versions` row (with `full_snapshot`, `version_number`) + an `entity_embeddings` row, then asserts `search` returns it with a similarity score, scoped by `campaign_id`/`entity_type`, ordered by distance.
+
+**Scope (out):** The other AI ports; Query-Mode reuse of this port (Phase 3); embedding generation (F2.6/D-063).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`, `database-migration`  **Decisions:** D-062, D-088  **Dependencies:** F2.1.2, F2.1.3, F2.1.4, F2.5.1
+
+---
+
+#### F2.5.3 — Real SpringAiEntityResolutionAdapter (LLM call 2)
+
+**Goal:** Replace the F2.2.4 stub with the real bounded LLM resolution call: given high-score mentions + candidate `EntityContext`s, return MATCH/NEW/UNCERTAIN outcomes (D-042).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiEntityResolutionAdapter.java` (**replace the stub body**, F2.2.4) — `@Component @Profile("llm-real | llm-ollama")`; inject `ChatClient` + `LlmCostLogger`; `@Value("${blue-steel.llm.resolution-max-tokens}")`; `TokenEstimator` budget check on the serialized mentions+context → `TokenBudgetExceededException` before the call; `chatClient.prompt().system(<resolution prompt>).user(<mentions + candidate contexts>).call()` → read `ChatResponse` usage; `.entity(...)` structured output → per-mention `ResolutionOutcome` + nullable `matchedEntityId`; map to `List<ResolvedEntity>`; `LlmCostLogger.logLlmCall("resolution", …)` (MDC `stage="resolution"`, D-088); never log raw response (LOG-01).
+- `apps/api/src/main/resources/application.properties` (**edit**) + `.env.example` (**edit**) — add `blue-steel.llm.resolution-max-tokens=${BLUE_STEEL_LLM_RESOLUTION_MAX_TOKENS:2000}` (D-034 envelope).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/SpringAiEntityResolutionAdapterTest.java` — stubbed `ChatClient` fluent chain returns canned outcomes; assert mapping to `ResolvedEntity` (incl. `matchedEntityId` only for MATCH) and `TokenBudgetExceededException` on oversize input.
+
+**Scope (out):** Stage-1 retrieval (F2.5.2); orchestration + the similarity floor (F2.5.4); the `ChatClient` bean (F2.4.2).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-042, D-034, D-072, D-088  **Dependencies:** F2.2.1, F2.2.2, F2.2.4, F2.4.1
+
+---
+
+#### F2.5.4 — EntityResolutionService (two-stage orchestration)
+
+**Goal:** Orchestrate Stage 1 (pgvector, no LLM) + Stage 2 (bounded LLM) per extracted mention, producing one `ResolvedEntity` each (D-041). Builds the `EntityContext` candidates from `SimilarityResult`s before the port call.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/EntityResolutionService.java` — internal `@Service`; `List<ResolvedEntity> run(UUID campaignId, ExtractionResult extraction)`: for each mention in each typed list (actors/spaces/events/relations): Stage 1 — `EmbeddingPort.embed(<mention name/description>)` → `EntitySimilaritySearchPort.search(vector, campaignId, entityType, topN)`; if max similarity `< blue-steel.resolution.similarity-floor` (default 0.75) → `ResolvedEntity(NEW)` with **no** LLM call; else Stage 2 — map the top-`N` `SimilarityResult`s to `EntityContext` and call `EntityResolutionPort.resolve(mention, candidates)` → MATCH/NEW/UNCERTAIN; aggregate. INFO entry/exit (LOG-02).
+- `apps/api/src/main/resources/application.properties` (**edit**) + `.env.example` (**edit**) — add `blue-steel.resolution.similarity-floor=${BLUE_STEEL_RESOLUTION_SIMILARITY_FLOOR:0.75}` and `blue-steel.resolution.top-n=${BLUE_STEEL_RESOLUTION_TOP_N:3}`.
+- `apps/api/src/test/java/com/bluesteel/application/session/EntityResolutionServiceTest.java` — mocked `EmbeddingPort` + `EntitySimilaritySearchPort` + `EntityResolutionPort`; asserts below-floor → `NEW` with **no** resolution-port call, above-floor → forwards top-`N` contexts and returns the port's outcomes.
+
+**Scope (out):** The real adapters (F2.5.2/F2.5.3 — tests use mocks); listener wiring (F2.5.5); conflict detection (F2.6).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-041, D-042  **Dependencies:** F2.2.1, F2.2.2, F2.2.4, F2.2.6, F2.5.1
+
+---
+
+#### F2.5.5 — Wire resolution into SessionIngestionEventListener
+
+**Goal:** Extend the listener so a session runs entity resolution after extraction, holding the `List<ResolvedEntity>` in-memory for the next stage (F2.6).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/SessionIngestionEventListener.java` (**edit**, F2.4.6) — after `ExtractionPipelineService.run(...)` returns the `ExtractionResult`, call `EntityResolutionService.run(session.campaignId(), extractionResult)`; the listener exits after resolution (the resolved entities are passed to conflict detection in F2.6).
+- `apps/api/src/test/java/com/bluesteel/application/session/SessionIngestionEventListenerTest.java` (**update**, F2.4.6) — mock `ExtractionPipelineService` + `EntityResolutionService`; assert resolution is invoked with the extraction output after extraction.
+
+**Scope (out):** Conflict detection (F2.6); diff generation (F2.7).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-041  **Dependencies:** F2.4.6, F2.5.4
 
 ---
 
