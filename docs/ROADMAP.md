@@ -793,6 +793,12 @@ npx shadcn@latest add button input label form card
 | F2.3.10 | Scheduled stuck-processing TTL checker (@Scheduled + @EnableScheduling) | 🔲 |
 | F2.3.11 | SessionController + DTOs + GlobalExceptionHandler mappings | 🔲 |
 | F2.4 | Knowledge extraction pipeline | 🔲 |
+| F2.4.1 | LLM cost logger + token-budget utilities (shared LLM infra) | 🔲 |
+| F2.4.2 | AiConfig real llm-real ChatClient bean + provider config | 🔲 |
+| F2.4.3 | Real SpringAiNarrativeExtractionAdapter (replaces F2.2.3 stub) | 🔲 |
+| F2.4.4 | NarrativeBlockRepository.findBySessionId (port + adapter extension) | 🔲 |
+| F2.4.5 | ExtractionPipelineService (transitions + extract + MDC + fail handling) | 🔲 |
+| F2.4.6 | Wire extraction into SessionIngestionEventListener | 🔲 |
 | F2.5 | Entity resolution pipeline | 🔲 |
 | F2.6 | Conflict detection pipeline | 🔲 |
 | F2.7 | Diff generation + draft API | 🔲 |
@@ -1262,20 +1268,110 @@ npx shadcn@latest add button input label form card
 
 #### F2.4 — Knowledge extraction pipeline
 
+> **Umbrella task — run the F2.4.N sub-tasks below, not this.**
+>
+> **No SETUP required** — the spring-ai-bom + Anthropic/OpenAI starters are already in `pom.xml`
+> (D-032) and the `llm-real` profile config is a `.properties` file authored by sub-task F2.4.2;
+> no new dependency or tooling is introduced. The mock adapter, ports, value models (F2.2),
+> and the session aggregate/listener (F2.3) are produced by the cited dependencies.
+
 **Goal:** LLM Call 1. Extract actors, spaces, events, and relations from the session summary. Generate the narrative summary header as a co-output (D-005). Wire into the `SessionSubmittedEvent` async listener.
-
-**Scope (in):**
-
-*Application:* `ExtractionPipelineService` (internal): calls `NarrativeExtractionPort`; transitions session `pending → processing` on start; on exception → transitions to `failed` with reason. `SessionIngestionEventListener` extended: calls extraction stage; passes `ExtractionResult` in-memory to the next stage (added in F2.5).
-
-*Adapters:*
-- `SpringAiNarrativeExtractionAdapter` (`@Profile("llm-real | llm-ollama")`): provider-neutral — injects `ChatClient` (backed by Anthropic under `llm-real`, Ollama under `llm-ollama` per `AiConfig`, D-088); structured output (`BeanOutputConverter`); produces `ExtractionResult`; logs tokens_in, tokens_out, cost_usd at INFO with MDC `stage = "extraction"` (LOG-01, D-072)
 
 **Scope (out):** Entity resolution (F2.5). The listener exits after extraction in this feature.
 
 **Skills:** `session-ingestion-pipeline`  
 **Decisions:** D-005, D-032, D-034, D-049, D-072, D-088  
 **Dependencies:** F2.3
+
+---
+
+#### F2.4.1 — LLM cost logger + token-budget utilities
+
+**Goal:** Shared LLM-call instrumentation reused by every real Spring AI adapter (F2.4–F2.6): structured cost logging and the pre-call input-token budget guard (D-034, LOG-01, D-072).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/config/LlmCostLogger.java` — `@Component`; `logLlmCall(String stage, int tokensIn, int tokensOut, java.time.Instant start)`; emits one INFO line via `log.atInfo().addKeyValue("stage" / "tokens_in" / "tokens_out" / "cost_usd" / "duration_ms")`; `session_id`/`user_id` come from MDC (set by the caller, F2.4.5); private `estimateCostUsd` per Claude pricing; never logs raw response content.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/TokenEstimator.java` — `public static int estimate(String text)` (≈ `Math.ceil(len / 4.0)`); input-budget only.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/TokenBudgetExceededException.java` — `RuntimeException(int estimated, int max)`; thrown before any `ChatClient` call.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/TokenEstimatorTest.java` — empty/short/long boundary cases.
+
+**Scope (out):** The adapter that uses these (F2.4.3); MDC population (F2.4.5); JSON appender config (already in `logback-spring.xml`, D-072).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-034, D-072  **Dependencies:** F2.2
+
+---
+
+#### F2.4.2 — AiConfig real ChatClient (llm-real) + provider config
+
+**Goal:** Provide the `llm-real` `ChatClient` bean (Anthropic) the extraction adapter injects, plus the provider properties and the extraction token-budget envelope. The `llm-ollama` `ChatClient` bean is F2.12.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/AiConfig.java` (**edit**, F2.2.8) — add `@Bean @Profile("llm-real")` `ChatClient` built from the auto-configured Anthropic `ChatModel` (`ChatClient.create(chatModel)`); Javadoc notes the adapter is `@Profile("llm-real | llm-ollama")` so exactly one `ChatClient` bean must be active per profile (Ollama's bean is F2.12).
+- `apps/api/src/main/resources/application-llm-real.properties` (**new**) — `spring.ai.anthropic.api-key=${ANTHROPIC_API_KEY}`, `spring.ai.anthropic.chat.options.model=…`, `…temperature=…`; `spring.ai.openai.api-key=${OPENAI_API_KEY}` (satisfies OpenAI autoconfig under `llm-real`; the real embedding adapter ships later).
+- `apps/api/src/main/resources/application.properties` (**edit**) — add `blue-steel.llm.extraction-max-tokens=${BLUE_STEEL_LLM_EXTRACTION_MAX_TOKENS:4000}` (D-034 envelope); `.env.example` (**edit**) — mirror the new var.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/AiConfigTest.java` — unit test: the bean method returns a non-null `ChatClient` given a mock `ChatModel` (no Spring context start, no API key).
+
+**Scope (out):** Ollama beans + dimension override (F2.12); the real OpenAI `EmbeddingModel` bean (F2.5/F2.6); adapter logic (F2.4.3).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-032, D-034, D-088  **Dependencies:** F2.2.8
+
+---
+
+#### F2.4.3 — Real SpringAiNarrativeExtractionAdapter
+
+**Goal:** Replace the F2.2.3 stub with the real LLM-call-1 implementation: provider-neutral `ChatClient`, structured output, token-budget guard, and cost logging (D-005, D-034, D-072).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiNarrativeExtractionAdapter.java` (**replace the stub body**, F2.2.3) — `@Component @Profile("llm-real | llm-ollama")`; inject `ChatClient` + `LlmCostLogger`; `@Value("${blue-steel.llm.extraction-max-tokens}")`; `TokenEstimator.estimate(rawSummaryText) > max` → throw `TokenBudgetExceededException` before any call; `chatClient.prompt().system(<extraction prompt incl. 1–3 sentence narrative-header instruction, D-005>).user(rawSummaryText).call()`; read `ChatResponse` usage metadata for `tokens_in`/`tokens_out`, then `.entity(ExtractionResult.class)`; `LlmCostLogger.logLlmCall("extraction", …)`; let an `.entity()` parse failure propagate (the service maps it to `failed`); never log raw response (LOG-01).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/SpringAiNarrativeExtractionAdapterTest.java` — asserts `TokenBudgetExceededException` on oversize input (no `ChatClient` invocation); happy path via a stubbed `ChatClient` fluent chain returning a canned `ExtractionResult`.
+
+**Scope (out):** The `ChatClient` bean (F2.4.2); session transitions / MDC (F2.4.5); resolution adapter (F2.5).
+
+**Skills:** `spring-ai-llm-adapter`  **Decisions:** D-005, D-032, D-034, D-072, D-088  **Dependencies:** F2.2.1, F2.2.3, F2.4.1
+
+---
+
+#### F2.4.4 — NarrativeBlock lookup (port + adapter extension)
+
+**Goal:** Add a read method so the listener can fetch the immutable summary text for a session — `NarrativeBlockRepository` (F2.3.3) currently exposes only `save()`. (Mirrors the F1.9.2 port+adapter-extension precedent.)
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/session/NarrativeBlockRepository.java` (**edit**, F2.3.3) — add `Optional<NarrativeBlock> findBySessionId(UUID sessionId)`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/NarrativeBlockJpaRepository.java` (**edit**, F2.3.5) — derived query `Optional<NarrativeBlockJpaEntity> findBySessionId(UUID)`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/NarrativeBlockPersistenceAdapter.java` (**edit**, F2.3.5) — implement `findBySessionId` with `toDomain` mapping.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/session/NarrativeBlockPersistenceAdapterIT.java` (**extend**, F2.3.5) — round-trip assertion for `findBySessionId`.
+
+**Scope (out):** Consuming the result (F2.4.6).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-054  **Dependencies:** F2.3.2, F2.3.3, F2.3.5
+
+---
+
+#### F2.4.5 — ExtractionPipelineService
+
+**Goal:** Orchestrate the extraction stage: transition the session to `processing`, set the logging MDC, call the extraction port, and fail cleanly on error.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/ExtractionPipelineService.java` — internal `@Service`; `ExtractionResult run(Session session, String rawSummaryText)`: `session.startProcessing()` + `SessionRepository.save` (pending→processing); set MDC `session_id`/`user_id` from the session; call `NarrativeExtractionPort.extract(rawSummaryText)`; on any exception → `session.markFailed("EXTRACTION_FAILED")` + save, log ERROR with full context, rethrow; clear MDC in `finally`; INFO on entry/exit (LOG-02). Returns the `ExtractionResult` in-memory (the next stage is F2.5; the listener exits after extraction in this feature).
+- `apps/api/src/test/java/com/bluesteel/application/session/ExtractionPipelineServiceTest.java` — mocked `NarrativeExtractionPort` + `SessionRepository`; asserts the processing transition, the `failed`/`EXTRACTION_FAILED` path on a thrown port exception, and the returned result on success.
+
+**Scope (out):** The real adapter (F2.4.3); the listener edit (F2.4.6); entity resolution (F2.5).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-005, D-034, D-072  **Dependencies:** F2.2.1, F2.2.3, F2.3.1, F2.3.3
+
+---
+
+#### F2.4.6 — Wire extraction into SessionIngestionEventListener
+
+**Goal:** Replace the F2.3.8 stub body so a submitted session runs real extraction instead of immediately failing with `PIPELINE_NOT_IMPLEMENTED`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/session/SessionIngestionEventListener.java` (**edit**, F2.3.8) — on `SessionSubmittedEvent`, load the `Session` (`SessionRepository.findById`) and its `NarrativeBlock` (`NarrativeBlockRepository.findBySessionId`), then call `ExtractionPipelineService.run(session, block.rawSummaryText())`; the listener exits after extraction (session left in `processing` for F2.5+); failures are already handled inside the service.
+- `apps/api/src/test/java/com/bluesteel/application/session/SessionIngestionEventListenerTest.java` (**update**, F2.3.8) — mock the repos + `ExtractionPipelineService`; assert the listener loads the block and delegates extraction (no longer ends `FAILED` on the happy path).
+
+**Scope (out):** Resolution/conflict/diff stages (F2.5–F2.7).
+
+**Skills:** `session-ingestion-pipeline`  **Decisions:** D-005  **Dependencies:** F2.3.8, F2.4.4, F2.4.5
 
 ---
 
