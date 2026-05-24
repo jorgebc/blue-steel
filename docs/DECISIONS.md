@@ -89,7 +89,7 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-076 | DiffPayload and CommitPayload are formalized JSON contracts in ARCHITECTURE.md §7.6 | ✅ Active | Phase 2 |
 | D-077 | Invitation model: no invitations table; temporary password + `force_password_change` flag | ✅ Active | Phase 1 |
 | D-078 | Domain constructors enforce non-blank invariants; adapter Bean Validation is first line, not sole gatekeeper | ✅ Active | Definition |
-| D-079 | CommitPayload: `matched_entity_id` validated at adapter (non-null) and application (campaign ownership) | ✅ Active | Definition |
+| D-079 | CommitPayload: `matchedEntityId` validated at adapter (non-null) and application (campaign ownership) | ✅ Active | Definition |
 | D-080 | CommitPayload completeness: explicit decision required for every diff card | ✅ Active | Definition |
 | D-081 | CommitPayload validation owned by `CommitService` (application layer); `DiffPayload`/`CommitPayload` remain application-layer types | ✅ Active | Definition |
 | D-082 | Modals forbidden — all contextual interactions use Focused Overlays | ✅ Active | Definition |
@@ -1221,7 +1221,7 @@ Email delivery is the one concern deliberately outsourced — running a reliable
 **Status:** Active
 
 **Decision:**
-`POST /api/v1/campaigns` requires a `gm_user_id` field in the request body. Campaign creation and GM assignment are a single atomic operation: the campaign row and the `campaign_members` row (`role = 'gm'`) are inserted in the same transaction. `gm_user_id` is required — the request is rejected with `422` if omitted or if the referenced user does not exist. A campaign can never exist in a GM-less state.
+`POST /api/v1/campaigns` requires a `gmUserId` field in the request body. Campaign creation and GM assignment are a single atomic operation: the campaign row and the `campaign_members` row (`role = 'gm'`) are inserted in the same transaction. `gmUserId` is required — the request is rejected with `422` if omitted or if the referenced user does not exist. A campaign can never exist in a GM-less state.
 
 **Reason:**
 `POST /api/v1/campaigns/{id}/members` requires `gm` role to execute. If campaign creation and GM assignment were separate steps, there would be no way for admin to assign the first GM — the campaign would exist in a GM-less state with no actor able to invoke the membership endpoint. Atomic assignment at creation time eliminates this chicken-and-egg problem and enforces the invariant that every campaign always has a GM.
@@ -1546,7 +1546,9 @@ A developer testing the extraction pipeline in local dev does not want to send r
 **Decision:**  
 `DiffPayload` (returned by `GET .../diff`, stored in `sessions.diff_payload` JSONB) and `CommitPayload` (submitted to `POST .../commit`) are formalized as canonical JSON schemas in ARCHITECTURE.md §7.6. These schemas are the authoritative source for both the backend Java records and the frontend TypeScript types. Any change to either schema requires a simultaneous update to both the Java record and the TypeScript type — enforced as a review convention (D-077).
 
-The field names use `snake_case` for JSON keys, consistent with the existing API convention. Java records map these via Jackson `@JsonProperty` or a global `PropertyNamingStrategies.SNAKE_CASE` config.
+The field names use `camelCase` for JSON keys, consistent with the existing API convention (the implemented auth/user/invitation DTOs are camelCase — e.g. `accessToken`, `forcePasswordChange`; no global Jackson naming strategy is configured). The backend records are plain Java records whose field names serialize as-is; no `@JsonProperty` casing overrides are needed.
+
+**Amendment (2026-05-24):** This decision originally specified `snake_case`, claiming consistency with the existing API convention. That premise was incorrect — every implemented DTO (F1.5/F1.6/F1.9) is camelCase and no `PropertyNamingStrategies.SNAKE_CASE` config exists. The schemas in ARCHITECTURE.md §7.6 (and the snake_case keys formerly shown in §7.8/§7.10) were corrected to camelCase to match the implemented convention. Database column names remain `snake_case` (a separate, unaffected concern).
 
 **Reason:**  
 `DiffPayload` is a triple-boundary contract: (1) the backend serializes it, (2) it is persisted as JSONB in PostgreSQL, and (3) the frontend deserializes it. Schema drift at any of these three points produces bugs that are hard to detect because the JSONB column accepts any valid JSON and JPA maps it as a String. Without a formal, canonical definition, the backend and frontend are likely to diverge silently. Formalizing the schema in ARCHITECTURE.md makes it a first-class architectural artifact, not an implicit assumption.
@@ -1617,19 +1619,19 @@ If adapters are bypassed — internal call paths, test harnesses, future CLI ada
 
 ---
 
-### D-079 — CommitPayload: `matched_entity_id` validated at adapter (non-null) and application (campaign ownership)
+### D-079 — CommitPayload: `matchedEntityId` validated at adapter (non-null) and application (campaign ownership)
 
 **Date:** 2026-04-14  
 **Status:** Active
 
 **Decision:**  
-When `uncertain_resolutions[*].resolution = MATCH`, the `matched_entity_id` field is validated at two tiers:
+When `uncertainResolutions[*].resolution = MATCH`, the `matchedEntityId` field is validated at two tiers:
 
-1. **Adapter (Bean Validation):** Cross-field constraint — `matched_entity_id` must be non-null when `resolution = MATCH`. Returns `400` if violated.
-2. **Application (`CommitService`):** `matched_entity_id` must reference an entity that exists within the same `campaign_id` as the session being committed. Returns `422 INVALID_ENTITY_REFERENCE` if not found.
+1. **Adapter (Bean Validation):** Cross-field constraint — `matchedEntityId` must be non-null when `resolution = MATCH`. Returns `400` if violated.
+2. **Application (`CommitService`):** `matchedEntityId` must reference an entity that exists within the same `campaign_id` as the session being committed. Returns `422 INVALID_ENTITY_REFERENCE` if not found.
 
 **Reason:**  
-Without the campaign ownership check, a client (malicious or buggy) could submit a `matched_entity_id` from a different campaign, causing a cross-campaign entity merge — a data integrity violation. This is an IDOR-adjacent pattern: the adapter cannot enforce ownership (it has no DB access), so the application service is the correct enforcement tier for the ownership check. The null check is a format constraint that belongs at the adapter level.
+Without the campaign ownership check, a client (malicious or buggy) could submit a `matchedEntityId` from a different campaign, causing a cross-campaign entity merge — a data integrity violation. This is an IDOR-adjacent pattern: the adapter cannot enforce ownership (it has no DB access), so the application service is the correct enforcement tier for the ownership check. The null check is a format constraint that belongs at the adapter level.
 
 **Alternatives considered:**  
 - Rely on DB foreign key only — rejected; a mismatched entity from another campaign passes the FK check (the entity exists), and the merge would succeed silently. The FK does not enforce `campaign_id` scope.
@@ -1642,9 +1644,9 @@ Without the campaign ownership check, a client (malicious or buggy) could submit
 **Status:** Active
 
 **Decision:**  
-The `card_decisions` array in the CommitPayload must contain an explicit entry for every `DiffCard` in the stored `diff_payload`. A missing decision for any non-UNCERTAIN card is rejected with `422 INCOMPLETE_CARD_DECISIONS`. There is no implicit accept for omitted cards.
+The `cardDecisions` array in the CommitPayload must contain an explicit entry for every `DiffCard` in the stored `diff_payload`. A missing decision for any non-UNCERTAIN card is rejected with `422 INCOMPLETE_CARD_DECISIONS`. There is no implicit accept for omitted cards.
 
-UNCERTAIN cards are covered by `uncertain_resolutions`, not `card_decisions`. Conflict cards are covered by `acknowledged_conflicts`. The completeness check applies only to `card_decisions` vs. non-UNCERTAIN `DiffCard` entries.
+UNCERTAIN cards are covered by `uncertainResolutions`, not `cardDecisions`. Conflict cards are covered by `acknowledgedConflicts`. The completeness check applies only to `cardDecisions` vs. non-UNCERTAIN `DiffCard` entries.
 
 **Reason:**  
 Implicit accept creates an ambiguous failure mode: a network error dropping half the payload is indistinguishable from a deliberate decision to accept all unmentioned cards. Requiring explicit decisions makes the commit payload self-describing and auditable. Every card decision is on the record. This is consistent with D-002 (no auto-commit) — the user must explicitly sign off on every extraction item, not just the contentious ones.
@@ -1668,7 +1670,7 @@ The validation boundary is documented explicitly: `CommitService` is the authori
 Promoting `DiffPayload` and `CommitPayload` to the domain layer would require moving the canonical JSON contract types (D-076) into `com.bluesteel.domain`, coupling the domain to a schema that is inherently application/transport-level (JSONB persistence + HTTP response shape). The domain aggregate's invariants are about state transitions, version history append-only behaviour, and field-level constraints — not about validating structured application payloads. Keeping the types in `application.model` and making `CommitService` the authoritative validator satisfies the defence-in-depth requirement without polluting the domain model with transport concerns.
 
 **Mitigation for single-point-of-validation risk:**  
-A mandatory set of unit tests in `test/application/` must prove `CommitService` performs all validation checks (UNCERTAIN completeness, conflict acknowledgment, card completeness, card_id existence, matched_entity_id non-null and campaign-owned) before calling any world-state write method. Any future alternative commit path must implement the same checks or delegate to the same validation logic.
+A mandatory set of unit tests in `test/application/` must prove `CommitService` performs all validation checks (UNCERTAIN completeness, conflict acknowledgment, card completeness, cardId existence, matchedEntityId non-null and campaign-owned) before calling any world-state write method. Any future alternative commit path must implement the same checks or delegate to the same validation logic.
 
 **Alternatives considered:**  
 - Session aggregate validates commit payload — rejected; requires domain types for `DiffPayload` / `CommitPayload`, coupling the domain to a transport/persistence contract. The domain invariant (write-once history, valid state transitions) does not require the domain to parse structured application payloads.

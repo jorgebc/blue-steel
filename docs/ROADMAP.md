@@ -1574,8 +1574,8 @@ npx shadcn@latest add button input label form card
 > repository (F2.3), and the `SessionController` (F2.3.11) are produced by the cited dependencies;
 > no new dependency or tooling is introduced.
 >
-> **Schema authority:** `DiffPayload` is the formal contract in ARCHITECTURE §7.6 (D-076) — snake_case
-> keys, `card_type`-discriminated `DiffCard` union (EXISTING/NEW/UNCERTAIN) + `ConflictCard`. The
+> **Schema authority:** `DiffPayload` is the formal contract in ARCHITECTURE §7.6 (D-076) — camelCase
+> keys (D-076 amended 2026-05-24), `cardType`-discriminated `DiffCard` union (EXISTING/NEW/UNCERTAIN) + `ConflictCard`. The
 > backend records and `apps/web/src/types/sessions.ts` must mirror it exactly; it is read-only to the
 > client (the commit payload, F2.8, is a separate derived shape).
 
@@ -1591,16 +1591,16 @@ npx shadcn@latest add button input label form card
 
 #### F2.7.1 — DiffCard sealed interface + entity card variants
 
-**Goal:** Model the three `DiffCard` variants as a `card_type`-discriminated union per ARCHITECTURE §7.6 (D-076), with Jackson polymorphism + snake_case mapping so the payload round-trips through JSONB and the API unchanged.
+**Goal:** Model the three `DiffCard` variants as a `cardType`-discriminated union per ARCHITECTURE §7.6 (D-076), with Jackson polymorphism so the payload round-trips through JSONB and the API unchanged.
 
 **Scope (in):**
-- `apps/api/src/main/java/com/bluesteel/application/model/diff/DiffCard.java` — `sealed interface` permitting the three records; `@JsonTypeInfo(use = NAME, property = "card_type")` + `@JsonSubTypes` mapping `EXISTING`/`NEW`/`UNCERTAIN`.
-- `apps/api/src/main/java/com/bluesteel/application/model/diff/ExistingEntityCard.java` — `card_id, entity_id, entity_type, name, changed_fields (Map<String,Object>)` (delta only, D-006).
-- `apps/api/src/main/java/com/bluesteel/application/model/diff/NewEntityCard.java` — `card_id, entity_type, name, full_profile (Map<String,Object>)` (full profile, D-007).
-- `apps/api/src/main/java/com/bluesteel/application/model/diff/UncertainEntityCard.java` — `card_id, entity_type, extracted_mention, candidate_entity_id, candidate_entity_name` (D-042).
-- `apps/api/src/test/java/com/bluesteel/application/model/diff/DiffCardTest.java` — Jackson round-trip per variant asserting the `card_type` discriminator + snake_case keys (use the project `ObjectMapper`).
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/DiffCard.java` — `sealed interface` permitting the three records; `@JsonTypeInfo(use = NAME, property = "cardType")` + `@JsonSubTypes` mapping `EXISTING`/`NEW`/`UNCERTAIN`.
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/ExistingEntityCard.java` — `cardId, entityId, entityType, name, changedFields (Map<String,Object>)` (delta only, D-006).
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/NewEntityCard.java` — `cardId, entityType, name, fullProfile (Map<String,Object>)` (full profile, D-007).
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/UncertainEntityCard.java` — `cardId, entityType, extractedMention, candidateEntityId, candidateEntityName` (D-042).
+- `apps/api/src/test/java/com/bluesteel/application/model/diff/DiffCardTest.java` — Jackson round-trip per variant asserting the `cardType` discriminator + camelCase keys (use the project `ObjectMapper`).
 
-> All field names map to the snake_case JSON keys via `@JsonProperty` (the schema is snake_case even though the rest of the API is camelCase — D-076 is authoritative for this contract).
+> Field names are plain camelCase records and serialize as-is — no `@JsonProperty` casing overrides (D-076, amended 2026-05-24: the diff contract is camelCase like the rest of the API). The `cardType` discriminator is the only Jackson property name pinned explicitly (via `@JsonTypeInfo`).
 
 **Scope (out):** `ConflictCard` + `DiffPayload` aggregate (F2.7.2); assembly logic (F2.7.3).
 
@@ -1613,8 +1613,8 @@ npx shadcn@latest add button input label form card
 **Goal:** Model the conflict card and the top-level `DiffPayload` envelope that holds the typed card arrays + conflicts, completing the §7.6 contract.
 
 **Scope (in):**
-- `apps/api/src/main/java/com/bluesteel/application/model/diff/ConflictCard.java` — `conflict_id, entity_id, entity_type, description, extracted_fact, existing_fact` (non-blocking, D-033).
-- `apps/api/src/main/java/com/bluesteel/application/model/diff/DiffPayload.java` — `record DiffPayload(String narrativeSummaryHeader, List<DiffCard> actors, List<DiffCard> spaces, List<DiffCard> events, List<DiffCard> relations, List<ConflictCard> detectedConflicts)` with snake_case `@JsonProperty` keys (`narrative_summary_header`, `detected_conflicts`).
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/ConflictCard.java` — `conflictId, entityId, entityType, description, extractedFact, existingFact` (non-blocking, D-033).
+- `apps/api/src/main/java/com/bluesteel/application/model/diff/DiffPayload.java` — `record DiffPayload(String narrativeSummaryHeader, List<DiffCard> actors, List<DiffCard> spaces, List<DiffCard> events, List<DiffCard> relations, List<ConflictCard> detectedConflicts)` (plain camelCase records; fields serialize as-is — no `@JsonProperty`).
 - `apps/api/src/test/java/com/bluesteel/application/model/diff/DiffPayloadTest.java` — full-payload Jackson round-trip with a mix of card variants + a conflict.
 
 **Scope (out):** Assembly from pipeline outputs (F2.7.3); persistence (F2.7.3 stores the serialized string on the session).
@@ -1628,7 +1628,7 @@ npx shadcn@latest add button input label form card
 **Goal:** Assemble the `DiffPayload` from the three in-memory pipeline outputs, serialize it, attach it to the session, and transition the session to `draft`.
 
 **Scope (in):**
-- `apps/api/src/main/java/com/bluesteel/application/service/session/DiffGenerationService.java` — internal `@Service`; `void run(Session session, ExtractionResult extraction, List<ResolvedEntity> resolved, List<ConflictWarning> conflicts)`: set `narrativeSummaryHeader` from the extraction; per resolved mention → MATCH ⇒ `ExistingEntityCard` (delta), NEW ⇒ `NewEntityCard` (full profile), UNCERTAIN ⇒ `UncertainEntityCard`; map `ConflictWarning`s → `ConflictCard`s; mint a `card_id`/`conflict_id` (`UUID`) per card; serialize the `DiffPayload` via the injected Jackson `ObjectMapper`; attach the JSON to the session and transition it to `draft` (the `Session` aggregate stores `diff_payload` and exposes the draft transition, F2.3.1); `SessionRepository.save`; INFO entry/exit (LOG-02).
+- `apps/api/src/main/java/com/bluesteel/application/service/session/DiffGenerationService.java` — internal `@Service`; `void run(Session session, ExtractionResult extraction, List<ResolvedEntity> resolved, List<ConflictWarning> conflicts)`: set `narrativeSummaryHeader` from the extraction; per resolved mention → MATCH ⇒ `ExistingEntityCard` (delta), NEW ⇒ `NewEntityCard` (full profile), UNCERTAIN ⇒ `UncertainEntityCard`; map `ConflictWarning`s → `ConflictCard`s; mint a `cardId`/`conflictId` (`UUID`) per card; serialize the `DiffPayload` via the injected Jackson `ObjectMapper`; attach the JSON to the session and transition it to `draft` (the `Session` aggregate stores `diff_payload` and exposes the draft transition, F2.3.1); `SessionRepository.save`; INFO entry/exit (LOG-02).
 - `apps/api/src/test/java/com/bluesteel/application/session/DiffGenerationServiceTest.java` — mocked `SessionRepository` (+ real `ObjectMapper`); asserts each outcome → the right card variant, conflicts mapped, session ends `draft` with a non-null `diff_payload`.
 
 **Scope (out):** The async listener wiring (F2.7.4); the read endpoint (F2.7.5/F2.7.6); commit + user edits (F2.8 — not persisted to `diff_payload`).
@@ -1687,7 +1687,7 @@ npx shadcn@latest add button input label form card
 **Scope (in):**
 
 *Application:*
-- `CommitSessionUseCase` (driving port): validates zero UNCERTAIN entities in payload (422 `UNCERTAIN_ENTITIES_PRESENT`, D-042); validates `acknowledged_conflicts` covers all detected conflicts (422 `CONFLICTS_NOT_ACKNOWLEDGED`, D-033); for each card: ACCEPT → create/update entity + append version row; EDIT → same with user-edited fields; DELETE → no world state change; assigns `sequence_number` (`MAX(sequence_number) + 1` inside `@Transactional` with lock, D-069); transitions session → `committed`; clears `diff_payload`; publishes `SessionCommittedEvent`
+- `CommitSessionUseCase` (driving port): validates zero UNCERTAIN entities in payload (422 `UNCERTAIN_ENTITIES_PRESENT`, D-042); validates `acknowledgedConflicts` covers all detected conflicts (422 `CONFLICTS_NOT_ACKNOWLEDGED`, D-033); for each card: ACCEPT → create/update entity + append version row; EDIT → same with user-edited fields; DELETE → no world state change; assigns `sequence_number` (`MAX(sequence_number) + 1` inside `@Transactional` with lock, D-069); transitions session → `committed`; clears `diff_payload`; publishes `SessionCommittedEvent`
 - `EmbeddingGenerationListener` (`@EventListener + @Async`): handles `SessionCommittedEvent`; for each committed entity version: calls `EmbeddingPort`; inserts row into `entity_embeddings`; failure per entity is logged at ERROR and swallowed — does not fail the listener (D-063)
 - `WorldStateRepository` driven port; `WorldStateAdapter` in `adapters.out.persistence` (JPA entities + repositories for all versioned entity tables)
 
