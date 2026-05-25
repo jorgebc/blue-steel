@@ -69,6 +69,19 @@
 | F1.9.7 | Backend: SearchUsersUseCase + service (admin or GM-anywhere; search by email) | 🔲 |
 | F1.9.8 | Backend: CampaignMembershipController + DTOs + 409/422 handler mappings | 🔲 |
 | F1.9.9 | Backend: UserSearchController + DTO (GET /api/v1/users?email=) | 🔲 |
+| F1.10 | Frontend: campaign list, selection + home | 🔲 |
+| F1.10.1 | Frontend: campaign DTO TypeScript types (+ CampaignRole) | 🔲 |
+| F1.10.2 | Frontend: campaigns API client + list/detail hooks | 🔲 |
+| F1.10.3 | Frontend: CampaignContextGuard (loads campaign → sets activeRole) | 🔲 |
+| F1.10.4 | Frontend: CampaignListPage (authenticated `/`) | 🔲 |
+| F1.10.5 | Frontend: CampaignHomePage (campaign hub + commit target) | 🔲 |
+| F1.10.6 | Frontend: campaign route wiring (`/`, `/campaigns/:campaignId`) | 🔲 |
+| F1.11 | Frontend: campaign app-shell + sidebar | 🔲 |
+| F1.11.1 | Frontend: uiStore (sidebar expand/collapse, persisted) | 🔲 |
+| F1.11.2 | Frontend: Sidebar component (mode nav, role-gated, collapse) | 🔲 |
+| F1.11.3 | Frontend: AppShell layout + campaign route restructure | 🔲 |
+| F1.11.4 | Frontend: admin-create data layer (user search + create campaign) | 🔲 |
+| F1.11.5 | Frontend: CreateCampaignPage + `/campaigns/new` route (admin) | 🔲 |
 
 ---
 
@@ -337,10 +350,11 @@ npx shadcn@latest add button input label form card
 **Goal:** In-memory client-state stores. Access token never touches `localStorage` (D-030).
 
 **Scope (in):**
+- `apps/web/src/types/campaign.ts` — `CampaignRole` (`'gm' | 'editor' | 'player'` — lowercase, mirrors the wire `role`). Minimal stub the store imports; **extended with the campaign DTO types by F1.10.1.**
 - `apps/web/src/store/authStore.ts` (+ `authStore.test.ts`) — `accessToken: string | null`; `currentUser: CurrentUser | null`; `setAccessToken`, `setCurrentUser`, `logout`
-- `apps/web/src/store/campaignStore.ts` (+ `campaignStore.test.ts`) — `activeCampaignId: string | null`; `activeRole: CampaignRole | null` (empty for now); `setCampaign`, `clearCampaign`
+- `apps/web/src/store/campaignStore.ts` (+ `campaignStore.test.ts`) — `activeCampaignId: string | null`; `activeRole: CampaignRole | null` (imported from `@/types/campaign`; populated by `CampaignContextGuard`, F1.10.3); `setCampaign(campaignId, role)`, `clearCampaign`
 
-**Scope (out):** No fetching, no persistence middleware. `uiStore` (later). Role is never read from the JWT.
+**Scope (out):** No fetching, no persistence middleware. `uiStore` (F1.11). Campaign DTO types beyond `CampaignRole` (F1.10.1). Role is never read from the JWT.
 
 **Skills:** `auth`, `frontend-testing`  **Decisions:** D-030, D-043  **Dependencies:** F1.7-SETUP, F1.7.1
 
@@ -401,7 +415,7 @@ npx shadcn@latest add button input label form card
 
 #### F1.7.7 — LoginPage
 
-**Goal:** Email/password form (React Hook Form + shadcn `Form`/`Input`/`Button`, in a `rounded-2xl` card). Submit via `useLogin`; map `400` field errors with `setError`; surface auth failure through `InlineBanner` (error variant); submit button shows in-button `Loader2` while pending. On success redirect to `/change-password` if `forcePasswordChange`, else `/status` (campaign list deferred — F1.8).
+**Goal:** Email/password form (React Hook Form + shadcn `Form`/`Input`/`Button`, in a `rounded-2xl` card). Submit via `useLogin`; map `400` field errors with `setError`; surface auth failure through `InlineBanner` (error variant); submit button shows in-button `Loader2` while pending. On success redirect to `/change-password` if `forcePasswordChange`, else `/` (the authenticated home — the F1.7.10 placeholder until F1.10.6 makes `/` the campaign list).
 
 **Scope (in):**
 - `apps/web/src/features/auth/LoginPage.tsx` (+ `LoginPage.test.tsx`, incl. axe assertion)
@@ -414,7 +428,7 @@ npx shadcn@latest add button input label form card
 
 #### F1.7.8 — ChangePasswordPage
 
-**Goal:** Forced/voluntary password-change form (RHF + shadcn, card layout). `newPassword` client-validated to min 12 chars (mirrors backend); submit via `useChangePassword`; `InlineBanner` for success/error; in-button `Loader2` while pending. On success clear `forcePasswordChange` in `currentUser` and redirect to `/status`.
+**Goal:** Forced/voluntary password-change form (RHF + shadcn, card layout). `newPassword` client-validated to min 12 chars (mirrors backend); submit via `useChangePassword`; `InlineBanner` for success/error; in-button `Loader2` while pending. On success clear `forcePasswordChange` in `currentUser` and redirect to `/` (the authenticated home — campaign list once F1.10.6 lands).
 
 **Scope (in):**
 - `apps/web/src/features/auth/ChangePasswordPage.tsx` (+ `ChangePasswordPage.test.tsx`, incl. axe assertion)
@@ -753,6 +767,203 @@ npx shadcn@latest add button input label form card
 
 ---
 
+#### F1.10 — Frontend: campaign list, selection + home
+
+> **Umbrella task — run the F1.10.N sub-tasks below, not this.**
+
+**Goal:** The frontend campaign surface the Input-Mode flow depends on: list the caller's campaigns, enter one, and land on a campaign home. Critically, entering a campaign is what **populates `campaignStore` (`activeCampaignId` + `activeRole`)** — the role context every campaign-scoped feature (F2.9–F2.11) reads. Campaign home is also the navigation target after a successful commit.
+
+> **No SETUP required.** Uses only the shadcn primitives F1.7 already installed (`card`, `button`); no new component, package, or config. The backend campaign API is F1.8.
+
+**Scope (out):** The full sidebar/app-shell + mode navigation + `uiStore` + admin campaign-creation UI — all handled by **F1.11** (the next task). Member management UI for F1.9 endpoints (not in v1 Input-Mode slice).
+
+**Skills:** `frontend-api-resource`, `ux-skeleton-crafting`, `ux-inline-feedback`, `auth`, `frontend-testing`  
+**Decisions:** D-043, D-086, D-087  
+**Dependencies:** F1.7, F1.8
+
+> **Backend contract (verified against F1.8.8 `CampaignController` + `CampaignResponse`). Envelope
+> `{ data, meta, errors: [{ code, message, field }] }`; all IDs UUID, timestamps ISO-8601:**
+> - `GET /api/v1/campaigns` → `data: CampaignResponse[]` (caller's campaigns; admin → all).
+> - `GET /api/v1/campaigns/{campaignId}` → `data: CampaignResponse`; **403 `FORBIDDEN`** (non-member), **404 `CAMPAIGN_NOT_FOUND`**.
+> - `CampaignResponse` = `{ id: string, name: string, createdBy: string, createdAt: string, role: 'gm' | 'editor' | 'player' | null }`. **`role` is LOWERCASE** (F1.8.8 "role lowercased") — matches the FE `CampaignRole` union and F2.9.4's `activeRole === 'player'` check; `null` only when an admin lists a campaign they don't belong to.
+> - `POST /api/v1/campaigns` is **admin-only** — no self-create UI in v1 (D-051); the admin campaign-creation screen is deferred to F1.11.
+
+---
+
+#### F1.10.1 — Campaign DTO TypeScript types
+
+**Goal:** Hand-written mirrors of the F1.8.8 campaign DTO so the client + pages import real, compiling symbols. Extends the `CampaignRole` stub F1.7.2 already created.
+
+**Scope (in):**
+- `apps/web/src/types/campaign.ts` (**extend**, F1.7.2) — add `CampaignResponse` / `Campaign` (`{ id: string; name: string; createdBy: string; createdAt: string; role: CampaignRole | null }`), reusing the existing `CampaignRole` union (`'gm' | 'editor' | 'player'`, lowercase).
+
+**Scope (out):** Fetch logic/hooks (F1.10.2); components (F1.10.3+). Member/invitation types (F1.9 UI, deferred). No runtime test — `npm run type-check` verifies this types-only sub-task.
+
+**Skills:** `frontend-api-resource`  **Decisions:** D-043  **Dependencies:** F1.8, F1.7.2
+
+---
+
+#### F1.10.2 — campaigns API client + list/detail hooks
+
+**Goal:** Typed fetch functions + TanStack Query hooks for the two campaign reads.
+
+**Scope (in):**
+- `apps/web/src/api/campaigns.ts` (+ `campaigns.test.ts`) — `campaignKeys` query-key factory (`all`, `detail(id)`); `getCampaigns(): Promise<CampaignResponse[]>` → `GET /api/v1/campaigns`; `getCampaign(campaignId): Promise<CampaignResponse>` → `GET .../{id}`; hooks `useCampaigns()` and `useCampaign(campaignId, enabled?)`. All via `apiClient` (F1.7.3). Tests mock `apiClient`; assert URLs, the parsed list/detail, and that the 403/404 error path propagates.
+
+**Scope (out):** Components/pages/guard (F1.10.3+). Create/mutation (admin UI, F1.11).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-043  **Dependencies:** F1.10.1, F1.7.3
+
+---
+
+#### F1.10.3 — CampaignContextGuard (loads campaign → sets activeRole)
+
+**Goal:** The keystone: a route wrapper that loads the campaign for `:campaignId` and writes the active campaign + role into `campaignStore`, so every nested campaign-scoped route (F2.9–F2.11) can read `activeRole`. Loading is a skeleton (D-086); membership failure redirects out.
+
+**Scope (in):**
+- `apps/web/src/components/domain/CampaignContextGuard.tsx` (+ `CampaignContextGuard.test.tsx`, incl. axe) — reads `:campaignId` via `useParams`; `useCampaign(campaignId)`; while loading render a DTO-derived `animate-pulse` skeleton; on success call `useCampaignStore.setCampaign(campaignId, role)` then render `<Outlet />`; on `403`/`404` render an error `InlineBanner` and `<Navigate to="/" replace />`. Clears/overwrites stale store context when `campaignId` changes.
+
+**Scope (out):** The pages it wraps (F1.10.4/F1.10.5). Route registration (F1.10.6). Per-feature role gating (the consuming features, e.g. F2.9.4).
+
+**Skills:** `frontend-api-resource`, `auth`, `ux-skeleton-crafting`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-043, D-086, D-087  **Dependencies:** F1.10.2, F1.7.2, F1.7.6
+
+---
+
+#### F1.10.4 — CampaignListPage (authenticated `/`)
+
+**Goal:** The post-login landing: list the caller's campaigns as cards linking into each campaign home.
+
+**Scope (in):**
+- `apps/web/src/features/campaigns/CampaignListPage.tsx` (+ `CampaignListPage.test.tsx`, incl. axe) — `useCampaigns()`; renders a `rounded-2xl` card per campaign (`name`, role badge) linking to `/campaigns/{id}`; DTO-derived skeleton while loading (D-086); empty state ("No campaigns yet — ask your GM or an admin to add you"); fetch error → error `InlineBanner`.
+
+**Scope (out):** Route registration (F1.10.6). Campaign home (F1.10.5). Create-campaign affordance (admin, F1.11).
+
+**Skills:** `frontend-api-resource`, `ux-skeleton-crafting`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-086, D-087  **Dependencies:** F1.10.2, F1.7.6
+
+---
+
+#### F1.10.5 — CampaignHomePage (campaign hub + commit target)
+
+**Goal:** The per-campaign landing at `/campaigns/:campaignId` — the hub the user reaches on entry and after a successful commit (F2.11.5). Minimal in this slice.
+
+**Scope (in):**
+- `apps/web/src/features/campaigns/CampaignHomePage.tsx` (+ `CampaignHomePage.test.tsx`, incl. axe) — reads `:campaignId`; uses the cached `useCampaign(campaignId)` (populated by `CampaignContextGuard`); shows the campaign name + entry cards: a **"New session"** card linking to `/campaigns/{campaignId}/sessions/new` (Input Mode), plus **disabled "Coming soon"** stubs for Query Mode (Phase 3) and Exploration (Phase 4).
+
+**Scope (out):** The persistent sidebar/app-shell + mode nav (F1.11). The session pages themselves (F2.9+). Route registration (F1.10.6).
+
+**Skills:** `frontend-api-resource`, `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-087  **Dependencies:** F1.10.2
+
+---
+
+#### F1.10.6 — campaign route wiring (`/`, `/campaigns/:campaignId`)
+
+**Goal:** Register the campaign routes and the guarded campaign subtree that all campaign-scoped features nest under.
+
+**Scope (in):**
+- `apps/web/src/main.tsx` (**edit**, F1.7.10) — set the authenticated `/` route's element to `CampaignListPage` (replacing the F1.7.10 placeholder); add a campaign subtree `/campaigns/:campaignId` whose element is `CampaignContextGuard` (so `activeRole` is populated for everything nested), with `CampaignHomePage` as its index route. All under the existing `RequireAuth` (F1.7.5). The Input-Mode session routes are nested **inside** this `:campaignId` guarded subtree by F2.9.5 / F2.10.12. No new providers.
+
+**Scope (out):** Session routes (F2.9.5/F2.10.12 nest into this subtree). Sidebar/app-shell (F1.11).
+
+**Skills:** `frontend-api-resource`, `auth`  **Decisions:** D-087  **Dependencies:** F1.10.3, F1.10.4, F1.10.5, F1.7.5, F1.7.10
+
+---
+
+#### F1.11 — Frontend: campaign app-shell + sidebar
+
+> **Umbrella task — run the F1.11.N sub-tasks below, not this.**
+
+**Goal:** Wrap the campaign-scoped routes in the persistent **app-shell + Sidebar** from UX Constitution §6 (`uiStore`-driven collapse, role-gated mode nav), and add the admin campaign-creation flow. Builds now: Query/Exploration nav render as disabled "coming soon" stubs (like F1.10.5) until their phases ship.
+
+> **No SETUP required.** Uses the shadcn primitives F1.7 already installed (`card`, `button`, `form`/`input`/`label`) + `lucide-react` icons (already a dep) + `zustand/middleware` `persist`. No new component or package.
+
+**Scope (out):** Activating the Query (Phase 3) / Exploration (Phase 4) nav links — they stay disabled stubs here; a real Settings page (stubbed). Member-management UI for F1.9 endpoints. The campaign list/context guard/home already shipped by F1.10 (F1.11 wraps + trims them).
+
+**Skills:** `ux-navigation-logic`, `frontend-api-resource`, `react-hook-form`, `auth`, `frontend-testing`  
+**Decisions:** D-051, D-087  
+**Dependencies:** F1.10, F1.9.9
+
+> **Note — role field:** the campaign role lives in `campaignStore.activeRole` (F1.7.2). The
+> `ux-navigation-logic` skill's `currentUserRole` is an older name — use `activeRole` (and
+> `apps/web/CLAUDE.md` §4 is corrected to match).
+
+> **Backend contract (verified):**
+> - `GET /api/v1/users?email=` → `data: { id, email }[]` (F1.9.9 `UserSearchResponse`; admin-or-GM).
+> - `POST /api/v1/campaigns` body `{ name, gmUserId }` → **201** `CampaignResponse` (admin-only, F1.8.8).
+> - Admin is detected from `authStore.currentUser.isAdmin` (F1.7.1 `CurrentUser`); never from a route.
+
+---
+
+#### F1.11.1 — uiStore (sidebar expand/collapse, persisted)
+
+**Goal:** The client-state store for sidebar layout, persisted across reloads. Mirrors the `ux-navigation-logic` skill snippet.
+
+**Scope (in):**
+- `apps/web/src/store/uiStore.ts` (+ `uiStore.test.ts`) — Zustand + `persist` (`zustand/middleware`); `sidebarExpanded: boolean` (default `true`), `toggleSidebar()`, `setSidebarExpanded(value)`; localStorage key `blue-steel-sidebar`. Test asserts toggle + persisted key (never read `localStorage` directly in components).
+
+**Scope (out):** The `Sidebar` that consumes it (F1.11.2). Any non-sidebar UI flags.
+
+**Skills:** `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-087  **Dependencies:** F1.7.2
+
+---
+
+#### F1.11.2 — Sidebar component (mode nav, role-gated, collapse)
+
+**Goal:** The persistent campaign navigation per UX §6 — campaign switcher, mode nav (Input live; Query/Exploration/Settings stubbed), collapse toggle, user/logout — with `player` role gating.
+
+**Scope (in):**
+- `apps/web/src/components/domain/Sidebar.tsx` (+ `Sidebar.test.tsx`, incl. axe) — reads `useUiStore(s => s.sidebarExpanded)` + `useCampaignStore(s => s.activeRole)` + `activeCampaignId`; campaign-switcher label from the cached `useCampaign(activeCampaignId)` (F1.10.2) + a "Switch campaign" link to `/`; `lucide-react` icons; `NavLink`s — **Input Mode** → `/campaigns/{activeCampaignId}/sessions/new` (live), **Query / Exploration / Settings** → disabled "coming soon" items; **Input item hidden (not just disabled) when `activeRole === 'player'`** (D); User + Logout at the bottom (`authStore.logout()` → navigate `/login`); `w-16` collapsed / `w-64` expanded with `transition-all duration-200`; active-route accent `bg-blue-50 text-blue-600 border-r-2 border-blue-500` via `NavLink`. Collapsed → icons only (text removed, not truncated).
+
+**Scope (out):** The `AppShell` that mounts it + route wiring (F1.11.3). The `uiStore` itself (F1.11.1). Real Query/Exploration routes (their phases).
+
+**Skills:** `ux-navigation-logic`, `frontend-api-resource`, `auth`, `frontend-testing`  **Decisions:** D-087  **Dependencies:** F1.11.1, F1.7.2, F1.7.4, F1.10.2
+
+---
+
+#### F1.11.3 — AppShell layout + campaign route restructure
+
+**Goal:** Mount the sidebar as a persistent shell around every campaign-scoped page by inserting an `AppShell` layout route inside the existing `CampaignContextGuard` subtree.
+
+**Scope (in):**
+- `apps/web/src/components/domain/AppShell.tsx` (+ `AppShell.test.tsx`, incl. axe) — flex layout: `<Sidebar />` + `<main className="flex-1 …"><Outlet /></main>` (page background `slate-50`).
+- `apps/web/src/main.tsx` (**edit**, F1.10.6) — insert `AppShell` as a **layout route nested inside the `/campaigns/:campaignId` `CampaignContextGuard`** (guard stays the parent rendering `<Outlet/>`; `AppShell` becomes the child layout whose `<Outlet/>` holds the campaign pages). `CampaignHomePage` is the index route. All existing/future campaign children (`sessions/new` F2.9.5, `…/diff` F2.10.12) render inside the shell automatically — no change to those sub-tasks.
+- `apps/web/src/features/campaigns/CampaignHomePage.tsx` (**edit**, F1.10.5) — **trim** the Input/Query/Exploration entry cards now that the sidebar owns navigation; keep the campaign-name welcome/landing content.
+
+**Scope (out):** The `Sidebar` (F1.11.2). The list `/` and create `/campaigns/new` pages — they are **not** campaign-scoped and stay outside the shell.
+
+**Skills:** `ux-navigation-logic`, `frontend-api-resource`, `frontend-testing`  **Decisions:** D-087  **Dependencies:** F1.11.2, F1.10.3, F1.10.5, F1.10.6
+
+---
+
+#### F1.11.4 — admin-create data layer (user search + create campaign)
+
+**Goal:** The typed client surface the admin create flow needs: search users (for the GM picker) and create a campaign.
+
+**Scope (in):**
+- `apps/web/src/types/auth.ts` (**extend**, F1.7.1) — `UserSearchResult` (`{ id: string; email: string }`).
+- `apps/web/src/api/users.ts` (**extend**, F1.7.4) + `users.test.ts` (**extend**) — `searchUsers(email): Promise<UserSearchResult[]>` → `GET /api/v1/users?email=`; hook `useUserSearch(email, enabled?)`.
+- `apps/web/src/api/campaigns.ts` (**extend**, F1.10.2) + `campaigns.test.ts` (**extend**) — `createCampaign({ name, gmUserId }): Promise<CampaignResponse>` → `POST /api/v1/campaigns`; hook `useCreateCampaign()` (invalidate `campaignKeys.all` on success). Tests mock `apiClient`.
+
+**Scope (out):** The create page/form + admin gating (F1.11.5). Member-management endpoints (F1.9 UI).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-024  **Dependencies:** F1.7.4, F1.10.2, F1.7.3
+
+---
+
+#### F1.11.5 — CreateCampaignPage + `/campaigns/new` route (admin)
+
+**Goal:** The admin-only campaign-creation page, reachable from the campaign list, that creates a campaign with its GM and lands on the new campaign home.
+
+**Scope (in):**
+- `apps/web/src/features/campaigns/CreateCampaignPage.tsx` (+ `CreateCampaignPage.test.tsx`, incl. axe) — admin gate: `<Navigate to="/" replace />` when `!useAuthStore(s => s.currentUser?.isAdmin)`; React Hook Form over `{ name, gmUserId }`; GM picker = email input → `useUserSearch` results list → select sets `gmUserId`; submit via `useCreateCampaign`; `400` field errors via `setError`, other errors via error `InlineBanner`; in-button `Loader2` while pending; on success `navigate('/campaigns/{id}')`.
+- `apps/web/src/main.tsx` (**edit**, F1.11.3) — add `/campaigns/new` behind `RequireAuth`, **outside** `AppShell` (not campaign-scoped).
+- `apps/web/src/features/campaigns/CampaignListPage.tsx` (**edit**, F1.10.4) — an admin-only "New campaign" link to `/campaigns/new`.
+
+**Scope (out):** The data-layer hooks (F1.11.4). The shell/sidebar (F1.11.2/F1.11.3). Editing an existing campaign (not in v1).
+
+**Skills:** `react-hook-form`, `frontend-api-resource`, `auth`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-024, D-051, D-087  **Dependencies:** F1.11.4, F1.7.2, F1.7.6, F1.10.4
+
+---
+
 ### Phase 2 — Session Ingestion Pipeline
 
 > **Principle:** Schema first, mocks second, backend pipeline third, frontend last.
@@ -829,8 +1040,33 @@ npx shadcn@latest add button input label form card
 | F2.8.9 | EmbeddingGenerationListener (async post-commit, D-063) | 🔲 |
 | F2.8.10 | Commit endpoint (controller + request DTO + 422 mapping) | 🔲 |
 | F2.9 | Frontend: Input Mode — session submission + status polling | 🔲 |
+| F2.9-SETUP | Frontend scaffolding — `shadcn add textarea` (human step) | 👤 |
+| F2.9.1 | Frontend: session submit + status TypeScript types | 🔲 |
+| F2.9.2 | Frontend: sessions API client + submit/status-polling hooks | 🔲 |
+| F2.9.3 | Frontend: ProcessingStatusView (poll → skeleton → draft/failed) | 🔲 |
+| F2.9.4 | Frontend: SubmitSessionPage form (role guard + error states) | 🔲 |
+| F2.9.5 | Frontend: register `/sessions/new` route behind RequireAuth | 🔲 |
 | F2.10 | Frontend: Input Mode — diff review screen | 🔲 |
+| F2.10-SETUP | Frontend scaffolding — `shadcn add badge checkbox radio-group` (human step) | 👤 |
+| F2.10.1 | Frontend: DiffPayload read TypeScript types (§7.6) | 🔲 |
+| F2.10.2 | Frontend: useSessionDiff query hook | 🔲 |
+| F2.10.3 | Frontend: FocusedOverlay primitive + useEscapeKey (no-modal) | 🔲 |
+| F2.10.4 | Frontend: useDiffState reducer hook (decisions/resolutions/acks) | 🔲 |
+| F2.10.5 | Frontend: DeltaCard + NewEntityCard (entity decision cards) | 🔲 |
+| F2.10.6 | Frontend: UncertainCard (inline MATCH/NEW resolution) | 🔲 |
+| F2.10.7 | Frontend: ConflictWarningCard (acknowledge, non-blocking) | 🔲 |
+| F2.10.8 | Frontend: EditCardOverlay (FocusedOverlay-based field edit) | 🔲 |
+| F2.10.9 | Frontend: NarrativeSummaryHeader + DiffCategorySection | 🔲 |
+| F2.10.10 | Frontend: CommitButton (controlled disabled guard) | 🔲 |
+| F2.10.11 | Frontend: DiffReviewPage container (fetch + skeleton + assemble) | 🔲 |
+| F2.10.12 | Frontend: register `/sessions/:sessionId/diff` route | 🔲 |
 | F2.11 | Frontend: Input Mode — commit flow + draft recovery | 🔲 |
+| F2.11.1 | Frontend: CommitPayload wire TypeScript types (§7.6) | 🔲 |
+| F2.11.2 | Frontend: buildCommitPayload pure builder (state → payload) | 🔲 |
+| F2.11.3 | Frontend: commit + discard API client + mutation hooks | 🔲 |
+| F2.11.4 | Frontend: DiscardConfirmOverlay (FocusedOverlay confirm) | 🔲 |
+| F2.11.5 | Frontend: DiffReviewPage commit wiring (+ 422 handling) | 🔲 |
+| F2.11.6 | Frontend: DiffReviewPage GM-only discard wiring | 🔲 |
 | F2.12 | Local LLM via Ollama (offline real pipeline) | 🔲 |
 | F2.12-SETUP | Human: add Ollama starter, install Ollama, pull models | 🔲 |
 | F2.12.1 | Ollama profile config + AiConfig model-bean wiring | 🔲 |
@@ -1891,60 +2127,432 @@ to `CommitPayload`, delegate to the use case, and map `CommitValidationException
 
 #### F2.9 — Frontend: Input Mode — session submission + status polling
 
-**Goal:** Session submission form and processing status view. The user submits a summary, sees the pipeline running, and is navigated to the diff review when `draft` is ready.
+> **Umbrella task — run the F2.9.N sub-tasks below, not this.**
 
-**Scope (in):**
-- `api/sessions.ts`: typed client for `POST /campaigns/{id}/sessions`, `GET /sessions/{id}/status`; `useSubmitSession` mutation; `useSessionStatus` query with `refetchInterval: (data) => data?.status === 'processing' ? 2000 : false`
-- TypeScript types mirroring session submission and status response shapes
-- `features/input/SubmitSessionPage.tsx`: shadcn/ui `Textarea` + React Hook Form; disabled while in-flight; role guard: redirect if `player`
-- `features/input/ProcessingStatusView.tsx`: polling state; navigates to `/sessions/{id}/diff` on `draft`
-- Error states: `400 SUMMARY_TOO_LARGE` → inline message with `maxTokens`; `409 ACTIVE_SESSION_EXISTS` → recovery link using `existingSessionId` from response; `failed` status → `failureReason` and `message` displayed
-- Route: `/campaigns/:campaignId/sessions/new`
+**Goal:** Session submission form and processing status view. The user submits a summary, sees the pipeline running, and is navigated to the diff review when the session reaches `draft`. The original scope is split across `F2.9-SETUP` (human scaffolding) and the ordered `F2.9.1`–`F2.9.5` sub-tasks.
 
-**Scope (out):** Diff review (F2.10).
+**Scope (out):** Diff review (F2.10). Commit flow + draft-recovery banner (F2.11) — F2.9 only surfaces the `409` recovery *link*; it does not pre-check for an existing draft on page load. No `FocusedOverlay` is needed: this flow has no contextual action (no confirm/expand/inline-edit) per UX Constitution §4.
 
 **Skills:** `frontend-api-resource`, `frontend-testing`  
-**Decisions:** D-049, D-054, D-067  
-**Dependencies:** F1.7, F2.3
+**Decisions:** D-049, D-054, D-067, D-076, D-083, D-086, D-087  
+**Dependencies:** F1.7, F1.10, F2.3
+
+---
+
+#### F2.9-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** Everything else the sub-tasks need already exists from
+> `F1.7-SETUP` and F1.7 (the `@/` alias, Tailwind v4 + theme, `shadcn init`, the Vitest setup file,
+> `@hookform/resolvers` + `zod`, the `apiClient`, the Zustand stores, `RequireAuth`, `InlineBanner`,
+> and the shadcn `button input label form card` primitives). F2.9 adds **only** the one missing
+> shadcn primitive.
+
+```bash
+cd apps/web
+npx shadcn@latest add textarea     # writes apps/web/src/components/ui/textarea.tsx
+# VITE_API_BASE_URL is already documented + wired by F1.7.10 — nothing to add here.
+```
+
+> **Backend contract (verified against `apps/api` — F2.3.11 `SessionController` + DTOs, the
+> `SessionStatus` domain enum, and `GlobalExceptionHandler`). Every response uses the envelope
+> `{ data, meta, errors: [{ code, message, field }] }`; request/response keys are camelCase (D-076):**
+> - `POST /api/v1/campaigns/{campaignId}/sessions` body `{ summaryText }` (`@NotBlank`) → **202** `data: { sessionId, status }` (`SessionAcceptedResponse`)
+> - `GET  /api/v1/campaigns/{campaignId}/sessions/{sessionId}/status` → `data: { sessionId, status, failureReason, message }` (`SessionStatusResponse`; `failureReason`/`message` nullable)
+> - `DELETE /api/v1/campaigns/{campaignId}/sessions/{sessionId}` exists (discard) but belongs to **F2.11**, not F2.9.
+>
+> **`status` is the `SessionStatus` Java enum serialized by Jackson's default (enum *name*) — it is
+> UPPERCASE on the wire: `'PENDING' | 'PROCESSING' | 'DRAFT' | 'COMMITTED' | 'FAILED' | 'DISCARDED'`.**
+> There is no `@JsonValue`/global lowercasing (confirmed: `HealthResponse` already emits `'UP'|'DEGRADED'`
+> and F1.7.1 mirrors it uppercase). ⚠️ The `frontend-api-resource` skill's example uses lowercase
+> `'processing'` **and** `summary_text` — **both are stale**; use UPPERCASE statuses and `summaryText`.
+>
+> **Error envelope reality — there is NO structured slot for `existingSessionId` or `maxTokens`;
+> `ApiError` is only `{ code, message, field }`:**
+> - `400` field-blank summary → `{ code: 'VALIDATION_ERROR', field: 'summaryText' }` (Bean Validation).
+> - `400` oversize → `{ code: 'SUMMARY_TOO_LARGE', message }` — the token limit is embedded in `message` text only; surface the message verbatim (no structured `maxTokens`).
+> - `409` active draft → `{ code: 'ACTIVE_SESSION_EXISTS', message }` — `existingSessionId` (UUID) is embedded in `message` text only; the client extracts it via regex to build the resume link.
+> - F1.7.3's `apiClient` parses the envelope and **throws on `errors[]`**; the thrown error exposes the parsed `ApiError[]` (+ HTTP `status`). Reference F1.7.3's actual exported error type when narrowing — do not invent a new one.
+
+---
+
+#### F2.9.1 — Session submit + status TypeScript types
+
+**Goal:** Hand-written TypeScript mirrors of the F2.3.11 session DTOs so every later sub-task imports real, compiling symbols. No runtime logic.
+
+**Scope (in):**
+- `apps/web/src/types/session.ts` — `SessionStatus` (`'PENDING' | 'PROCESSING' | 'DRAFT' | 'COMMITTED' | 'FAILED' | 'DISCARDED'` — UPPERCASE, mirrors the Java enum name); `SubmitSessionRequest` (`{ summaryText: string }`); `SessionAcceptedResponse` (`{ sessionId: string; status: SessionStatus }`); `SessionStatusResponse` (`{ sessionId: string; status: SessionStatus; failureReason: string | null; message: string | null }` — `failureReason` is a free-form string, not a union: the backend set grows across phases, e.g. `PIPELINE_NOT_IMPLEMENTED` today, later `PIPELINE_TIMEOUT`/extraction reasons).
+
+**Scope (out):** No fetch logic, hooks, or components (F2.9.2+). Diff/commit types (F2.10/F2.11). No runtime test — `npm run type-check` is the verification for this types-only sub-task.
+
+**Skills:** `frontend-api-resource`  **Decisions:** D-076  **Dependencies:** F2.9-SETUP, F1.7.1
+
+---
+
+#### F2.9.2 — sessions API client + submit/status-polling hooks
+
+**Goal:** Typed fetch functions + TanStack Query v5 hooks for session submit and status polling, plus a pure helper that extracts `existingSessionId` from the `409` error message (the envelope carries no structured field for it).
+
+**Scope (in):**
+- `apps/web/src/api/sessions.ts` (+ `sessions.test.ts`) — `sessionKeys` query-key factory; `submitSession(campaignId, body: SubmitSessionRequest)` → `POST .../sessions` (sends camelCase `{ summaryText }`); `getSessionStatus(campaignId, sessionId)` → `GET .../{sid}/status`; hook `useSubmitSession(campaignId)` (mutation; on success invalidate `sessionKeys.all(campaignId)`); hook `useSessionStatus(campaignId, sessionId, enabled)` with `refetchInterval: (query) => query.state.data?.status === 'PROCESSING' ? 2000 : false`; exported helper `extractExistingSessionId(error): string | null` (regex-matches a UUID in an `ACTIVE_SESSION_EXISTS` message; null otherwise). All requests go through `apiClient` (F1.7.3) — never raw `fetch`.
+- Tests mock `apiClient`; cover submit success, the `refetchInterval` predicate returning `2000` for `PROCESSING` and `false` for `DRAFT`/`FAILED`, and `extractExistingSessionId` (UUID present / absent).
+
+**Scope (out):** UI/components (F2.9.3/F2.9.4). Diff + commit + discard clients (F2.10/F2.11). The `apiClient` wrapper itself (F1.7.3).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-054, D-076  **Dependencies:** F2.9.1, F1.7.3
+
+---
+
+#### F2.9.3 — ProcessingStatusView (poll → skeleton → draft/failed)
+
+**Goal:** Given a campaign + session id, poll status and represent each state per the UX Constitution: a DTO-derived **skeleton** while `PROCESSING` (no content spinner, D-086), navigate to the diff route on `DRAFT`, and surface a `FAILED` session's `failureReason` + `message` via an error `InlineBanner`.
+
+**Scope (in):**
+- `apps/web/src/features/input/ProcessingStatusView.tsx` (+ `ProcessingStatusView.test.tsx`, incl. axe assertion) — props `{ campaignId: string; sessionId: string }`; uses `useSessionStatus`; `PROCESSING` (and initial load) → `animate-pulse` skeleton blocks matching the eventual review header (per §5 skeleton classes — `h-4`/`h-3` `bg-slate-200`), with an `aria-live="polite"` "Processing your session…" status line; `DRAFT` → `useNavigate` to `/campaigns/{campaignId}/sessions/{sessionId}/diff`; `FAILED` → `InlineBanner` variant `error` showing `failureReason` + `message`; fetch error → `InlineBanner` error.
+
+**Scope (out):** The submit form (F2.9.4). The diff page itself (F2.10) — this only navigates to its route. Route registration (F2.9.5).
+
+**Skills:** `frontend-api-resource`, `ux-skeleton-crafting`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-086, D-087  **Dependencies:** F2.9.1, F2.9.2, F1.7.6
+
+---
+
+#### F2.9.4 — SubmitSessionPage form (role guard + error states)
+
+**Goal:** Summary-submission form (React Hook Form + shadcn `Form`/`Textarea`/`Button` in a `rounded-2xl` card) with a `player` role guard; on successful submit, hand off to `ProcessingStatusView` for the returned session. Map the verified `400`/`409` errors to field errors and `InlineBanner`s.
+
+**Scope (in):**
+- `apps/web/src/features/input/SubmitSessionPage.tsx` (+ `SubmitSessionPage.test.tsx`, incl. axe assertion) — reads `campaignId` via `useParams`; role guard reads `useCampaignStore(s => s.activeRole)` (populated by `CampaignContextGuard`, F1.10.3 — this route nests under it per F2.9.5) and `<Navigate to="/campaigns/{campaignId}" replace>`-redirects when `activeRole === 'player'`; RHF form over `{ summaryText }` with client `required` validation; submit via `useSubmitSession`; submit `Button` `disabled` + in-button `Loader2` while `isPending` (the one place a spinner is allowed, §5); on success store the returned `sessionId` in local `useState` and render `<ProcessingStatusView campaignId sessionId />` in place of the form; on error narrow the thrown `ApiError[]`: `VALIDATION_ERROR` → `setError('summaryText', …)`, `SUMMARY_TOO_LARGE` → error `InlineBanner` (render `message` verbatim), `ACTIVE_SESSION_EXISTS` → warning `InlineBanner` with a "Resume your unfinished review" link to `/campaigns/{campaignId}/sessions/{id}/diff` built from `extractExistingSessionId(error)`.
+
+**Scope (out):** Route registration (F2.9.5). Pre-load draft-recovery check + discard (F2.11). A reusable `RequireRole` guard (deferred until ≥2 features need it — inline here per scope). Populating `activeRole` (done by `CampaignContextGuard`, F1.10.3).
+
+**Skills:** `react-hook-form`, `frontend-api-resource`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-054, D-067, D-076, D-083, D-087  **Dependencies:** F2.9-SETUP, F2.9.1, F2.9.2, F2.9.3, F1.10.3, F1.7.2, F1.7.6
+
+---
+
+#### F2.9.5 — Register `/sessions/new` route behind RequireAuth
+
+**Goal:** Wire the submission page into the app router so an authenticated `gm`/`editor` can reach it, with the campaign role context loaded.
+
+**Scope (in):**
+- `apps/web/src/main.tsx` (**edit**, F1.10.6) — add `sessions/new` as a child route of the `/campaigns/:campaignId` subtree, i.e. **inside the `CampaignContextGuard`** (F1.10.3) so `activeRole` is populated before `SubmitSessionPage`'s `player` guard runs. (`RequireAuth` already wraps the subtree, F1.7.5.) No new providers.
+
+**Scope (out):** Diff/commit routes (F2.10/F2.11). The sidebar Input Mode nav item (F1.11/`ux-navigation-logic`). Role gating beyond auth (handled inside the page, F2.9.4). The campaign subtree + guard themselves (F1.10.6).
+
+**Skills:** `frontend-api-resource`, `auth`  **Decisions:** D-087  **Dependencies:** F2.9.4, F1.10.6, F1.7.5
 
 ---
 
 #### F2.10 — Frontend: Input Mode — diff review screen
 
-**Goal:** Render all diff card types, handle UNCERTAIN resolution, surface conflict warnings. The Commit button disabled state is the primary guard for D-042.
+> **Umbrella task — run the F2.10.N sub-tasks below, not this.**
 
-**Scope (in):**
-- `api/sessions.ts` extended: `GET /sessions/{id}/diff` → `useSessionDiff`; TypeScript types mirroring `DiffPayload` per ARCHITECTURE.md §7.6 formal schema (D-076)
-- `components/domain/DiffCard.tsx` variants: `ExistingEntityCard` (Accept/Edit/Delete, delta fields only), `NewEntityCard` (full profile), `UncertainEntityCard` (Same entity / Different entity radio — no defer, D-042), `ConflictWarningCard` (acknowledgment checkbox, non-blocking, D-033)
-- `features/input/DiffReviewPage.tsx`: narrative summary header; sections by entity type; conflict warnings section at top; progress indicator `"N items require your decision"` when UNCERTAIN or unacknowledged conflicts remain; all card state in `useReducer` (accept/edit/delete decisions, UNCERTAIN resolutions, conflict acknowledgments)
-- Commit button: `disabled` derived from `unresolvedUncertainCount + unacknowledgedConflictCount > 0`
-- Route: `/campaigns/:campaignId/sessions/:sessionId/diff`
+**Goal:** The trust boundary between AI extraction and world state: render the four card types, force UNCERTAIN resolution, surface (acknowledgeable) conflicts, and hold all per-card decisions in client state. The Commit **button disabled state** is the primary guard for D-042 (backend `422` is defence in depth). The original scope is split across `F2.10-SETUP` (human scaffolding) and the ordered `F2.10.1`–`F2.10.12` sub-tasks.
 
-**Scope (out):** Commit API call (F2.11). "Propose a change" affordance is Exploration Mode (Phase 4, D-012).
+**Scope (out):** The commit API call + `CommitPayload` assembly/types + draft-recovery banner + discard (all F2.11 — F2.10 builds the decision *state* the F2.11 payload builder consumes, and a `CommitButton` whose `onCommit` is wired in F2.11). "Propose a change" affordance is Exploration Mode (Phase 4, D-012).
 
 **Skills:** `frontend-diff-review`, `frontend-testing`  
-**Decisions:** D-004, D-005, D-006, D-007, D-033, D-042, D-076  
-**Dependencies:** F1.7, F2.7
+**Decisions:** D-004, D-005, D-006, D-007, D-033, D-042, D-076, D-082, D-086, D-087  
+**Dependencies:** F1.7, F2.7, F2.9
+
+---
+
+#### F2.10-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** Everything else already exists from `F1.7-SETUP`/F1.7
+> (`@/` alias, Tailwind v4 + theme, `shadcn init`, Vitest setup, `apiClient`, Zustand stores,
+> `RequireAuth`, `InlineBanner`, `@hookform/resolvers` + `zod`, and the `button input label form card`
+> primitives) and F2.9 (the `textarea` primitive, `src/types/session.ts`, `src/api/sessions.ts` +
+> `sessionKeys`, the `/sessions/new` route). F2.10 adds **only** the missing shadcn primitives.
+
+```bash
+cd apps/web
+npx shadcn@latest add badge checkbox radio-group
+#   -> writes src/components/ui/{badge,checkbox,radio-group}.tsx
+#      (radio-group pulls @radix-ui/react-radio-group; checkbox pulls @radix-ui/react-checkbox)
+```
+
+> **Backend contract (verified against ARCHITECTURE.md §7.6 + the F2.7 Java records — `DiffCard`
+> sealed interface, `ExistingEntityCard`/`NewEntityCard`/`UncertainEntityCard`, `ConflictCard`,
+> `DiffPayload`). Returned by `GET /api/v1/campaigns/{campaignId}/sessions/{sessionId}/diff` as
+> `ApiResponse<DiffPayload>` (200). The payload is READ-ONLY from the client — it is never POSTed
+> back (the commit payload is a separate derived shape, F2.11). All keys are camelCase (D-076):**
+> - `DiffPayload` = `{ narrativeSummaryHeader: string, actors: DiffCard[], spaces: DiffCard[], events: DiffCard[], relations: DiffCard[], detectedConflicts: ConflictCard[] }`
+> - `DiffCard` is a union discriminated by **`cardType`** (`'EXISTING' | 'NEW' | 'UNCERTAIN'` — UPPERCASE, the Jackson `@JsonTypeInfo` name):
+>   - `EXISTING`: `{ cardId, cardType: 'EXISTING', entityId, entityType, name, changedFields: Record<string, unknown> }` (delta only, D-006)
+>   - `NEW`: `{ cardId, cardType: 'NEW', entityType, name, fullProfile: Record<string, unknown> }` (full profile, D-007)
+>   - `UNCERTAIN`: `{ cardId, cardType: 'UNCERTAIN', entityType, extractedMention, candidateEntityId, candidateEntityName }` (D-042)
+>   - `ConflictCard` is **NOT** in the `DiffCard` union (it has no `cardType`): `{ conflictId, entityId, entityType, description, extractedFact, existingFact }` (D-033)
+> - **`entityType` is LOWERCASE on the wire:** `'actor' | 'space' | 'event' | 'relation'` (note: this differs from `SessionStatus`/`cardType`, which are UPPERCASE — §7.6 pins these as lowercase).
+> - Read access requires `gm|editor` and `status === 'draft'`; outside `draft` (or not found) the endpoint returns **404** (`SESSION_NOT_FOUND`) — there is no separate "no draft" code.
+>
+> **File-location reconciliation:** §7.6 and the `frontend-diff-review` skill say diff types live in
+> `src/types/sessions.ts` (plural). The repo standardized on **singular** `src/types/session.ts`
+> (created by F2.9.1, matching `types/auth.ts`/`types/health.ts`). Extend that existing file — do
+> **not** create a second `sessions.ts`. The API client file is `src/api/sessions.ts` (plural,
+> created by F2.9.2) — extend it. Diff **cards** are used only by the input feature, so they live in
+> `src/features/input/components/` (per the "feature-scoped until shared" rule), **not**
+> `components/domain/`; only `FocusedOverlay` (reused app-wide) is a `components/domain/` primitive.
+
+---
+
+#### F2.10.1 — DiffPayload read TypeScript types (§7.6)
+
+**Goal:** Hand-written mirrors of the F2.7 diff records so every later sub-task imports real, compiling, discriminated symbols. Read shapes only — the `CommitPayload` wire types are F2.11.
+
+**Scope (in):**
+- `apps/web/src/types/session.ts` (**extend**, F2.9.1) — `CardType` (`'EXISTING' | 'NEW' | 'UNCERTAIN'`); `EntityType` (`'actor' | 'space' | 'event' | 'relation'` — lowercase per §7.6); `ExistingDiffCard`, `NewDiffCard`, `UncertainDiffCard` (exact §7.6 fields above); `DiffCard = ExistingDiffCard | NewDiffCard | UncertainDiffCard` (discriminated on `cardType`); `ConflictCard` (separate — no `cardType`); `DiffPayload` aggregate. `changedFields`/`fullProfile` typed `Record<string, unknown>` (no `any`).
+
+**Scope (out):** Fetch hook (F2.10.2); FE decision-state types (`CardDecision`/`UncertainResolution`, F2.10.4); `CommitPayload` wire types + `buildCommitPayload` (F2.11). No runtime test — `npm run type-check` verifies this types-only sub-task.
+
+**Skills:** `frontend-diff-review`, `frontend-api-resource`  **Decisions:** D-004, D-006, D-007, D-033, D-042, D-076  **Dependencies:** F2.10-SETUP, F2.9.1
+
+---
+
+#### F2.10.2 — useSessionDiff query hook
+
+**Goal:** Typed fetch function + TanStack Query hook for the draft diff, extending the existing sessions client.
+
+**Scope (in):**
+- `apps/web/src/api/sessions.ts` (**extend**, F2.9.2) + `sessions.test.ts` (**extend**) — add `sessionKeys.diff(campaignId, sessionId)` to the existing key factory; `getSessionDiff(campaignId, sessionId): Promise<DiffPayload>` → `GET .../{sid}/diff` via `apiClient`; hook `useSessionDiff(campaignId, sessionId, enabled?)` (`useQuery`, no polling — diff is fetched once in `draft`). Tests mock `apiClient`; assert the URL + that the parsed `DiffPayload` is returned, and the `404` error path propagates.
+
+**Scope (out):** Components/state (F2.10.3+). Commit/discard mutations (F2.11). The status-poll hook (already F2.9.2).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-076  **Dependencies:** F2.10.1, F2.9.2, F1.7.3
+
+---
+
+#### F2.10.3 — FocusedOverlay primitive + useEscapeKey (no-modal)
+
+**Goal:** The reusable app-wide overlay primitive that replaces all modals/dialogs (D-082, UX Constitution §4). Built here because F2.10's card-edit flow is the first contextual action; reused later (annotations, confirms).
+
+**Scope (in):**
+- `apps/web/src/hooks/useEscapeKey.ts` (+ `useEscapeKey.test.ts`) — `useEscapeKey(handler)` document-level `keydown` listener, cleaned up on unmount.
+- `apps/web/src/components/domain/FocusedOverlay.tsx` (+ `FocusedOverlay.test.tsx`, incl. axe assertion) — props `{ open, onClose, children, className? }`; backdrop `fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm` with `onClick={onClose}` + `aria-hidden`; focused element `z-50 shadow-xl ring-2 ring-blue-500/50` anchored in flow (never viewport-centred); calls `useEscapeKey(onClose)`; first focusable child `autoFocus`. Test covers ESC + backdrop-click close and that `open=false` renders nothing.
+
+**Scope (out):** Any feature usage of the overlay (the edit overlay is F2.10.8). shadcn `Dialog`/`AlertDialog` are forbidden (D-082).
+
+**Skills:** `ux-focused-overlay`, `frontend-testing`  **Decisions:** D-082, D-087  **Dependencies:** F1.7-SETUP
+
+---
+
+#### F2.10.4 — useDiffState reducer hook (decisions / resolutions / acks)
+
+**Goal:** The single source of truth for all per-card user decisions, with derived unresolved counts that drive the commit guard. Pure logic — the most heavily unit-tested piece.
+
+**Scope (in):**
+- `apps/web/src/features/input/hooks/useDiffState.ts` (+ `useDiffState.test.ts`) — exports the FE decision types `CardDecision` (`{action:'accept'} | {action:'edit'; editedFields: Record<string,unknown>} | {action:'delete'}`), `UncertainResolution` (`{cardId; resolution:'MATCH'; matchedEntityId:string} | {cardId; resolution:'NEW'; matchedEntityId:null}`), and the `isEdit` type guard; a `useReducer`-backed hook exposing `decisions: Map<string,CardDecision>`, `uncertainResolutions: Map<string,UncertainResolution>`, `acknowledgedConflicts: Set<string>`, the mutators `setDecision`/`resolveUncertain`/`acknowledgeConflict`, and derived `unresolvedUncertainCount` (UNCERTAIN cards without a resolution) + `unacknowledgedConflictCount` (conflicts not yet acknowledged). Initialized from a `DiffPayload`; non-UNCERTAIN cards default to `accept`. Tests cover defaulting, each mutator, and both derived counts reaching zero.
+
+**Scope (out):** The wire `CommitPayload` shape + `buildCommitPayload` (F2.11 — consumes this state). Card UI (F2.10.5–F2.10.8). Page wiring (F2.10.11).
+
+**Skills:** `frontend-diff-review`, `frontend-testing`  **Decisions:** D-033, D-042, D-053  **Dependencies:** F2.10.1
+
+---
+
+#### F2.10.5 — DeltaCard + NewEntityCard (entity decision cards)
+
+**Goal:** The two non-UNCERTAIN entity cards. Both expose Accept / Edit / Delete; they differ only in the field block — `DeltaCard` shows `changedFields` only (D-006), `NewEntityCard` shows the full `fullProfile` (D-007). No "add" affordance (D-053).
+
+**Scope (in):**
+- `apps/web/src/features/input/components/DeltaCard.tsx` (+ `DeltaCard.test.tsx`, incl. axe) — props `{ card: ExistingDiffCard; decision: CardDecision; onSetDecision: (d: CardDecision) => void; onEdit: () => void }`; renders `name`, the `changedFields` delta, and Accept/Delete buttons (reflecting current `decision`) + an Edit button that calls `onEdit` (overlay is F2.10.8); `rounded-2xl` card.
+- `apps/web/src/features/input/components/NewEntityCard.tsx` (+ `NewEntityCard.test.tsx`, incl. axe) — same action contract; renders the full `fullProfile`.
+
+**Scope (out):** The edit overlay itself (F2.10.8 — these only emit `onEdit`). UNCERTAIN/conflict cards (F2.10.6/F2.10.7). Layout/sections (F2.10.9).
+
+**Skills:** `frontend-diff-review`, `frontend-testing`  **Decisions:** D-006, D-007, D-053  **Dependencies:** F2.10-SETUP, F2.10.1, F2.10.4
+
+---
+
+#### F2.10.6 — UncertainCard (inline MATCH/NEW resolution)
+
+**Goal:** Force the binary resolution of an UNCERTAIN card — "Same entity" (`MATCH` → `candidateEntityId`) or "Different entity" (`NEW`). No defer/skip option (D-042).
+
+**Scope (in):**
+- `apps/web/src/features/input/components/UncertainCard.tsx` (+ `UncertainCard.test.tsx`, incl. axe) — props `{ card: UncertainDiffCard; resolution: UncertainResolution | undefined; onResolve: (r: UncertainResolution) => void }`; `Badge` "Requires Resolution"; shows `extractedMention` + `candidateEntityName`; a keyboard-navigable `RadioGroup` (Same entity / Different entity) that calls `onResolve` with the correct `matchedEntityId` (candidate id for MATCH, `null` for NEW); visible focus indicators.
+
+**Scope (out):** The commit guard that counts unresolved cards (F2.10.4/F2.10.10). Other card types.
+
+**Skills:** `frontend-diff-review`, `frontend-testing`  **Decisions:** D-042  **Dependencies:** F2.10-SETUP, F2.10.1, F2.10.4
+
+---
+
+#### F2.10.7 — ConflictWarningCard (acknowledge, non-blocking)
+
+**Goal:** Surface a detected contradiction the user must acknowledge before commit, without blocking edits (non-blocking, D-033).
+
+**Scope (in):**
+- `apps/web/src/features/input/components/ConflictWarningCard.tsx` (+ `ConflictWarningCard.test.tsx`, incl. axe) — props `{ conflict: ConflictCard; acknowledged: boolean; onAcknowledge: (conflictId: string) => void }`; `role="alert"` content showing `description`, `extractedFact` vs `existingFact`; an acknowledgment `Checkbox` (amber/warning styling) that calls `onAcknowledge(conflict.conflictId)`.
+
+**Scope (out):** The unacknowledged-count guard (F2.10.4/F2.10.10). Entity cards.
+
+**Skills:** `frontend-diff-review`, `frontend-testing`  **Decisions:** D-033  **Dependencies:** F2.10-SETUP, F2.10.1, F2.10.4
+
+---
+
+#### F2.10.8 — EditCardOverlay (FocusedOverlay-based field edit)
+
+**Goal:** The contextual "Edit" action for a Delta/New card — edit the relevant fields inside a `FocusedOverlay` (no modal, D-082) and commit the change as an `edit` decision. On cancel, revert to `accept`.
+
+**Scope (in):**
+- `apps/web/src/features/input/components/EditCardOverlay.tsx` (+ `EditCardOverlay.test.tsx`, incl. axe) — props `{ card: ExistingDiffCard | NewDiffCard; open: boolean; onClose: () => void; onSave: (editedFields: Record<string, unknown>) => void }`; wraps `FocusedOverlay`; React Hook Form over the editable fields (`changedFields` for Delta, `fullProfile` for New — only those fields, not a full entity form); Save calls `onSave(editedFields)` (the page maps this to `setDecision({action:'edit', editedFields})`); Cancel/ESC/backdrop closes without saving.
+
+**Scope (out):** `FocusedOverlay` itself (F2.10.3). The `setDecision` wiring + revert-to-accept on cancel (F2.10.11 page). Validation beyond required fields.
+
+**Skills:** `frontend-diff-review`, `ux-focused-overlay`, `react-hook-form`, `frontend-testing`  **Decisions:** D-006, D-007, D-082, D-087  **Dependencies:** F2.10.1, F2.10.3, F2.10.4
+
+---
+
+#### F2.10.9 — NarrativeSummaryHeader + DiffCategorySection
+
+**Goal:** The presentational scaffolding around the cards: the AI session summary shown first (D-005) and the per-category (Actors/Spaces/Events/Relations) collapsible section wrapper.
+
+**Scope (in):**
+- `apps/web/src/features/input/components/NarrativeSummaryHeader.tsx` (+ `NarrativeSummaryHeader.test.tsx`, incl. axe) — props `{ summary: string }`; display-only 1–3 sentence header; never `dangerouslySetInnerHTML` (LLM text is plain).
+- `apps/web/src/features/input/components/DiffCategorySection.tsx` (+ `DiffCategorySection.test.tsx`, incl. axe) — props `{ title: string; count: number; children: React.ReactNode }`; `<section>` with `aria-labelledby` heading; local expand/collapse (a section is presentational — not global UI state).
+
+**Scope (out):** The cards rendered inside (F2.10.5–F2.10.7). Page composition (F2.10.11).
+
+**Skills:** `frontend-diff-review`, `frontend-testing`  **Decisions:** D-005, D-087  **Dependencies:** F2.10-SETUP, F2.10.1
+
+---
+
+#### F2.10.10 — CommitButton (controlled disabled guard)
+
+**Goal:** The D-042 primary guard as a controlled component: disabled while any UNCERTAIN is unresolved or any conflict unacknowledged (or a commit is in flight), with the "N items require your decision" progress text.
+
+**Scope (in):**
+- `apps/web/src/features/input/components/CommitButton.tsx` (+ `CommitButton.test.tsx`, incl. axe) — props `{ unresolvedUncertainCount: number; unacknowledgedConflictCount: number; isPending: boolean; onCommit: () => void }`; `disabled = unresolvedUncertainCount + unacknowledgedConflictCount > 0 || isPending`; when disabled set `aria-disabled` + descriptive `aria-label`; show "N item(s) require your decision" when the sum > 0; in-button `Loader2` while `isPending` (the only permitted spinner, §5).
+
+**Scope (out):** The actual commit mutation + `onCommit` implementation + `422` handling (all F2.11 — here `onCommit` is just a prop). Count computation (F2.10.4 supplies it).
+
+**Skills:** `frontend-diff-review`, `frontend-testing`  **Decisions:** D-042  **Dependencies:** F2.10.4
+
+---
+
+#### F2.10.11 — DiffReviewPage container (fetch + skeleton + assemble)
+
+**Goal:** Compose the whole screen: fetch the diff, drive `useDiffState`, lay out the narrative header + conflict section (top) + per-type category sections of cards + the edit overlay + the commit button. Loading is a DTO-derived skeleton (no spinner, D-086); fetch/404 errors surface via `InlineBanner`.
+
+**Scope (in):**
+- `apps/web/src/features/input/DiffReviewPage.tsx` (+ `DiffReviewPage.test.tsx`, incl. axe) — reads `campaignId`/`sessionId` via `useParams`; `useSessionDiff`; `useDiffState(diff)`; while loading render an inline `animate-pulse` skeleton matching the header + a couple of card placeholders (§5 classes); on error/404 render an error `InlineBanner`; renders `NarrativeSummaryHeader`, a `detectedConflicts` section of `ConflictWarningCard`s at the top, then `DiffCategorySection`s mapping each card to `DeltaCard`/`NewEntityCard`/`UncertainCard` by `cardType`; owns the `EditCardOverlay` open state + maps its `onSave` to `setDecision({action:'edit',…})` and Cancel to `accept`; renders `CommitButton` fed by the derived counts with a **placeholder** `onCommit` (real mutation is F2.11).
+
+**Scope (out):** The commit mutation, payload assembly, success/redirect, and `422` defence-in-depth handling (F2.11). Route registration (F2.10.12). Draft-recovery banner (F2.11).
+
+**Skills:** `frontend-diff-review`, `ux-skeleton-crafting`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-004, D-005, D-033, D-042, D-086, D-087  **Dependencies:** F2.10.1, F2.10.2, F2.10.4, F2.10.5, F2.10.6, F2.10.7, F2.10.8, F2.10.9, F2.10.10, F1.7.6
+
+---
+
+#### F2.10.12 — Register `/sessions/:sessionId/diff` route
+
+**Goal:** Wire the diff review page into the router so the F2.9 `ProcessingStatusView` navigation target resolves for an authenticated `gm`/`editor`.
+
+**Scope (in):**
+- `apps/web/src/main.tsx` (**edit**, F2.9.5) — add `sessions/:sessionId/diff` as a child route of the `/campaigns/:campaignId` subtree (i.e. **inside `CampaignContextGuard`**, F1.10.3), alongside the `sessions/new` route. `RequireAuth` already wraps the subtree (F1.7.5). No new providers.
+
+**Scope (out):** Commit/discard routes + draft-recovery entry (F2.11). Sidebar nav (F1.11). Page-level role gating (the diff endpoint already enforces `gm|editor` server-side; F2.11 owns any client role affordance). The campaign subtree + guard themselves (F1.10.6).
+
+**Skills:** `frontend-api-resource`, `auth`  **Decisions:** D-087  **Dependencies:** F2.10.11, F1.10.6, F1.7.5, F2.9.5
 
 ---
 
 #### F2.11 — Frontend: Input Mode — commit flow + draft recovery
 
-**Goal:** Assemble and submit the commit payload, handle 422 defence-in-depth responses, render success state, and provide draft recovery for users returning mid-review.
+> **Umbrella task — run the F2.11.N sub-tasks below, not this.**
 
-**Scope (in):**
-- `api/sessions.ts` extended: `POST /sessions/{id}/commit` → `useCommitSession` mutation; commit payload builder (pure function: card decisions + UNCERTAIN resolutions + conflict acknowledgments → `CommitPayload` per ARCHITECTURE.md §7.6 formal schema, D-076)
-- `DiffReviewPage` extended: Commit button → assemble payload → call `useCommitSession`; spinner while in-flight; on success: invalidate all campaign query keys; navigate to campaign home
-- 422 error handling: `UNCERTAIN_ENTITIES_PRESENT` and `CONFLICTS_NOT_ACKNOWLEDGED` → UI notification (treated as UI bug, not user error); log to console
-- Discard button: GM-only (from `campaignStore.activeRole`); confirmation dialog; calls `DELETE /sessions/{sid}`; navigates to `/sessions/new` on success
-- Draft recovery: on `/sessions/new`, check for existing draft; if found → show banner "You have an unfinished review" with link to `/sessions/{id}/diff`; uses the `existingSessionId` from the `409` response of `useSubmitSession`
-- `api/sessions.ts` extended: `DELETE /sessions/{sid}` → `useDiscardSession` mutation
+**Goal:** Turn the reviewed diff into a committed world state: assemble the `CommitPayload` from `useDiffState`, POST it, **navigate to the campaign home** on success (F1.10.5), handle the `422` defence-in-depth codes as UI bugs, and provide GM discard (the unblock path). The original scope is split across the ordered `F2.11.1`–`F2.11.6` sub-tasks.
 
-**Scope (out):** World state exploration (Phase 4).
+> **No SETUP required.** Every primitive is already present: F1.7 (`apiClient`, `InlineBanner`, Zustand `campaignStore.activeRole`, `Button`/`Loader2`), F2.10 (`FocusedOverlay`, `useDiffState` + its `CardDecision`/`UncertainResolution` types + `isEdit`, `DiffReviewPage`, `src/api/sessions.ts`, `src/types/session.ts`). The discard confirmation is a `FocusedOverlay` (D-082) — **not** a shadcn `Dialog`/`AlertDialog` — so no new shadcn component is installed.
+
+> **Draft-recovery reconciliation (important — avoids a duplicate + an invented endpoint):** the
+> *reactive* recovery link is **already delivered by F2.9.4** — a `409 ACTIVE_SESSION_EXISTS` from
+> `useSubmitSession` renders a "Resume your unfinished review" banner via `extractExistingSessionId`.
+> A *proactive* "check for a draft on page load" would need `GET /api/v1/campaigns/{id}/sessions`
+> (the §7.6 list endpoint), which is **not** in the backend decomposition (F2.3 exposed only
+> `POST`, `/{sid}/status`, `/{sid}/diff`, `DELETE /{sid}`). So v1 draft recovery = the F2.9.4
+> reactive link (resume) **plus** the F2.11 GM discard (unblock to resubmit). F2.11 does **not**
+> re-implement the banner or assume a list endpoint.
+
+**Scope (out):** Proactive list-based draft detection (no `GET /sessions` endpoint — see above). The reactive resume banner (F2.9.4). World state exploration + world-state cache keys (Phase 4). The campaign-home page itself (F1.10.5 — **commit** navigates there; **discard** returns to the campaign Input entry `/sessions/new`).
 
 **Skills:** `frontend-diff-review`, `frontend-testing`  
-**Decisions:** D-002, D-033, D-042, D-054, D-076  
-**Dependencies:** F2.10, F2.8
+**Decisions:** D-002, D-033, D-042, D-053, D-054, D-076, D-082, D-083, D-087  
+**Dependencies:** F2.10, F2.8, F1.10
+
+---
+
+#### F2.11.1 — CommitPayload wire TypeScript types (§7.6)
+
+**Goal:** Hand-written mirrors of the F2.8 `CommitSessionRequest`/`CommitPayload` shape so the builder and client compile against the exact wire contract. Write shapes only.
+
+**Scope (in):**
+- `apps/web/src/types/session.ts` (**extend**, F2.10.1) — `CardDecisionPayload` (`{ cardId: string; action: 'accept' | 'edit' | 'delete'; editedFields?: Record<string, unknown> }` — `editedFields` present+non-empty only for `edit`); `UncertainResolutionPayload` (`{ cardId: string; resolution: 'MATCH' | 'NEW'; matchedEntityId: string | null }`); `AcknowledgedConflictPayload` (`{ conflictId: string }`); `CommitPayload` (`{ cardDecisions: CardDecisionPayload[]; uncertainResolutions: UncertainResolutionPayload[]; acknowledgedConflicts: AcknowledgedConflictPayload[] }`). All camelCase (D-076); no `any`.
+
+**Scope (out):** The builder logic (F2.11.2). The mutation/client (F2.11.3). The read `DiffPayload` types (already F2.10.1). No runtime test — `npm run type-check` verifies this types-only sub-task.
+
+**Skills:** `frontend-diff-review`, `frontend-api-resource`  **Decisions:** D-053, D-076  **Dependencies:** F2.10.1
+
+---
+
+#### F2.11.2 — buildCommitPayload pure builder (state → payload)
+
+**Goal:** The pure function translating a `DiffPayload` + the live `useDiffState` into a §7.6-valid `CommitPayload`. This is the correctness core of commit — exhaustively unit-tested against the server's validation rules.
+
+**Scope (in):**
+- `apps/web/src/features/input/hooks/useCommitPayload.ts` (+ `useCommitPayload.test.ts`) — `buildCommitPayload(diff: DiffPayload, state: DiffState): CommitPayload`: emit a `cardDecisions` entry for **every** non-UNCERTAIN card (default `accept` when untouched — D-080); include `editedFields` **only** when `action === 'edit'` (via the `isEdit` guard); map every `uncertainResolutions` entry (`matchedEntityId` = candidate id for MATCH, `null` for NEW); map every acknowledged `conflictId`; never emit an `add` action (D-053). Tests assert: all non-UNCERTAIN cards present, edit-only `editedFields`, MATCH/NEW `matchedEntityId`, and that `acknowledgedConflicts` covers every detected conflict.
+
+**Scope (out):** The wire types (F2.11.1). The mutation call + error handling (F2.11.3/F2.11.5). The decision *state* itself (F2.10.4).
+
+**Skills:** `frontend-diff-review`, `frontend-testing`  **Decisions:** D-033, D-042, D-053, D-076, D-080  **Dependencies:** F2.11.1, F2.10.1, F2.10.4
+
+---
+
+#### F2.11.3 — commit + discard API client + mutation hooks
+
+**Goal:** Typed fetch functions + TanStack Query mutation hooks for commit and discard, extending the existing sessions client.
+
+**Scope (in):**
+- `apps/web/src/api/sessions.ts` (**extend**, F2.9.2/F2.10.2) + `sessions.test.ts` (**extend**) — `commitSession(campaignId, sessionId, payload: CommitPayload)` → `POST .../{sid}/commit` (200; treat `data` as void); `discardSession(campaignId, sessionId)` → `DELETE .../{sid}` (200); hooks `useCommitSession(campaignId, sessionId)` and `useDiscardSession(campaignId, sessionId)`, both invalidating `sessionKeys.all(campaignId)` on success. All via `apiClient`. Tests mock `apiClient`; assert the URLs/bodies and that a thrown `ApiError[]` (e.g. `422 UNCERTAIN_ENTITIES_PRESENT`, `409 INVALID_SESSION_STATE`) propagates to the caller.
+
+**Scope (out):** Payload assembly (F2.11.2). Page wiring + 422-as-UI-bug presentation (F2.11.5/F2.11.6). The confirmation overlay (F2.11.4).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-002, D-054, D-076  **Dependencies:** F2.11.1, F2.9.2, F2.10.2, F1.7.3
+
+---
+
+#### F2.11.4 — DiscardConfirmOverlay (FocusedOverlay confirm)
+
+**Goal:** The discard confirmation as a `FocusedOverlay` (modals forbidden, D-082), not a shadcn dialog. A destructive-action confirm with an explicit cancel.
+
+**Scope (in):**
+- `apps/web/src/features/input/components/DiscardConfirmOverlay.tsx` (+ `DiscardConfirmOverlay.test.tsx`, incl. axe) — props `{ open: boolean; onConfirm: () => void; onClose: () => void; isPending: boolean }`; wraps `FocusedOverlay`; warning copy ("Discard this draft? This cannot be undone."); a destructive confirm `Button` (`bg-red-600`, in-button `Loader2` while `isPending`) + a Cancel button; ESC/backdrop close via the overlay.
+
+**Scope (out):** The discard mutation + role gating + navigation (F2.11.6). `FocusedOverlay` itself (F2.10.3).
+
+**Skills:** `ux-focused-overlay`, `frontend-diff-review`, `frontend-testing`  **Decisions:** D-082, D-087  **Dependencies:** F2.10.3
+
+---
+
+#### F2.11.5 — DiffReviewPage commit wiring (+ 422 handling)
+
+**Goal:** Wire the real commit into the review page: build the payload, call the mutation, navigate to the campaign home on success, and treat the defence-in-depth `422`s as UI bugs (the disabled button should have prevented them).
+
+**Scope (in):**
+- `apps/web/src/features/input/DiffReviewPage.tsx` (**edit**, F2.10.11) + `DiffReviewPage.test.tsx` (**extend**) — replace the placeholder `onCommit` with: `buildCommitPayload(diff, state)` → `useCommitSession(campaignId, sessionId)`; pass `isPending` to `CommitButton`; **on success `navigate('/campaigns/{campaignId}', { replace: true })` (the campaign home, F1.10.5)** — the mutation invalidates `sessionKeys.all(campaignId)`; also invalidate `campaignKeys.detail(campaignId)` (F1.10.2) so the home reflects the commit. Navigating away is required because the session leaves `draft` and `GET .../diff` then `404`s — the page must not refetch it. On error narrow the `ApiError[]` — `UNCERTAIN_ENTITIES_PRESENT`/`CONFLICTS_NOT_ACKNOWLEDGED`/other commit codes → `console.error` (UI-bug signal) + a generic error `InlineBanner` ("Something went wrong committing this review"); do **not** silently re-enable the button (it stays count-driven). Test the success navigation (to campaign home) and the 422-as-banner path.
+
+**Scope (out):** Discard button/overlay wiring (F2.11.6). Payload builder internals (F2.11.2). The mutation hook (F2.11.3). The campaign-home page (F1.10.5).
+
+**Skills:** `frontend-diff-review`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-002, D-042, D-076, D-083, D-087  **Dependencies:** F2.11.2, F2.11.3, F2.10.11, F1.10.2, F1.10.5, F1.7.6
+
+---
+
+#### F2.11.6 — DiffReviewPage GM-only discard wiring
+
+**Goal:** Add the GM-only discard affordance to the review page, gated on campaign role and confirmed via the overlay; on success the campaign is unblocked and the user returns to submit a new session.
+
+**Scope (in):**
+- `apps/web/src/features/input/DiffReviewPage.tsx` (**edit**, F2.11.5) + `DiffReviewPage.test.tsx` (**extend**) — render a "Discard draft" button **only** when `useCampaignStore(s => s.activeRole) === 'gm'` (D-054; the backend also enforces GM + draft, returning 403/409); clicking opens `DiscardConfirmOverlay`; confirm → `useDiscardSession(campaignId, sessionId)` (pass `isPending` to the overlay); on success `navigate` to `/campaigns/{campaignId}/sessions/new`; on `409 INVALID_SESSION_STATE`/`403` → error `InlineBanner`. Test: button hidden for non-GM, shown for GM, and confirm→discard→navigate.
+
+**Scope (out):** Commit wiring (F2.11.5). The overlay component (F2.11.4) and discard hook (F2.11.3). Proactive draft detection (no endpoint — see umbrella).
+
+**Skills:** `frontend-diff-review`, `ux-focused-overlay`, `ux-inline-feedback`, `auth`, `frontend-testing`  **Decisions:** D-054, D-082, D-083, D-087  **Dependencies:** F2.11.4, F2.11.3, F2.11.5, F1.7.2, F1.7.6
 
 ---
 

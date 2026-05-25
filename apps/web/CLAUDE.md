@@ -79,8 +79,8 @@ npm run build                           # production build
 - On `401`: attempt one silent refresh (`POST /auth/refresh` with `credentials: 'include'`), retry once. Redirect to login if that also returns `401`.
 
 **Campaign role:**
-- NOT in the JWT. Comes from campaign membership API response. Stored in `campaignStore.currentUserRole`.
-- Always derive role from `useCampaignStore(s => s.currentUserRole)`, never from token.
+- NOT in the JWT. Comes from campaign membership API response. Stored in `campaignStore.activeRole`.
+- Always derive role from `useCampaignStore(s => s.activeRole)`, never from token.
 
 **API client:** `src/api/client.ts` wraps `fetch` with auth headers and silent refresh logic. Components never call `fetch` directly — they use hooks from `src/api/`.
 
