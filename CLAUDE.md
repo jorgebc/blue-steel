@@ -40,7 +40,8 @@ git config core.hooksPath .githooks   # activates pre-push CI checks
 podman compose up -d        # or: docker compose up -d
 
 # Backend (from apps/api/)
-mvn spring-boot:run -Dspring-boot.run.profiles=local   # mocked LLMs, zero API cost
+mvn spring-boot:run -Dspring-boot.run.profiles=local              # mocked LLMs, zero API cost
+mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-ollama   # real LOCAL models via Ollama — offline, no API keys (D-088)
 mvn spotless:check    # format check
 mvn test              # unit + ArchUnit (fast)
 mvn verify            # + integration tests (Podman/Docker required)
@@ -59,9 +60,14 @@ npm test              # Vitest (CI mode)
 | `DATABASE_URL` | Neon PostgreSQL connection string |
 | `ANTHROPIC_API_KEY` | Claude (text gen) — `llm-real` profile only |
 | `OPENAI_API_KEY` | `text-embedding-3-small` — `llm-real` profile only |
+| `OLLAMA_BASE_URL` | Ollama server — `llm-ollama` profile (default `http://localhost:11434`; no key needed) (D-088) |
+| `OLLAMA_CHAT_MODEL` | Local chat model — `llm-ollama` (default `qwen2.5:7b`) |
+| `OLLAMA_EMBEDDING_MODEL` | Local embedding model — `llm-ollama` (default `bge-m3`, 1024 dims) |
+| `EMBEDDING_DIMENSION` | pgvector embedding column dimension (default 1536; set 1024 under `llm-ollama`) |
 | `JWT_SECRET` | HS256 symmetric secret (min 32 bytes) |
 | `EMAIL_API_KEY` | Transactional email (Resend) |
 | `VITE_API_BASE_URL` | Backend URL for frontend (e.g. `http://localhost:8080`) |
+| `SONAR_TOKEN` | Local SonarQube user token (Podman container `sonarqube-local`). Required by `.ai/pipeline` BE engineer Sonar gate. Never commit (D-050). |
 
 Secrets are **never committed**. `.env` and `.env.local` are always gitignored (D-050).
 
@@ -131,6 +137,18 @@ void health_returnsDegradedWhenDbIsDown() { ... }
 ```
 
 The method name and the display name serve different audiences: the method name is code; the display name is the test report that humans read. Both must be present.
+
+### SonarQube quality gate (backend, local)
+
+The BE engineer pipeline (`.ai/pipeline`) runs a Sonar scan after `mvn test` succeeds. Issues are filtered to files modified on the current branch — legacy issues in untouched files do not block the gate.
+
+Local setup (developer machine only — not wired into CI):
+
+1. Start the container: `podman start sonarqube-local` (server at `http://localhost:9000`, project key `blue-steel-api`).
+2. Generate a token: SonarQube UI → My Account → Security → Generate Token.
+3. Set `SONAR_TOKEN=<token>` in `.env.local` (gitignored per D-050 — never commit).
+
+The tool and retry contract live in `.ai/pipeline/tools/shell_runner.py` (`run_sonar_backend`) and `.ai/pipeline/prompts/be_engineer.md`. Max 2 fix attempts inside a single BE engineer run; then `BLOCKED:` and stop.
 
 ---
 

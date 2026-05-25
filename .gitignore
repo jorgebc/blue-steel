@@ -74,3 +74,8 @@ venv/
 # Temporary
 tmp/
 temp/
+
+# AI pipeline
+.ai/logs/
+.ai/context/tasks/
+.env.pipeline

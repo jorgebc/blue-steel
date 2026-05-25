@@ -156,15 +156,15 @@ validates that all `UNCERTAIN` entities from the diff have been resolved. If any
 1. Check `resolved_entities` in the payload covers all `UNCERTAIN` entities from the stored diff.
 2. Reject with `422` if any remain — this is a defence-in-depth check, not reliance on the UI.
 
-### 6b. Uncertain resolution integrity: `matched_entity_id` validation
+### 6b. Uncertain resolution integrity: `matchedEntityId` validation
 
 Before applying any MATCH resolutions, `CommitService` must:
 
-1. **Adapter layer (Bean Validation):** Verify `matched_entity_id` is non-null when `resolution = MATCH`.
+1. **Adapter layer (Bean Validation):** Verify `matchedEntityId` is non-null when `resolution = MATCH`.
    This is a cross-field constraint on the commit payload DTO — implement via `@AssertTrue` or a
    custom constraint annotation. Returns `400` if violated.
 
-2. **Application layer (CommitService):** Verify each `matched_entity_id` references an entity
+2. **Application layer (CommitService):** Verify each `matchedEntityId` references an entity
    that exists in the current campaign (`campaign_id` scope). Returns `422 INVALID_ENTITY_REFERENCE`
    if the entity is not found. This prevents cross-campaign entity merges (IDOR-adjacent integrity
    violation).
@@ -174,14 +174,14 @@ Before applying any MATCH resolutions, `CommitService` must:
 for (UncertainResolution resolution : payload.uncertainResolutions()) {
     if (resolution.resolution() == Resolution.MATCH) {
         if (resolution.matchedEntityId() == null) {
-            throw new ValidationException("matched_entity_id required for MATCH resolution");
+            throw new ValidationException("matchedEntityId required for MATCH resolution");
         }
         boolean exists = entityRepository.existsByIdAndCampaignId(
             resolution.matchedEntityId(), campaignId);
         if (!exists) {
             throw new BusinessRuleViolationException(
                 ErrorCode.INVALID_ENTITY_REFERENCE,
-                "matched_entity_id does not belong to campaign " + campaignId);
+                "matchedEntityId does not belong to campaign " + campaignId);
         }
     }
 }
@@ -194,7 +194,7 @@ for (UncertainResolution resolution : payload.uncertainResolutions()) {
 hard contradictions (e.g., an event asserts a character is dead who is currently alive).
 
 These become warning cards in the diff — non-blocking (D-033). The commit payload must include
-`acknowledged_conflicts` with entries for each detected conflict. An empty array is valid only
+`acknowledgedConflicts` with entries for each detected conflict. An empty array is valid only
 when no conflicts were detected. The backend rejects with `422 CONFLICTS_NOT_ACKNOWLEDGED` if
 conflicts were detected and the array is absent or empty.
 
@@ -210,14 +210,14 @@ called. Validation order:
 
 | Check | Error code | Decision |
 |---|---|---|
-| All `card_id` values in `card_decisions` exist in stored diff | `422 UNKNOWN_CARD_ID` | D-080 |
-| No duplicate `card_id` entries in `card_decisions` | `422 DUPLICATE_CARD_DECISION` | D-080 |
-| Every non-UNCERTAIN card in diff has an entry in `card_decisions` | `422 INCOMPLETE_CARD_DECISIONS` | D-080 |
-| All UNCERTAIN cards in diff have an entry in `uncertain_resolutions` | `422 UNCERTAIN_ENTITIES_PRESENT` | D-042 |
-| All ConflictCards in diff have an entry in `acknowledged_conflicts` | `422 CONFLICTS_NOT_ACKNOWLEDGED` | D-033 |
-| `matched_entity_id` non-null for every MATCH resolution | `400` (adapter) / `422` if missed | D-079 |
-| `matched_entity_id` belongs to the same campaign | `422 INVALID_ENTITY_REFERENCE` | D-079 |
-| No `add` action in any `card_decisions` entry | `422 UNSUPPORTED_ACTION` | D-053 |
+| All `cardId` values in `cardDecisions` exist in stored diff | `422 UNKNOWN_CARD_ID` | D-080 |
+| No duplicate `cardId` entries in `cardDecisions` | `422 DUPLICATE_CARD_DECISION` | D-080 |
+| Every non-UNCERTAIN card in diff has an entry in `cardDecisions` | `422 INCOMPLETE_CARD_DECISIONS` | D-080 |
+| All UNCERTAIN cards in diff have an entry in `uncertainResolutions` | `422 UNCERTAIN_ENTITIES_PRESENT` | D-042 |
+| All ConflictCards in diff have an entry in `acknowledgedConflicts` | `422 CONFLICTS_NOT_ACKNOWLEDGED` | D-033 |
+| `matchedEntityId` non-null for every MATCH resolution | `400` (adapter) / `422` if missed | D-079 |
+| `matchedEntityId` belongs to the same campaign | `422 INVALID_ENTITY_REFERENCE` | D-079 |
+| No `add` action in any `cardDecisions` entry | `422 UNSUPPORTED_ACTION` | D-053 |
 
 **Step 2 — Apply world state:**
 
@@ -235,29 +235,29 @@ called. Validation order:
 
 ```json
 {
-  "card_decisions": [
+  "cardDecisions": [
     {
-      "card_id": "uuid — references a DiffCard.card_id from the diff payload",
+      "cardId": "uuid — references a DiffCard.cardId from the diff payload",
       "action": "accept | edit | delete",
-      "edited_fields": { "fieldName": "newValue" }
+      "editedFields": { "fieldName": "newValue" }
     }
   ],
-  "uncertain_resolutions": [
+  "uncertainResolutions": [
     {
-      "card_id": "uuid — references an UNCERTAIN DiffCard.card_id",
+      "cardId": "uuid — references an UNCERTAIN DiffCard.cardId",
       "resolution": "MATCH | NEW",
-      "matched_entity_id": "uuid — required when resolution = MATCH; null when NEW"
+      "matchedEntityId": "uuid — required when resolution = MATCH; null when NEW"
     }
   ],
-  "acknowledged_conflicts": [
-    { "conflict_id": "uuid — references a ConflictCard.conflict_id" }
+  "acknowledgedConflicts": [
+    { "conflictId": "uuid — references a ConflictCard.conflictId" }
   ]
 }
 ```
 
 **Notes:**
-- `card_decisions` must contain an entry for **every** non-UNCERTAIN card in the diff (D-080).
-- `edited_fields` is required and non-empty when `action = edit`; null/omitted otherwise.
+- `cardDecisions` must contain an entry for **every** non-UNCERTAIN card in the diff (D-080).
+- `editedFields` is required and non-empty when `action = edit`; null/omitted otherwise.
 - `add` action is deferred to v2 (D-053). Any `add` action returns `422 UNSUPPORTED_ACTION`.
 - Backend Java records and frontend TypeScript types in `src/types/sessions.ts` must mirror this schema exactly.
 

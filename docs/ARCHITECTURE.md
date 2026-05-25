@@ -367,7 +367,7 @@ entity_embeddings
   entity_id UUID
   entity_version_id UUID FK
   session_id UUID FK
-  embedding vector(1536)      ← dimension matches chosen embedding model
+  embedding vector(1536)      ← dimension matches chosen embedding model; per-profile (1536 OpenAI prod / 1024 Ollama local) via a Liquibase parameter (D-088)
   content_hash TEXT           ← detect unchanged content, skip re-embedding
   created_at TIMESTAMP
 ```
@@ -443,6 +443,8 @@ Blue Steel uses two LLM providers with distinct responsibilities. Both are behin
 | Embeddings (entity vectorisation, similarity retrieval) | OpenAI | `text-embedding-3-small`, 1536 dimensions |
 
 **Why two providers:** Anthropic does not provide an embedding API — Claude models are generative only. The embedding provider is necessarily separate from the generation provider. This is not a compromise; it is how the ecosystem works. The `EmbeddingPort` abstraction means the application layer is unaware of which provider handles embeddings.
+
+**Local development provider (D-088):** a third wiring — the `llm-ollama` Spring profile — runs both concerns against local models served by Ollama (chat via `OllamaChatModel`, embeddings via Ollama, default `bge-m3`) for fully offline, zero-cost development, including real semantic Query Mode. Provider selection is purely a matter of which `ChatModel`/`EmbeddingModel` bean is active (`AiConfig`); the `SpringAi*` adapters are provider-neutral. The embedding **dimension is a per-profile setting** — OpenAI@1536 in production, Ollama `bge-m3`@1024 locally (§5.5). Embeddings from different models occupy different vector spaces and are never cross-comparable, so any one database uses exactly one embedding model; a local Ollama database is its own island, never mixed with production.
 
 Spring AI is used for two concerns only: `ChatClient` (text generation) and `EmbeddingModel` (vector generation). Spring AI's `VectorStore` abstraction is **not used** — it provides a generic flat similarity search interface that cannot express the domain-specific retrieval queries this system requires (filtering by `entity_type`, joining through `entity_versions → sessions`, scoping by `campaign_id`). All pgvector similarity searches are written as native PostgreSQL queries via Spring Data JPA or `JdbcTemplate`, giving full control over query shape and index usage. See D-062.
 
@@ -599,13 +601,13 @@ Query (user question, free text)
        │
        ▼
  Response + citations ──────── structured response: answer text +
-                                list of session_ids that support each claim
+                                list of sessionIds that support each claim
        │
        ▼
  Returned to client
 ```
 
-**Citation grounding:** The LLM is instructed to attribute each factual claim to a specific `session_id` from the provided context. Claims it cannot attribute to provided context are suppressed — consistent with D-003. The response envelope carries a `citations` field mapping claim spans to session references.
+**Citation grounding:** The LLM is instructed to attribute each factual claim to a specific `sessionId` from the provided context. Claims it cannot attribute to provided context are suppressed — consistent with D-003. The response envelope carries a `citations` field mapping claim spans to session references.
 
 **Cost note:** Query Mode makes exactly one LLM call per query. Context is bounded by the pgvector retrieval result set (top-N chunks, configurable) and a token envelope applied before the call.
 
@@ -712,7 +714,7 @@ The session ingestion flow uses a staged endpoint sequence:
 
 | Step | Method + Path | Description |
 |---|---|---|
-| 1. Submit summary | `POST /api/v1/campaigns/{id}/sessions` | Accepts raw summary text; triggers async ingestion pipeline; returns `session_id` and initial status `processing`. Rejected with `409` if another session is in `processing` or `draft` state. |
+| 1. Submit summary | `POST /api/v1/campaigns/{id}/sessions` | Accepts raw summary text; triggers async ingestion pipeline; returns `sessionId` and initial status `processing`. Rejected with `409` if another session is in `processing` or `draft` state. |
 | 2. Poll status | `GET /api/v1/campaigns/{id}/sessions/{sid}/status` | Returns current pipeline status: `processing` \| `draft` \| `committed` \| `failed` |
 | 3. Retrieve draft diff | `GET /api/v1/campaigns/{id}/sessions/{sid}/diff` | Returns the full structured diff payload when status is `draft` |
 | 4. Commit | `POST /api/v1/campaigns/{id}/sessions/{sid}/commit` | Submits the reviewed diff payload. Backend validates: zero UNCERTAIN entities, caller is GM or editor. Returns `422` with specific error codes on violation. |
@@ -723,46 +725,46 @@ This is the formal, authoritative definition of the `DiffPayload` JSON contract.
 
 ```json
 {
-  "narrative_summary_header": "string — 1–3 sentence AI-generated session summary (D-005); display-only",
+  "narrativeSummaryHeader": "string — 1–3 sentence AI-generated session summary (D-005); display-only",
   "actors":    [ "<DiffCard>" ],
   "spaces":    [ "<DiffCard>" ],
   "events":    [ "<DiffCard>" ],
   "relations": [ "<DiffCard>" ],
-  "detected_conflicts": [ "<ConflictCard>" ]
+  "detectedConflicts": [ "<ConflictCard>" ]
 }
 ```
 
-**DiffCard** — four variants, discriminated by `card_type`:
+**DiffCard** — four variants, discriminated by `cardType`:
 
 ```json
 // EXISTING — entity already in world state; shows delta only (D-006)
 {
-  "card_id":          "uuid — stable identifier used in commit payload to reference this card",
-  "card_type":        "EXISTING",
-  "entity_id":        "uuid — world state entity this card refers to",
-  "entity_type":      "actor | space | event | relation",
-  "name":             "string — current entity name",
-  "changed_fields":   { "fieldName": "newValue", "...": "..." }
+  "cardId":          "uuid — stable identifier used in commit payload to reference this card",
+  "cardType":        "EXISTING",
+  "entityId":        "uuid — world state entity this card refers to",
+  "entityType":      "actor | space | event | relation",
+  "name":            "string — current entity name",
+  "changedFields":   { "fieldName": "newValue", "...": "..." }
 }
 
 // NEW — entity appearing for the first time; shows full profile (D-007)
 {
-  "card_id":          "uuid",
-  "card_type":        "NEW",
-  "entity_type":      "actor | space | event | relation",
-  "name":             "string — extracted name",
-  "full_profile":     { "fieldName": "value", "...": "..." }
+  "cardId":          "uuid",
+  "cardType":        "NEW",
+  "entityType":      "actor | space | event | relation",
+  "name":            "string — extracted name",
+  "fullProfile":     { "fieldName": "value", "...": "..." }
 }
 
 // UNCERTAIN — AI cannot determine if this is a new entity or an existing one (D-041, D-042)
 // User must resolve to MATCH or NEW before commit. No defer option.
 {
-  "card_id":              "uuid",
-  "card_type":            "UNCERTAIN",
-  "entity_type":          "actor | space | event | relation",
-  "extracted_mention":    "string — the raw text mention from the summary",
-  "candidate_entity_id":  "uuid — best candidate match in world state",
-  "candidate_entity_name":"string — name of the candidate for display"
+  "cardId":              "uuid",
+  "cardType":            "UNCERTAIN",
+  "entityType":          "actor | space | event | relation",
+  "extractedMention":    "string — the raw text mention from the summary",
+  "candidateEntityId":   "uuid — best candidate match in world state",
+  "candidateEntityName": "string — name of the candidate for display"
 }
 ```
 
@@ -770,12 +772,12 @@ This is the formal, authoritative definition of the `DiffPayload` JSON contract.
 
 ```json
 {
-  "conflict_id":      "uuid — referenced in commit payload acknowledged_conflicts",
-  "entity_id":        "uuid — entity where the contradiction was detected",
-  "entity_type":      "actor | space | event | relation",
-  "description":      "string — human-readable description of the contradiction",
-  "extracted_fact":   "string — what the current session claims",
-  "existing_fact":    "string — what the world state currently holds"
+  "conflictId":      "uuid — referenced in commit payload acknowledgedConflicts",
+  "entityId":        "uuid — entity where the contradiction was detected",
+  "entityType":      "actor | space | event | relation",
+  "description":     "string — human-readable description of the contradiction",
+  "extractedFact":   "string — what the current session claims",
+  "existingFact":    "string — what the world state currently holds"
 }
 ```
 
@@ -789,37 +791,37 @@ Supported actions per card: `accept` (no change to extracted data), `edit` (user
 
 ```json
 {
-  "card_decisions": [
+  "cardDecisions": [
     {
-      "card_id":      "uuid — references a DiffCard.card_id from the diff payload",
-      "action":       "accept | edit | delete",
-      "edited_fields": { "fieldName": "newValue" }
+      "cardId":      "uuid — references a DiffCard.cardId from the diff payload",
+      "action":      "accept | edit | delete",
+      "editedFields": { "fieldName": "newValue" }
     }
   ],
-  "uncertain_resolutions": [
+  "uncertainResolutions": [
     {
-      "card_id":           "uuid — references an UNCERTAIN DiffCard.card_id",
-      "resolution":        "MATCH | NEW",
-      "matched_entity_id": "uuid — required when resolution = MATCH; null when NEW"
+      "cardId":          "uuid — references an UNCERTAIN DiffCard.cardId",
+      "resolution":      "MATCH | NEW",
+      "matchedEntityId": "uuid — required when resolution = MATCH; null when NEW"
     }
   ],
-  "acknowledged_conflicts": [
+  "acknowledgedConflicts": [
     {
-      "conflict_id": "uuid — references a ConflictCard.conflict_id"
+      "conflictId": "uuid — references a ConflictCard.conflictId"
     }
   ]
 }
 ```
 
 **Validation rules enforced server-side (defence in depth):**
-- `uncertain_resolutions` must include an entry for every `UNCERTAIN` card in the diff. Any missing resolution → `422 UNCERTAIN_ENTITIES_PRESENT` (D-042).
-- `acknowledged_conflicts` must include an entry for every `ConflictCard` in `detected_conflicts`. An empty array is valid only when the diff had no conflicts → `422 CONFLICTS_NOT_ACKNOWLEDGED` (D-033).
-- `action = "edit"` requires `edited_fields` to be present and non-empty → `400` (adapter Bean Validation). `edited_fields` is ignored and should be null when `action` is `accept` or `delete`.
-- `uncertain_resolutions[*].matched_entity_id` must be non-null when `resolution = MATCH` → `400` (adapter). The application layer additionally verifies `matched_entity_id` references an entity within the same campaign → `422 INVALID_ENTITY_REFERENCE`.
-- Any `card_id` in `card_decisions` or `uncertain_resolutions` that does not match a `card_id` in the stored `diff_payload` → `422 UNKNOWN_CARD_ID`. Duplicate `card_id` entries within the same array → `422 DUPLICATE_CARD_DECISION`.
-- `card_decisions` must contain an explicit entry for **every** non-UNCERTAIN `DiffCard` in the stored diff. A missing entry for any card is rejected → `422 INCOMPLETE_CARD_DECISIONS` (D-080). There is no implicit accept for omitted cards.
-- `edited_fields` is required and non-empty when `action = edit`. It is omitted or null for `accept` and `delete`.
-- `card_decisions` must not be empty (at least one card must be in the diff for commit to be valid).
+- `uncertainResolutions` must include an entry for every `UNCERTAIN` card in the diff. Any missing resolution → `422 UNCERTAIN_ENTITIES_PRESENT` (D-042).
+- `acknowledgedConflicts` must include an entry for every `ConflictCard` in `detectedConflicts`. An empty array is valid only when the diff had no conflicts → `422 CONFLICTS_NOT_ACKNOWLEDGED` (D-033).
+- `action = "edit"` requires `editedFields` to be present and non-empty → `400` (adapter Bean Validation). `editedFields` is ignored and should be null when `action` is `accept` or `delete`.
+- `uncertainResolutions[*].matchedEntityId` must be non-null when `resolution = MATCH` → `400` (adapter). The application layer additionally verifies `matchedEntityId` references an entity within the same campaign → `422 INVALID_ENTITY_REFERENCE`.
+- Any `cardId` in `cardDecisions` or `uncertainResolutions` that does not match a `cardId` in the stored `diff_payload` → `422 UNKNOWN_CARD_ID`. Duplicate `cardId` entries within the same array → `422 DUPLICATE_CARD_DECISION`.
+- `cardDecisions` must contain an explicit entry for **every** non-UNCERTAIN `DiffCard` in the stored diff. A missing entry for any card is rejected → `422 INCOMPLETE_CARD_DECISIONS` (D-080). There is no implicit accept for omitted cards.
+- `editedFields` is required and non-empty when `action = edit`. It is omitted or null for `accept` and `delete`.
+- `cardDecisions` must not be empty (at least one card must be in the diff for commit to be valid).
 
 **Draft state persistence:** The draft diff is stored server-side in `sessions.diff_payload` (status `draft`). This enables failure recovery — if the user closes the browser mid-review, the diff is retrievable on return. Client-side edits to diff cards are submitted as part of the final commit payload, not persisted incrementally.
 
@@ -830,9 +832,9 @@ Supported actions per card: `accept` (no change to extracted data), `edit` (user
 ```json
 {
   "data": {
-    "session_id": "...",
+    "sessionId": "...",
     "status": "failed",
-    "failure_reason": "EXTRACTION_FAILED | BUDGET_EXCEEDED | INTERNAL_ERROR",
+    "failureReason": "EXTRACTION_FAILED | BUDGET_EXCEEDED | INTERNAL_ERROR",
     "message": "Human-readable description for display"
   }
 }
@@ -884,11 +886,11 @@ Two distinct invitation endpoints, one per caller context (D-051, D-064):
 ```json
 {
   "name": "The Shattered Crown",
-  "gm_user_id": "<uuid of existing user to assign as GM>"
+  "gmUserId": "<uuid of existing user to assign as GM>"
 }
 ```
 
-`gm_user_id` is required. The request is rejected with `422` if the referenced user does not exist. On success, the campaign row is created and a `campaign_members` row is inserted in the same transaction with `role = 'gm'` for the specified user. A campaign can never exist in a GM-less state (D-061).
+`gmUserId` is required. The request is rejected with `422` if the referenced user does not exist. On success, the campaign row is created and a `campaign_members` row is inserted in the same transaction with `role = 'gm'` for the specified user. A campaign can never exist in a GM-less state (D-061).
 
 ---
 
@@ -930,7 +932,7 @@ All endpoints are read-only. All require campaign membership. Pagination follows
   "data": {
     "answer": "...",
     "citations": [
-      { "session_id": "...", "session_number": 4, "claim": "..." }
+      { "sessionId": "...", "sessionNumber": 4, "claim": "..." }
     ]
   }
 }

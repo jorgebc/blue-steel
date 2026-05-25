@@ -89,7 +89,7 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-076 | DiffPayload and CommitPayload are formalized JSON contracts in ARCHITECTURE.md §7.6 | ✅ Active | Phase 2 |
 | D-077 | Invitation model: no invitations table; temporary password + `force_password_change` flag | ✅ Active | Phase 1 |
 | D-078 | Domain constructors enforce non-blank invariants; adapter Bean Validation is first line, not sole gatekeeper | ✅ Active | Definition |
-| D-079 | CommitPayload: `matched_entity_id` validated at adapter (non-null) and application (campaign ownership) | ✅ Active | Definition |
+| D-079 | CommitPayload: `matchedEntityId` validated at adapter (non-null) and application (campaign ownership) | ✅ Active | Definition |
 | D-080 | CommitPayload completeness: explicit decision required for every diff card | ✅ Active | Definition |
 | D-081 | CommitPayload validation owned by `CommitService` (application layer); `DiffPayload`/`CommitPayload` remain application-layer types | ✅ Active | Definition |
 | D-082 | Modals forbidden — all contextual interactions use Focused Overlays | ✅ Active | Definition |
@@ -616,7 +616,7 @@ Polyglot persistence (dedicated vector database + relational database) introduce
 **Status:** Active
 
 **Decision:**  
-Anthropic (Claude) is the default LLM provider. Integration is provider-agnostic via Spring AI's abstraction layer. The LLM is an external actor behind a driven port. Additional providers (OpenAI, Google Gemini) are not implemented in v1.
+Anthropic (Claude) is the default LLM provider. Integration is provider-agnostic via Spring AI's abstraction layer. The LLM is an external actor behind a driven port. Additional providers (OpenAI, Google Gemini) are not implemented in v1. (A local-dev Ollama wiring — the `llm-ollama` profile — is added by D-088 as a configuration concern only, exactly as this decision's port design intends.)
 
 **Reason:**  
 Developer holds an active Anthropic subscription. Claude is well-suited to long-context narrative understanding and structured extraction tasks. Spring AI provides model-agnostic abstractions (`ChatClient`, `EmbeddingModel`) — swapping providers means replacing the adapter, not touching domain or application code. This is Cockburn's hexagonal pattern applied directly: the LLM is an external actor behind a port. Note: Spring AI's `VectorStore` is not used — pgvector retrieval uses native queries (D-062).
@@ -767,7 +767,7 @@ Configuration that belongs to an adapter should travel with that adapter. A shar
 ### D-040 — OQ-C resolved: Embedding model — OpenAI text-embedding-3-small
 
 **Date:** 2026-04-06  
-**Status:** Active
+**Status:** Active — embedding model/dimension made configurable per profile by D-088 (OpenAI@1536 remains the production default)
 
 **Decision:**  
 The embedding model is OpenAI `text-embedding-3-small` at 1536 dimensions. Embedding calls are routed through the `EmbeddingPort` abstraction via Spring AI — the application layer is unaware of the provider.
@@ -777,7 +777,7 @@ Anthropic does not provide an embedding API; Claude models are generative only. 
 
 **Alternatives considered:**  
 - OpenAI `text-embedding-3-large` (3072 dimensions) — rejected; marginally better quality, 6x more expensive, 2x larger vectors with slower similarity search. Quality delta does not justify cost and storage overhead for this domain.
-- Ollama local models (`nomic-embed-text`, `mxbai-embed-large`) — rejected; requires a running local service as an operational dependency, complicating deployment and making the project harder to run for others. Appropriate for experimentation, not for a portfolio project.
+- Ollama local models (`nomic-embed-text`, `mxbai-embed-large`) — rejected; requires a running local service as an operational dependency, complicating deployment and making the project harder to run for others. Appropriate for experimentation, not for a portfolio project. **(Revisited by D-088:** this concern applies to *production*; Ollama embeddings are now an opt-in **local-dev** option via the `llm-ollama` profile with a per-profile vector dimension — `bge-m3`@1024 — while OpenAI@1536 remains the production default.**)**
 
 ---
 
@@ -950,7 +950,7 @@ Path-filtered workflows avoid wasting CI minutes on unrelated changes. The two p
 **Decision:**
 In local development, all LLM-backed ports (`NarrativeExtractionPort`, `EntityResolutionPort`, `ConflictDetectionPort`, `QueryAnsweringPort`, `EmbeddingPort`) are implemented by in-memory mock adapters that return canned responses. The `local` Spring profile activates mocks by default.
 
-A separate `llm-real` Spring profile swaps in the real Anthropic and OpenAI adapters. Activated via `--spring.profiles.active=local,llm-real` when real pipeline testing is needed. Mock and real implementations coexist in `adapters.out.ai`.
+A separate `llm-real` Spring profile swaps in the real Anthropic and OpenAI adapters. Activated via `--spring.profiles.active=local,llm-real` when real pipeline testing is needed. Mock and real implementations coexist in `adapters.out.ai`. D-088 adds a third selection, the `llm-ollama` profile (real local models via Ollama, offline); mock adapters are gated `@Profile("!llm-real & !llm-ollama")` so exactly one provider set is ever active.
 
 **Reason:**
 Day-to-day development work (UI, domain logic, API endpoints, test writing) does not require real LLM calls. Mock adapters provide deterministic, fast, zero-cost feedback. The hexagonal port design makes this swap transparent — no domain code changes needed. Real APIs are available when the extraction or query pipelines need to be tested end-to-end, but this is the exception rather than the default.
@@ -1041,7 +1041,7 @@ The "add" action requires a distinct frontend flow (a creation form embedded in 
 **Status:** Active
 
 **Decision:**
-At most one session per campaign may be in `processing` or `draft` state at any time. A new session submission is rejected with `409 DRAFT_IN_PROGRESS` if another session is currently in one of those states. The GM may explicitly discard a draft session (`DELETE /api/v1/campaigns/{id}/sessions/{sid}`, GM role required, only valid when status is `draft`). Discarding sets `status = 'discarded'` and clears `diff_payload`. The session row and `narrative_blocks` record are both preserved — no physical deletion occurs. `discarded` is a terminal status; a discarded session cannot be reactivated.
+At most one session per campaign may be in `processing` or `draft` state at any time. A new session submission is rejected with `409 ACTIVE_SESSION_EXISTS` (response includes `existingSessionId`) if another session is currently in one of those states. The GM may explicitly discard a draft session (`DELETE /api/v1/campaigns/{id}/sessions/{sid}`, GM role required, only valid when status is `draft`). Discarding sets `status = 'discarded'` and clears `diff_payload`. The session row and `narrative_blocks` record are both preserved — no physical deletion occurs. `discarded` is a terminal status; a discarded session cannot be reactivated.
 
 **Reason:**
 Allowing concurrent drafts would require conflict resolution between two uncommitted world state modifications touching the same entities. The session pipeline is designed around a linear, sequential ingestion model (D-001 — world state is cumulative). Preventing concurrent drafts enforces this linearity at the API boundary. GMs need a clean path to abandon a draft that was submitted in error without having to commit incorrect data.
@@ -1058,7 +1058,10 @@ ON sessions (campaign_id)
 WHERE status IN ('processing', 'draft');
 ```
 
-This makes it physically impossible for two rows with the same `campaign_id` to simultaneously hold a status in the active set. A concurrent duplicate insert fails with a unique constraint violation, which the application layer catches and converts to `409 DRAFT_IN_PROGRESS`. The index is defined in the Liquibase migration for the `sessions` table.
+This makes it physically impossible for two rows with the same `campaign_id` to simultaneously hold a status in the active set. A concurrent duplicate insert fails with a unique constraint violation, which the application layer catches and converts to `409 ACTIVE_SESSION_EXISTS`. The index is defined in the Liquibase migration for the `sessions` table.
+
+**Amendment rationale (2026-05-24) — error-code name:**
+The 409 error code is `ACTIVE_SESSION_EXISTS`, not the originally-drafted `DRAFT_IN_PROGRESS`. The block fires when another session is in `processing` *or* `draft`, so "active session" describes the trigger accurately where "draft in progress" misleads. This aligns the decision with the canonical name already used by the F2.3 roadmap spec, the F2.9 frontend spec, and the `.ai/pipeline` product-owner reference. The response includes `existingSessionId` so the client can link to the blocking session.
 
 **Alternatives considered:**
 - Allow multiple concurrent drafts — rejected; would require ordering guarantees, concurrent entity resolution conflicts, and a merge step that adds significant complexity for no clear benefit.
@@ -1218,7 +1221,7 @@ Email delivery is the one concern deliberately outsourced — running a reliable
 **Status:** Active
 
 **Decision:**
-`POST /api/v1/campaigns` requires a `gm_user_id` field in the request body. Campaign creation and GM assignment are a single atomic operation: the campaign row and the `campaign_members` row (`role = 'gm'`) are inserted in the same transaction. `gm_user_id` is required — the request is rejected with `422` if omitted or if the referenced user does not exist. A campaign can never exist in a GM-less state.
+`POST /api/v1/campaigns` requires a `gmUserId` field in the request body. Campaign creation and GM assignment are a single atomic operation: the campaign row and the `campaign_members` row (`role = 'gm'`) are inserted in the same transaction. `gmUserId` is required — the request is rejected with `422` if omitted or if the referenced user does not exist. A campaign can never exist in a GM-less state.
 
 **Reason:**
 `POST /api/v1/campaigns/{id}/members` requires `gm` role to execute. If campaign creation and GM assignment were separate steps, there would be no way for admin to assign the first GM — the campaign would exist in a GM-less state with no actor able to invoke the membership endpoint. Atomic assignment at creation time eliminates this chicken-and-egg problem and enforces the invariant that every campaign always has a GM.
@@ -1543,7 +1546,9 @@ A developer testing the extraction pipeline in local dev does not want to send r
 **Decision:**  
 `DiffPayload` (returned by `GET .../diff`, stored in `sessions.diff_payload` JSONB) and `CommitPayload` (submitted to `POST .../commit`) are formalized as canonical JSON schemas in ARCHITECTURE.md §7.6. These schemas are the authoritative source for both the backend Java records and the frontend TypeScript types. Any change to either schema requires a simultaneous update to both the Java record and the TypeScript type — enforced as a review convention (D-077).
 
-The field names use `snake_case` for JSON keys, consistent with the existing API convention. Java records map these via Jackson `@JsonProperty` or a global `PropertyNamingStrategies.SNAKE_CASE` config.
+The field names use `camelCase` for JSON keys, consistent with the existing API convention (the implemented auth/user/invitation DTOs are camelCase — e.g. `accessToken`, `forcePasswordChange`; no global Jackson naming strategy is configured). The backend records are plain Java records whose field names serialize as-is; no `@JsonProperty` casing overrides are needed.
+
+**Amendment (2026-05-24):** This decision originally specified `snake_case`, claiming consistency with the existing API convention. That premise was incorrect — every implemented DTO (F1.5/F1.6/F1.9) is camelCase and no `PropertyNamingStrategies.SNAKE_CASE` config exists. The schemas in ARCHITECTURE.md §7.6 (and the snake_case keys formerly shown in §7.8/§7.10) were corrected to camelCase to match the implemented convention. Database column names remain `snake_case` (a separate, unaffected concern).
 
 **Reason:**  
 `DiffPayload` is a triple-boundary contract: (1) the backend serializes it, (2) it is persisted as JSONB in PostgreSQL, and (3) the frontend deserializes it. Schema drift at any of these three points produces bugs that are hard to detect because the JSONB column accepts any valid JSON and JPA maps it as a String. Without a formal, canonical definition, the backend and frontend are likely to diverge silently. Formalizing the schema in ARCHITECTURE.md makes it a first-class architectural artifact, not an implicit assumption.
@@ -1614,19 +1619,19 @@ If adapters are bypassed — internal call paths, test harnesses, future CLI ada
 
 ---
 
-### D-079 — CommitPayload: `matched_entity_id` validated at adapter (non-null) and application (campaign ownership)
+### D-079 — CommitPayload: `matchedEntityId` validated at adapter (non-null) and application (campaign ownership)
 
 **Date:** 2026-04-14  
 **Status:** Active
 
 **Decision:**  
-When `uncertain_resolutions[*].resolution = MATCH`, the `matched_entity_id` field is validated at two tiers:
+When `uncertainResolutions[*].resolution = MATCH`, the `matchedEntityId` field is validated at two tiers:
 
-1. **Adapter (Bean Validation):** Cross-field constraint — `matched_entity_id` must be non-null when `resolution = MATCH`. Returns `400` if violated.
-2. **Application (`CommitService`):** `matched_entity_id` must reference an entity that exists within the same `campaign_id` as the session being committed. Returns `422 INVALID_ENTITY_REFERENCE` if not found.
+1. **Adapter (Bean Validation):** Cross-field constraint — `matchedEntityId` must be non-null when `resolution = MATCH`. Returns `400` if violated.
+2. **Application (`CommitService`):** `matchedEntityId` must reference an entity that exists within the same `campaign_id` as the session being committed. Returns `422 INVALID_ENTITY_REFERENCE` if not found.
 
 **Reason:**  
-Without the campaign ownership check, a client (malicious or buggy) could submit a `matched_entity_id` from a different campaign, causing a cross-campaign entity merge — a data integrity violation. This is an IDOR-adjacent pattern: the adapter cannot enforce ownership (it has no DB access), so the application service is the correct enforcement tier for the ownership check. The null check is a format constraint that belongs at the adapter level.
+Without the campaign ownership check, a client (malicious or buggy) could submit a `matchedEntityId` from a different campaign, causing a cross-campaign entity merge — a data integrity violation. This is an IDOR-adjacent pattern: the adapter cannot enforce ownership (it has no DB access), so the application service is the correct enforcement tier for the ownership check. The null check is a format constraint that belongs at the adapter level.
 
 **Alternatives considered:**  
 - Rely on DB foreign key only — rejected; a mismatched entity from another campaign passes the FK check (the entity exists), and the merge would succeed silently. The FK does not enforce `campaign_id` scope.
@@ -1639,9 +1644,9 @@ Without the campaign ownership check, a client (malicious or buggy) could submit
 **Status:** Active
 
 **Decision:**  
-The `card_decisions` array in the CommitPayload must contain an explicit entry for every `DiffCard` in the stored `diff_payload`. A missing decision for any non-UNCERTAIN card is rejected with `422 INCOMPLETE_CARD_DECISIONS`. There is no implicit accept for omitted cards.
+The `cardDecisions` array in the CommitPayload must contain an explicit entry for every `DiffCard` in the stored `diff_payload`. A missing decision for any non-UNCERTAIN card is rejected with `422 INCOMPLETE_CARD_DECISIONS`. There is no implicit accept for omitted cards.
 
-UNCERTAIN cards are covered by `uncertain_resolutions`, not `card_decisions`. Conflict cards are covered by `acknowledged_conflicts`. The completeness check applies only to `card_decisions` vs. non-UNCERTAIN `DiffCard` entries.
+UNCERTAIN cards are covered by `uncertainResolutions`, not `cardDecisions`. Conflict cards are covered by `acknowledgedConflicts`. The completeness check applies only to `cardDecisions` vs. non-UNCERTAIN `DiffCard` entries.
 
 **Reason:**  
 Implicit accept creates an ambiguous failure mode: a network error dropping half the payload is indistinguishable from a deliberate decision to accept all unmentioned cards. Requiring explicit decisions makes the commit payload self-describing and auditable. Every card decision is on the record. This is consistent with D-002 (no auto-commit) — the user must explicitly sign off on every extraction item, not just the contentious ones.
@@ -1665,7 +1670,7 @@ The validation boundary is documented explicitly: `CommitService` is the authori
 Promoting `DiffPayload` and `CommitPayload` to the domain layer would require moving the canonical JSON contract types (D-076) into `com.bluesteel.domain`, coupling the domain to a schema that is inherently application/transport-level (JSONB persistence + HTTP response shape). The domain aggregate's invariants are about state transitions, version history append-only behaviour, and field-level constraints — not about validating structured application payloads. Keeping the types in `application.model` and making `CommitService` the authoritative validator satisfies the defence-in-depth requirement without polluting the domain model with transport concerns.
 
 **Mitigation for single-point-of-validation risk:**  
-A mandatory set of unit tests in `test/application/` must prove `CommitService` performs all validation checks (UNCERTAIN completeness, conflict acknowledgment, card completeness, card_id existence, matched_entity_id non-null and campaign-owned) before calling any world-state write method. Any future alternative commit path must implement the same checks or delegate to the same validation logic.
+A mandatory set of unit tests in `test/application/` must prove `CommitService` performs all validation checks (UNCERTAIN completeness, conflict acknowledgment, card completeness, cardId existence, matchedEntityId non-null and campaign-owned) before calling any world-state write method. Any future alternative commit path must implement the same checks or delegate to the same validation logic.
 
 **Alternatives considered:**  
 - Session aggregate validates commit payload — rejected; requires domain types for `DiffPayload` / `CommitPayload`, coupling the domain to a transport/persistence contract. The domain invariant (write-once history, valid state transitions) does not require the domain to parse structured application payloads.
@@ -1757,6 +1762,68 @@ Spinners cause layout shift (the spinner height rarely matches the content heigh
 
 **Reason:**
 Without a written design authority, visual decisions are made ad-hoc per component. This produces inconsistent spacing, mismatched elevation levels, and interaction patterns that vary by feature. The constitution makes the design system enforceable and explicit — especially important for an AI-agent-driven development workflow where each agent otherwise starts from its own priors.
+
+---
+
+### D-088 — Local LLM option via Ollama (`llm-ollama` profile) + configurable embedding dimension
+
+**Date:** 2026-05-24
+**Status:** Active
+
+**Decision:**
+A third LLM provider wiring is added for local development: the `llm-ollama` Spring profile runs the entire ingestion + Query Mode pipeline against local models served by Ollama — fully offline, no API keys, zero cost. It is layered on `local` like `llm-real` (e.g. `--spring.profiles.active=local,llm-ollama`).
+
+Provider selection follows a three-way profile convention; the Spring AI adapters are provider-neutral (`SpringAi*`) and the active `ChatModel`/`EmbeddingModel` beans are chosen per profile in `AiConfig`:
+- mock adapters → `@Profile("!llm-real & !llm-ollama")` (default in dev; off whenever a real provider is selected; off in prod)
+- real Spring AI adapters → `@Profile("llm-real | llm-ollama")`
+- `llm-real` → Anthropic `ChatClient` + OpenAI embeddings; `llm-ollama` → Ollama chat + Ollama embeddings
+
+All models are env-overridable properties (no hard-coding), so adopting a new Ollama model is a config change, never a code change: `OLLAMA_BASE_URL` (`spring.ai.ollama.base-url`, default `http://localhost:11434`), `OLLAMA_CHAT_MODEL` (`spring.ai.ollama.chat.options.model`, default `qwen2.5:7b`), `OLLAMA_EMBEDDING_MODEL` (`spring.ai.ollama.embedding.options.model`, default `bge-m3`).
+
+The embedding dimension becomes a per-profile Liquibase parameter: the `entity_embeddings.embedding` column is `vector(${embeddingDimension})`, set by `spring.liquibase.parameters.embeddingDimension` (`EMBEDDING_DIMENSION`, default 1536). Prod/`llm-real` stays OpenAI@1536; `llm-ollama` defaults to 1024 (bge-m3). Liquibase checksums the changeset *text* (the placeholder), not the resolved SQL, so the append-only history (DB-02) is intact; prod always resolves to 1536.
+
+**Coupling rule:** the embedding model and dimension are a pair. Changing `OLLAMA_EMBEDDING_MODEL` to a model of a different dimension requires updating `EMBEDDING_DIMENSION` and recreating the local DB (`docker compose down -v`) — a pgvector column's dimension is fixed at create time. The chat model has no such constraint. Embeddings from different models occupy different vector spaces and are never cross-comparable, so a single database must use exactly one embedding model; a local Ollama DB is its own island, never mixed with a prod (OpenAI) DB.
+
+**Reason:**
+Lets the project be run, demoed, and developed end-to-end with real extraction and real semantic Query Mode at zero cost, with no external dependency or network — valuable for offline work and for anyone running the project without API keys. The hexagonal port design (D-032) makes this a configuration concern: no domain, application, or adapter code changes — only a new Spring AI starter, a profile config file, and profile-selected model beans. This revisits the embedding portion of D-040 (which rejected Ollama on operational-dependency grounds): that concern applies to *production*, not to an opt-in local profile, and OpenAI@1536 remains the production default.
+
+**Caveat:**
+Local chat models (7–8B) are weaker than Claude at the strict structured-JSON output (`ChatClient.entity(...)`) the extraction/resolution/conflict stages require, so local extraction may hit the `EXTRACTION_FAILED` path more often. Embedding generation and Query Mode retrieval are robust locally. The chat model is tunable via `OLLAMA_CHAT_MODEL` to trade speed for reliability.
+
+**Alternatives considered:**
+- Text generation via Ollama but embeddings still OpenAI/mock — rejected; the goal is real semantic Query Mode locally, which requires real local embeddings stored in pgvector.
+- Force a 1536-dimension local embedding model to reuse the existing column — rejected; same-dimension vectors from different models are still not comparable, so reusing the column buys nothing and needlessly constrains model choice. A per-profile dimension is cleaner.
+- Reverse D-040 outright for production — rejected; OpenAI@1536 stays the production default. Ollama is a local-dev option only.
+
+Cross-refs: D-032 (provider-agnostic by design), D-040 (embedding model), D-049 (mock vs real profiles), D-062 (native pgvector).
+
+---
+
+### D-089 — World-state commit write uses native SQL, not JPA
+
+**Date:** 2026-05-24
+**Status:** Active
+
+**Decision:**
+The world-state write performed at commit (`CommitService` → `WorldStatePort` → `WorldStateAdapter`, F2.8) is implemented with native `JdbcTemplate` SQL, **not** JPA entities/repositories. A single `WorldStateAdapter` writes across the four head/version table-pairs (`actors`/`actor_versions`, `spaces`/`space_versions`, `events`/`event_versions`, `relations`/`relation_versions`), selecting the target pair from a **whitelisted** `entity_type` enum (never string-interpolated caller input). The new `version_number` is computed `COALESCE(MAX(version_number),0)+1` per head inside the commit `@Transactional`; `changed_fields`/`full_snapshot` are bound as `?::jsonb`.
+
+This refines DB-01 ("JPA for standard CRUD; native SQL for all pgvector queries") at one boundary: the world-state *write* is native even though it is not a pgvector query.
+
+**Reason:**
+- The write is **insert-only append** (D-001/D-003: version history is never updated or deleted; head rows are inserted once). JPA's core value — dirty checking, entity lifecycle, lazy loading, relationship graphs — is wasted on insert-only tables.
+- The four entity types are **structurally identical** head/version pairs differing only by table name. JPA cannot collapse four separate tables into one entity, so it forces ~8 near-duplicate `@Entity` classes plus repositories; native models the runtime `entity_type` routing in one whitelist.
+- **Read/write consistency:** the read path over these same tables is already native (`EntitySimilaritySearchAdapter`, F2.5.2, joins `*_versions`/heads in a pgvector distance query). A native write keeps one mental model for this table family. The existing `SessionRecoveryAdapter` establishes the `@Lazy JdbcTemplate` precedent.
+
+**Scope boundary (so this is not over-applied):**
+- pgvector tables (`entity_embeddings`) stay native per **D-062** (read F2.5.2; write F2.8.6).
+- The world-state head/version write is native per this decision.
+- **All other CRUD stays JPA per DB-01** (`User`, `Session`, `NarrativeBlock`, `RefreshToken`, campaign membership, etc.).
+- The choice is documented in `WorldStateAdapter`'s class Javadoc (cites D-089).
+
+**Alternatives considered:**
+- JPA entities + repositories (the literal DB-01 / original F2.8-prose reading) — rejected; ~8 near-duplicate entities for four identical table-pairs, JPA lifecycle machinery wasted on append-only inserts, and a mixed JPA-write/native-read model on one table family. The only wins (convention-literalism, persistence-layer uniformity) do not outweigh the file-count and consistency costs.
+
+Cross-refs: D-001/D-003 (append-only versioning), D-062 (native pgvector), D-069 (sequence_number at commit), DB-01 (apps/api/CLAUDE.md §7).
 
 ---
 

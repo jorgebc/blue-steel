@@ -211,7 +211,7 @@ if (role != CampaignRole.GM && role != CampaignRole.EDITOR) {
 - **Skipping the ArchUnit check.** After adding a new class, always run ArchUnit. Import mistakes
   (e.g., accidentally importing a Spring type in domain code) only appear there.
 
-- **Forgetting `acknowledged_conflicts` in commit payload.** See `session-ingestion-pipeline`
+- **Forgetting `acknowledgedConflicts` in commit payload.** See `session-ingestion-pipeline`
   skill for the full commit validation rules (D-033, D-042).
 
 ## References

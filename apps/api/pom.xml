@@ -43,6 +43,11 @@
     <pitest-maven.version>1.25.0</pitest-maven.version>
     <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
 
+    <!-- SonarQube (local-only quality gate, invoked by .ai/pipeline BE engineer) -->
+    <sonar-maven-plugin.version>3.10.0.2594</sonar-maven-plugin.version>
+    <sonar.sourceEncoding>UTF-8</sonar.sourceEncoding>
+    <sonar.java.source>25</sonar.java.source>
+
     <spring-boot.repackage.skip>false</spring-boot.repackage.skip>
   </properties>
 
@@ -276,6 +281,18 @@
           <!-- Do not run during standard mvn test / mvn verify phases -->
           <skipDependencyCheck>false</skipDependencyCheck>
         </configuration>
+      </plugin>
+
+      <!-- ── SonarQube Maven scanner — local-only quality gate ──────────── -->
+      <!-- Invoked explicitly by .ai/pipeline (BE engineer) via:             -->
+      <!--   mvn sonar:sonar -Dsonar.host.url=http://localhost:9000          -->
+      <!--                   -Dsonar.token=$SONAR_TOKEN                      -->
+      <!--                   -Dsonar.projectKey=blue-steel-api               -->
+      <!-- Token is never committed (D-050) — only passed via -D from env.   -->
+      <plugin>
+        <groupId>org.sonarsource.scanner.maven</groupId>
+        <artifactId>sonar-maven-plugin</artifactId>
+        <version>${sonar-maven-plugin.version}</version>
       </plugin>
 
       <!-- ── Liquibase Maven plugin ─────────────────────────────────────── -->

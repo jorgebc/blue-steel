@@ -22,6 +22,7 @@ same driven port interfaces.
 
 **Key decisions:**
 - D-049: Local `spring.profiles = local` activates mock adapters (zero cost). `llm-real` profile activates real adapters.
+- D-088: `llm-ollama` profile runs real LOCAL models via Ollama (offline, zero cost), including real embeddings. Embedding dimension is a per-profile Liquibase parameter (OpenAI@1536 / Ollama `bge-m3`@1024).
 - D-034: Every LLM call must bound its context. Token budget check before every call.
 - D-062: Spring AI `VectorStore` not used — native pgvector SQL only.
 - ARCH-04: `VectorStore` cannot express domain-specific retrieval (campaign scoping, entity_type filtering, version joins).
@@ -81,6 +82,30 @@ public class MockNarrativeExtractionAdapter implements NarrativeExtractionPort {
 
 **Integration tests always use mock adapters.** Never activate `llm-real` in CI. The test Spring
 context uses `@ActiveProfiles("local")` via `BaseIntegrationTest`.
+
+### Three-way provider convention (D-088)
+
+There are three provider selections, layered on `local`. Profile expressions must be mutually
+exclusive so exactly one bean per port is active:
+
+```java
+// Mock — default in dev; off whenever a real provider is selected; off in prod (which runs llm-real)
+@Component
+@Profile("!llm-real & !llm-ollama")
+public class MockNarrativeExtractionAdapter implements NarrativeExtractionPort { ... }
+
+// Real — ONE provider-neutral adapter for both real providers; injects ChatClient (no provider type)
+@Component
+@Profile("llm-real | llm-ollama")
+public class SpringAiNarrativeExtractionAdapter implements NarrativeExtractionPort {
+    private final ChatClient chatClient;  // provider chosen by the active ChatModel bean in AiConfig
+}
+```
+
+The provider is selected at the **bean** level in `AiConfig`, not by separate adapter classes:
+`@Profile("llm-real")` wires the Anthropic `ChatModel` + OpenAI `EmbeddingModel`; `@Profile("llm-ollama")`
+wires Ollama's `ChatModel` + `EmbeddingModel`. The adapters never change. Ollama models + base-url are
+env-overridable (`OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`).
 
 ---
 
@@ -172,6 +197,13 @@ public class MockEmbeddingAdapter implements EmbeddingPort {
 
 **Embedding generation is async post-commit** (D-063). The `EmbeddingPort` is called inside
 a `@Async` `@EventListener` handler, not in the commit endpoint itself.
+
+**Embedding dimension is per-profile (D-088).** The `entity_embeddings.embedding` column is
+`vector(${embeddingDimension})` — a Liquibase parameter (`spring.liquibase.parameters.embeddingDimension`,
+default 1536, set 1024 under `llm-ollama` for `bge-m3`). Vectors from different models are NOT
+comparable even at equal dimension, so a single database must use exactly one embedding model. Changing
+`OLLAMA_EMBEDDING_MODEL` to a different-dimension model requires updating `EMBEDDING_DIMENSION` **and**
+recreating the local DB (`docker compose down -v`) — a pgvector column's dimension is fixed at create time.
 
 ---
 

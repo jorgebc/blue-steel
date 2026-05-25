@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""Entry point for the Blue Steel multi-agent AI development pipeline.
+
+Usage examples:
+  python run_task.py --task F1.7 --phase 1          # planning only
+  python run_task.py --task F1.7 --phase 2          # execution only
+  python run_task.py --task F1.7 --phase 3          # quality only
+  python run_task.py --task F1.7 --phase all        # full pipeline
+  python run_task.py --task F1.7 --phase all --resume
+  python run_task.py --task F1.7 --phase all --mode cloud
+"""
+
+import os
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+import click
+import colorama
+from colorama import Fore, Style
+
+colorama.init(autoreset=True)
+
+# ── sys.path: make the pipeline package importable ────────────────────────────
+_REPO_ROOT = Path(__file__).parent
+_PIPELINE_DIR = _REPO_ROOT / ".ai" / "pipeline"
+_PLANNING_DIR = _PIPELINE_DIR / "agents" / "planning"
+_ENGINEERS_DIR = _PIPELINE_DIR / "agents" / "engineers"
+_QUALITY_DIR = _PIPELINE_DIR / "agents" / "quality"
+
+for _p in [
+    str(_PIPELINE_DIR),
+    str(_PLANNING_DIR),
+    str(_ENGINEERS_DIR),
+    str(_QUALITY_DIR),
+]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+
+# ── Env: load .env.local (then .env) from the repo root, like the test runners ──
+# run_task.py reads secrets (SONAR_TOKEN, ANTHROPIC_API_KEY, ...) from the process
+# environment. Without this, those vars would have to be exported by hand. Existing
+# environment values win — load_dotenv does not override them by default.
+def _load_env() -> None:
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return  # python-dotenv not installed; rely on the ambient environment
+    for _env_file in (".env.local", ".env"):
+        _candidate = _REPO_ROOT / _env_file
+        if _candidate.exists():
+            load_dotenv(_candidate)
+            break
+
+
+_load_env()
+
+
+# ── Box helpers ───────────────────────────────────────────────────────────────
+
+_BOX_WIDTH = 58
+_BOX_BORDER = "=" * _BOX_WIDTH
+
+
+def _print_header(task_id: str, mode: str) -> None:
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(_BOX_BORDER)
+    print(" BLUE STEEL - AI PIPELINE")
+    print(f" Task:  {task_id}")
+    print(f" Mode:  {mode}")
+    print(f" Start: {ts}")
+    print(_BOX_BORDER)
+
+
+def _print_footer_ok(task_id: str, elapsed_s: float) -> None:
+    mins = int(elapsed_s // 60)
+    secs = int(elapsed_s % 60)
+    elapsed_str = f"{mins}m {secs:02d}s" if mins > 0 else f"{secs}s"
+    log_path = f".ai/logs/{task_id}.log"
+    print(f"\n{_BOX_BORDER}")
+    print(f" [OK] Task {task_id} completed in {elapsed_str}")
+    print(f" Log: {log_path}")
+    print(_BOX_BORDER)
+
+
+def _print_footer_blocked(task_id: str, reason: str) -> None:
+    log_path = f".ai/logs/{task_id}.log"
+    print()
+    print(f"{Fore.RED}{_BOX_BORDER}")
+    print(f"{Fore.RED} [BLOCKED] Task {task_id} - {reason}")
+    print(f"{Fore.RED} Log: {log_path}")
+    print(f"{Fore.RED}{_BOX_BORDER}{Style.RESET_ALL}")
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+_CONTEXT_DIR = ".ai/context/tasks"
+
+_REPORT_LABELS = [
+    ("Plan",         "{}_plan.md"),
+    ("Execution",    "{}_execution.md"),
+    ("Verification", "{}_verification.md"),
+    ("Review",       "{}_review.md"),
+    ("SecOps",       "{}_secops.md"),
+    ("Done summary", "{}_done.md"),
+    ("Error",        "{}_error.md"),
+]
+
+
+def _print_report_table(task_id: str) -> None:
+    click.echo("\n--- Generated reports ---")
+    found_any = False
+    for label, pattern in _REPORT_LABELS:
+        path = Path(f"{_CONTEXT_DIR}/{pattern.format(task_id)}")
+        if path.exists():
+            click.echo(f"  {label:<14} {path}")
+            found_any = True
+    if not found_any:
+        click.echo("  (none)")
+
+
+def _overall_verdict(result: dict) -> str:
+    if result.get("completed"):
+        return "DONE"
+    if result.get("blocked"):
+        return f"BLOCKED — {result.get('blocked_reason', 'see error report')}"
+    return "INCOMPLETE"
+
+
+# ── Individual phase runners ──────────────────────────────────────────────────
+
+def _run_single_phase(task_id: str, node: str, runner) -> None:
+    """Run one phase with the same banner + spinner + done-line as the full pipeline.
+
+    *runner* is a no-arg callable returning the phase result; *node* is its
+    ``PHASE_META`` key (planning / execution / quality).
+    """
+    from logger import MARKER_FAIL, get_logger
+    from progress import phase_progress
+
+    logger = get_logger(task_id)  # ensure the log file is open before the phase starts
+    t0 = time.time()
+    try:
+        with phase_progress(node, task_id):
+            runner()
+        _print_report_table(task_id)
+        _print_footer_ok(task_id, time.time() - t0)
+    except Exception as exc:
+        logger.error(
+            f"{MARKER_FAIL} {node} phase failed: {type(exc).__name__}: {exc}",
+            extra={"role": "pipeline"},
+            exc_info=True,
+        )
+        _print_footer_blocked(task_id, str(exc))
+        raise
+
+
+def _run_phase_1(task_id: str) -> None:
+    """Planning phase: PO + Architect conversation -> _plan.md."""
+    from agents.planning.planning_crew import run_planning
+
+    _run_single_phase(task_id, "planning", lambda: run_planning(task_id))
+
+
+def _run_phase_2(task_id: str) -> None:
+    """Execution phase: BE + FE engineer agents -> _execution.md."""
+    from agents.engineers.execution_crew import run_execution
+
+    _run_single_phase(task_id, "execution", lambda: run_execution(task_id))
+
+
+def _run_phase_3(task_id: str) -> None:
+    """Quality phase: verification + review + secops -> three reports."""
+    from agents.quality.quality_pipeline import run_quality
+
+    _run_single_phase(task_id, "quality", lambda: run_quality(task_id))
+
+
+def _print_phase_recap(result: dict) -> None:
+    """Print a compact phase | duration | verdict table for the run."""
+    from progress import PHASE_META, fmt_duration, read_durations
+
+    durations = read_durations()
+    verdicts = {
+        "planning":     "done" if result.get("plan_path") else "—",
+        "execution":    "done" if result.get("execution_summary") else "—",
+        "quality": (
+            f"verification={'PASSED' if result.get('quality_passed') else 'N/A'}, "
+            f"secops={result.get('secops_verdict', 'N/A')}"
+        ),
+        "final_review": result.get("review_verdict", "—"),
+    }
+    click.echo("\n--- Phase recap ---")
+    for node, (label, _, _) in PHASE_META.items():
+        dur = fmt_duration(durations[node]) if node in durations else "—"
+        click.echo(f"  {label:<14} {dur:>8}   {verdicts.get(node, '')}")
+
+
+def _run_full_pipeline(task_id: str, resume: bool) -> None:
+    """Full pipeline: all phases connected by LangGraph."""
+    from orchestrator import run_pipeline
+
+    t0 = time.time()
+    result = run_pipeline(task_id, resume=resume)
+    elapsed = time.time() - t0
+
+    _print_phase_recap(result)
+
+    if result.get("blocked"):
+        reason = result.get("blocked_reason", "see error report")
+        _print_footer_blocked(task_id, reason)
+    else:
+        _print_footer_ok(task_id, elapsed)
+
+    _print_report_table(task_id)
+
+
+# ── CLI ───────────────────────────────────────────────────────────────────────
+
+@click.command()
+@click.option("--task", required=True, help="Task ID to run (e.g. F1.7, F2.3)")
+@click.option(
+    "--mode",
+    default="local",
+    show_default=True,
+    type=click.Choice(["cloud", "local"]),
+    help="LLM mode: cloud (Claude via Anthropic) or local (Ollama)",
+)
+@click.option(
+    "--phase",
+    default="all",
+    show_default=True,
+    help="Pipeline phase: 1=planning, 2=execution, 3=quality, all=full pipeline",
+)
+@click.option(
+    "--resume",
+    is_flag=True,
+    default=False,
+    help="Resume an interrupted full-pipeline run from last checkpoint",
+)
+def main(task: str, mode: str, phase: str, resume: bool) -> None:
+    """Run a Blue Steel AI pipeline task."""
+    # --resume is implemented via LangGraph SqliteSaver, which only runs in the
+    # full-pipeline orchestrator. Individual phase runners would silently ignore
+    # it. Reject the combination explicitly.
+    if resume and phase != "all":
+        raise click.UsageError(
+            "--resume requires --phase all; single-phase runners do not support "
+            "checkpoint resume."
+        )
+
+    os.environ["PIPELINE_MODE"] = mode
+
+    _print_header(task, mode)
+
+    if phase == "1":
+        _run_phase_1(task)
+    elif phase == "2":
+        _run_phase_2(task)
+    elif phase == "3":
+        _run_phase_3(task)
+    elif phase == "all":
+        _run_full_pipeline(task, resume=resume)
+    else:
+        click.echo(
+            f"Unknown phase '{phase}'. Use 1, 2, 3, or all.",
+            err=True,
+        )
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

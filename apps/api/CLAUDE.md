@@ -14,8 +14,8 @@
 | ORM | Spring Data JPA + Hibernate |
 | Migrations | Liquibase |
 | Auth | Spring Security (JWT HS256) |
-| LLM generation | Spring AI `ChatClient` → Anthropic |
-| LLM embeddings | Spring AI `EmbeddingModel` → OpenAI `text-embedding-3-small` (1536 dims) |
+| LLM generation | Spring AI `ChatClient` → Anthropic (`llm-real`) or Ollama (`llm-ollama`, D-088) |
+| LLM embeddings | Spring AI `EmbeddingModel` → OpenAI `text-embedding-3-small` (1536) or Ollama `bge-m3` (1024) per profile (D-088) |
 | Vector retrieval | **Native pgvector SQL only** — `VectorStore` never used (D-062) |
 | Testing | JUnit 5, Mockito, Testcontainers, PITest, ArchUnit |
 | Style | Spotless + google-java-format |
@@ -64,6 +64,7 @@ cd apps/api
 
 mvn spring-boot:run -Dspring-boot.run.profiles=local                  # mock LLMs (zero cost)
 mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-real         # real Anthropic+OpenAI
+mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-ollama       # real LOCAL models via Ollama — offline, zero cost (D-088)
 
 mvn spotless:check                               # format check (google-java-format)
 mvn spotless:apply                               # auto-fix formatting
@@ -71,6 +72,10 @@ mvn test                                         # unit + ArchUnit (fast; also r
 mvn verify                                       # + Testcontainers IT (Podman/Docker required)
 mvn test-compile pitest:mutationCoverage         # mutation tests — domain core (slow)
 mvn package -DskipTests                          # production JAR
+
+# SonarQube — local-only quality gate, not part of CI. Requires the
+# sonarqube-local Podman container to be running and $SONAR_TOKEN in env.
+mvn sonar:sonar -Dsonar.host.url=http://localhost:9000 -Dsonar.token=$SONAR_TOKEN -Dsonar.projectKey=blue-steel-api
 ```
 
 **CI step order** (mirrors `backend.yml`): `spotless:check → compile → test → verify → pitest`
@@ -130,6 +135,7 @@ A failing ArchUnit test is a layer violation in production code — fix the code
 - Generated async post-commit via `@Async` / `ApplicationEvent` (D-063)
 - Entity versions without embeddings excluded from Query Mode retrieval
 - Commit returns `200` before embeddings are generated
+- Provider + dimension are per-profile: OpenAI@1536 (`llm-real`/prod), Ollama `bge-m3`@1024 (`llm-ollama`, offline). Column is `vector(${embeddingDimension})` via a Liquibase parameter; vectors from different models are not comparable — never mix models in one DB (D-088)
 
 ---
 
@@ -158,6 +164,10 @@ Never put business logic in controllers. Never put format validation in services
 **Logging (LOG-02):** One static `Logger` per class (`LoggerFactory.getLogger`). Domain layer: no logging — domain must not depend on infrastructure. Application services: INFO on use-case entry/exit with minimum business IDs; ERROR on unhandled exceptions. Adapters out: ERROR on infrastructure failures with full exception; never silently swallow a caught exception. Never log at INFO on high-throughput paths (e.g. health check polling). Never log passwords, tokens, or PII. Local profile: `com.bluesteel` packages at DEBUG; third-party at WARN. Prod profile: project at INFO; third-party at WARN; DEBUG disabled.
 
 **Testing (TEST-01):** Every domain class → unit tests. Every use-case service → unit tests with mocked ports. Persistence adapters → Testcontainers IT. Domain core → PITest on every build.
+
+**SonarQube (local-only):** A `sonar-maven-plugin` is configured in `pom.xml` so the AI pipeline's BE engineer can run `mvn sonar:sonar` against a local Podman container (`sonarqube-local`, `http://localhost:9000`, project key `blue-steel-api`). Token comes from `$SONAR_TOKEN` (`.env.local`, never committed — D-050). The pipeline filters reported issues down to files modified on the current branch and iterates fixes up to 2 attempts. Not part of CI today. See repo-root `CLAUDE.md` §6 for the developer setup steps.
+
+**LLM profiles (D-049, D-088):** three provider selections layered on `local` — mock (`@Profile("!llm-real & !llm-ollama")`, default dev), `llm-real` (Anthropic + OpenAI), `llm-ollama` (Ollama, offline). Adapters are provider-neutral (`SpringAi*`, `@Profile("llm-real | llm-ollama")`); `AiConfig` picks the active `ChatModel`/`EmbeddingModel` bean per profile. Ollama models + dimension are env-overridable (`OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`, `EMBEDDING_DIMENSION`). Changing the Ollama embedding model to a different dimension → update `EMBEDDING_DIMENSION` and recreate the local DB (`docker compose down -v`).
 
 **Proposals schema (D-016):** `proposals` + `proposal_votes` tables exist from day one but the approval pipeline ships in v2. Do NOT implement proposal approval logic.
 

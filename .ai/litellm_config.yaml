@@ -1,0 +1,22 @@
+model_list:
+  - model_name: cloud-model
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: local-reasoning
+    litellm_params:
+      model: ollama/qwen3:14b
+      api_base: http://localhost:11434
+
+  - model_name: local-coding
+    litellm_params:
+      model: ollama/qwen2.5-coder:14b
+      api_base: http://localhost:11434
+
+environment_variables:
+  PIPELINE_MODE: local
+
+litellm_settings:
+  drop_params: true
+  max_retries: 3
