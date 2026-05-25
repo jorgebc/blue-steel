@@ -165,7 +165,7 @@ Never put business logic in controllers. Never put format validation in services
 
 **Testing (TEST-01):** Every domain class → unit tests. Every use-case service → unit tests with mocked ports. Persistence adapters → Testcontainers IT. Domain core → PITest on every build.
 
-**SonarQube (local-only):** A `sonar-maven-plugin` is configured in `pom.xml` so the AI pipeline's BE engineer can run `mvn sonar:sonar` against a local Podman container (`sonarqube-local`, `http://localhost:9000`, project key `blue-steel-api`). Token comes from `$SONAR_TOKEN` (`.env.local`, never committed — D-050). The pipeline filters reported issues down to files modified on the current branch and iterates fixes up to 2 attempts. Not part of CI today. See repo-root `CLAUDE.md` §6 for the developer setup steps.
+**SonarQube (local-only):** AI-pipeline BE-engineer gate — `mvn sonar:sonar` (command in §3, setup in repo-root `CLAUDE.md` §6). Filters issues to branch-modified files; ≤2 fix attempts; not in CI.
 
 **LLM profiles (D-049, D-088):** three provider selections layered on `local` — mock (`@Profile("!llm-real & !llm-ollama")`, default dev), `llm-real` (Anthropic + OpenAI), `llm-ollama` (Ollama, offline). Adapters are provider-neutral (`SpringAi*`, `@Profile("llm-real | llm-ollama")`); `AiConfig` picks the active `ChatModel`/`EmbeddingModel` bean per profile. Ollama models + dimension are env-overridable (`OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`, `EMBEDDING_DIMENSION`). Changing the Ollama embedding model to a different dimension → update `EMBEDDING_DIMENSION` and recreate the local DB (`docker compose down -v`).
 

@@ -4,6 +4,15 @@
 
 ---
 
+## Working Principles
+
+1. **Think first.** State assumptions; ask when uncertain. Surface multiple interpretations and simpler alternatives — don't pick silently.
+2. **Simplicity first.** Minimum code that solves the problem. No speculative features, abstractions, or handling for impossible cases.
+3. **Surgical changes.** Touch only what the task needs; match existing style; clean up only the orphans your own change created. Every changed line traces to the request.
+4. **Goal-driven.** Turn the task into a verifiable check (failing test → pass; green before & after a refactor), then loop until it's met.
+
+---
+
 ## 1. Project
 
 Blue Steel is an AI-assisted narrative memory system for tabletop RPG campaigns. GMs paste raw session summaries → LLM pipeline extracts structured knowledge (actors, events, locations, relationships) → versioned world state. Users query in natural language or browse through four visual exploration views. Backend + frontend communicate exclusively over a versioned REST API (`/api/v1/`).
@@ -41,6 +50,7 @@ podman compose up -d        # or: docker compose up -d
 
 # Backend (from apps/api/)
 mvn spring-boot:run -Dspring-boot.run.profiles=local              # mocked LLMs, zero API cost
+mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-real     # real Anthropic + OpenAI
 mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-ollama   # real LOCAL models via Ollama — offline, no API keys (D-088)
 mvn spotless:check    # format check
 mvn test              # unit + ArchUnit (fast)
@@ -152,7 +162,7 @@ The tool and retry contract live in `.ai/pipeline/tools/shell_runner.py` (`run_s
 
 ---
 
-## 7. Skills (formerly §6)
+## 7. Skills
 
 Read `skills/SKILLS_INDEX.md` before starting any non-trivial task.
 
