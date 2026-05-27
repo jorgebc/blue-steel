@@ -46,7 +46,7 @@
 | F1.7.4 | Frontend: auth + user API resource hooks | ✅ |
 | F1.7.5 | Frontend: RequireAuth route guard (+ forced-password-change redirect) | ✅ |
 | F1.7.6 | Frontend: InlineBanner feedback component (no-toast) | ✅ |
-| F1.7.7 | Frontend: LoginPage form | 🔲 |
+| F1.7.7 | Frontend: LoginPage form | ✅ |
 | F1.7.8 | Frontend: ChangePasswordPage form | 🔲 |
 | F1.7.9 | Frontend: /status round-trip health page (skeleton loading) | 🔲 |
 | F1.7.10 | Frontend: app wiring (routes + providers) + Vercel config | 🔲 |
