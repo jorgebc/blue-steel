@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import './index.css'
 
 // App entry point — routes, providers, and features added in subsequent phases.
 ReactDOM.createRoot(document.getElementById('root')!).render(
