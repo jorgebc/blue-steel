@@ -48,7 +48,7 @@
 | F1.7.6 | Frontend: InlineBanner feedback component (no-toast) | ✅ |
 | F1.7.7 | Frontend: LoginPage form | ✅ |
 | F1.7.8 | Frontend: ChangePasswordPage form | ✅ |
-| F1.7.9 | Frontend: /status round-trip health page (skeleton loading) | 🔲 |
+| F1.7.9 | Frontend: /status round-trip health page (skeleton loading) | ✅ |
 | F1.7.10 | Frontend: app wiring (routes + providers) + Vercel config | 🔲 |
 | F1.8 | Campaign creation + membership API | 🔲 |
 | F1.8.1 | Backend: Campaign + CampaignMember domain + CampaignNotFoundException | 🔲 |
