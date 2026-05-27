@@ -41,7 +41,7 @@
 | F1.7 | Frontend: walking skeleton + auth scaffold | 🔲 |
 | F1.7-SETUP | Frontend scaffolding — Vite alias, Tailwind v4 + theme, shadcn/ui, Vitest setup (human step) | 👤 |
 | F1.7.1 | Frontend: shared API envelope + auth + health TypeScript types | ✅ |
-| F1.7.2 | Frontend: Zustand auth + campaign stores | 🔲 |
+| F1.7.2 | Frontend: Zustand auth + campaign stores | ✅ |
 | F1.7.3 | Frontend: base HTTP client with silent-refresh on 401 | 🔲 |
 | F1.7.4 | Frontend: auth + user API resource hooks | 🔲 |
 | F1.7.5 | Frontend: RequireAuth route guard (+ forced-password-change redirect) | 🔲 |
