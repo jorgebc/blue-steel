@@ -44,7 +44,7 @@
 | F1.7.2 | Frontend: Zustand auth + campaign stores | ✅ |
 | F1.7.3 | Frontend: base HTTP client with silent-refresh on 401 | ✅ |
 | F1.7.4 | Frontend: auth + user API resource hooks | ✅ |
-| F1.7.5 | Frontend: RequireAuth route guard (+ forced-password-change redirect) | 🔲 |
+| F1.7.5 | Frontend: RequireAuth route guard (+ forced-password-change redirect) | ✅ |
 | F1.7.6 | Frontend: InlineBanner feedback component (no-toast) | 🔲 |
 | F1.7.7 | Frontend: LoginPage form | 🔲 |
 | F1.7.8 | Frontend: ChangePasswordPage form | 🔲 |
