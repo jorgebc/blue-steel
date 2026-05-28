@@ -1,0 +1,85 @@
+package com.bluesteel.adapters.out.persistence.campaign;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.bluesteel.TestcontainersPostgresBaseIT;
+import com.bluesteel.adapters.out.persistence.user.UserPersistenceAdapter;
+import com.bluesteel.domain.campaign.Campaign;
+import com.bluesteel.domain.campaign.CampaignMember;
+import com.bluesteel.domain.campaign.CampaignRole;
+import com.bluesteel.domain.user.User;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+@DisplayName("CampaignMembershipAdapter")
+class CampaignMembershipAdapterIT extends TestcontainersPostgresBaseIT {
+
+  @Autowired private CampaignMembershipAdapter adapter;
+  @Autowired private CampaignPersistenceAdapter campaignAdapter;
+  @Autowired private UserPersistenceAdapter userAdapter;
+
+  @Test
+  @DisplayName("should save a member and resolve their role")
+  void saveAndResolveRole_matchFound() {
+    User user = savedUser();
+    Campaign campaign = savedCampaign(user.id());
+
+    adapter.save(
+        CampaignMember.create(
+            UUID.randomUUID(), campaign.id(), user.id(), CampaignRole.GM, Instant.now()));
+
+    Optional<CampaignRole> role = adapter.resolveRole(campaign.id(), user.id());
+    assertThat(role).isPresent().contains(CampaignRole.GM);
+  }
+
+  @Test
+  @DisplayName("should return empty when user is not a member of the campaign")
+  void resolveRole_noMembership_returnsEmpty() {
+    Optional<CampaignRole> role = adapter.resolveRole(UUID.randomUUID(), UUID.randomUUID());
+    assertThat(role).isEmpty();
+  }
+
+  @Test
+  @DisplayName("should persist role as lowercase text compatible with DB CHECK constraint")
+  void saveAndResolveRole_editorRole_mappedCorrectly() {
+    User user = savedUser();
+    Campaign campaign = savedCampaign(user.id());
+
+    adapter.save(
+        CampaignMember.create(
+            UUID.randomUUID(), campaign.id(), user.id(), CampaignRole.EDITOR, Instant.now()));
+
+    Optional<CampaignRole> role = adapter.resolveRole(campaign.id(), user.id());
+    assertThat(role).isPresent().contains(CampaignRole.EDITOR);
+  }
+
+  private User savedUser() {
+    UUID id = UUID.randomUUID();
+    User user =
+        User.create(
+            id,
+            id + "@example.com",
+            "$2a$10$hash",
+            false,
+            false,
+            Instant.now().truncatedTo(ChronoUnit.MICROS));
+    userAdapter.save(user);
+    return user;
+  }
+
+  private Campaign savedCampaign(UUID createdBy) {
+    Campaign campaign =
+        Campaign.create(
+            UUID.randomUUID(),
+            "Campaign-" + UUID.randomUUID(),
+            createdBy,
+            Instant.now().truncatedTo(ChronoUnit.MICROS));
+    campaignAdapter.save(campaign);
+    return campaign;
+  }
+}

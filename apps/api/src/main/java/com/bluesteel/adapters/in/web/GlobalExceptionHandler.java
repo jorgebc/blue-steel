@@ -1,5 +1,6 @@
 package com.bluesteel.adapters.in.web;
 
+import com.bluesteel.domain.exception.CampaignNotFoundException;
 import com.bluesteel.domain.exception.DomainException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
@@ -55,6 +56,12 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ApiResponse<Void> handleUserNotFound(UserNotFoundException ex) {
     return ApiResponse.error(ApiError.of("USER_NOT_FOUND", ex.getMessage()));
+  }
+
+  @ExceptionHandler(CampaignNotFoundException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public ApiResponse<Void> handleCampaignNotFound(CampaignNotFoundException ex) {
+    return ApiResponse.error(ApiError.of("CAMPAIGN_NOT_FOUND", ex.getMessage()));
   }
 
   @ExceptionHandler(InvalidPasswordException.class)
