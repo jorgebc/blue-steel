@@ -65,6 +65,14 @@ npm run build                           # production build
 
 **CI step order** (mirrors `frontend.yml`): `npm audit → type-check → lint → test → build`
 
+### Adding shadcn/ui components
+
+```bash
+npx shadcn@latest add <component> --yes
+```
+
+**Windows path-alias fix (already applied):** shadcn's CLI on Windows resolves `@/components/ui` as a literal `@\` directory instead of `src\`. To work around this, `components.json` uses `src/` paths (e.g. `"ui": "src/components/ui"`) so files land in the right place. Both `src/*` and `@/*` are wired as aliases in `vite.config.ts` and `tsconfig.app.json`, so generated `src/lib/utils` imports and hand-written `@/lib/utils` imports both resolve correctly — no manual fixup needed after `shadcn add`.
+
 ---
 
 ## 4. Architecture Rules

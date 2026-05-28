@@ -32,26 +32,87 @@ Definition & Analysis is complete. Architecture decisions are finalized and docu
 
 ## Local development
 
-**Requirements:** JDK 25, Maven, Podman (or Docker).
+### Prerequisites
+
+| Tool | Minimum version |
+|---|---|
+| JDK | 25 |
+| Maven | 3.9 |
+| Node.js | 20 |
+| npm | bundled with Node |
+| Docker **or** Podman | any recent version |
+
+### Start the full stack
+
+**1. Start the database** (from repo root)
 
 ```bash
-# 1. Start the database
-podman compose up -d        # or: docker compose up -d
+docker compose up -d        # or: podman compose up -d
+```
 
-# 2. Start the backend (mock LLMs — zero API cost)
-cd apps/api
+Starts PostgreSQL 16 + pgvector on `localhost:5432`.
+Verify: `docker ps` shows a running `pgvector/pgvector:pg16` container.
+
+**2. Start the backend** (from `apps/api/`)
+
+```bash
 mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 ```
 
-The API is available at `http://localhost:8080`. Health check: `GET /api/v1/health`.
+The `local` profile ships with hardcoded safe defaults — no `.env` file needed:
 
-To use real LLM calls, add the `llm-real` profile and set `ANTHROPIC_API_KEY` + `OPENAI_API_KEY` in your environment.
+| Setting | Local value |
+|---|---|
+| Database URL | `jdbc:postgresql://localhost:5432/bluesteel` |
+| JWT secret | pre-set dev secret (≥ 32 bytes) |
+| Admin email | `admin@local.dev` |
+| Admin password | `Admin!Local123456` |
+| Email | logged to console (mock — no provider key needed) |
+
+Verify: `GET http://localhost:8080/api/v1/health` → `{"data":{"status":"UP","db":"UP"},...}`
+
+**3. Configure the frontend env** (from `apps/web/`, once)
 
 ```bash
-# 3. Start the frontend (separate terminal)
-cd apps/web
-npm install && npm run dev   # http://localhost:5173
+cp apps/web/.env.example apps/web/.env.local
 ```
+
+`.env.example` ships with `VITE_API_BASE_URL=http://localhost:8080` — correct for local dev.
+Edit `.env.local` only if your backend runs on a different port.
+
+**4. Start the frontend** (from `apps/web/`)
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Frontend starts on `http://localhost:5173`.
+
+### Manual test scenarios
+
+| URL | Expected behaviour |
+|---|---|
+| `/status` | Health page loads without login. Shows `API: UP` / `Database: UP`. |
+| `/login` | Login form renders. Invalid credentials show an error banner (no toast). |
+| `/login` with `admin@local.dev` / `Admin!Local123456` | Redirects to `/` on success. |
+| `/` (no session) | Redirects to `/login`. |
+| `/change-password` (no session) | Redirects to `/login`. |
+| Hard-refresh on any route | Stays on that route (SPA routing intact). |
+
+### Optional: Real LLM profiles
+
+```bash
+# Anthropic + OpenAI (requires ANTHROPIC_API_KEY + OPENAI_API_KEY in env)
+mvn spring-boot:run "-Dspring-boot.run.profiles=local,llm-real"
+
+# Local Ollama — offline, zero cost (requires Ollama running on localhost)
+mvn spring-boot:run "-Dspring-boot.run.profiles=local,llm-ollama"
+```
+
+With `llm-ollama`, set `EMBEDDING_DIMENSION=1024` and recreate the DB to match the 1024-dim
+embedding column: `docker compose down -v && docker compose up -d`
 
 ---
 

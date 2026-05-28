@@ -1,54 +1,45 @@
 package com.bluesteel.adapters.in.web;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * CORS configuration. The production frontend origin is read from {@code VITE_API_BASE_URL}. The
- * local dev origin ({@code http://localhost:5173}) is only added when running under the {@code
- * local} Spring profile so it is never active in production.
+ * CORS configuration. Allowed origins are read from {@code cors.allowed-origins} — set per Spring
+ * profile in the properties files. No profile detection in this class.
  */
 @Configuration
-public class WebConfig implements WebMvcConfigurer {
+public class WebConfig {
 
-  /** Production frontend origin. Expected to be set in prod; may be blank in local dev. */
-  @Value("${VITE_API_BASE_URL:}")
-  private String corsAllowedOrigin;
+  @Value("${cors.allowed-origins:}")
+  private String allowedOrigins;
 
   /**
-   * {@code true} when the {@code local} profile is active; controls whether the local dev origin is
-   * added to the allowlist.
+   * Exposes CORS policy as a bean so Spring Security's filter can apply it before the authorization
+   * check, ensuring OPTIONS preflights receive the correct headers without a JWT.
    */
-  @Value("${spring.profiles.active:}")
-  private String activeProfiles;
-
-  @Override
-  public void addCorsMappings(CorsRegistry registry) {
-    List<String> origins = new ArrayList<>();
-
-    // Only allow localhost in local dev profile — never expose it in production
-    if (activeProfiles.contains("local")) {
-      origins.add("http://localhost:5173");
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    if (allowedOrigins.isBlank()) {
+      return request -> null;
     }
-    if (!corsAllowedOrigin.isBlank()) {
-      origins.add(corsAllowedOrigin);
-    }
-
-    if (origins.isEmpty()) {
-      // No origins configured: refuse all cross-origin requests (safe default)
-      return;
-    }
-
-    registry
-        .addMapping("/api/**")
-        .allowedOrigins(origins.toArray(String[]::new))
-        .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-        // Restrict to the headers the API actually uses rather than wildcard
-        .allowedHeaders("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With")
-        .allowCredentials(true);
+    CorsConfiguration config = new CorsConfiguration();
+    config.setAllowedOrigins(
+        Arrays.stream(allowedOrigins.split(","))
+            .map(String::trim)
+            .filter(s -> !s.isBlank())
+            .toList());
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+    config.setAllowedHeaders(
+        List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
+    config.setAllowCredentials(true);
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/api/**", config);
+    return source;
   }
 }

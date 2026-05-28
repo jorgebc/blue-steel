@@ -1,0 +1,32 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@theme {
+  /* Typography */
+  --font-sans: ui-sans-serif, system-ui, Inter, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Blue Steel Colour Tokens */
+  --color-surface: #ffffff;
+  --color-background: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-accent-pressed: #1d4ed8;
+  --color-accent-subtle: #eff6ff;
+
+  /* Border Radius — MD3 style */
+  --radius-card: 1rem;        /* rounded-2xl = 16px */
+  --radius-button: 0.5rem;    /* rounded-lg = 8px */
+  --radius-input: 0.5rem;     /* rounded-lg = 8px */
+  --radius-badge: 9999px;     /* rounded-full */
+  --radius-icon-btn: 9999px;  /* rounded-full */
+
+  /* Elevation shadows */
+  --shadow-tonal:   0 1px 2px 0 rgb(0 0 0 / 0.05);           /* shadow-sm */
+  --shadow-elevated: 0 4px 6px -1px rgb(0 0 0 / 0.1);         /* shadow-md */
+  --shadow-overlay: 0 10px 15px -3px rgb(0 0 0 / 0.1);        /* shadow-lg */
+  --shadow-nav:     0 20px 25px -5px rgb(0 0 0 / 0.1);        /* shadow-xl */
+}
