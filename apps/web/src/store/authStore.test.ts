@@ -11,7 +11,7 @@ const mockUser: CurrentUser = {
 
 describe('authStore', () => {
   beforeEach(() => {
-    useAuthStore.setState({ accessToken: null, currentUser: null })
+    useAuthStore.setState({ accessToken: null, currentUser: null, isInitializing: false })
   })
 
   it('setAccessToken stores the token', () => {
@@ -35,5 +35,16 @@ describe('authStore', () => {
     useAuthStore.getState().logout()
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(useAuthStore.getState().currentUser).toBeNull()
+  })
+
+  it('isInitializing is true on initial store state', () => {
+    useAuthStore.setState({ isInitializing: true })
+    expect(useAuthStore.getState().isInitializing).toBe(true)
+  })
+
+  it('setInitialized sets isInitializing to false', () => {
+    useAuthStore.setState({ isInitializing: true })
+    useAuthStore.getState().setInitialized()
+    expect(useAuthStore.getState().isInitializing).toBe(false)
   })
 })

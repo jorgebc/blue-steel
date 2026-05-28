@@ -15,7 +15,31 @@ const mockUser: CurrentUser = {
 
 describe('RequireAuth', () => {
   beforeEach(() => {
-    useAuthStore.setState({ accessToken: null, currentUser: null })
+    useAuthStore.setState({ accessToken: null, currentUser: null, isInitializing: false })
+  })
+
+  it('renders nothing while isInitializing is true', () => {
+    useAuthStore.setState({ isInitializing: true })
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
+          <Route path="/login" element={<div>Login Page</div>} />
+          <Route
+            path="*"
+            element={
+              <RequireAuth>
+                <div>Protected Content</div>
+              </RequireAuth>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(container.firstChild).toBeNull()
+    expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
   })
 
   it('redirects to /login when there is no access token', () => {

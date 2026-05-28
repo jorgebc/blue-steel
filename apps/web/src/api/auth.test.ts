@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
-import { login, logout, getCurrentUser, useLogin, useLogout } from './auth'
+import { login, logout, getCurrentUser, useLogin, useLogout, initAuth } from './auth'
 import { ApiClientError } from './client'
 import { useAuthStore } from '@/store/authStore'
 import type { ApiEnvelope } from '@/types/api'
-import type { AuthLoginResponse, UserMeResponse } from '@/types/auth'
+import type { AuthLoginResponse, RefreshResponse, UserMeResponse } from '@/types/auth'
 
 const BASE = 'http://localhost:8080'
 
@@ -60,7 +60,7 @@ describe('auth API', () => {
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, 'fetch')
     vi.stubGlobal('location', { href: '' })
-    useAuthStore.setState({ accessToken: null, currentUser: null })
+    useAuthStore.setState({ accessToken: null, currentUser: null, isInitializing: false })
   })
 
   afterEach(() => {
@@ -176,6 +176,29 @@ describe('auth API', () => {
       expect(useAuthStore.getState().accessToken).toBeNull()
       expect(useAuthStore.getState().currentUser).toBeNull()
     })
+  })
+
+  // ── initAuth ────────────────────────────────────────────────────────────────
+
+  it('initAuth() on success: restores accessToken and currentUser from the refresh cookie', async () => {
+    const refreshResponse: RefreshResponse = { accessToken: 'refreshed-token' }
+    fetchSpy
+      .mockResolvedValueOnce(envelopeResponse(refreshResponse)) // POST /auth/refresh
+      .mockResolvedValueOnce(envelopeResponse(mockUser))        // GET /users/me
+
+    await initAuth()
+
+    expect(useAuthStore.getState().accessToken).toBe('refreshed-token')
+    expect(useAuthStore.getState().currentUser).toEqual(mockUser)
+  })
+
+  it('initAuth() on 401: leaves the store unchanged', async () => {
+    fetchSpy.mockResolvedValueOnce(new Response(null, { status: 401 }))
+
+    await initAuth()
+
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(useAuthStore.getState().currentUser).toBeNull()
   })
 
   it('useLogout on server failure: still clears the auth store (best-effort)', async () => {

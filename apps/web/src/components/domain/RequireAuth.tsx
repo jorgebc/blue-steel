@@ -6,9 +6,12 @@ interface Props {
 }
 
 export function RequireAuth({ children }: Props) {
+  const isInitializing = useAuthStore((s) => s.isInitializing)
   const accessToken = useAuthStore((s) => s.accessToken)
   const currentUser = useAuthStore((s) => s.currentUser)
   const location = useLocation()
+
+  if (isInitializing) return null
 
   if (!accessToken) {
     return <Navigate to="/login" state={{ from: location }} replace />

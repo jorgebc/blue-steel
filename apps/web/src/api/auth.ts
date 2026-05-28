@@ -1,11 +1,36 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from './client'
 import { useAuthStore } from '@/store/authStore'
-import type { AuthLoginResponse, UserMeResponse } from '@/types/auth'
+import type { ApiEnvelope } from '@/types/api'
+import type { AuthLoginResponse, RefreshResponse, UserMeResponse } from '@/types/auth'
 
 // For cache invalidation by downstream tasks (e.g. F1.7.5+)
 export const authKeys = {
   currentUser: () => ['users', 'me'] as const,
+}
+
+// ─── App-boot session restore ────────────────────────────────────────────────
+
+/**
+ * Attempts a silent token refresh on app startup using the httpOnly cookie.
+ * On success, restores accessToken + currentUser in the auth store so a hard
+ * refresh does not log the user out. Always resolves — failures are silent.
+ */
+export async function initAuth(): Promise<void> {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!res.ok) return
+    const envelope = (await res.json()) as ApiEnvelope<RefreshResponse>
+    if (envelope.errors?.length) return
+    useAuthStore.getState().setAccessToken(envelope.data.accessToken)
+    const me = await getCurrentUser()
+    useAuthStore.getState().setCurrentUser(me)
+  } catch {
+    // No valid cookie or network error — user must log in
+  }
 }
 
 // ─── Raw fetch functions ────────────────────────────────────────────────────
