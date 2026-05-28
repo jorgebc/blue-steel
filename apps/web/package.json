@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "format": "prettier --write src/",
     "test": "vitest run --passWithNoTests",
-    "sbom": "cyclonedx-npm --output-format JSON --output-file sbom-frontend.json --no-short-PURLs"
+    "sbom": "cyclonedx-npm --output-format JSON --output-file sbom-frontend.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
