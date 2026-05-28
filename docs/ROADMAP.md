@@ -50,15 +50,15 @@
 | F1.7.8 | Frontend: ChangePasswordPage form | ✅ |
 | F1.7.9 | Frontend: /status round-trip health page (skeleton loading) | ✅ |
 | F1.7.10 | Frontend: app wiring (routes + providers) + Vercel config | ✅ |
-| F1.8 | Campaign creation + membership API | 🔲 |
-| F1.8.1 | Backend: Campaign + CampaignMember domain + CampaignNotFoundException | 🔲 |
-| F1.8.2 | Backend: campaign driven ports + command/read-model records | 🔲 |
-| F1.8.3 | Backend: CreateCampaignUseCase + service (admin-only, atomic GM) | 🔲 |
-| F1.8.4 | Backend: GetCampaignUseCase + service (member-or-admin) | 🔲 |
-| F1.8.5 | Backend: ListCampaignsUseCase + service (caller's campaigns; admin all) | 🔲 |
-| F1.8.6 | Backend: campaign persistence adapter (JPA + Testcontainers IT) | 🔲 |
-| F1.8.7 | Backend: campaign membership persistence adapter + CampaignMembershipPort | 🔲 |
-| F1.8.8 | Backend: CampaignController + DTOs + 404 mapping | 🔲 |
+| F1.8 | Campaign creation + membership API | ✅ |
+| F1.8.1 | Backend: Campaign + CampaignMember domain + CampaignNotFoundException | ✅ |
+| F1.8.2 | Backend: campaign driven ports + command/read-model records | ✅ |
+| F1.8.3 | Backend: CreateCampaignUseCase + service (admin-only, atomic GM) | ✅ |
+| F1.8.4 | Backend: GetCampaignUseCase + service (member-or-admin) | ✅ |
+| F1.8.5 | Backend: ListCampaignsUseCase + service (caller's campaigns; admin all) | ✅ |
+| F1.8.6 | Backend: campaign persistence adapter (JPA + Testcontainers IT) | ✅ |
+| F1.8.7 | Backend: campaign membership persistence adapter + CampaignMembershipPort | ✅ |
+| F1.8.8 | Backend: CampaignController + DTOs + 404 mapping | ✅ |
 | F1.9 | Campaign-scoped invitation + role enforcement | 🔲 |
 | F1.9.1 | Backend: CampaignMember.withRole + membership exceptions (CANNOT_REMOVE_GM, ALREADY_CAMPAIGN_MEMBER) | 🔲 |
 | F1.9.2 | Backend: extend CampaignMembershipRepository + adapter (find/delete/existsByRole) | 🔲 |
