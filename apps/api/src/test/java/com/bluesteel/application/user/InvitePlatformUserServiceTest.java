@@ -54,13 +54,17 @@ class InvitePlatformUserServiceTest {
   @DisplayName("should create a new user account and send email when email is not registered")
   void invite_newEmail_createsUserAndSendsEmail() {
     when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
-    when(passwordEncoder.encode(any())).thenReturn("$2a$10$hash");
+    when(passwordEncoder.encode(any(String.class))).thenReturn("$2a$10$hash");
 
     InvitePlatformUserCommand cmd =
         new InvitePlatformUserCommand(UUID.randomUUID(), true, "new@example.com");
     InvitationResult result = service.invite(cmd);
 
     assertThat(result).isEqualTo(InvitationResult.CREATED);
+
+    ArgumentCaptor<String> encodeCaptor = ArgumentCaptor.forClass(String.class);
+    verify(passwordEncoder).encode(encodeCaptor.capture());
+    assertThat(encodeCaptor.getValue()).isNotBlank().hasSize(16);
 
     ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
     verify(userRepository).save(userCaptor.capture());
@@ -72,6 +76,7 @@ class InvitePlatformUserServiceTest {
     ArgumentCaptor<EmailMessage> emailCaptor = ArgumentCaptor.forClass(EmailMessage.class);
     verify(emailPort).send(emailCaptor.capture());
     assertThat(emailCaptor.getValue().to()).isEqualTo("new@example.com");
+    assertThat(emailCaptor.getValue().subject()).isEqualTo("Your Blue Steel invitation");
   }
 
   @Test
@@ -87,7 +92,7 @@ class InvitePlatformUserServiceTest {
             false,
             Instant.now());
     when(userRepository.findByEmail("existing@example.com")).thenReturn(Optional.of(existing));
-    when(passwordEncoder.encode(any())).thenReturn("$2a$10$newhash");
+    when(passwordEncoder.encode(any(String.class))).thenReturn("$2a$10$newhash");
 
     InvitePlatformUserCommand cmd =
         new InvitePlatformUserCommand(UUID.randomUUID(), true, "existing@example.com");
@@ -95,12 +100,19 @@ class InvitePlatformUserServiceTest {
 
     assertThat(result).isEqualTo(InvitationResult.REFRESHED);
 
+    ArgumentCaptor<String> encodeCaptor = ArgumentCaptor.forClass(String.class);
+    verify(passwordEncoder).encode(encodeCaptor.capture());
+    assertThat(encodeCaptor.getValue()).isNotBlank().hasSize(16);
+
     ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
     verify(userRepository).save(userCaptor.capture());
     User saved = userCaptor.getValue();
     assertThat(saved.passwordHash()).isEqualTo("$2a$10$newhash");
     assertThat(saved.forcePasswordChange()).isTrue();
 
-    verify(emailPort).send(any(EmailMessage.class));
+    ArgumentCaptor<EmailMessage> emailCaptor = ArgumentCaptor.forClass(EmailMessage.class);
+    verify(emailPort).send(emailCaptor.capture());
+    assertThat(emailCaptor.getValue().to()).isEqualTo("existing@example.com");
+    assertThat(emailCaptor.getValue().subject()).isEqualTo("Your Blue Steel invitation");
   }
 }

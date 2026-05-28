@@ -60,10 +60,11 @@ class LogoutServiceTest {
   @Test
   @DisplayName("should do nothing when refresh token is not found")
   void logout_unknownToken_noOp() {
-    when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.empty());
+    when(refreshTokenRepository.findByTokenHash(RefreshToken.sha256("unknown-token")))
+        .thenReturn(Optional.empty());
 
     service.logout("unknown-token");
 
-    verify(refreshTokenRepository, never()).revokeFamily(any());
+    verify(refreshTokenRepository, never()).revokeFamily(any(UUID.class));
   }
 }

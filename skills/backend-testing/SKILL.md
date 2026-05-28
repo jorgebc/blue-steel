@@ -455,6 +455,26 @@ even those not called by the path under test. Use `verify(port, never())` to ass
 must not be called on a given path. If mocking more than 4–5 ports for a single use-case, treat
 it as an SRP signal.
 
+### Matcher Hygiene
+
+Never use wildcard matchers. Use actual expected values or `ArgumentCaptor`.
+
+| ❌ Never write | ✅ Write instead |
+|----------------|-----------------|
+| `when(port.call(any())).thenReturn(x)` | `when(port.call(knownValue)).thenReturn(x)` |
+| `when(port.call(anyBoolean())).thenReturn(x)` | `when(port.call(true)).thenReturn(x)` |
+| `when(port.call(eq(v))).thenReturn(x)` | `when(port.call(v)).thenReturn(x)` |
+| `verify(repo).save(any())` when SUT builds the object | `ArgumentCaptor<T> cap = ArgumentCaptor.forClass(T.class); verify(repo).save(cap.capture()); assertThat(cap.getValue().field()).isEqualTo(...)` |
+| `verify(repo, never()).save(any())` | `verify(repo, never()).save(any(MyType.class))` ← only acceptable use of `any()` |
+
+**Why:** Wildcard matchers silently survive method-signature refactors. A concrete value or `ArgumentCaptor` assertion will fail immediately if the wrong type or value is passed.
+
+**When to use `ArgumentCaptor`:** The argument is constructed by the SUT (e.g. a new domain aggregate, a computed hash, a generated password). Capture it and assert its meaningful fields rather than accepting any value.
+
+**Only acceptable `any()` uses:**
+1. `never()` verifications — there is no "expected value" to assert.
+2. `when()` stubs for genuinely unknowable arguments (e.g. randomly-generated temp passwords). In this case use the typed form `any(String.class)`, not raw `any()`.
+
 **Constructor injection in Tier 2 tests.** Construct the service explicitly in `@BeforeEach`
 rather than using `@InjectMocks`. This produces a compile error when dependencies change,
 makes test setup intent explicit, and aligns with constructor-injection architecture.

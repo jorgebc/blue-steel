@@ -2,8 +2,6 @@ package com.bluesteel.application.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -69,7 +67,7 @@ class ChangePasswordServiceTest {
     User user =
         User.create(userId, "user@example.com", "$2a$10$stored", false, true, Instant.now());
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(passwordEncoder.matches(eq("correctpass"), any())).thenReturn(true);
+    when(passwordEncoder.matches("correctpass", "$2a$10$stored")).thenReturn(true);
     when(passwordEncoder.encode("newpass")).thenReturn("$2a$10$newhash");
 
     service.change(new ChangePasswordCommand(userId, "correctpass", "newpass"));

@@ -165,6 +165,8 @@ Never put business logic in controllers. Never put format validation in services
 
 **Testing (TEST-01):** Every domain class → unit tests. Every use-case service → unit tests with mocked ports. Persistence adapters → Testcontainers IT. Domain core → PITest on every build.
 
+**Testing — Mockito Matchers (TEST-02):** Never use `any()`, `anyString()`, `anyBoolean()`, or other wildcard matchers — not even `eq()` wrappers. Use the actual expected value directly in the stub or verify call. When the argument is constructed internally by the SUT (not passed in from outside), use `ArgumentCaptor` and assert on the captured value. The only exception is `never()` verifications and genuinely unknowable arguments (e.g. randomly-generated values): use a typed class matcher there (`any(MyClass.class)`).
+
 **SonarQube (local-only):** AI-pipeline BE-engineer gate — `mvn sonar:sonar` (command in §3, setup in repo-root `CLAUDE.md` §6). Filters issues to branch-modified files; ≤2 fix attempts; not in CI.
 
 **LLM profiles (D-049, D-088):** three provider selections layered on `local` — mock (`@Profile("!llm-real & !llm-ollama")`, default dev), `llm-real` (Anthropic + OpenAI), `llm-ollama` (Ollama, offline). Adapters are provider-neutral (`SpringAi*`, `@Profile("llm-real | llm-ollama")`); `AiConfig` picks the active `ChatModel`/`EmbeddingModel` bean per profile. Ollama models + dimension are env-overridable (`OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`, `EMBEDDING_DIMENSION`). Changing the Ollama embedding model to a different dimension → update `EMBEDDING_DIMENSION` and recreate the local DB (`docker compose down -v`).

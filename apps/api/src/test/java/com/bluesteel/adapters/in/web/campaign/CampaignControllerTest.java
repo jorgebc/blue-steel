@@ -1,7 +1,5 @@
 package com.bluesteel.adapters.in.web.campaign;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -11,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.campaign.CampaignView;
+import com.bluesteel.application.model.campaign.CreateCampaignCommand;
 import com.bluesteel.application.port.in.campaign.CreateCampaignUseCase;
 import com.bluesteel.application.port.in.campaign.GetCampaignUseCase;
 import com.bluesteel.application.port.in.campaign.ListCampaignsUseCase;
@@ -81,7 +80,9 @@ class CampaignControllerTest {
   void create_adminUser_returns201() throws Exception {
     CampaignView view =
         new CampaignView(CAMPAIGN_ID, "Dragon Keep", CALLER_ID, NOW, CampaignRole.GM);
-    when(createCampaignUseCase.create(any())).thenReturn(view);
+    when(createCampaignUseCase.create(
+            new CreateCampaignCommand(CALLER_ID, true, "Dragon Keep", GM_USER_ID)))
+        .thenReturn(view);
 
     mockMvc
         .perform(
@@ -147,7 +148,7 @@ class CampaignControllerTest {
   void list_authenticatedUser_returns200() throws Exception {
     CampaignView view =
         new CampaignView(CAMPAIGN_ID, "Dragon Keep", CALLER_ID, NOW, CampaignRole.PLAYER);
-    when(listCampaignsUseCase.list(any(), anyBoolean())).thenReturn(List.of(view));
+    when(listCampaignsUseCase.list(CALLER_ID, false)).thenReturn(List.of(view));
 
     mockMvc
         .perform(get("/api/v1/campaigns"))
@@ -162,7 +163,7 @@ class CampaignControllerTest {
   void get_member_returns200() throws Exception {
     CampaignView view =
         new CampaignView(CAMPAIGN_ID, "Dragon Keep", CALLER_ID, NOW, CampaignRole.GM);
-    when(getCampaignUseCase.get(any(), any(), anyBoolean())).thenReturn(view);
+    when(getCampaignUseCase.get(CAMPAIGN_ID, CALLER_ID, false)).thenReturn(view);
 
     mockMvc
         .perform(get("/api/v1/campaigns/{id}", CAMPAIGN_ID))
@@ -175,7 +176,7 @@ class CampaignControllerTest {
   @DisplayName("should return 404 when campaign does not exist")
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
   void get_campaignNotFound_returns404() throws Exception {
-    when(getCampaignUseCase.get(any(), any(), anyBoolean()))
+    when(getCampaignUseCase.get(CAMPAIGN_ID, CALLER_ID, false))
         .thenThrow(new CampaignNotFoundException(CAMPAIGN_ID));
 
     mockMvc
@@ -188,7 +189,7 @@ class CampaignControllerTest {
   @DisplayName("should return 403 when caller is not a member of the campaign")
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
   void get_nonMember_returns403() throws Exception {
-    when(getCampaignUseCase.get(any(), any(), anyBoolean()))
+    when(getCampaignUseCase.get(CAMPAIGN_ID, CALLER_ID, false))
         .thenThrow(new UnauthorizedException("Not a member"));
 
     mockMvc.perform(get("/api/v1/campaigns/{id}", CAMPAIGN_ID)).andExpect(status().isForbidden());

@@ -1,6 +1,5 @@
 package com.bluesteel.adapters.in.web.user;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -10,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bluesteel.BlueSteelApplication;
+import com.bluesteel.application.model.user.ChangePasswordCommand;
 import com.bluesteel.application.model.user.UserProfile;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
@@ -105,7 +105,7 @@ class UserControllerTest {
   void changePassword_wrongCurrentPassword_returns422() throws Exception {
     doThrow(new InvalidPasswordException("Current password is incorrect"))
         .when(changePasswordUseCase)
-        .change(any());
+        .change(new ChangePasswordCommand(UUID.fromString(USER_ID), "wrongpass", "NewPassword1!"));
 
     mockMvc
         .perform(

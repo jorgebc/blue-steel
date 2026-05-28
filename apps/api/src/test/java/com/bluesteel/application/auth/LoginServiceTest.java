@@ -2,8 +2,6 @@ package com.bluesteel.application.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +14,7 @@ import com.bluesteel.application.service.auth.LoginService;
 import com.bluesteel.domain.auth.RefreshToken;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.user.User;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,8 +70,8 @@ class LoginServiceTest {
     UUID userId = UUID.randomUUID();
     User user = User.create(userId, "user@example.com", "$2a$hash", false, true, Instant.now());
     when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-    when(passwordEncoder.matches(eq("password"), any())).thenReturn(true);
-    when(jwtPort.issue(eq(userId), eq(false), any())).thenReturn("access-token-123");
+    when(passwordEncoder.matches("password", "$2a$hash")).thenReturn(true);
+    when(jwtPort.issue(userId, false, Duration.ofMinutes(15))).thenReturn("access-token-123");
 
     LoginResult result = service.login(new LoginCommand("user@example.com", "password"));
 
