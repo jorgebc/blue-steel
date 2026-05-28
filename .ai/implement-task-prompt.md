@@ -3,7 +3,7 @@
 > Reusable prompt. **Edit only the TASK line**, then run. Everything below is standing
 > context that works for any Phase task, backend or frontend.
 
-**TASK:** F1.8.1   <!-- ← edit this: the ROADMAP task id to implement (e.g. F1.7.1, F1.8.3) -->
+**TASK:** F1.7.10
 
 ---
 
