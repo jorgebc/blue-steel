@@ -1,6 +1,5 @@
 package com.bluesteel.adapters.in.web.auth;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -9,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bluesteel.BlueSteelApplication;
+import com.bluesteel.application.model.auth.LoginCommand;
 import com.bluesteel.application.model.auth.LoginResult;
 import com.bluesteel.application.model.auth.RefreshResult;
 import com.bluesteel.application.port.in.auth.LoginUseCase;
@@ -72,7 +72,7 @@ class AuthControllerTest {
   @DisplayName(
       "should return 200 with accessToken and set refresh_token cookie on successful login")
   void login_validCredentials_returns200WithTokens() throws Exception {
-    when(loginUseCase.login(any()))
+    when(loginUseCase.login(new LoginCommand("user@example.com", "Password1!")))
         .thenReturn(
             new LoginResult("access-token-123", "raw-refresh-token", USER_ID, false, false));
 
@@ -92,7 +92,7 @@ class AuthControllerTest {
   @Test
   @DisplayName("should return 401 when credentials are invalid")
   void login_invalidCredentials_returns401() throws Exception {
-    when(loginUseCase.login(any()))
+    when(loginUseCase.login(new LoginCommand("user@example.com", "wrong")))
         .thenThrow(new InvalidCredentialsException("Invalid email or password"));
 
     mockMvc
@@ -110,7 +110,7 @@ class AuthControllerTest {
   @Test
   @DisplayName("should return 401 on refresh token reuse")
   void refresh_tokenReuseDetected_returns401() throws Exception {
-    when(refreshTokenUseCase.refresh(any()))
+    when(refreshTokenUseCase.refresh("stale-token"))
         .thenThrow(new RefreshTokenException("REFRESH_TOKEN_REUSE_DETECTED", "Reuse detected"));
 
     mockMvc
@@ -124,7 +124,7 @@ class AuthControllerTest {
   @Test
   @DisplayName("should return 200 and rotate tokens on valid refresh")
   void refresh_validToken_returns200WithNewTokens() throws Exception {
-    when(refreshTokenUseCase.refresh(any()))
+    when(refreshTokenUseCase.refresh("valid-token"))
         .thenReturn(new RefreshResult("new-access-token", "new-refresh-token", USER_ID, false));
 
     mockMvc
@@ -138,7 +138,7 @@ class AuthControllerTest {
   @Test
   @DisplayName("should return 200 and clear cookie on logout")
   void logout_authenticated_returns200AndClearsCookie() throws Exception {
-    doNothing().when(logoutUseCase).logout(any());
+    doNothing().when(logoutUseCase).logout("some-token");
 
     mockMvc
         .perform(

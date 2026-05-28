@@ -13,6 +13,8 @@ import com.bluesteel.application.port.out.campaign.CampaignMembershipRepository;
 import com.bluesteel.application.port.out.campaign.CampaignRepository;
 import com.bluesteel.application.port.out.user.UserRepository;
 import com.bluesteel.application.service.campaign.CreateCampaignService;
+import com.bluesteel.domain.campaign.Campaign;
+import com.bluesteel.domain.campaign.CampaignMember;
 import com.bluesteel.domain.campaign.CampaignRole;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.exception.UserNotFoundException;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -55,8 +58,8 @@ class CreateCampaignServiceTest {
 
     assertThatThrownBy(() -> sut.create(cmd)).isInstanceOf(UnauthorizedException.class);
 
-    verify(campaignRepository, never()).save(any());
-    verify(membershipRepository, never()).save(any());
+    verify(campaignRepository, never()).save(any(Campaign.class));
+    verify(membershipRepository, never()).save(any(CampaignMember.class));
   }
 
   @Test
@@ -68,8 +71,8 @@ class CreateCampaignServiceTest {
 
     assertThatThrownBy(() -> sut.create(cmd)).isInstanceOf(UserNotFoundException.class);
 
-    verify(campaignRepository, never()).save(any());
-    verify(membershipRepository, never()).save(any());
+    verify(campaignRepository, never()).save(any(Campaign.class));
+    verify(membershipRepository, never()).save(any(CampaignMember.class));
   }
 
   @Test
@@ -87,7 +90,14 @@ class CreateCampaignServiceTest {
     assertThat(view.id()).isNotNull();
     assertThat(view.createdAt()).isNotNull();
 
-    verify(campaignRepository).save(any());
-    verify(membershipRepository).save(any());
+    ArgumentCaptor<Campaign> campaignCaptor = ArgumentCaptor.forClass(Campaign.class);
+    verify(campaignRepository).save(campaignCaptor.capture());
+    assertThat(campaignCaptor.getValue().name()).isEqualTo("Dragon Keep");
+    assertThat(campaignCaptor.getValue().createdBy()).isEqualTo(CALLER_ID);
+
+    ArgumentCaptor<CampaignMember> memberCaptor = ArgumentCaptor.forClass(CampaignMember.class);
+    verify(membershipRepository).save(memberCaptor.capture());
+    assertThat(memberCaptor.getValue().userId()).isEqualTo(GM_USER_ID);
+    assertThat(memberCaptor.getValue().role()).isEqualTo(CampaignRole.GM);
   }
 }

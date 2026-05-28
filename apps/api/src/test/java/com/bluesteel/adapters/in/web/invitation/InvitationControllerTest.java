@@ -1,6 +1,5 @@
 package com.bluesteel.adapters.in.web.invitation;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -9,10 +8,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.user.InvitationResult;
+import com.bluesteel.application.model.user.InvitePlatformUserCommand;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
 import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
 import com.bluesteel.application.port.in.user.InvitePlatformUserUseCase;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,7 +61,10 @@ class InvitationControllerTest {
   @DisplayName("should return 201 when a new user account is created")
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "ADMIN")
   void invite_newEmail_returns201() throws Exception {
-    when(invitePlatformUserUseCase.invite(any())).thenReturn(InvitationResult.CREATED);
+    when(invitePlatformUserUseCase.invite(
+            new InvitePlatformUserCommand(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"), true, "new@example.com")))
+        .thenReturn(InvitationResult.CREATED);
 
     mockMvc
         .perform(
@@ -79,7 +83,12 @@ class InvitationControllerTest {
   @DisplayName("should return 200 when existing account credentials are refreshed")
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "ADMIN")
   void invite_existingEmail_returns200() throws Exception {
-    when(invitePlatformUserUseCase.invite(any())).thenReturn(InvitationResult.REFRESHED);
+    when(invitePlatformUserUseCase.invite(
+            new InvitePlatformUserCommand(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                true,
+                "existing@example.com")))
+        .thenReturn(InvitationResult.REFRESHED);
 
     mockMvc
         .perform(

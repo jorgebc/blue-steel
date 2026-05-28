@@ -2,8 +2,6 @@ package com.bluesteel.application.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +14,7 @@ import com.bluesteel.domain.auth.RefreshToken;
 import com.bluesteel.domain.auth.RefreshTokenStatus;
 import com.bluesteel.domain.exception.RefreshTokenException;
 import com.bluesteel.domain.user.User;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
@@ -45,7 +44,8 @@ class RefreshTokenServiceTest {
   @Test
   @DisplayName("should throw RefreshTokenException when token is not found")
   void refresh_unknownToken_throwsException() {
-    when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.empty());
+    when(refreshTokenRepository.findByTokenHash(RefreshToken.sha256("unknown-raw-token")))
+        .thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.refresh("unknown-raw-token"))
         .isInstanceOf(RefreshTokenException.class)
@@ -67,7 +67,8 @@ class RefreshTokenServiceTest {
             RefreshTokenStatus.CONSUMED,
             Instant.now().plus(30, ChronoUnit.DAYS),
             Instant.now());
-    when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(consumed));
+    when(refreshTokenRepository.findByTokenHash(RefreshToken.sha256("some-raw-token")))
+        .thenReturn(Optional.of(consumed));
 
     assertThatThrownBy(() -> service.refresh("some-raw-token"))
         .isInstanceOf(RefreshTokenException.class)
@@ -89,7 +90,8 @@ class RefreshTokenServiceTest {
             RefreshTokenStatus.ACTIVE,
             Instant.now().minus(1, ChronoUnit.SECONDS),
             Instant.now().minus(31, ChronoUnit.DAYS));
-    when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(expired));
+    when(refreshTokenRepository.findByTokenHash(RefreshToken.sha256("raw-token")))
+        .thenReturn(Optional.of(expired));
 
     assertThatThrownBy(() -> service.refresh("raw-token"))
         .isInstanceOf(RefreshTokenException.class)
@@ -117,7 +119,7 @@ class RefreshTokenServiceTest {
     User user = User.create(userId, "user@example.com", "$2a$hash", false, false, Instant.now());
     when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(active));
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(jwtPort.issue(eq(userId), eq(false), any())).thenReturn("new-access-token");
+    when(jwtPort.issue(userId, false, Duration.ofMinutes(15))).thenReturn("new-access-token");
 
     RefreshResult result = service.refresh(rawToken);
 

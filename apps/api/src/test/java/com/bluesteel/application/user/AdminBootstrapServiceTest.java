@@ -41,7 +41,7 @@ class AdminBootstrapServiceTest {
   @DisplayName("should seed admin user when none exists")
   void bootstrap_noAdmin_seedsAdminUser() {
     when(userRepository.existsByIsAdminTrue()).thenReturn(false);
-    when(passwordEncoder.encode(any())).thenReturn("$2a$10$hashedpassword");
+    when(passwordEncoder.encode("SecurePass!123456")).thenReturn("$2a$10$hashedpassword");
 
     service.bootstrap();
 
@@ -61,7 +61,7 @@ class AdminBootstrapServiceTest {
 
     service.bootstrap();
 
-    verify(userRepository, never()).save(any());
+    verify(userRepository, never()).save(any(User.class));
   }
 
   @Test
