@@ -4,16 +4,9 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { axe } from 'vitest-axe'
 import { Sidebar } from './Sidebar'
-import { useAuthStore } from '@/store/authStore'
 import { useCampaignStore } from '@/store/campaignStore'
 import { useUiStore } from '@/store/uiStore'
 import type { CampaignRole } from '@/types/campaign'
-
-const mockNavigate = vi.fn()
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
-  return { ...actual, useNavigate: () => mockNavigate }
-})
 
 vi.mock('@/api/campaigns', () => ({
   useCampaign: () => ({ data: { id: 'c1', name: 'Curse of Strahd', role: 'gm' } }),
@@ -22,9 +15,6 @@ vi.mock('@/api/campaigns', () => ({
 function setup(role: CampaignRole | null = 'gm', expanded = true) {
   useUiStore.setState({ sidebarExpanded: expanded })
   useCampaignStore.setState({ activeCampaignId: 'c1', activeRole: role })
-  useAuthStore.setState({
-    currentUser: { id: 'u1', email: 'gm@example.com', isAdmin: false, forcePasswordChange: false },
-  })
   return render(
     <MemoryRouter>
       <Sidebar />
@@ -79,13 +69,6 @@ describe('Sidebar', () => {
     setup('gm', false)
     expect(screen.queryByText('Curse of Strahd')).not.toBeInTheDocument()
     expect(screen.queryByText('Input')).not.toBeInTheDocument()
-  })
-
-  it('logs out and navigates to /login', async () => {
-    setup('gm')
-    await userEvent.click(screen.getByRole('button', { name: /log out/i }))
-    expect(useAuthStore.getState().currentUser).toBeNull()
-    expect(mockNavigate).toHaveBeenCalledWith('/login')
   })
 
   it('has no accessibility violations', async () => {

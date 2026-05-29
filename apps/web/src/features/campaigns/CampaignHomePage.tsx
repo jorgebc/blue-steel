@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom'
+import { Sparkles } from 'lucide-react'
 import { useCampaign } from '@/api/campaigns'
 
 /**
@@ -11,11 +12,18 @@ export function CampaignHomePage() {
   const { data: campaign } = useCampaign(campaignId)
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <h1 className="mb-2 text-2xl font-semibold">{campaign?.name ?? 'Campaign'}</h1>
-      <p className="text-sm text-slate-500">
-        Welcome back. Use the sidebar to add a session or explore your world.
-      </p>
+    <main className="mx-auto max-w-3xl p-8">
+      <div className="flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+          <Sparkles className="h-6 w-6" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">{campaign?.name ?? 'Campaign'}</h1>
+          <p className="mt-2 max-w-prose text-sm text-slate-500">
+            Welcome back. Use the sidebar to add a session or explore your world as it grows.
+          </p>
+        </div>
+      </div>
     </main>
   )
 }

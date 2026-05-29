@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { useLogin } from '@/api/auth'
 import { ApiClientError } from '@/api/client'
+import { Brand } from '@/components/domain/Brand'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Button } from '@/components/ui/button'
 import {
@@ -67,6 +68,9 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
       <div className="w-full max-w-sm">
+        <div className="mb-8 flex justify-center">
+          <Brand size="lg" />
+        </div>
         <div className="rounded-2xl bg-white p-8 shadow-sm">
           <h1 className="mb-6 text-2xl font-semibold text-slate-900">Sign in</h1>
           {banner && (

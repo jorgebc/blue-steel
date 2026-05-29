@@ -76,14 +76,28 @@ describe('CampaignListPage', () => {
     expect(screen.getByText('gm')).toBeInTheDocument()
   })
 
-  it('shows the empty state when there are no campaigns', () => {
+  it('shows the empty state with guidance for non-admins when there are no campaigns', () => {
+    setAdmin(false)
     mockResult({ data: [], isLoading: false, isError: false })
 
     renderPage()
 
-    expect(
-      screen.getByText(/no campaigns yet — ask your gm or an admin to add you/i)
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /no campaigns yet/i })).toBeInTheDocument()
+    expect(screen.getByText(/ask your gm or an admin to add you/i)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /new campaign/i })).not.toBeInTheDocument()
+  })
+
+  it('offers a New campaign call to action in the empty state for admins', () => {
+    setAdmin(true)
+    mockResult({ data: [], isLoading: false, isError: false })
+
+    renderPage()
+
+    expect(screen.getByRole('heading', { name: /no campaigns yet/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /new campaign/i })).toHaveAttribute(
+      'href',
+      '/campaigns/new'
+    )
   })
 
   it('shows an error banner when the list fails to load', () => {

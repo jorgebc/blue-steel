@@ -2,17 +2,18 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 
 /**
- * Persistent layout for every campaign-scoped page: the {@link Sidebar} on the
- * left and the routed campaign page in the main region. Mounted as a layout
- * route inside the campaign-context guard so the shell wraps all children.
+ * Campaign-scoped layout nested under the authenticated shell: the
+ * {@link Sidebar} on the left and the routed campaign page beside it. The page
+ * background and top bar come from {@link AuthenticatedLayout}; each routed page
+ * owns its own {@code <main>} landmark.
  */
 export function AppShell() {
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex flex-1">
       <Sidebar />
-      <main className="flex-1">
+      <div className="flex-1">
         <Outlet />
-      </main>
+      </div>
     </div>
   )
 }

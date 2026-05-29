@@ -1,17 +1,14 @@
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import {
   ChevronLeft,
   Compass,
   Library,
-  LogOut,
   Search,
   Settings,
   Upload,
-  User,
   type LucideIcon,
 } from 'lucide-react'
 import { useCampaign } from '@/api/campaigns'
-import { useAuthStore } from '@/store/authStore'
 import { useCampaignStore } from '@/store/campaignStore'
 import { useUiStore } from '@/store/uiStore'
 
@@ -52,25 +49,18 @@ function ComingSoonItem({
  * current user with logout. Collapsed renders icons only.
  */
 export function Sidebar() {
-  const navigate = useNavigate()
   const expanded = useUiStore((s) => s.sidebarExpanded)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
   const activeCampaignId = useCampaignStore((s) => s.activeCampaignId)
   const activeRole = useCampaignStore((s) => s.activeRole)
-  const currentUser = useAuthStore((s) => s.currentUser)
   const { data: campaign } = useCampaign(activeCampaignId ?? undefined)
-
-  function handleLogout() {
-    useAuthStore.getState().logout()
-    navigate('/login')
-  }
 
   return (
     <nav
       aria-label="Campaign navigation"
       className={`${
         expanded ? 'w-64' : 'w-16'
-      } flex h-screen flex-col border-r border-slate-200 bg-white transition-all duration-200`}
+      } sticky top-14 flex h-[calc(100vh-3.5rem)] flex-col border-r border-slate-200 bg-white transition-all duration-200`}
     >
       {/* Campaign switcher */}
       <div className="border-b border-slate-200 p-4">
@@ -108,25 +98,13 @@ export function Sidebar() {
         <ComingSoonItem label="Settings" icon={Settings} expanded={expanded} />
       </div>
 
-      {/* User + logout + collapse toggle */}
+      {/* Collapse toggle */}
       <div className="border-t border-slate-200 p-2">
-        <div className={`flex items-center gap-3 px-2 py-2 text-sm text-slate-600`}>
-          <User className="h-5 w-5 shrink-0" aria-hidden />
-          {expanded && <span className="truncate">{currentUser?.email}</span>}
-        </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className={`${itemBaseClass} w-full rounded-lg ${inactiveLinkClass}`}
-        >
-          <LogOut className="h-5 w-5 shrink-0" aria-hidden />
-          {expanded && <span>Log out</span>}
-        </button>
         <button
           type="button"
           onClick={toggleSidebar}
           aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
-          className="mt-1 flex w-full items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+          className="flex w-full items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100"
         >
           <ChevronLeft
             className={`h-4 w-4 transition-transform duration-200 ${expanded ? '' : 'rotate-180'}`}
