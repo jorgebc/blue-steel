@@ -4,7 +4,7 @@ import type { CampaignRole } from '@/types/campaign'
 interface CampaignState {
   activeCampaignId: string | null
   activeRole: CampaignRole | null
-  setCampaign: (campaignId: string, role: CampaignRole) => void
+  setCampaign: (campaignId: string, role: CampaignRole | null) => void
   clearCampaign: () => void
 }
 

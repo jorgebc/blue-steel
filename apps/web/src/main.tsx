@@ -7,6 +7,9 @@ import { initAuth } from '@/api/auth'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage'
 import { StatusPage } from '@/features/status/StatusPage'
+import { CampaignListPage } from '@/features/campaigns/CampaignListPage'
+import { CampaignHomePage } from '@/features/campaigns/CampaignHomePage'
+import { CampaignContextGuard } from '@/components/domain/CampaignContextGuard'
 import { RequireAuth } from '@/components/domain/RequireAuth'
 import { useAuthStore } from '@/store/authStore'
 
@@ -24,30 +27,38 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AppInitializer>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/status" element={<StatusPage />} />
-          <Route
-            path="/change-password"
-            element={
-              <RequireAuth>
-                <ChangePasswordPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/"
-            element={
-              <RequireAuth>
-                <div className="flex min-h-screen items-center justify-center bg-slate-50">
-                  <p className="text-slate-500">Campaign list coming soon.</p>
-                </div>
-              </RequireAuth>
-            }
-          />
-        </Routes>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/status" element={<StatusPage />} />
+            <Route
+              path="/change-password"
+              element={
+                <RequireAuth>
+                  <ChangePasswordPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/"
+              element={
+                <RequireAuth>
+                  <CampaignListPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/campaigns/:campaignId"
+              element={
+                <RequireAuth>
+                  <CampaignContextGuard />
+                </RequireAuth>
+              }
+            >
+              <Route index element={<CampaignHomePage />} />
+            </Route>
+          </Routes>
         </AppInitializer>
       </BrowserRouter>
     </QueryClientProvider>
-  </React.StrictMode>,
+  </React.StrictMode>
 )

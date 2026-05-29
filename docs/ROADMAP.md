@@ -69,13 +69,13 @@
 | F1.9.7 | Backend: SearchUsersUseCase + service (admin or GM-anywhere; search by email) | ✅ |
 | F1.9.8 | Backend: CampaignMembershipController + DTOs + 409/422 handler mappings | ✅ |
 | F1.9.9 | Backend: UserSearchController + DTO (GET /api/v1/users?email=) | ✅ |
-| F1.10 | Frontend: campaign list, selection + home | 🔲 |
-| F1.10.1 | Frontend: campaign DTO TypeScript types (+ CampaignRole) | 🔲 |
-| F1.10.2 | Frontend: campaigns API client + list/detail hooks | 🔲 |
-| F1.10.3 | Frontend: CampaignContextGuard (loads campaign → sets activeRole) | 🔲 |
-| F1.10.4 | Frontend: CampaignListPage (authenticated `/`) | 🔲 |
-| F1.10.5 | Frontend: CampaignHomePage (campaign hub + commit target) | 🔲 |
-| F1.10.6 | Frontend: campaign route wiring (`/`, `/campaigns/:campaignId`) | 🔲 |
+| F1.10 | Frontend: campaign list, selection + home | ✅ |
+| F1.10.1 | Frontend: campaign DTO TypeScript types (+ CampaignRole) | ✅ |
+| F1.10.2 | Frontend: campaigns API client + list/detail hooks | ✅ |
+| F1.10.3 | Frontend: CampaignContextGuard (loads campaign → sets activeRole) | ✅ |
+| F1.10.4 | Frontend: CampaignListPage (authenticated `/`) | ✅ |
+| F1.10.5 | Frontend: CampaignHomePage (campaign hub + commit target) | ✅ |
+| F1.10.6 | Frontend: campaign route wiring (`/`, `/campaigns/:campaignId`) | ✅ |
 | F1.11 | Frontend: campaign app-shell + sidebar | 🔲 |
 | F1.11.1 | Frontend: uiStore (sidebar expand/collapse, persisted) | 🔲 |
 | F1.11.2 | Frontend: Sidebar component (mode nav, role-gated, collapse) | 🔲 |
