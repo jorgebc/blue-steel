@@ -9,7 +9,9 @@ import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage'
 import { StatusPage } from '@/features/status/StatusPage'
 import { CampaignListPage } from '@/features/campaigns/CampaignListPage'
 import { CampaignHomePage } from '@/features/campaigns/CampaignHomePage'
+import { CreateCampaignPage } from '@/features/campaigns/CreateCampaignPage'
 import { CampaignContextGuard } from '@/components/domain/CampaignContextGuard'
+import { AppShell } from '@/components/domain/AppShell'
 import { RequireAuth } from '@/components/domain/RequireAuth'
 import { useAuthStore } from '@/store/authStore'
 
@@ -47,6 +49,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               }
             />
             <Route
+              path="/campaigns/new"
+              element={
+                <RequireAuth>
+                  <CreateCampaignPage />
+                </RequireAuth>
+              }
+            />
+            <Route
               path="/campaigns/:campaignId"
               element={
                 <RequireAuth>
@@ -54,7 +64,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 </RequireAuth>
               }
             >
-              <Route index element={<CampaignHomePage />} />
+              <Route element={<AppShell />}>
+                <Route index element={<CampaignHomePage />} />
+              </Route>
             </Route>
           </Routes>
         </AppInitializer>

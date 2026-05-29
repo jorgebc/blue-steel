@@ -76,12 +76,12 @@
 | F1.10.4 | Frontend: CampaignListPage (authenticated `/`) | ✅ |
 | F1.10.5 | Frontend: CampaignHomePage (campaign hub + commit target) | ✅ |
 | F1.10.6 | Frontend: campaign route wiring (`/`, `/campaigns/:campaignId`) | ✅ |
-| F1.11 | Frontend: campaign app-shell + sidebar | 🔲 |
-| F1.11.1 | Frontend: uiStore (sidebar expand/collapse, persisted) | 🔲 |
-| F1.11.2 | Frontend: Sidebar component (mode nav, role-gated, collapse) | 🔲 |
-| F1.11.3 | Frontend: AppShell layout + campaign route restructure | 🔲 |
-| F1.11.4 | Frontend: admin-create data layer (user search + create campaign) | 🔲 |
-| F1.11.5 | Frontend: CreateCampaignPage + `/campaigns/new` route (admin) | 🔲 |
+| F1.11 | Frontend: campaign app-shell + sidebar | ✅ |
+| F1.11.1 | Frontend: uiStore (sidebar expand/collapse, persisted) | ✅ |
+| F1.11.2 | Frontend: Sidebar component (mode nav, role-gated, collapse) | ✅ |
+| F1.11.3 | Frontend: AppShell layout + campaign route restructure | ✅ |
+| F1.11.4 | Frontend: admin-create data layer (user search + create campaign) | ✅ |
+| F1.11.5 | Frontend: CreateCampaignPage + `/campaigns/new` route (admin) | ✅ |
 
 ---
 

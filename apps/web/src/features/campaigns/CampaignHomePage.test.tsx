@@ -38,22 +38,16 @@ describe('CampaignHomePage', () => {
     } as ReturnType<typeof useCampaign>)
   })
 
-  it('shows the campaign name and the entry cards', () => {
+  it('shows the campaign name as the page heading', () => {
     renderPage()
 
     expect(screen.getByRole('heading', { name: /curse of strahd/i })).toBeInTheDocument()
-    expect(screen.getByText('New session')).toBeInTheDocument()
-    expect(screen.getByText('Query')).toBeInTheDocument()
-    expect(screen.getByText('Exploration')).toBeInTheDocument()
   })
 
-  it('links the New session card to the campaign sessions/new route', () => {
+  it('shows a welcome message pointing to the sidebar', () => {
     renderPage()
 
-    expect(screen.getByRole('link', { name: /new session/i })).toHaveAttribute(
-      'href',
-      '/campaigns/c1/sessions/new'
-    )
+    expect(screen.getByText(/use the sidebar/i)).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

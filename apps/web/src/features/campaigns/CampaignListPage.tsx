@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCampaigns } from '@/api/campaigns'
+import { useAuthStore } from '@/store/authStore'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import type { CampaignRole } from '@/types/campaign'
@@ -29,11 +30,22 @@ function RoleBadge({ role }: { role: CampaignRole | null }) {
  */
 export function CampaignListPage() {
   const { data: campaigns, isLoading, isError } = useCampaigns()
+  const isAdmin = useAuthStore((s) => s.currentUser?.isAdmin)
   const [dismissed, setDismissed] = useState(false)
 
   return (
     <main className="mx-auto max-w-3xl p-6">
-      <h1 className="mb-6 text-2xl font-semibold">Your campaigns</h1>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Your campaigns</h1>
+        {isAdmin && (
+          <Link
+            to="/campaigns/new"
+            className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+          >
+            New campaign
+          </Link>
+        )}
+      </div>
 
       {isLoading ? (
         <div className="flex flex-col gap-4">
