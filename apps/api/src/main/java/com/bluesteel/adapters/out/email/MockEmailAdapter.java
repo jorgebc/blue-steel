@@ -7,9 +7,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-/** Logs emails to the console instead of sending them (D-075). Active on {@code local} profile. */
+/**
+ * Logs emails to the console instead of sending them (D-075). Active when {@code email-real} is not
+ * set.
+ */
 @Component
-@Profile("local")
+@Profile("!email-real")
 public class MockEmailAdapter implements EmailPort {
 
   private static final Logger log = LoggerFactory.getLogger(MockEmailAdapter.class);
