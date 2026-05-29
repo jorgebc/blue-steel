@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from './client'
 import type { CampaignResponse } from '@/types/campaign'
 
@@ -37,5 +37,23 @@ export function useCampaign(id: string | undefined) {
     queryKey: campaignKeys.detail(id ?? ''),
     queryFn: () => getCampaign(id as string),
     enabled: !!id,
+  })
+}
+
+/** Creates a campaign with its GM (admin-only on the backend). */
+export async function createCampaign(body: {
+  name: string
+  gmUserId: string
+}): Promise<CampaignResponse> {
+  const res = await apiClient.post<CampaignResponse>('/api/v1/campaigns', body)
+  return res.data
+}
+
+/** Creates a campaign and refreshes the campaign list cache on success. */
+export function useCreateCampaign() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: createCampaign,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: campaignKeys.all }),
   })
 }

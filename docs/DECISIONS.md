@@ -98,6 +98,9 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-085 | Progressive density — low density for Input/Settings/Onboarding; high density for Exploration/Timeline | ✅ Active | Definition |
 | D-086 | Mandatory skeleton loading — spinners banned in primary content areas; skeletons derived from DTOs | ✅ Active | Definition |
 | D-087 | UX_CONSTITUTION.md is the frontend design authority — read before any UI task | ✅ Active | Definition |
+| D-088 | Local LLM option via Ollama (`llm-ollama` profile) + configurable embedding dimension | ✅ Active | Definition |
+| D-089 | World-state commit write uses native SQL, not JPA | ✅ Active | Phase 2 |
+| D-090 | Versioning: Semantic Versioning via annotated Git tags on `main` (repo-wide, pre-1.0) | ✅ Active | Definition |
 
 ---
 
@@ -1824,6 +1827,32 @@ This refines DB-01 ("JPA for standard CRUD; native SQL for all pgvector queries"
 - JPA entities + repositories (the literal DB-01 / original F2.8-prose reading) — rejected; ~8 near-duplicate entities for four identical table-pairs, JPA lifecycle machinery wasted on append-only inserts, and a mixed JPA-write/native-read model on one table family. The only wins (convention-literalism, persistence-layer uniformity) do not outweigh the file-count and consistency costs.
 
 Cross-refs: D-001/D-003 (append-only versioning), D-062 (native pgvector), D-069 (sequence_number at commit), DB-01 (apps/api/CLAUDE.md §7).
+
+---
+
+### D-090 — Versioning: Semantic Versioning via annotated Git tags on `main` (repo-wide, pre-1.0)
+
+**Date:** 2026-05-29
+**Status:** Active
+
+**Decision:**
+Releases follow [Semantic Versioning](https://semver.org) (`MAJOR.MINOR.PATCH`) and are marked by **annotated** Git tags named `vMAJOR.MINOR.PATCH` (e.g. `v0.1.0`).
+
+- **Repo-wide, single version line.** The monorepo (D-022) is versioned as one product: a tag marks a milestone for the whole repository, not per-package. `apps/web/package.json` (+ its lockfile) carries the human-facing version number; the backend `pom.xml` stays at `-SNAPSHOT` during development and is not independently tagged. There is intentionally **no** `web-v*` / `api-v*` split.
+- **Tags live on `main` only.** A version is tagged on the `main` commit *after* the work has merged (tag the merge/merge-base commit on `main`). Feature branches may carry the `package.json` version bump, but are **never** tagged — a tag must be permanently reachable from `main`.
+- **Annotated, not lightweight.** Tags are created with `git tag -a` and a message summarizing the milestone (what shipped), so the tag carries author, date, and notes.
+- **Pre-1.0 semantics.** While `0.x`, the product is pre-release: the public surface is unstable and a `MINOR` bump may include breaking changes. `0.x` minors track ROADMAP phase milestones (e.g. `0.1.0` = the Phase-1 frontend foundation: auth, campaigns, app-shell, branding). `1.0.0` is reserved for when the v1 feature set — Input (ingestion), Query, and Exploration modes — is functionally complete.
+- **Commits** continue to follow Conventional Commits (D-065); a version bump is a `chore` commit. SemVer governs the release tag, Conventional Commits govern individual commits — they are complementary, not the same scheme.
+
+**Reason:**
+There was no prior versioning or tagging convention (the repo had zero tags). SemVer + annotated tags is the conventional, low-ceremony choice and gives immutable, reviewable milestone markers. A single repo-wide version keeps things simple given that web and api ship together as one product and there is no independent release cadence (D-044: only local + prod). Restricting tags to `main` avoids tags that point at commits which may be rebased, squashed, or abandoned before merge. Pre-1.0 honestly communicates that the core interaction modes are still being built.
+
+**Alternatives considered:**
+- **Per-package tags (`web-vX`, `api-vX`).** Rejected for now — added ceremony with no benefit while the two apps are released together; can be revisited if their release cadences ever diverge.
+- **Lightweight tags.** Rejected — annotated tags carry author/date/message and are Git's recommended form for releases.
+- **Tagging the feature branch at the milestone.** Rejected — a tag must be reachable from `main`; tagging pre-merge points at a commit that the merge (squash/rebase) may discard. The branch carries the version bump; `main` carries the tag.
+
+Cross-refs: D-022 (monorepo structure), D-044 (environments: local + prod only), D-065 (Conventional Commits), D-066 (branch naming); ROADMAP.md (phase milestones).
 
 ---
 

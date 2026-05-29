@@ -76,12 +76,17 @@
 | F1.10.4 | Frontend: CampaignListPage (authenticated `/`) | ✅ |
 | F1.10.5 | Frontend: CampaignHomePage (campaign hub + commit target) | ✅ |
 | F1.10.6 | Frontend: campaign route wiring (`/`, `/campaigns/:campaignId`) | ✅ |
-| F1.11 | Frontend: campaign app-shell + sidebar | 🔲 |
-| F1.11.1 | Frontend: uiStore (sidebar expand/collapse, persisted) | 🔲 |
-| F1.11.2 | Frontend: Sidebar component (mode nav, role-gated, collapse) | 🔲 |
-| F1.11.3 | Frontend: AppShell layout + campaign route restructure | 🔲 |
-| F1.11.4 | Frontend: admin-create data layer (user search + create campaign) | 🔲 |
-| F1.11.5 | Frontend: CreateCampaignPage + `/campaigns/new` route (admin) | 🔲 |
+| F1.11 | Frontend: campaign app-shell + sidebar | ✅ |
+| F1.11.1 | Frontend: uiStore (sidebar expand/collapse, persisted) | ✅ |
+| F1.11.2 | Frontend: Sidebar component (mode nav, role-gated, collapse) | ✅ |
+| F1.11.3 | Frontend: AppShell layout + campaign route restructure | ✅ |
+| F1.11.4 | Frontend: admin-create data layer (user search + create campaign) | ✅ |
+| F1.11.5 | Frontend: CreateCampaignPage + `/campaigns/new` route (admin) | ✅ |
+| F1.11.6 | Frontend: Brand component (reusable wordmark/mark) | ✅ |
+| F1.11.7 | Frontend: AppBar global top bar + relocate identity/logout from Sidebar | ✅ |
+| F1.11.8 | Frontend: AuthenticatedLayout + authenticated route restructure | ✅ |
+| F1.11.9 | Frontend: branded auth surfaces (Login + ChangePassword) | ✅ |
+| F1.11.10 | Frontend: warmer empty + welcome surfaces | ✅ |
 
 ---
 
@@ -872,7 +877,7 @@ npx shadcn@latest add button input label form card
 
 > **Umbrella task — run the F1.11.N sub-tasks below, not this.**
 
-**Goal:** Wrap the campaign-scoped routes in the persistent **app-shell + Sidebar** from UX Constitution §6 (`uiStore`-driven collapse, role-gated mode nav), and add the admin campaign-creation flow. Builds now: Query/Exploration nav render as disabled "coming soon" stubs (like F1.10.5) until their phases ship.
+**Goal:** Wrap the campaign-scoped routes in the persistent **app-shell + Sidebar** from UX Constitution §6 (`uiStore`-driven collapse, role-gated mode nav), and add the admin campaign-creation flow. Builds now: Query/Exploration nav render as disabled "coming soon" stubs (like F1.10.5) until their phases ship. Extended (F1.11.6–F1.11.10) with a **global top bar (AppBar)** wrapping every authenticated page — giving the campaign list/create pages persistent chrome and an always-reachable logout — plus a reusable Blue Steel **brand mark** and branded login/empty/welcome surfaces (UX Constitution §3 "top bar").
 
 > **No SETUP required.** Uses the shadcn primitives F1.7 already installed (`card`, `button`, `form`/`input`/`label`) + `lucide-react` icons (already a dep) + `zustand/middleware` `persist`. No new component or package.
 
@@ -961,6 +966,80 @@ npx shadcn@latest add button input label form card
 **Scope (out):** The data-layer hooks (F1.11.4). The shell/sidebar (F1.11.2/F1.11.3). Editing an existing campaign (not in v1).
 
 **Skills:** `react-hook-form`, `frontend-api-resource`, `auth`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-024, D-051, D-087  **Dependencies:** F1.11.4, F1.7.2, F1.7.6, F1.10.4
+
+---
+
+#### F1.11.6 — Brand component (reusable wordmark/mark)
+
+**Goal:** A single presentational brand lockup — a `lucide-react` mark in accent `blue-500` + the "Blue Steel" wordmark — reused by the global top bar and the auth pages so the product reads as branded, not a bare form. No router/store dependency.
+
+**Scope (in):**
+- `apps/web/src/components/domain/Brand.tsx` (+ `Brand.test.tsx`, incl. axe) — mark + wordmark; optional `size` variant (`sm` for the AppBar, `lg` for auth pages). Pure presentational.
+
+**Scope (out):** The AppBar that consumes it (F1.11.7); auth-page placement (F1.11.9). No SVG/logo asset — Lucide icon + text only.
+
+**Skills:** `frontend-testing`  **Decisions:** D-087  **Dependencies:** F1.7-SETUP
+
+---
+
+#### F1.11.7 — AppBar global top bar + relocate identity/logout from Sidebar
+
+**Goal:** The persistent top bar (UX Constitution §3 "top bar", elevation 4) on every authenticated page: `<Brand>` linking home (`/`) on the left; current-user email + **Log out** on the right. Logout (clear `authStore` → navigate `/login`) moves here from the Sidebar so it is reachable everywhere — closing the gap where the campaign list had no way to sign out.
+
+**Scope (in):**
+- `apps/web/src/components/domain/AppBar.tsx` (+ `AppBar.test.tsx`, incl. axe) — `h-14 bg-white border-b border-slate-200 shadow-sm`; left `<Link to="/"><Brand size="sm"/></Link>`; right `currentUser.email` (from `authStore`) + secondary-style Log out button (`LogOut` icon) calling `authStore.logout()` then `navigate('/login')`. Inline only — no dropdown.
+- `apps/web/src/components/domain/Sidebar.tsx` (**edit**, F1.11.2) — remove the user-identity row + Log out button (now global); drop the now-unused `useNavigate`/`handleLogout`/`User`/`LogOut` imports. Keep campaign switcher, mode nav, collapse toggle.
+- `apps/web/src/components/domain/Sidebar.test.tsx` (**edit**) — move/remove the "logs out and navigates to /login" assertion (now covered by `AppBar.test.tsx`).
+
+**Scope (out):** Mounting the bar in a layout (F1.11.8). A user profile/dropdown menu (not in v1).
+
+**Skills:** `ux-navigation-logic`, `auth`, `frontend-testing`  **Decisions:** D-087  **Dependencies:** F1.11.6, F1.11.2, F1.7.4
+
+---
+
+#### F1.11.8 — AuthenticatedLayout + authenticated route restructure
+
+**Goal:** Mount the AppBar as a shell around **all** authenticated pages (not just campaign-scoped ones) via an `AuthenticatedLayout` layout route, so the campaign list and create pages gain the bar. The campaign Sidebar now sits below the bar.
+
+**Scope (in):**
+- `apps/web/src/components/domain/AuthenticatedLayout.tsx` (+ `AuthenticatedLayout.test.tsx`, incl. axe) — `flex min-h-screen flex-col bg-slate-50`: `<AppBar/>` over a `flex flex-1` region holding `<Outlet/>`.
+- `apps/web/src/main.tsx` (**edit**, F1.11.3/F1.11.5) — wrap `/`, `/campaigns/new`, and the `/campaigns/:campaignId` subtree in one `<Route element={<RequireAuth><AuthenticatedLayout/></RequireAuth>}>` layout route. `/login`, `/status`, `/change-password` stay outside the shell.
+- `apps/web/src/components/domain/AppShell.tsx` (**edit**, F1.11.3) — drop the `min-h-screen bg-slate-50` wrapper (now owned by the layout); reduce to `<div className="flex flex-1"><Sidebar/><main className="flex-1"><Outlet/></main></div>`.
+- `apps/web/src/components/domain/Sidebar.tsx` (**edit**, F1.11.2) — `h-screen` → `sticky top-14 h-[calc(100vh-3.5rem)]` so it sits flush below the bar while content scrolls.
+
+**Scope (out):** The AppBar itself (F1.11.7); branded auth surfaces (F1.11.9); page-content copy (F1.11.10).
+
+**Skills:** `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-087  **Dependencies:** F1.11.7, F1.11.3, F1.10.6
+
+---
+
+#### F1.11.9 — Branded auth surfaces (Login + ChangePassword)
+
+**Goal:** Make the first impression branded — place the `<Brand>` lockup on the login and change-password pages (which sit outside the shell) so they share the product identity instead of a bare card.
+
+**Scope (in):**
+- `apps/web/src/features/auth/LoginPage.tsx` (**edit**, F1.7.7) — add `<Brand size="lg"/>` above the form card; form/validation/`InlineBanner` unchanged.
+- `apps/web/src/features/auth/ChangePasswordPage.tsx` (**edit**, F1.7.8) — same Brand header for consistency.
+- `LoginPage.test.tsx` / `ChangePasswordPage.test.tsx` (**edit**) — adjust for the new heading structure; retain existing axe assertions.
+
+**Scope (out):** AppBar/shell (these pages stay shell-less); empty/welcome states (F1.11.10).
+
+**Skills:** `frontend-testing`  **Decisions:** D-087  **Dependencies:** F1.11.6, F1.7.7, F1.7.8
+
+---
+
+#### F1.11.10 — Warmer empty + welcome surfaces
+
+**Goal:** Replace flat empty/welcome copy with intentional empty-state and welcome treatments so the campaign list and campaign home feel designed, within constitution tokens.
+
+**Scope (in):**
+- `apps/web/src/features/campaigns/CampaignListPage.tsx` (**edit**, F1.10.4) — centered empty-state block (muted Lucide icon + `text-base font-medium` heading + supportive body); **admin** gets a prominent `New campaign` CTA inside the block, **non-admin** keeps the "ask your GM or an admin to add you" guidance. Header `New campaign` button shows only when the list is non-empty.
+- `apps/web/src/features/campaigns/CampaignHomePage.tsx` (**edit**, F1.11.3) — warmer welcome (icon/heading + supportive copy pointing to the sidebar), keeping the campaign-name landing role.
+- `CampaignListPage.test.tsx` / `CampaignHomePage.test.tsx` (**edit**) — update empty-state/welcome copy assertions; add the admin-empty-state CTA assertion.
+
+**Scope (out):** Card/hover restyle, graph or deeper visual work (not in this pass).
+
+**Skills:** `ux-skeleton-crafting`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-087  **Dependencies:** F1.11.8, F1.10.4, F1.10.5
 
 ---
 

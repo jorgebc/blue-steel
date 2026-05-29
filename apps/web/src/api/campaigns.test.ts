@@ -3,12 +3,20 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 import { apiClient } from './client'
-import { getCampaign, getCampaigns, useCampaign, useCampaigns } from './campaigns'
+import {
+  campaignKeys,
+  createCampaign,
+  getCampaign,
+  getCampaigns,
+  useCampaign,
+  useCampaigns,
+  useCreateCampaign,
+} from './campaigns'
 import { createTestQueryClient } from '@/test/createTestQueryClient'
 import type { CampaignResponse } from '@/types/campaign'
 
 vi.mock('./client', () => ({
-  apiClient: { get: vi.fn() },
+  apiClient: { get: vi.fn(), post: vi.fn() },
 }))
 
 const campaign: CampaignResponse = {
@@ -100,5 +108,43 @@ describe('useCampaign', () => {
 
     expect(apiClient.get).not.toHaveBeenCalled()
     expect(result.current.fetchStatus).toBe('idle')
+  })
+})
+
+describe('createCampaign', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('POSTs name and gmUserId to the campaigns endpoint and unwraps the envelope', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(campaign))
+
+    const result = await createCampaign({ name: 'Curse of Strahd', gmUserId: 'u1' })
+
+    expect(apiClient.post).toHaveBeenCalledWith('/api/v1/campaigns', {
+      name: 'Curse of Strahd',
+      gmUserId: 'u1',
+    })
+    expect(result).toEqual(campaign)
+  })
+})
+
+describe('useCreateCampaign', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('invalidates the campaign list cache on success', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(campaign))
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    const localWrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children)
+
+    const { result } = renderHook(() => useCreateCampaign(), { wrapper: localWrapper })
+    result.current.mutate({ name: 'Curse of Strahd', gmUserId: 'u1' })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: campaignKeys.all })
   })
 })

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
-import { changePassword, useChangePassword } from './users'
+import { changePassword, searchUsers, useChangePassword, useUserSearch } from './users'
 import { ApiClientError } from './client'
 import type { ApiEnvelope } from '@/types/api'
 
@@ -75,8 +75,7 @@ describe('users API', () => {
     await expect(
       changePassword({ currentPassword: 'wrong', newPassword: 'new-pass' })
     ).rejects.toSatisfy(
-      (err: unknown) =>
-        err instanceof ApiClientError && err.errors[0].code === 'INCORRECT_PASSWORD'
+      (err: unknown) => err instanceof ApiClientError && err.errors[0].code === 'INCORRECT_PASSWORD'
     )
   })
 
@@ -92,5 +91,47 @@ describe('users API', () => {
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
+  })
+
+  // ── searchUsers() ─────────────────────────────────────────────────────────────
+
+  it('searchUsers() GETs /api/v1/users with an encoded email query and unwraps the envelope', async () => {
+    const users = [{ id: 'u1', email: 'alice@example.com' }]
+    fetchSpy.mockResolvedValueOnce(envelopeResponse(users))
+
+    const result = await searchUsers('alice@example.com')
+
+    const [url, init] = fetchSpy.mock.calls[0]
+    expect(url).toBe(`${BASE}/api/v1/users?email=alice%40example.com`)
+    expect((init as RequestInit).method).toBe('GET')
+    expect(result).toEqual(users)
+  })
+
+  // ── useUserSearch ────────────────────────────────────────────────────────────
+
+  it('useUserSearch returns matching users on success', async () => {
+    const users = [{ id: 'u1', email: 'alice@example.com' }]
+    fetchSpy.mockResolvedValueOnce(envelopeResponse(users))
+
+    const { result } = renderHook(() => useUserSearch('alice'), { wrapper: createWrapper() })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual(users)
+  })
+
+  it('useUserSearch does not fetch when the email query is empty', () => {
+    const { result } = renderHook(() => useUserSearch(''), { wrapper: createWrapper() })
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(result.current.fetchStatus).toBe('idle')
+  })
+
+  it('useUserSearch does not fetch when explicitly disabled', () => {
+    const { result } = renderHook(() => useUserSearch('alice', false), {
+      wrapper: createWrapper(),
+    })
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(result.current.fetchStatus).toBe('idle')
   })
 })
