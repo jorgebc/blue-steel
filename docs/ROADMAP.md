@@ -59,16 +59,16 @@
 | F1.8.6 | Backend: campaign persistence adapter (JPA + Testcontainers IT) | ✅ |
 | F1.8.7 | Backend: campaign membership persistence adapter + CampaignMembershipPort | ✅ |
 | F1.8.8 | Backend: CampaignController + DTOs + 404 mapping | ✅ |
-| F1.9 | Campaign-scoped invitation + role enforcement | 🔲 |
-| F1.9.1 | Backend: CampaignMember.withRole + membership exceptions (CANNOT_REMOVE_GM, ALREADY_CAMPAIGN_MEMBER) | 🔲 |
-| F1.9.2 | Backend: extend CampaignMembershipRepository + adapter (find/delete/existsByRole) | 🔲 |
-| F1.9.3 | Backend: TemporaryPasswordGenerator shared component (de-duplicate invite flows) | 🔲 |
-| F1.9.4 | Backend: InviteCampaignMemberUseCase + service (GM-only, create-or-add, 409 if member) | 🔲 |
-| F1.9.5 | Backend: ChangeMemberRoleUseCase + service (GM-only, GM role protected) | 🔲 |
-| F1.9.6 | Backend: RemoveMemberUseCase + service (GM-only, 422 CANNOT_REMOVE_GM) | 🔲 |
-| F1.9.7 | Backend: SearchUsersUseCase + service (admin or GM-anywhere; search by email) | 🔲 |
-| F1.9.8 | Backend: CampaignMembershipController + DTOs + 409/422 handler mappings | 🔲 |
-| F1.9.9 | Backend: UserSearchController + DTO (GET /api/v1/users?email=) | 🔲 |
+| F1.9 | Campaign-scoped invitation + role enforcement | ✅ |
+| F1.9.1 | Backend: CampaignMember.withRole + membership exceptions (CANNOT_REMOVE_GM, ALREADY_CAMPAIGN_MEMBER) | ✅ |
+| F1.9.2 | Backend: extend CampaignMembershipRepository + adapter (find/delete/existsByRole) | ✅ |
+| F1.9.3 | Backend: TemporaryPasswordGenerator shared component (de-duplicate invite flows) | ✅ |
+| F1.9.4 | Backend: InviteCampaignMemberUseCase + service (GM-only, create-or-add, 409 if member) | ✅ |
+| F1.9.5 | Backend: ChangeMemberRoleUseCase + service (GM-only, GM role protected) | ✅ |
+| F1.9.6 | Backend: RemoveMemberUseCase + service (GM-only, 422 CANNOT_REMOVE_GM) | ✅ |
+| F1.9.7 | Backend: SearchUsersUseCase + service (admin or GM-anywhere; search by email) | ✅ |
+| F1.9.8 | Backend: CampaignMembershipController + DTOs + 409/422 handler mappings | ✅ |
+| F1.9.9 | Backend: UserSearchController + DTO (GET /api/v1/users?email=) | ✅ |
 | F1.10 | Frontend: campaign list, selection + home | 🔲 |
 | F1.10.1 | Frontend: campaign DTO TypeScript types (+ CampaignRole) | 🔲 |
 | F1.10.2 | Frontend: campaigns API client + list/detail hooks | 🔲 |

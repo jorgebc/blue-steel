@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.user.InvitationResult;
 import com.bluesteel.application.model.user.InvitePlatformUserCommand;
+import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
 import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
@@ -45,6 +46,7 @@ class InvitationControllerTest {
 
   @MockitoBean private AdminBootstrapUseCase adminBootstrapUseCase;
   @MockitoBean private InvitePlatformUserUseCase invitePlatformUserUseCase;
+  @MockitoBean private InviteCampaignMemberUseCase inviteCampaignMemberUseCase;
   @MockitoBean private GetCurrentUserUseCase getCurrentUserUseCase;
   @MockitoBean private ChangePasswordUseCase changePasswordUseCase;
 

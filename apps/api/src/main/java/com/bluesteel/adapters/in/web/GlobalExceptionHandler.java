@@ -1,6 +1,8 @@
 package com.bluesteel.adapters.in.web;
 
+import com.bluesteel.domain.exception.AlreadyCampaignMemberException;
 import com.bluesteel.domain.exception.CampaignNotFoundException;
+import com.bluesteel.domain.exception.CannotRemoveGmException;
 import com.bluesteel.domain.exception.DomainException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
@@ -62,6 +64,18 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ApiResponse<Void> handleCampaignNotFound(CampaignNotFoundException ex) {
     return ApiResponse.error(ApiError.of("CAMPAIGN_NOT_FOUND", ex.getMessage()));
+  }
+
+  @ExceptionHandler(AlreadyCampaignMemberException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ApiResponse<Void> handleAlreadyCampaignMember(AlreadyCampaignMemberException ex) {
+    return ApiResponse.error(ApiError.of("ALREADY_CAMPAIGN_MEMBER", ex.getMessage()));
+  }
+
+  @ExceptionHandler(CannotRemoveGmException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
+  public ApiResponse<Void> handleCannotRemoveGm(CannotRemoveGmException ex) {
+    return ApiResponse.error(ApiError.of("CANNOT_REMOVE_GM", ex.getMessage()));
   }
 
   @ExceptionHandler(InvalidPasswordException.class)

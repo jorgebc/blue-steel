@@ -12,6 +12,7 @@ import com.bluesteel.application.model.campaign.CampaignView;
 import com.bluesteel.application.model.campaign.CreateCampaignCommand;
 import com.bluesteel.application.port.in.campaign.CreateCampaignUseCase;
 import com.bluesteel.application.port.in.campaign.GetCampaignUseCase;
+import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.campaign.ListCampaignsUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
@@ -54,6 +55,7 @@ class CampaignControllerTest {
 
   @MockitoBean private AdminBootstrapUseCase adminBootstrapUseCase;
   @MockitoBean private InvitePlatformUserUseCase invitePlatformUserUseCase;
+  @MockitoBean private InviteCampaignMemberUseCase inviteCampaignMemberUseCase;
   @MockitoBean private GetCurrentUserUseCase getCurrentUserUseCase;
   @MockitoBean private ChangePasswordUseCase changePasswordUseCase;
   @MockitoBean private CreateCampaignUseCase createCampaignUseCase;

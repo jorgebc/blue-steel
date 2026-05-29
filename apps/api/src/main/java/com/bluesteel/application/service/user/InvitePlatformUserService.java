@@ -8,7 +8,6 @@ import com.bluesteel.application.port.out.email.EmailPort;
 import com.bluesteel.application.port.out.user.UserRepository;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.user.User;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,20 +25,20 @@ public class InvitePlatformUserService implements InvitePlatformUserUseCase {
 
   private static final Logger log = LoggerFactory.getLogger(InvitePlatformUserService.class);
 
-  private static final String PASSWORD_CHARS =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-  private static final int PASSWORD_LENGTH = 16;
-  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-
   private final UserRepository userRepository;
   private final EmailPort emailPort;
   private final PasswordEncoder passwordEncoder;
+  private final TemporaryPasswordGenerator temporaryPasswordGenerator;
 
   public InvitePlatformUserService(
-      UserRepository userRepository, EmailPort emailPort, PasswordEncoder passwordEncoder) {
+      UserRepository userRepository,
+      EmailPort emailPort,
+      PasswordEncoder passwordEncoder,
+      TemporaryPasswordGenerator temporaryPasswordGenerator) {
     this.userRepository = userRepository;
     this.emailPort = emailPort;
     this.passwordEncoder = passwordEncoder;
+    this.temporaryPasswordGenerator = temporaryPasswordGenerator;
   }
 
   @Override
@@ -49,7 +48,7 @@ public class InvitePlatformUserService implements InvitePlatformUserUseCase {
       throw new UnauthorizedException("Only admins may invite platform users");
     }
 
-    String tempPassword = generateTemporaryPassword();
+    String tempPassword = temporaryPasswordGenerator.generate();
     String passwordHash = passwordEncoder.encode(tempPassword);
 
     Optional<User> existing = userRepository.findByEmail(command.email());
@@ -75,14 +74,6 @@ public class InvitePlatformUserService implements InvitePlatformUserUseCase {
             buildEmailBody(command.email(), tempPassword)));
 
     return result;
-  }
-
-  private String generateTemporaryPassword() {
-    StringBuilder sb = new StringBuilder(PASSWORD_LENGTH);
-    for (int i = 0; i < PASSWORD_LENGTH; i++) {
-      sb.append(PASSWORD_CHARS.charAt(SECURE_RANDOM.nextInt(PASSWORD_CHARS.length())));
-    }
-    return sb.toString();
   }
 
   private String buildEmailBody(String email, String tempPassword) {

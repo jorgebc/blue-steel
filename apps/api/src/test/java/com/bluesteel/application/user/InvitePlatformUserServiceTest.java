@@ -2,7 +2,6 @@ package com.bluesteel.application.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -12,6 +11,7 @@ import com.bluesteel.application.model.user.InvitePlatformUserCommand;
 import com.bluesteel.application.port.out.email.EmailPort;
 import com.bluesteel.application.port.out.user.UserRepository;
 import com.bluesteel.application.service.user.InvitePlatformUserService;
+import com.bluesteel.application.service.user.TemporaryPasswordGenerator;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.user.User;
 import java.time.Instant;
@@ -30,15 +30,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @DisplayName("InvitePlatformUserService")
 class InvitePlatformUserServiceTest {
 
+  private static final String TEMP_PASSWORD = "Temp0Pass1Word2!";
+
   @Mock private UserRepository userRepository;
   @Mock private EmailPort emailPort;
   @Mock private PasswordEncoder passwordEncoder;
+  @Mock private TemporaryPasswordGenerator temporaryPasswordGenerator;
 
   private InvitePlatformUserService service;
 
   @BeforeEach
   void setUp() {
-    service = new InvitePlatformUserService(userRepository, emailPort, passwordEncoder);
+    service =
+        new InvitePlatformUserService(
+            userRepository, emailPort, passwordEncoder, temporaryPasswordGenerator);
   }
 
   @Test
@@ -53,8 +58,9 @@ class InvitePlatformUserServiceTest {
   @Test
   @DisplayName("should create a new user account and send email when email is not registered")
   void invite_newEmail_createsUserAndSendsEmail() {
+    when(temporaryPasswordGenerator.generate()).thenReturn(TEMP_PASSWORD);
     when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
-    when(passwordEncoder.encode(any(String.class))).thenReturn("$2a$10$hash");
+    when(passwordEncoder.encode(TEMP_PASSWORD)).thenReturn("$2a$10$hash");
 
     InvitePlatformUserCommand cmd =
         new InvitePlatformUserCommand(UUID.randomUUID(), true, "new@example.com");
@@ -62,14 +68,11 @@ class InvitePlatformUserServiceTest {
 
     assertThat(result).isEqualTo(InvitationResult.CREATED);
 
-    ArgumentCaptor<String> encodeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(passwordEncoder).encode(encodeCaptor.capture());
-    assertThat(encodeCaptor.getValue()).isNotBlank().hasSize(16);
-
     ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
     verify(userRepository).save(userCaptor.capture());
     User saved = userCaptor.getValue();
     assertThat(saved.email()).isEqualTo("new@example.com");
+    assertThat(saved.passwordHash()).isEqualTo("$2a$10$hash");
     assertThat(saved.forcePasswordChange()).isTrue();
     assertThat(saved.isAdmin()).isFalse();
 
@@ -77,6 +80,7 @@ class InvitePlatformUserServiceTest {
     verify(emailPort).send(emailCaptor.capture());
     assertThat(emailCaptor.getValue().to()).isEqualTo("new@example.com");
     assertThat(emailCaptor.getValue().subject()).isEqualTo("Your Blue Steel invitation");
+    assertThat(emailCaptor.getValue().body()).contains(TEMP_PASSWORD);
   }
 
   @Test
@@ -91,18 +95,15 @@ class InvitePlatformUserServiceTest {
             false,
             false,
             Instant.now());
+    when(temporaryPasswordGenerator.generate()).thenReturn(TEMP_PASSWORD);
     when(userRepository.findByEmail("existing@example.com")).thenReturn(Optional.of(existing));
-    when(passwordEncoder.encode(any(String.class))).thenReturn("$2a$10$newhash");
+    when(passwordEncoder.encode(TEMP_PASSWORD)).thenReturn("$2a$10$newhash");
 
     InvitePlatformUserCommand cmd =
         new InvitePlatformUserCommand(UUID.randomUUID(), true, "existing@example.com");
     InvitationResult result = service.invite(cmd);
 
     assertThat(result).isEqualTo(InvitationResult.REFRESHED);
-
-    ArgumentCaptor<String> encodeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(passwordEncoder).encode(encodeCaptor.capture());
-    assertThat(encodeCaptor.getValue()).isNotBlank().hasSize(16);
 
     ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
     verify(userRepository).save(userCaptor.capture());

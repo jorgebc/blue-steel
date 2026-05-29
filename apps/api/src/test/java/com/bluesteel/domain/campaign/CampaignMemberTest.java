@@ -35,4 +35,20 @@ class CampaignMemberTest {
         IllegalArgumentException.class,
         () -> CampaignMember.create(ID, CAMPAIGN_ID, USER_ID, null, NOW));
   }
+
+  @Test
+  @DisplayName("should return a copy with the new role and all other fields preserved")
+  void withRole_changesRoleOnly() {
+    CampaignMember original =
+        CampaignMember.create(ID, CAMPAIGN_ID, USER_ID, CampaignRole.PLAYER, NOW);
+
+    CampaignMember updated = original.withRole(CampaignRole.EDITOR);
+
+    assertThat(updated.role()).isEqualTo(CampaignRole.EDITOR);
+    assertThat(updated.id()).isEqualTo(ID);
+    assertThat(updated.campaignId()).isEqualTo(CAMPAIGN_ID);
+    assertThat(updated.userId()).isEqualTo(USER_ID);
+    assertThat(updated.joinedAt()).isEqualTo(NOW);
+    assertThat(original.role()).isEqualTo(CampaignRole.PLAYER);
+  }
 }
