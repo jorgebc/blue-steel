@@ -45,6 +45,9 @@ build/
 # Postman environments with real values — commit only *.example.json
 **/postman/postman_env_oracle.json
 
+# Local setup checklists — operator docs, not source
+SETUP_CHECKLIST.md
+
 # Logs
 logs/
 *.log

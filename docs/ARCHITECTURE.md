@@ -1093,7 +1093,7 @@ All open architecture questions are resolved. OQ-B is documented in D-059.
 
 ## 11. Deployment & Infrastructure
 
-All decisions in this section are captured in DECISIONS.md as D-044 through D-050.
+All decisions in this section are captured in DECISIONS.md as D-044 through D-050 and D-091–D-092.
 
 ---
 
@@ -1104,7 +1104,7 @@ Two environments only: **local** and **prod** (D-044).
 | Environment | Purpose | Infrastructure |
 |---|---|---|
 | `local` | Development and manual testing | Docker Compose on developer machine |
-| `prod` | Live deployment | Oracle Cloud + Vercel + Neon |
+| `prod` | Live deployment | Render + Vercel + Neon |
 
 No staging environment. The project scope and team size do not justify consuming free-tier quota on a third environment. Local development is the pre-production validation layer.
 
@@ -1115,12 +1115,12 @@ No staging environment. The project scope and team size do not justify consuming
 | Component | Platform | Tier | Notes |
 |---|---|---|---|
 | **Frontend** | Vercel | Free (Hobby) | Auto-deploy on push to `main`; branch preview URLs per PR |
-| **Backend** | Oracle Cloud Always Free | Free (always) | ARM VM — 4 OCPUs / 24GB RAM, configurable allocation; Docker + Compose managed by VM owner |
+| **Backend** | Render | Free (web service) | amd64 Docker container; sleeps after 15 min idle (~1 min cold start); deploy via webhook (D-091) |
 | **Database** | Neon | Free (always) | Serverless PostgreSQL + pgvector; never pauses; DB branching available for migration testing |
 
-**Oracle Cloud ARM note:** The Oracle VM uses an ARM (`linux/arm64`) architecture. All Docker images for the backend must be built for `linux/arm64`. GitHub Actions runners are `x86_64` — multi-arch builds use `docker buildx` with cross-compilation. Spring Boot on ARM is fully supported and performs well (D-046).
+**Render free tier note:** Render web services on the free plan sleep after 15 minutes of inactivity and wake on the next incoming request (roughly 1-minute delay). This is an accepted trade-off for zero cost given the weekly-session usage pattern of the app (D-091). Images are built for `linux/amd64` — the native architecture of Render's infrastructure.
 
-**Docker image registry:** Images are pushed to **GitHub Container Registry (ghcr.io)**, which is free for public repositories and included in GitHub free plan allowances for private repositories. The deploy step pulls from `ghcr.io` to the Oracle VM.
+**Docker image registry:** Images are pushed to **GitHub Container Registry (ghcr.io)**, which is free for public repositories. The GHCR package must be set to **Public** so Render can pull the image without credentials. CI pushes a new image on every merge to `main`, then calls the Render deploy hook to trigger a redeploy.
 
 ---
 
@@ -1163,9 +1163,9 @@ Triggered on push/PR when `apps/api/**` changes.
 3. Integration tests (Testcontainers — real Postgres)
 4. PIT mutation tests — domain core only
 5. Build JAR
-6. Build Docker image (linux/arm64 via docker buildx)
+6. Build Docker image (linux/amd64 via docker buildx)
 7. Push image to ghcr.io
-8. Deploy: SSH into Oracle VM → docker pull → docker compose up -d
+8. Deploy: POST to Render deploy hook → Render pulls new image and restarts
 ```
 
 Steps 6–8 run only on push to `main`, not on PRs.
@@ -1187,24 +1187,32 @@ Deployment to Vercel is handled natively by Vercel's GitHub integration — a pu
 
 ### 11.5 Secret Management
 
-Production secrets live in a `.env` file on the Oracle VM — never committed to the repository (D-050).
+Production secrets are stored in the **Render dashboard** (Service → Environment → Environment Variables) — never committed to the repository (D-092).
 
-Secrets required at runtime:
+Runtime secrets injected into the backend container:
 
 | Secret | Consumer |
 |---|---|
-| `DATABASE_URL` | Spring Boot — Neon JDBC URL without credentials |
+| `SPRING_PROFILES_ACTIVE` | Spring Boot — must be set to `prod` |
+| `DATABASE_URL` | Spring Boot — Neon JDBC URL (`jdbc:postgresql://...?sslmode=require`) |
 | `DB_USERNAME` | Spring Boot — Neon database user |
 | `DB_PASSWORD` | Spring Boot — Neon database password |
 | `ANTHROPIC_API_KEY` | Spring AI adapter — text generation |
 | `OPENAI_API_KEY` | Spring AI embedding adapter — text-embedding-3-small |
 | `JWT_SECRET` | Spring Security — HS256 symmetric secret (min 32 bytes) |
 | `EMAIL_API_KEY` | Email adapter (Resend) — transactional email |
-| `ADMIN_EMAIL` | `AdminBootstrapService` — email address of the singleton admin seeded on first startup (D-073) |
-| `ADMIN_PASSWORD` | `AdminBootstrapService` — initial plaintext password for the singleton admin; BCrypt-hashed before storage; should be changed immediately after first login |
-| `VITE_API_BASE_URL` | CORS — frontend origin allowed by the backend |
+| `ADMIN_EMAIL` | `AdminBootstrapService` — singleton admin email seeded on first startup (D-073) |
+| `ADMIN_PASSWORD` | `AdminBootstrapService` — initial plaintext password; BCrypt-hashed before storage; change after first login |
+| `CORS_ALLOWED_ORIGIN` | CORS — frontend origin allowed by the backend (Vercel URL) |
 
-The `.env` file is read by Docker Compose at container start via the `env_file` directive. Rotating a secret requires SSH access to the VM and a container restart.
+GitHub Actions repository secrets (CI-only, not available at runtime):
+
+| Secret | Purpose |
+|---|---|
+| `RENDER_DEPLOY_HOOK_URL` | Webhook URL to trigger a Render redeploy after a new image is pushed |
+| `RENDER_SERVICE_URL` | Public Render service URL — used by the smoke test to poll `/api/v1/health` |
+
+Rotating a runtime secret requires updating the value in the Render dashboard; Render restarts the service automatically.
 
 Vercel secrets (frontend environment variables) are managed through the Vercel dashboard and are not stored in the repository.
 
@@ -1220,10 +1228,10 @@ Developer pushes to main
         │       ▼
         │   GitHub Actions backend pipeline
         │   compile → test → mutation test → build JAR
-        │   → build arm64 Docker image
+        │   → build amd64 Docker image
         │   → push to ghcr.io
-        │   → SSH into Oracle VM
-        │   → docker pull + docker compose up -d
+        │   → POST Render deploy hook
+        │   → Render pulls new image + restarts container
         │   → Liquibase migrations run on startup (auto)
         │
         └── apps/web/** changed?
