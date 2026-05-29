@@ -56,11 +56,11 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-043 | Authentication: stateless JWT (auth only); campaign role via DB (authz) | ✅ Active | Definition |
 | D-044 | Environment model: local + prod only | ✅ Active | Definition |
 | D-045 | Frontend hosting: Vercel free tier | ✅ Active | Definition |
-| D-046 | Backend hosting: Oracle Cloud Always Free ARM VM | ✅ Active | Definition |
+| D-046 | Backend hosting: Oracle Cloud Always Free ARM VM | ⚠️ Superseded by D-091 | Definition |
 | D-047 | Database hosting: Neon free tier (PostgreSQL + pgvector) | ✅ Active | Definition |
 | D-048 | CI/CD: GitHub Actions with path-filtered workflows | ✅ Active | Definition |
 | D-049 | Local dev LLM strategy: mock ports by default, real APIs via profile flag | ✅ Active | Definition |
-| D-050 | Secret management: .env file on Oracle VM, never committed | ✅ Active | Definition |
+| D-050 | Secret management: .env file on Oracle VM, never committed | ⚠️ Superseded by D-092 | Definition |
 | D-051 | User onboarding: invitation-only, email with temporary password | ✅ Active | Definition |
 | D-052 | Query execution model: synchronous, single LLM call, 504 on timeout | ✅ Active | Definition |
 | D-053 | Commit payload: "add" action (manually introduce missed entities) deferred to v2 | ✅ Active | Definition |
@@ -101,6 +101,8 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-088 | Local LLM option via Ollama (`llm-ollama` profile) + configurable embedding dimension | ✅ Active | Definition |
 | D-089 | World-state commit write uses native SQL, not JPA | ✅ Active | Phase 2 |
 | D-090 | Versioning: Semantic Versioning via annotated Git tags on `main` (repo-wide, pre-1.0) | ✅ Active | Definition |
+| D-091 | Backend hosting: Render free tier (web service, amd64) | ✅ Active | Definition |
+| D-092 | Secret management: Render dashboard env vars + GitHub Actions secrets | ✅ Active | Definition |
 
 ---
 
@@ -1853,6 +1855,44 @@ There was no prior versioning or tagging convention (the repo had zero tags). Se
 - **Tagging the feature branch at the milestone.** Rejected — a tag must be reachable from `main`; tagging pre-merge points at a commit that the merge (squash/rebase) may discard. The branch carries the version bump; `main` carries the tag.
 
 Cross-refs: D-022 (monorepo structure), D-044 (environments: local + prod only), D-065 (Conventional Commits), D-066 (branch naming); ROADMAP.md (phase milestones).
+
+---
+
+### D-091 — Backend hosting: Render free tier (web service, amd64)
+
+**Date:** 2026-05-30
+**Status:** Active
+**Supersedes:** D-046
+
+**Decision:**
+Spring Boot API is deployed as a Docker web service on Render's free tier (amd64), pulling the image pushed to GHCR by CI. Render is triggered via a deploy hook webhook after each successful image push to `main`.
+
+**Reason:**
+Oracle Cloud Always Free ARM (D-046) is perpetually "out of capacity" and cannot be provisioned. Render's free tier is genuinely available, requires no credit card, supports Docker image deployment from GHCR, auto-provisions HTTPS, and integrates cleanly with the existing GitHub Actions pipeline — one `curl` to a deploy hook replaces the SSH deploy step. The accepted trade-off is a 15-min sleep / ~1-min cold start on first request after inactivity, which is acceptable for a weekly tabletop RPG session tool.
+
+**Alternatives considered:**
+- Oracle Cloud Always Free ARM (D-046) — original plan; rejected due to persistent capacity unavailability across all regions
+- Koyeb free tier — 512 MB RAM, uncertain CPU allocation (reported as 0.1–1 vCPU); Docker support confirmed but CPU limits create Spring Boot startup risk; Render preferred for clearer operational guarantees
+- Google Cloud Run always-free tier — generous request quota but requires a billing account (credit card on file); rejected to stay fully cost-free
+- Fly.io — removed free allowances for new accounts in late 2024; requires card and charges ~$2–5/month for minimum viable VM
+- Railway — $5/month credit only; expires and is not a permanent free tier
+
+---
+
+### D-092 — Secret management: Render dashboard env vars + GitHub Actions secrets
+
+**Date:** 2026-05-30
+**Status:** Active
+**Supersedes:** D-050
+
+**Decision:**
+Runtime secrets (`DATABASE_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `EMAIL_API_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CORS_ALLOWED_ORIGIN`) are stored in the Render dashboard (Service → Environment → Environment Variables). CI-only secrets (`RENDER_DEPLOY_HOOK_URL`, `RENDER_SERVICE_URL`) are stored as GitHub Actions repository secrets. No `.env` file on any server; no secrets committed.
+
+**Reason:**
+Replaces the Oracle VM `.env` file approach from D-050. Render containers are ephemeral — there is no VM to SSH into and no persistent filesystem to write an env file to. The Render dashboard provides encrypted secret storage with equivalent security guarantees, and secrets are injected as environment variables at container start. GitHub Actions secrets continue to hold CI-specific values (deploy hook URL, health check base URL). The "never committed" invariant from D-050 is preserved unchanged.
+
+**Alternatives considered:**
+- `.env` file on Render — Render containers are ephemeral; env files cannot be managed via SSH. Dashboard env vars are the canonical, supported approach.
 
 ---
 
