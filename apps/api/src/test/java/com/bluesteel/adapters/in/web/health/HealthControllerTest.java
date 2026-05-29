@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.health.ComponentStatus;
 import com.bluesteel.application.model.health.SystemHealth;
+import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.health.CheckHealthUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
@@ -43,6 +44,7 @@ class HealthControllerTest {
   @MockitoBean private CheckHealthUseCase checkHealthUseCase;
   @MockitoBean private AdminBootstrapUseCase adminBootstrapUseCase;
   @MockitoBean private InvitePlatformUserUseCase invitePlatformUserUseCase;
+  @MockitoBean private InviteCampaignMemberUseCase inviteCampaignMemberUseCase;
   @MockitoBean private GetCurrentUserUseCase getCurrentUserUseCase;
   @MockitoBean private ChangePasswordUseCase changePasswordUseCase;
 

@@ -27,6 +27,11 @@ public class CampaignMember {
     return new CampaignMember(id, campaignId, userId, role, joinedAt);
   }
 
+  /** Returns a copy of this membership with the role changed; all other fields are preserved. */
+  public CampaignMember withRole(CampaignRole newRole) {
+    return new CampaignMember(id, campaignId, userId, newRole, joinedAt);
+  }
+
   public UUID id() {
     return id;
   }

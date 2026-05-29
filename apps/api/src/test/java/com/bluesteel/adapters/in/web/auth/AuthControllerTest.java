@@ -14,6 +14,7 @@ import com.bluesteel.application.model.auth.RefreshResult;
 import com.bluesteel.application.port.in.auth.LoginUseCase;
 import com.bluesteel.application.port.in.auth.LogoutUseCase;
 import com.bluesteel.application.port.in.auth.RefreshTokenUseCase;
+import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
 import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
@@ -56,6 +57,7 @@ class AuthControllerTest {
   @MockitoBean private LogoutUseCase logoutUseCase;
   @MockitoBean private AdminBootstrapUseCase adminBootstrapUseCase;
   @MockitoBean private InvitePlatformUserUseCase invitePlatformUserUseCase;
+  @MockitoBean private InviteCampaignMemberUseCase inviteCampaignMemberUseCase;
   @MockitoBean private GetCurrentUserUseCase getCurrentUserUseCase;
   @MockitoBean private ChangePasswordUseCase changePasswordUseCase;
 
