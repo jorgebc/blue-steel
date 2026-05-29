@@ -98,6 +98,9 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-085 | Progressive density — low density for Input/Settings/Onboarding; high density for Exploration/Timeline | ✅ Active | Definition |
 | D-086 | Mandatory skeleton loading — spinners banned in primary content areas; skeletons derived from DTOs | ✅ Active | Definition |
 | D-087 | UX_CONSTITUTION.md is the frontend design authority — read before any UI task | ✅ Active | Definition |
+| D-088 | Local LLM option via Ollama (`llm-ollama` profile) + configurable embedding dimension | ✅ Active | Definition |
+| D-089 | World-state commit write uses native SQL, not JPA | ✅ Active | Phase 2 |
+| D-090 | Versioning: Semantic Versioning via annotated Git tags on `main` (repo-wide, pre-1.0) | ✅ Active | Definition |
 
 ---
 
