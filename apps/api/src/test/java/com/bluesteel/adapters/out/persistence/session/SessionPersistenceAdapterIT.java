@@ -138,4 +138,44 @@ class SessionPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
     assertThatThrownBy(() -> adapter.save(second))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
+
+  @Test
+  @DisplayName("should return 1 when no committed sessions exist for the campaign")
+  void nextSequenceNumber_noneCommitted_returnsOne() {
+    assertThat(adapter.nextSequenceNumber(campaignId)).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("should return MAX(sequence_number)+1 across committed sessions (D-069)")
+  void nextSequenceNumber_withCommittedSessions_returnsMaxPlusOne() {
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+
+    for (int i = 1; i <= 3; i++) {
+      Session s = Session.create(UUID.randomUUID(), campaignId, ownerId, now);
+      s.startProcessing();
+      s.toDraft("{}");
+      s.commit(i);
+      adapter.save(s);
+    }
+
+    assertThat(adapter.nextSequenceNumber(campaignId)).isEqualTo(4);
+  }
+
+  @Test
+  @DisplayName("should not count non-committed sessions when computing next sequence number")
+  void nextSequenceNumber_ignoresNonCommittedSessions() {
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+
+    Session committed = Session.create(UUID.randomUUID(), campaignId, ownerId, now);
+    committed.startProcessing();
+    committed.toDraft("{}");
+    committed.commit(1);
+    adapter.save(committed);
+
+    Session failed = Session.create(UUID.randomUUID(), campaignId, ownerId, now);
+    failed.markFailed("REASON");
+    adapter.save(failed);
+
+    assertThat(adapter.nextSequenceNumber(campaignId)).isEqualTo(2);
+  }
 }

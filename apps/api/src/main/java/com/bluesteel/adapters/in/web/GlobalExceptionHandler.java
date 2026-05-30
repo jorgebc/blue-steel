@@ -4,6 +4,7 @@ import com.bluesteel.domain.exception.ActiveSessionExistsException;
 import com.bluesteel.domain.exception.AlreadyCampaignMemberException;
 import com.bluesteel.domain.exception.CampaignNotFoundException;
 import com.bluesteel.domain.exception.CannotRemoveGmException;
+import com.bluesteel.domain.exception.CommitValidationException;
 import com.bluesteel.domain.exception.DomainException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
@@ -97,6 +98,12 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(RefreshTokenException.class)
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
   public ApiResponse<Void> handleRefreshToken(RefreshTokenException ex) {
+    return ApiResponse.error(ApiError.of(ex.code(), ex.getMessage()));
+  }
+
+  @ExceptionHandler(CommitValidationException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
+  public ApiResponse<Void> handleCommitValidation(CommitValidationException ex) {
     return ApiResponse.error(ApiError.of(ex.code(), ex.getMessage()));
   }
 

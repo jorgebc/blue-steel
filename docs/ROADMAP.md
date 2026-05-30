@@ -1107,17 +1107,17 @@ npx shadcn@latest add button input label form card
 | F2.7.4 | Wire diff generation into SessionIngestionEventListener (final stage) | ✅ |
 | F2.7.5 | GetSessionDiffUseCase + service (draft-only read) | ✅ |
 | F2.7.6 | Diff retrieval endpoint (GET .../diff) | ✅ |
-| F2.8 | Commit endpoint | 🔲 |
-| F2.8.1 | Commit application model (CommitPayload + nested records, camelCase) | 🔲 |
-| F2.8.2 | Session.commit(sequenceNumber) domain transition | 🔲 |
-| F2.8.3 | Session sequence-number assignment query (port + adapter + IT) | 🔲 |
-| F2.8.4 | World-state write contract (WorldStatePort + command/result records) | 🔲 |
-| F2.8.5 | WorldStateAdapter (native-SQL head+version write, D-089) + IT | 🔲 |
-| F2.8.6 | EntityEmbeddingWritePort + write adapter (native INSERT) + IT | 🔲 |
-| F2.8.7 | CommitPayloadValidator (8 checks) + CommitValidationException | 🔲 |
-| F2.8.8 | CommitService + CommitSessionUseCase + command + SessionCommittedEvent | 🔲 |
-| F2.8.9 | EmbeddingGenerationListener (async post-commit, D-063) | 🔲 |
-| F2.8.10 | Commit endpoint (controller + request DTO + 422 mapping) | 🔲 |
+| F2.8 | Commit endpoint | ✅ |
+| F2.8.1 | Commit application model (CommitPayload + nested records, camelCase) | ✅ |
+| F2.8.2 | Session.commit(sequenceNumber) domain transition | ✅ |
+| F2.8.3 | Session sequence-number assignment query (port + adapter + IT) | ✅ |
+| F2.8.4 | World-state write contract (WorldStatePort + command/result records) | ✅ |
+| F2.8.5 | WorldStateAdapter (native-SQL head+version write, D-089) + IT | ✅ |
+| F2.8.6 | EntityEmbeddingWritePort + write adapter (native INSERT) + IT | ✅ |
+| F2.8.7 | CommitPayloadValidator (8 checks) + CommitValidationException | ✅ |
+| F2.8.8 | CommitService + CommitSessionUseCase + command + SessionCommittedEvent | ✅ |
+| F2.8.9 | EmbeddingGenerationListener (async post-commit, D-063) | ✅ |
+| F2.8.10 | Commit endpoint (controller + request DTO + 422 mapping) | ✅ |
 | F2.9 | Frontend: Input Mode — session submission + status polling | 🔲 |
 | F2.9-SETUP | Frontend scaffolding — `shadcn add textarea` (human step) | 👤 |
 | F2.9.1 | Frontend: session submit + status TypeScript types | 🔲 |

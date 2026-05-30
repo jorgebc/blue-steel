@@ -110,11 +110,16 @@ public class Session {
     this.updatedAt = Instant.now();
   }
 
-  /** {@code DRAFT → COMMITTED}. */
-  public void commit() {
+  /**
+   * {@code DRAFT → COMMITTED}; records the assigned sequence number (D-069), stamps {@code
+   * committedAt}, and clears {@code diffPayload}.
+   */
+  public void commit(int sequenceNumber) {
     requireStatus(SessionStatus.DRAFT, "commit");
-    this.status = SessionStatus.COMMITTED;
+    this.sequenceNumber = sequenceNumber;
     this.committedAt = Instant.now();
+    this.status = SessionStatus.COMMITTED;
+    this.diffPayload = null;
     this.updatedAt = this.committedAt;
   }
 

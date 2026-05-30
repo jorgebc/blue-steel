@@ -24,6 +24,7 @@ import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.campaign.ListCampaignsUseCase;
 import com.bluesteel.application.port.in.campaign.RemoveMemberUseCase;
 import com.bluesteel.application.port.in.health.CheckHealthUseCase;
+import com.bluesteel.application.port.in.session.CommitSessionUseCase;
 import com.bluesteel.application.port.in.session.DiscardSessionUseCase;
 import com.bluesteel.application.port.in.session.GetSessionDiffUseCase;
 import com.bluesteel.application.port.in.session.GetSessionStatusUseCase;
@@ -34,6 +35,7 @@ import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
 import com.bluesteel.application.port.in.user.InvitePlatformUserUseCase;
 import com.bluesteel.application.port.in.user.SearchUsersUseCase;
 import com.bluesteel.domain.exception.ActiveSessionExistsException;
+import com.bluesteel.domain.exception.CommitValidationException;
 import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
 import com.bluesteel.domain.exception.SessionNotFoundException;
 import com.bluesteel.domain.exception.UnauthorizedException;
@@ -87,6 +89,7 @@ class SessionControllerTest {
   @MockitoBean private GetSessionStatusUseCase getSessionStatusUseCase;
   @MockitoBean private DiscardSessionUseCase discardSessionUseCase;
   @MockitoBean private GetSessionDiffUseCase getSessionDiffUseCase;
+  @MockitoBean private CommitSessionUseCase commitSessionUseCase;
 
   @Autowired private WebApplicationContext context;
 
@@ -290,5 +293,98 @@ class SessionControllerTest {
     mockMvc
         .perform(get("/api/v1/campaigns/{id}/sessions/{sid}/diff", CAMPAIGN_ID, SESSION_ID))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("should return 200 when commit payload is valid")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void commit_validRequest_returns200() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/sessions/{sid}/commit", CAMPAIGN_ID, SESSION_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "cardDecisions": [
+                        { "cardId": "33333333-3333-3333-3333-333333333333", "action": "accept" }
+                      ],
+                      "uncertainResolutions": [],
+                      "acknowledgedConflicts": []
+                    }
+                    """))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("should return 400 when action is edit but editedFields is empty")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void commit_editActionWithoutEditedFields_returns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/sessions/{sid}/commit", CAMPAIGN_ID, SESSION_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "cardDecisions": [
+                        { "cardId": "33333333-3333-3333-3333-333333333333", "action": "edit" }
+                      ],
+                      "uncertainResolutions": [],
+                      "acknowledgedConflicts": []
+                    }
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("should return 400 when resolution is MATCH but matchedEntityId is null")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void commit_matchResolutionWithoutMatchedEntityId_returns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/sessions/{sid}/commit", CAMPAIGN_ID, SESSION_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "cardDecisions": [
+                        { "cardId": "33333333-3333-3333-3333-333333333333", "action": "accept" }
+                      ],
+                      "uncertainResolutions": [
+                        { "cardId": "44444444-4444-4444-4444-444444444444", "resolution": "MATCH" }
+                      ],
+                      "acknowledgedConflicts": []
+                    }
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("should return 422 with code when CommitValidationException is thrown")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void commit_validationException_returns422WithCode() throws Exception {
+    doThrow(
+            new CommitValidationException(
+                "UNCERTAIN_ENTITIES_PRESENT", "Uncertain entities must be resolved"))
+        .when(commitSessionUseCase)
+        .commit(org.mockito.ArgumentMatchers.any());
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/sessions/{sid}/commit", CAMPAIGN_ID, SESSION_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "cardDecisions": [
+                        { "cardId": "33333333-3333-3333-3333-333333333333", "action": "accept" }
+                      ],
+                      "uncertainResolutions": [],
+                      "acknowledgedConflicts": []
+                    }
+                    """))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.errors[0].code").value("UNCERTAIN_ENTITIES_PRESENT"));
   }
 }

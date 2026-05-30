@@ -1,0 +1,21 @@
+package com.bluesteel.application.port.out.worldstate;
+
+import com.bluesteel.application.model.worldstate.CommittedEntityVersion;
+import com.bluesteel.application.model.worldstate.EntityWriteCommand;
+import java.util.UUID;
+
+/** Driven port for writing world-state entity heads and version history (D-001, D-089). */
+public interface WorldStatePort {
+
+  /**
+   * Creates a new entity head + version 1 when {@code cmd.existingEntityId()} is null; otherwise
+   * appends the next version to the existing head.
+   */
+  CommittedEntityVersion writeEntity(EntityWriteCommand cmd);
+
+  /**
+   * Returns {@code true} if an entity of the given type with the given id belongs to the campaign.
+   * Backs the D-079 {@code INVALID_ENTITY_REFERENCE} check at the application tier.
+   */
+  boolean existsInCampaign(String entityType, UUID entityId, UUID campaignId);
+}
