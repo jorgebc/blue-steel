@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    Proposals schema — created from day one per ARCHITECTURE §5.8 (D-016).
+    No application code touches this table in v1; proposal approval pipeline ships in v2.
+  -->
+  <changeSet id="0018-create-proposals" author="jorge">
+
+    <createTable tableName="proposals">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="campaign_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_proposals_campaign"
+                     references="campaigns(id)"/>
+      </column>
+      <!-- Discriminator for the polymorphic target entity -->
+      <column name="target_entity_type" type="TEXT">
+        <constraints nullable="true"/>
+      </column>
+      <!-- Polymorphic ref to the entity being proposed — no FK -->
+      <column name="target_entity_id" type="UUID">
+        <constraints nullable="true"/>
+      </column>
+      <column name="author_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_proposals_author"
+                     references="users(id)"/>
+      </column>
+      <column name="proposed_delta" type="JSONB">
+        <constraints nullable="true"/>
+      </column>
+      <column name="status" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+      <!-- TTL enforced in v2 (D-019) -->
+      <column name="expires_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="true"/>
+      </column>
+    </createTable>
+
+    <sql>
+      ALTER TABLE proposals
+        ADD CONSTRAINT chk_proposals_target_entity_type
+        CHECK (target_entity_type IN ('actor', 'space', 'event', 'relation'));
+    </sql>
+
+    <sql>
+      ALTER TABLE proposals
+        ADD CONSTRAINT chk_proposals_status
+        CHECK (status IN ('open', 'cosigned', 'approved', 'rejected', 'expired'));
+    </sql>
+
+    <rollback>
+      <sql>ALTER TABLE proposals DROP CONSTRAINT chk_proposals_status;</sql>
+      <sql>ALTER TABLE proposals DROP CONSTRAINT chk_proposals_target_entity_type;</sql>
+      <dropTable tableName="proposals"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

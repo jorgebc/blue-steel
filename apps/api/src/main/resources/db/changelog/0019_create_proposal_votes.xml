@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!-- Proposal votes — schema-only in v1 (D-016) -->
+  <changeSet id="0019-create-proposal-votes" author="jorge">
+
+    <createTable tableName="proposal_votes">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="proposal_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_proposal_votes_proposal"
+                     references="proposals(id)"/>
+      </column>
+      <column name="voter_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_proposal_votes_voter"
+                     references="users(id)"/>
+      </column>
+      <column name="vote" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+
+    <!-- Each voter may cast at most one vote per proposal -->
+    <addUniqueConstraint tableName="proposal_votes"
+                         columnNames="proposal_id, voter_id"
+                         constraintName="uidx_proposal_votes_proposal_voter"/>
+
+    <sql>
+      ALTER TABLE proposal_votes
+        ADD CONSTRAINT chk_proposal_votes_vote
+        CHECK (vote IN ('cosign', 'approve', 'reject'));
+    </sql>
+
+    <rollback>
+      <sql>ALTER TABLE proposal_votes DROP CONSTRAINT chk_proposal_votes_vote;</sql>
+      <dropUniqueConstraint tableName="proposal_votes"
+                            constraintName="uidx_proposal_votes_proposal_voter"/>
+      <dropTable tableName="proposal_votes"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

@@ -17,4 +17,30 @@
   <include file="db/changelog/0004_create_campaign_members.xml"/>
   <include file="db/changelog/0005_create_refresh_tokens.xml"/>
 
+  <!-- F2.1.1: session ingestion tables -->
+  <include file="db/changelog/0006_create_sessions.xml"/>
+  <include file="db/changelog/0007_create_narrative_blocks.xml"/>
+
+  <!-- F2.1.2: actor + space versioned world-state tables (D-035) -->
+  <include file="db/changelog/0008_create_actors.xml"/>
+  <include file="db/changelog/0009_create_actor_versions.xml"/>
+  <include file="db/changelog/0010_create_spaces.xml"/>
+  <include file="db/changelog/0011_create_space_versions.xml"/>
+
+  <!-- F2.1.3: event + relation versioned world-state tables (D-035) -->
+  <include file="db/changelog/0012_create_events.xml"/>
+  <include file="db/changelog/0013_create_event_versions.xml"/>
+  <include file="db/changelog/0014_create_relations.xml"/>
+  <include file="db/changelog/0015_create_relation_versions.xml"/>
+
+  <!-- F2.1.4: entity embeddings for pgvector similarity search (D-062) -->
+  <include file="db/changelog/0016_create_entity_embeddings.xml"/>
+
+  <!-- F2.1.5: annotations (immutable, no updated_at) -->
+  <include file="db/changelog/0017_create_annotations.xml"/>
+
+  <!-- F2.1.6: proposals + votes (schema-only; approval pipeline ships in v2, D-016) -->
+  <include file="db/changelog/0018_create_proposals.xml"/>
+  <include file="db/changelog/0019_create_proposal_votes.xml"/>
+
 </databaseChangeLog>

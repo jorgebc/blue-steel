@@ -52,7 +52,7 @@ blue-steel/
 | Build tool | Maven | latest stable |
 | LLM integration | Spring AI (`ChatClient`, `EmbeddingModel`) | aligned with Boot 4.x |
 | LLM provider (generation) | Google Gemini (`gemini-2.5-flash`) | via Spring AI `ChatClient` |
-| LLM provider (embeddings) | Google Gemini (`gemini-embedding-001`, 3072) | via Spring AI `EmbeddingModel` |
+| LLM provider (embeddings) | Google Gemini (`gemini-embedding-001`, outputDimensionality=1536) | via Spring AI `EmbeddingModel` |
 | Vector similarity retrieval | Native pgvector queries via Spring Data JPA / `JdbcTemplate` | — |
 | ORM | Spring Data JPA + Hibernate | aligned with Boot 4.x |
 | Database driver | PostgreSQL JDBC | latest stable |
@@ -367,7 +367,7 @@ entity_embeddings
   entity_id UUID
   entity_version_id UUID FK
   session_id UUID FK
-  embedding vector(3072)      ← dimension matches chosen embedding model; per-profile (3072 Gemini prod / 1024 Ollama local) via a Liquibase parameter (D-088, D-093)
+  embedding vector(1536)      ← dimension matches chosen embedding model; per-profile (1536 Gemini prod with outputDimensionality=1536 / 1024 Ollama local) via a Liquibase parameter (D-088, D-093)
   content_hash TEXT           ← detect unchanged content, skip re-embedding
   created_at TIMESTAMP
 ```
@@ -440,11 +440,11 @@ Blue Steel uses a single LLM provider — Google Gemini via Spring AI — for bo
 | Concern | Provider | Model |
 |---|---|---|
 | Text generation (extraction, conflict detection, query answering) | Google Gemini | `gemini-2.5-flash` via Spring AI `ChatClient` |
-| Embeddings (entity vectorisation, similarity retrieval) | Google Gemini | `gemini-embedding-001`, 3072 dimensions |
+| Embeddings (entity vectorisation, similarity retrieval) | Google Gemini | `gemini-embedding-001`, 1536 dimensions (outputDimensionality=1536) |
 
 **Why one provider:** Google Gemini exposes both generative and embedding models under a single API key, so generation and embeddings are centralised on one provider at zero cost on the free tier (D-093). The `EmbeddingPort` and `ChatClient` abstractions still keep the application layer unaware of which provider is wired, so reverting to a split-provider setup (a generative provider with no embedding API plus a separate embedding provider) would touch only adapter wiring.
 
-**Local development provider (D-088):** a third wiring — the `llm-ollama` Spring profile — runs both concerns against local models served by Ollama (chat via `OllamaChatModel`, embeddings via Ollama, default `bge-m3`) for fully offline, zero-cost development, including real semantic Query Mode. Provider selection is purely a matter of which `ChatModel`/`EmbeddingModel` bean is active (`AiConfig`); the `SpringAi*` adapters are provider-neutral. The embedding **dimension is a per-profile setting** — Gemini `gemini-embedding-001`@3072 in production, Ollama `bge-m3`@1024 locally (§5.5). Embeddings from different models occupy different vector spaces and are never cross-comparable, so any one database uses exactly one embedding model; a local Ollama database is its own island, never mixed with production.
+**Local development provider (D-088):** a third wiring — the `llm-ollama` Spring profile — runs both concerns against local models served by Ollama (chat via `OllamaChatModel`, embeddings via Ollama, default `bge-m3`) for fully offline, zero-cost development, including real semantic Query Mode. Provider selection is purely a matter of which `ChatModel`/`EmbeddingModel` bean is active (`AiConfig`); the `SpringAi*` adapters are provider-neutral. The embedding **dimension is a per-profile setting** — Gemini `gemini-embedding-001`@1536 (outputDimensionality=1536) in production, Ollama `bge-m3`@1024 locally (§5.5). Embeddings from different models occupy different vector spaces and are never cross-comparable, so any one database uses exactly one embedding model; a local Ollama database is its own island, never mixed with production.
 
 Spring AI is used for two concerns only: `ChatClient` (text generation) and `EmbeddingModel` (vector generation). Spring AI's `VectorStore` abstraction is **not used** — it provides a generic flat similarity search interface that cannot express the domain-specific retrieval queries this system requires (filtering by `entity_type`, joining through `entity_versions → sessions`, scoping by `campaign_id`). All pgvector similarity searches are written as native PostgreSQL queries via Spring Data JPA or `JdbcTemplate`, giving full control over query shape and index usage. See D-062.
 

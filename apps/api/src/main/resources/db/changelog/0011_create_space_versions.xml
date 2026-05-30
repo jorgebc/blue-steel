@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!-- Space version table — append-only history, mirrors actor_versions (D-035, D-001, D-003) -->
+  <changeSet id="0011-create-space-versions" author="jorge">
+
+    <createTable tableName="space_versions">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="space_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_space_versions_space"
+                     references="spaces(id)"/>
+      </column>
+      <column name="session_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_space_versions_session"
+                     references="sessions(id)"/>
+      </column>
+      <column name="version_number" type="INTEGER">
+        <constraints nullable="false"/>
+      </column>
+      <column name="changed_fields" type="JSONB">
+        <constraints nullable="true"/>
+      </column>
+      <column name="full_snapshot" type="JSONB">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+
+    <sql>
+      CREATE INDEX idx_space_versions_space_id ON space_versions (space_id);
+    </sql>
+
+    <rollback>
+      <dropIndex tableName="space_versions" indexName="idx_space_versions_space_id"/>
+      <dropTable tableName="space_versions"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

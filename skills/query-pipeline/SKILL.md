@@ -72,7 +72,7 @@ entity_embeddings
   entity_id UUID
   entity_version_id UUID FK → actor_versions.id (or equivalent)
   session_id UUID FK → sessions.id
-  embedding vector(3072)      -- gemini-embedding-001 dimensions
+  embedding vector(1536)      -- gemini-embedding-001 with outputDimensionality=1536 (D-093)
   content_hash TEXT           -- detect unchanged content, skip re-embedding
   created_at TIMESTAMP
 ```

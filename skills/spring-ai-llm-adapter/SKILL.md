@@ -22,8 +22,8 @@ same driven port interfaces.
 
 **Key decisions:**
 - D-049: Local `spring.profiles = local` activates mock adapters (zero cost). `llm-real` profile activates real adapters.
-- D-093: real provider is Google Gemini via Spring AI — `gemini-2.5-flash` (chat) + `gemini-embedding-001` (3072 dims), one `GEMINI_API_KEY` (supersedes D-032 Anthropic + D-040 OpenAI).
-- D-088: `llm-ollama` profile runs real LOCAL models via Ollama (offline, zero cost), including real embeddings. Embedding dimension is a per-profile Liquibase parameter (Gemini `gemini-embedding-001`@3072 / Ollama `bge-m3`@1024).
+- D-093: real provider is Google Gemini via Spring AI — `gemini-2.5-flash` (chat) + `gemini-embedding-001` with `outputDimensionality=1536`, one `GEMINI_API_KEY` (supersedes D-032 Anthropic + D-040 OpenAI).
+- D-088: `llm-ollama` profile runs real LOCAL models via Ollama (offline, zero cost), including real embeddings. Embedding dimension is a per-profile Liquibase parameter (Gemini `gemini-embedding-001`@1536 / Ollama `bge-m3`@1024).
 - D-034: Every LLM call must bound its context. Token budget check before every call.
 - D-062: Spring AI `VectorStore` not used — native pgvector SQL only.
 - ARCH-04: `VectorStore` cannot express domain-specific retrieval (campaign scoping, entity_type filtering, version joins).
@@ -180,7 +180,7 @@ public class SpringAiEmbeddingAdapter implements EmbeddingPort {
     public float[] embed(String content) {
         // EmbeddingModel.embed() returns EmbeddingResponse
         return embeddingModel.embed(content);
-        // gemini-embedding-001: 3072 dimensions (D-093)
+        // gemini-embedding-001 with outputDimensionality=1536 (D-093)
         // Free tier on Google AI Studio — negligible cost per entity version
     }
 }
@@ -191,7 +191,7 @@ public class SpringAiEmbeddingAdapter implements EmbeddingPort {
 public class MockEmbeddingAdapter implements EmbeddingPort {
     @Override
     public float[] embed(String content) {
-        return new float[3072];  // zero vector — sufficient for local dev
+        return new float[1536];  // zero vector — sufficient for local dev
     }
 }
 ```
@@ -201,7 +201,7 @@ a `@Async` `@EventListener` handler, not in the commit endpoint itself.
 
 **Embedding dimension is per-profile (D-088).** The `entity_embeddings.embedding` column is
 `vector(${embeddingDimension})` — a Liquibase parameter (`spring.liquibase.parameters.embeddingDimension`,
-default 3072 for `gemini-embedding-001`, set 1024 under `llm-ollama` for `bge-m3`). Vectors from different models are NOT
+default 1536 for `gemini-embedding-001` with `outputDimensionality=1536`, set 1024 under `llm-ollama` for `bge-m3`). Vectors from different models are NOT
 comparable even at equal dimension, so a single database must use exactly one embedding model. Changing
 `OLLAMA_EMBEDDING_MODEL` to a different-dimension model requires updating `EMBEDDING_DIMENSION` **and**
 recreating the local DB (`docker compose down -v`) — a pgvector column's dimension is fixed at create time.
