@@ -2,19 +2,84 @@ package com.bluesteel.adapters.out.ai;
 
 import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.application.port.out.ingestion.NarrativeExtractionPort;
+import com.bluesteel.config.LlmCostLogger;
+import java.time.Instant;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClient.CallResponseSpec;
+import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
- * Stub for the real Spring AI narrative-extraction adapter. Active on {@code llm-real} or {@code
- * llm-ollama} profiles; real {@code ChatClient} logic is wired in F2.4.
+ * Real narrative-extraction adapter using Spring AI {@link ChatClient}. Active on {@code llm-real}
+ * or {@code llm-ollama} profiles; the active {@code ChatClient} bean is provider-neutral and
+ * selected per profile in {@link AiConfig} (D-088).
+ *
+ * <p>Enforces a pre-call token budget (D-034) and logs every call via {@link LlmCostLogger}
+ * (LOG-01, D-072).
  */
 @Component
 @Profile("llm-real | llm-ollama")
 public class SpringAiNarrativeExtractionAdapter implements NarrativeExtractionPort {
 
+  private static final String SYSTEM_PROMPT =
+      """
+      You are a knowledge extraction assistant for tabletop RPG session summaries.
+      Extract all actors (named characters), spaces (locations/settings), events (plot occurrences),
+      and relations (connections between entities) explicitly mentioned in the session text.
+      Also produce a concise 1–3 sentence narrative summary header capturing the session's key events (D-005).
+      Return a single valid JSON object matching the schema provided. No extra text.
+      """;
+
+  private final ChatClient chatClient;
+  private final LlmCostLogger costLogger;
+  private final int maxContextTokens;
+
+  public SpringAiNarrativeExtractionAdapter(
+      ChatClient chatClient,
+      LlmCostLogger costLogger,
+      @Value("${blue-steel.llm.extraction-max-tokens}") int maxContextTokens) {
+    this.chatClient = chatClient;
+    this.costLogger = costLogger;
+    this.maxContextTokens = maxContextTokens;
+  }
+
   @Override
   public ExtractionResult extract(String rawSummaryText) {
-    throw new UnsupportedOperationException("Real LLM adapter not implemented until F2.4");
+    int estimated = TokenEstimator.estimate(rawSummaryText);
+    if (estimated > maxContextTokens) {
+      throw new TokenBudgetExceededException(estimated, maxContextTokens);
+    }
+
+    Instant start = Instant.now();
+
+    CallResponseSpec callSpec =
+        chatClient.prompt().system(SYSTEM_PROMPT).user(rawSummaryText).call();
+
+    ResponseEntity<ChatResponse, ExtractionResult> responseEntity =
+        callSpec.responseEntity(ExtractionResult.class);
+
+    ChatResponse chatResponse = responseEntity.getResponse();
+    ExtractionResult result = responseEntity.getEntity();
+
+    int tokensIn = estimated;
+    int tokensOut = 0;
+    if (chatResponse != null) {
+      Usage usage = chatResponse.getMetadata().getUsage();
+      Integer promptTokens = usage.getPromptTokens();
+      Integer completionTokens = usage.getCompletionTokens();
+      if (promptTokens != null) {
+        tokensIn = promptTokens;
+      }
+      if (completionTokens != null) {
+        tokensOut = completionTokens;
+      }
+    }
+
+    costLogger.logLlmCall("extraction", tokensIn, tokensOut, start);
+    return result;
   }
 }
