@@ -1,12 +1,16 @@
 package com.bluesteel.adapters.in.web;
 
+import com.bluesteel.domain.exception.ActiveSessionExistsException;
 import com.bluesteel.domain.exception.AlreadyCampaignMemberException;
 import com.bluesteel.domain.exception.CampaignNotFoundException;
 import com.bluesteel.domain.exception.CannotRemoveGmException;
 import com.bluesteel.domain.exception.DomainException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
+import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
 import com.bluesteel.domain.exception.RefreshTokenException;
+import com.bluesteel.domain.exception.SessionNotFoundException;
+import com.bluesteel.domain.exception.SummaryTooLargeException;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.exception.UserNotFoundException;
 import java.util.List;
@@ -105,6 +109,31 @@ public class GlobalExceptionHandler {
   public ApiResponse<Void> handleUnreadableBody(HttpMessageNotReadableException ex) {
     return ApiResponse.error(
         ApiError.of("MALFORMED_REQUEST", "Request body is malformed or missing"));
+  }
+
+  @ExceptionHandler(SummaryTooLargeException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ApiResponse<Void> handleSummaryTooLarge(SummaryTooLargeException ex) {
+    return ApiResponse.error(ApiError.of("SUMMARY_TOO_LARGE", ex.getMessage()));
+  }
+
+  @ExceptionHandler(ActiveSessionExistsException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ApiResponse<Void> handleActiveSessionExists(ActiveSessionExistsException ex) {
+    return ApiResponse.error(ApiError.of("ACTIVE_SESSION_EXISTS", ex.getMessage()));
+  }
+
+  @ExceptionHandler(InvalidSessionStateTransitionException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ApiResponse<Void> handleInvalidSessionStateTransition(
+      InvalidSessionStateTransitionException ex) {
+    return ApiResponse.error(ApiError.of("INVALID_SESSION_STATE", ex.getMessage()));
+  }
+
+  @ExceptionHandler(SessionNotFoundException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public ApiResponse<Void> handleSessionNotFound(SessionNotFoundException ex) {
+    return ApiResponse.error(ApiError.of("SESSION_NOT_FOUND", ex.getMessage()));
   }
 
   /**

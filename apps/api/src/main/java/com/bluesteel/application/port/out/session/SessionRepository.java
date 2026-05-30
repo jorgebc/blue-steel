@@ -1,0 +1,21 @@
+package com.bluesteel.application.port.out.session;
+
+import com.bluesteel.domain.session.Session;
+import java.util.Optional;
+import java.util.UUID;
+
+/** Driven port for persisting and querying {@link Session} aggregates. */
+public interface SessionRepository {
+
+  /** Persists a new or updated session. */
+  void save(Session session);
+
+  /** Returns the session by id, or empty if not found. */
+  Optional<Session> findById(UUID id);
+
+  /**
+   * Returns the single active session for a campaign (in {@code processing} or {@code draft}
+   * status), or empty if none exists. Backs the D-054 single-active-session enforcement.
+   */
+  Optional<Session> findActiveByCampaignId(UUID campaignId);
+}
