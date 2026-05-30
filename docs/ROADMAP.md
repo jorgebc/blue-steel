@@ -1061,15 +1061,15 @@ npx shadcn@latest add button input label form card
 | F2.1.4 | Entity-embeddings migration — vector(1536) + IVFFlat (0016) | ✅ |
 | F2.1.5 | Annotations table migration (0017) | ✅ |
 | F2.1.6 | Proposals + proposal-votes schema-only migrations (0018–0019) | ✅ |
-| F2.2 | Mock LLM + Email adapters (local profile) | 🔲 |
-| F2.2.1 | AI value model — extraction + shared EntityContext | 🔲 |
-| F2.2.2 | AI value model — entity-resolution outcomes | 🔲 |
-| F2.2.3 | Narrative-extraction port + mock + llm-real stub | 🔲 |
-| F2.2.4 | Entity-resolution port + mock + llm-real stub | 🔲 |
-| F2.2.5 | Conflict-detection port + mock + llm-real stub | 🔲 |
-| F2.2.6 | Embedding port + mock + llm-real stub | 🔲 |
-| F2.2.7 | Query-answering port + mock + llm-real stub | 🔲 |
-| F2.2.8 | AiConfig + local-profile mock-adapter wiring IT | 🔲 |
+| F2.2 | Mock LLM + Email adapters (local profile) | ✅ |
+| F2.2.1 | AI value model — extraction + shared EntityContext | ✅ |
+| F2.2.2 | AI value model — entity-resolution outcomes | ✅ |
+| F2.2.3 | Narrative-extraction port + mock + llm-real stub | ✅ |
+| F2.2.4 | Entity-resolution port + mock + llm-real stub | ✅ |
+| F2.2.5 | Conflict-detection port + mock + llm-real stub | ✅ |
+| F2.2.6 | Embedding port + mock + llm-real stub | ✅ |
+| F2.2.7 | Query-answering port + mock + llm-real stub | ✅ |
+| F2.2.8 | AiConfig + local-profile mock-adapter wiring IT | ✅ |
 | F2.3 | Session submission + status machine | 🔲 |
 | F2.3.1 | Session aggregate + status state machine + InvalidSessionStateTransitionException | 🔲 |
 | F2.3.2 | NarrativeBlock write-once domain entity | 🔲 |
