@@ -90,4 +90,29 @@ class NarrativeBlockPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
     assertThat(block.tokenCount()).isEqualTo(42);
     assertThat(block.sessionId()).isEqualTo(sessionId);
   }
+
+  @Test
+  @DisplayName("should retrieve a narrative block by session ID")
+  void findBySessionId_savedBlock_returnsBlock() {
+    UUID blockId = UUID.randomUUID();
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    String text = "The party discovered a hidden passage behind the waterfall.";
+    NarrativeBlock block = NarrativeBlock.create(blockId, sessionId, text, 14, now);
+    adapter.save(block);
+
+    var found = adapter.findBySessionId(sessionId);
+
+    assertThat(found).isPresent();
+    assertThat(found.get().rawSummaryText()).isEqualTo(text);
+    assertThat(found.get().sessionId()).isEqualTo(sessionId);
+    assertThat(found.get().id()).isEqualTo(blockId);
+  }
+
+  @Test
+  @DisplayName("should return empty when no block exists for the session ID")
+  void findBySessionId_noBlock_returnsEmpty() {
+    var found = adapter.findBySessionId(UUID.randomUUID());
+
+    assertThat(found).isEmpty();
+  }
 }

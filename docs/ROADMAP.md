@@ -1070,25 +1070,25 @@ npx shadcn@latest add button input label form card
 | F2.2.6 | Embedding port + mock + llm-real stub | ✅ |
 | F2.2.7 | Query-answering port + mock + llm-real stub | ✅ |
 | F2.2.8 | AiConfig + local-profile mock-adapter wiring IT | ✅ |
-| F2.3 | Session submission + status machine | 🔲 |
-| F2.3.1 | Session aggregate + status state machine + InvalidSessionStateTransitionException | 🔲 |
-| F2.3.2 | NarrativeBlock write-once domain entity | 🔲 |
-| F2.3.3 | Session driven ports + SessionSubmittedEvent + timeout-recovery port method | 🔲 |
-| F2.3.4 | Session persistence adapter (JPA entity + repo + adapter) | 🔲 |
-| F2.3.5 | NarrativeBlock persistence adapter (JPA entity + repo + adapter) | 🔲 |
-| F2.3.6 | SubmitSessionUseCase + service (token budget, 409, role, publish event) | 🔲 |
-| F2.3.7 | GetSessionStatus + DiscardSession use cases + services | 🔲 |
-| F2.3.8 | SessionIngestionEventListener stub (@EventListener + @Async) | 🔲 |
-| F2.3.9 | Timeout-recovery query — extend SessionRecoveryAdapter (PIPELINE_TIMEOUT) | 🔲 |
-| F2.3.10 | Scheduled stuck-processing TTL checker (@Scheduled + @EnableScheduling) | 🔲 |
-| F2.3.11 | SessionController + DTOs + GlobalExceptionHandler mappings | 🔲 |
-| F2.4 | Knowledge extraction pipeline | 🔲 |
-| F2.4.1 | LLM cost logger + token-budget utilities (shared LLM infra) | 🔲 |
-| F2.4.2 | AiConfig real llm-real ChatClient bean + provider config | 🔲 |
-| F2.4.3 | Real SpringAiNarrativeExtractionAdapter (replaces F2.2.3 stub) | 🔲 |
-| F2.4.4 | NarrativeBlockRepository.findBySessionId (port + adapter extension) | 🔲 |
-| F2.4.5 | ExtractionPipelineService (transitions + extract + MDC + fail handling) | 🔲 |
-| F2.4.6 | Wire extraction into SessionIngestionEventListener | 🔲 |
+| F2.3 | Session submission + status machine | ✅ |
+| F2.3.1 | Session aggregate + status state machine + InvalidSessionStateTransitionException | ✅ |
+| F2.3.2 | NarrativeBlock write-once domain entity | ✅ |
+| F2.3.3 | Session driven ports + SessionSubmittedEvent + timeout-recovery port method | ✅ |
+| F2.3.4 | Session persistence adapter (JPA entity + repo + adapter) | ✅ |
+| F2.3.5 | NarrativeBlock persistence adapter (JPA entity + repo + adapter) | ✅ |
+| F2.3.6 | SubmitSessionUseCase + service (token budget, 409, role, publish event) | ✅ |
+| F2.3.7 | GetSessionStatus + DiscardSession use cases + services | ✅ |
+| F2.3.8 | SessionIngestionEventListener stub (@EventListener + @Async) | ✅ |
+| F2.3.9 | Timeout-recovery query — extend SessionRecoveryAdapter (PIPELINE_TIMEOUT) | ✅ |
+| F2.3.10 | Scheduled stuck-processing TTL checker (@Scheduled + @EnableScheduling) | ✅ |
+| F2.3.11 | SessionController + DTOs + GlobalExceptionHandler mappings | ✅ |
+| F2.4 | Knowledge extraction pipeline | ✅ |
+| F2.4.1 | LLM cost logger + token-budget utilities (shared LLM infra) | ✅ |
+| F2.4.2 | AiConfig real llm-real ChatClient bean + provider config | ✅ |
+| F2.4.3 | Real SpringAiNarrativeExtractionAdapter (replaces F2.2.3 stub) | ✅ |
+| F2.4.4 | NarrativeBlockRepository.findBySessionId (port + adapter extension) | ✅ |
+| F2.4.5 | ExtractionPipelineService (transitions + extract + MDC + fail handling) | ✅ |
+| F2.4.6 | Wire extraction into SessionIngestionEventListener | ✅ |
 | F2.5 | Entity resolution pipeline | 🔲 |
 | F2.5.1 | SimilarityResult model + EntitySimilaritySearchPort | 🔲 |
 | F2.5.2 | EntitySimilaritySearchAdapter (native pgvector retrieval) | 🔲 |

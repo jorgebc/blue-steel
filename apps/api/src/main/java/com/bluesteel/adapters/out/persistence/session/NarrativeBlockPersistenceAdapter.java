@@ -2,6 +2,8 @@ package com.bluesteel.adapters.out.persistence.session;
 
 import com.bluesteel.application.port.out.session.NarrativeBlockRepository;
 import com.bluesteel.domain.session.NarrativeBlock;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +20,11 @@ public class NarrativeBlockPersistenceAdapter implements NarrativeBlockRepositor
   @Override
   public void save(NarrativeBlock block) {
     jpaRepository.save(toEntity(block));
+  }
+
+  @Override
+  public Optional<NarrativeBlock> findBySessionId(UUID sessionId) {
+    return jpaRepository.findBySessionId(sessionId).map(this::toDomain);
   }
 
   private NarrativeBlock toDomain(NarrativeBlockJpaEntity e) {
