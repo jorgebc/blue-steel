@@ -15,7 +15,7 @@
 | Migrations | Liquibase |
 | Auth | Spring Security (JWT HS256) |
 | LLM generation | Spring AI `ChatClient` → Google Gemini `gemini-2.5-flash` (`llm-real`, D-093) or Ollama (`llm-ollama`, D-088) |
-| LLM embeddings | Spring AI `EmbeddingModel` → Google `gemini-embedding-001` (3072, `llm-real`, D-093) or Ollama `bge-m3` (1024) per profile (D-088) |
+| LLM embeddings | Spring AI `EmbeddingModel` → Google `gemini-embedding-001` (outputDimensionality=1536, `llm-real`, D-093) or Ollama `bge-m3` (1024) per profile (D-088) |
 | Vector retrieval | **Native pgvector SQL only** — `VectorStore` never used (D-062) |
 | Testing | JUnit 5, Mockito, Testcontainers, PITest, ArchUnit |
 | Style | Spotless + google-java-format |
@@ -135,7 +135,7 @@ A failing ArchUnit test is a layer violation in production code — fix the code
 - Generated async post-commit via `@Async` / `ApplicationEvent` (D-063)
 - Entity versions without embeddings excluded from Query Mode retrieval
 - Commit returns `200` before embeddings are generated
-- Provider + dimension are per-profile: Gemini `gemini-embedding-001`@3072 (`llm-real`/prod, D-093), Ollama `bge-m3`@1024 (`llm-ollama`, offline). Column is `vector(${embeddingDimension})` via a Liquibase parameter; vectors from different models are not comparable — never mix models in one DB (D-088)
+- Provider + dimension are per-profile: Gemini `gemini-embedding-001`@1536 with `outputDimensionality=1536` (`llm-real`/prod, D-093), Ollama `bge-m3`@1024 (`llm-ollama`, offline). Column is `vector(${embeddingDimension})` via a Liquibase parameter; vectors from different models are not comparable — never mix models in one DB (D-088)
 
 ---
 

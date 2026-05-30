@@ -70,11 +70,11 @@ npm test              # Vitest (CI mode)
 | `DATABASE_URL` | Neon PostgreSQL connection string |
 | `GEMINI_API_KEY` | Google AI Studio key — Gemini chat + embeddings, `llm-real` profile only (D-093) |
 | `GEMINI_CHAT_MODEL` | Gemini chat model — `llm-real` (default `gemini-2.5-flash`) |
-| `GEMINI_EMBEDDING_MODEL` | Gemini embedding model — `llm-real` (default `gemini-embedding-001`, 3072 dims) |
+| `GEMINI_EMBEDDING_MODEL` | Gemini embedding model — `llm-real` (default `gemini-embedding-001`, outputDimensionality=1536) |
 | `OLLAMA_BASE_URL` | Ollama server — `llm-ollama` profile (default `http://localhost:11434`; no key needed) (D-088) |
 | `OLLAMA_CHAT_MODEL` | Local chat model — `llm-ollama` (default `qwen2.5:7b`) |
 | `OLLAMA_EMBEDDING_MODEL` | Local embedding model — `llm-ollama` (default `bge-m3`, 1024 dims) |
-| `EMBEDDING_DIMENSION` | pgvector embedding column dimension (default 3072 under `llm-real`; set 1024 under `llm-ollama`) |
+| `EMBEDDING_DIMENSION` | pgvector embedding column dimension (default 1536 under `llm-real`; set 1024 under `llm-ollama`) |
 | `JWT_SECRET` | HS256 symmetric secret (min 32 bytes) |
 | `EMAIL_API_KEY` | Transactional email (Resend) |
 | `VITE_API_BASE_URL` | Backend URL for frontend (e.g. `http://localhost:8080`) |
