@@ -1,6 +1,7 @@
 package com.bluesteel.application.service.session;
 
 import com.bluesteel.application.event.SessionSubmittedEvent;
+import com.bluesteel.application.model.ingestion.ConflictWarning;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.application.model.ingestion.ResolvedEntity;
 import com.bluesteel.application.port.out.session.NarrativeBlockRepository;
@@ -28,16 +29,19 @@ public class SessionIngestionEventListener {
   private final NarrativeBlockRepository narrativeBlockRepository;
   private final ExtractionPipelineService extractionPipelineService;
   private final EntityResolutionService entityResolutionService;
+  private final ConflictDetectionService conflictDetectionService;
 
   public SessionIngestionEventListener(
       SessionRepository sessionRepository,
       NarrativeBlockRepository narrativeBlockRepository,
       ExtractionPipelineService extractionPipelineService,
-      EntityResolutionService entityResolutionService) {
+      EntityResolutionService entityResolutionService,
+      ConflictDetectionService conflictDetectionService) {
     this.sessionRepository = sessionRepository;
     this.narrativeBlockRepository = narrativeBlockRepository;
     this.extractionPipelineService = extractionPipelineService;
     this.entityResolutionService = entityResolutionService;
+    this.conflictDetectionService = conflictDetectionService;
   }
 
   @EventListener
@@ -60,13 +64,16 @@ public class SessionIngestionEventListener {
                         "NarrativeBlock not found for session: " + event.sessionId()));
 
     // Extraction stage — session transitions to PROCESSING inside the service.
-    // On failure: ExtractionPipelineService marks the session FAILED and rethrows.
     ExtractionResult extractionResult =
         extractionPipelineService.run(session, block.rawSummaryText());
 
-    // Resolution stage — resolved entities held in-memory for conflict detection (F2.6).
-    @SuppressWarnings("unused")
+    // Resolution stage — resolved entities passed to conflict detection.
     List<ResolvedEntity> resolved =
         entityResolutionService.run(session.campaignId(), extractionResult);
+
+    // Conflict detection stage — warnings held in-memory for diff generation (F2.7).
+    @SuppressWarnings("unused")
+    List<ConflictWarning> conflicts =
+        conflictDetectionService.run(session.campaignId(), extractionResult, resolved);
   }
 }

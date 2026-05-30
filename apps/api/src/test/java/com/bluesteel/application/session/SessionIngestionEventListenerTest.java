@@ -5,9 +5,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bluesteel.application.event.SessionSubmittedEvent;
+import com.bluesteel.application.model.ingestion.ConflictWarning;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
+import com.bluesteel.application.model.ingestion.ResolutionOutcome;
+import com.bluesteel.application.model.ingestion.ResolvedEntity;
 import com.bluesteel.application.port.out.session.NarrativeBlockRepository;
 import com.bluesteel.application.port.out.session.SessionRepository;
+import com.bluesteel.application.service.session.ConflictDetectionService;
 import com.bluesteel.application.service.session.EntityResolutionService;
 import com.bluesteel.application.service.session.ExtractionPipelineService;
 import com.bluesteel.application.service.session.SessionIngestionEventListener;
@@ -33,6 +37,7 @@ class SessionIngestionEventListenerTest {
   @Mock private NarrativeBlockRepository narrativeBlockRepository;
   @Mock private ExtractionPipelineService extractionPipelineService;
   @Mock private EntityResolutionService entityResolutionService;
+  @Mock private ConflictDetectionService conflictDetectionService;
 
   private SessionIngestionEventListener sut;
 
@@ -43,7 +48,8 @@ class SessionIngestionEventListenerTest {
             sessionRepository,
             narrativeBlockRepository,
             extractionPipelineService,
-            entityResolutionService);
+            entityResolutionService,
+            conflictDetectionService);
   }
 
   @Test
@@ -64,6 +70,9 @@ class SessionIngestionEventListenerTest {
     when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
     when(narrativeBlockRepository.findBySessionId(sessionId)).thenReturn(Optional.of(block));
     when(extractionPipelineService.run(session, rawText)).thenReturn(extractionResult);
+    when(entityResolutionService.run(campaignId, extractionResult)).thenReturn(List.of());
+    when(conflictDetectionService.run(campaignId, extractionResult, List.of()))
+        .thenReturn(List.of());
 
     sut.onSessionSubmitted(new SessionSubmittedEvent(sessionId, campaignId));
 
@@ -93,6 +102,9 @@ class SessionIngestionEventListenerTest {
     when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
     when(narrativeBlockRepository.findBySessionId(sessionId)).thenReturn(Optional.of(block));
     when(extractionPipelineService.run(session, rawText)).thenReturn(extractionResult);
+    when(entityResolutionService.run(campaignId, extractionResult)).thenReturn(List.of());
+    when(conflictDetectionService.run(campaignId, extractionResult, List.of()))
+        .thenReturn(List.of());
 
     sut.onSessionSubmitted(new SessionSubmittedEvent(sessionId, campaignId));
 
@@ -103,5 +115,43 @@ class SessionIngestionEventListenerTest {
 
     assertThat(campaignIdCaptor.getValue()).isEqualTo(campaignId);
     assertThat(extractionCaptor.getValue()).isSameAs(extractionResult);
+  }
+
+  @Test
+  @DisplayName(
+      "should invoke ConflictDetectionService with campaignId, extraction output, and resolved entities after resolution")
+  void onSessionSubmitted_delegatesToConflictDetectionServiceAfterResolution() {
+    UUID sessionId = UUID.randomUUID();
+    UUID campaignId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+    String rawText = "Mira appeared at the castle gates.";
+
+    Session session = Session.create(sessionId, campaignId, ownerId, Instant.now());
+    NarrativeBlock block =
+        NarrativeBlock.create(UUID.randomUUID(), sessionId, rawText, 10, Instant.now());
+    ExtractionResult extractionResult =
+        new ExtractionResult("Mira appeared.", List.of(), List.of(), List.of(), List.of());
+    ResolvedEntity resolved = new ResolvedEntity(null, ResolutionOutcome.MATCH, UUID.randomUUID());
+
+    when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+    when(narrativeBlockRepository.findBySessionId(sessionId)).thenReturn(Optional.of(block));
+    when(extractionPipelineService.run(session, rawText)).thenReturn(extractionResult);
+    when(entityResolutionService.run(campaignId, extractionResult)).thenReturn(List.of(resolved));
+    when(conflictDetectionService.run(campaignId, extractionResult, List.of(resolved)))
+        .thenReturn(List.of(new ConflictWarning("Mira", "Contradiction found.")));
+
+    sut.onSessionSubmitted(new SessionSubmittedEvent(sessionId, campaignId));
+
+    ArgumentCaptor<UUID> campaignIdCaptor = ArgumentCaptor.forClass(UUID.class);
+    ArgumentCaptor<ExtractionResult> extractionCaptor =
+        ArgumentCaptor.forClass(ExtractionResult.class);
+    ArgumentCaptor<List<ResolvedEntity>> resolvedCaptor =
+        ArgumentCaptor.forClass((Class<List<ResolvedEntity>>) (Class<?>) List.class);
+    verify(conflictDetectionService)
+        .run(campaignIdCaptor.capture(), extractionCaptor.capture(), resolvedCaptor.capture());
+
+    assertThat(campaignIdCaptor.getValue()).isEqualTo(campaignId);
+    assertThat(extractionCaptor.getValue()).isSameAs(extractionResult);
+    assertThat(resolvedCaptor.getValue()).containsExactly(resolved);
   }
 }
