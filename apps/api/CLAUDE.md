@@ -70,6 +70,11 @@ mvn spotless:check                               # format check (google-java-for
 mvn spotless:apply                               # auto-fix formatting
 mvn test                                         # unit + ArchUnit (fast; also runs spotless:check)
 mvn verify                                       # + Testcontainers IT (Podman/Docker required)
+# On this machine (WSL2 + Podman, no Docker Desktop) the failsafe JVM needs DOCKER_HOST as both
+# an env var AND a -D system property — env alone is not forwarded to the forked process:
+DOCKER_HOST=tcp://172.24.22.209:2375 TESTCONTAINERS_RYUK_DISABLED=true \
+  mvn verify -DDOCKER_HOST=tcp://172.24.22.209:2375
+# The TCP bridge (Python script in WSL2) must be running first — see project memory for setup.
 mvn test-compile pitest:mutationCoverage         # mutation tests — domain core (slow)
 mvn package -DskipTests                          # production JAR
 

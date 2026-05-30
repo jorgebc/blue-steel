@@ -39,4 +39,24 @@ public class SessionRecoveryAdapter implements SessionRecoveryPort {
       return -1;
     }
   }
+
+  @Override
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public int recoverTimedOutSessions(int timeoutMinutes) {
+    try {
+      return jdbcTemplate.update(
+          """
+          UPDATE sessions
+          SET status = 'failed',
+              failure_reason = 'PIPELINE_TIMEOUT',
+              updated_at = now()
+          WHERE status = 'processing'
+            AND updated_at < now() - make_interval(mins => ?)
+          """,
+          timeoutMinutes);
+    } catch (BadSqlGrammarException e) {
+      log.debug("Sessions table not yet present — skipping timed-out-session recovery");
+      return -1;
+    }
+  }
 }
