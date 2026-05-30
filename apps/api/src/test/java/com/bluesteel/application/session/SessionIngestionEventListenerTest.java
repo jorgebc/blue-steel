@@ -5,13 +5,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bluesteel.application.event.SessionSubmittedEvent;
+import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.application.port.out.session.NarrativeBlockRepository;
 import com.bluesteel.application.port.out.session.SessionRepository;
+import com.bluesteel.application.service.session.EntityResolutionService;
 import com.bluesteel.application.service.session.ExtractionPipelineService;
 import com.bluesteel.application.service.session.SessionIngestionEventListener;
 import com.bluesteel.domain.session.NarrativeBlock;
 import com.bluesteel.domain.session.Session;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +32,7 @@ class SessionIngestionEventListenerTest {
   @Mock private SessionRepository sessionRepository;
   @Mock private NarrativeBlockRepository narrativeBlockRepository;
   @Mock private ExtractionPipelineService extractionPipelineService;
+  @Mock private EntityResolutionService entityResolutionService;
 
   private SessionIngestionEventListener sut;
 
@@ -36,7 +40,10 @@ class SessionIngestionEventListenerTest {
   void setUp() {
     sut =
         new SessionIngestionEventListener(
-            sessionRepository, narrativeBlockRepository, extractionPipelineService);
+            sessionRepository,
+            narrativeBlockRepository,
+            extractionPipelineService,
+            entityResolutionService);
   }
 
   @Test
@@ -51,9 +58,12 @@ class SessionIngestionEventListenerTest {
     Session session = Session.create(sessionId, campaignId, ownerId, Instant.now());
     NarrativeBlock block =
         NarrativeBlock.create(UUID.randomUUID(), sessionId, rawText, 10, Instant.now());
+    ExtractionResult extractionResult =
+        new ExtractionResult("Summary.", List.of(), List.of(), List.of(), List.of());
 
     when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
     when(narrativeBlockRepository.findBySessionId(sessionId)).thenReturn(Optional.of(block));
+    when(extractionPipelineService.run(session, rawText)).thenReturn(extractionResult);
 
     sut.onSessionSubmitted(new SessionSubmittedEvent(sessionId, campaignId));
 
@@ -63,5 +73,35 @@ class SessionIngestionEventListenerTest {
 
     assertThat(sessionCaptor.getValue()).isSameAs(session);
     assertThat(textCaptor.getValue()).isEqualTo(rawText);
+  }
+
+  @Test
+  @DisplayName(
+      "should invoke EntityResolutionService with campaignId and extraction output after extraction")
+  void onSessionSubmitted_delegatesToEntityResolutionServiceAfterExtraction() {
+    UUID sessionId = UUID.randomUUID();
+    UUID campaignId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+    String rawText = "The heroes discovered an ancient temple.";
+
+    Session session = Session.create(sessionId, campaignId, ownerId, Instant.now());
+    NarrativeBlock block =
+        NarrativeBlock.create(UUID.randomUUID(), sessionId, rawText, 10, Instant.now());
+    ExtractionResult extractionResult =
+        new ExtractionResult("Temple discovered.", List.of(), List.of(), List.of(), List.of());
+
+    when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+    when(narrativeBlockRepository.findBySessionId(sessionId)).thenReturn(Optional.of(block));
+    when(extractionPipelineService.run(session, rawText)).thenReturn(extractionResult);
+
+    sut.onSessionSubmitted(new SessionSubmittedEvent(sessionId, campaignId));
+
+    ArgumentCaptor<UUID> campaignIdCaptor = ArgumentCaptor.forClass(UUID.class);
+    ArgumentCaptor<ExtractionResult> extractionCaptor =
+        ArgumentCaptor.forClass(ExtractionResult.class);
+    verify(entityResolutionService).run(campaignIdCaptor.capture(), extractionCaptor.capture());
+
+    assertThat(campaignIdCaptor.getValue()).isEqualTo(campaignId);
+    assertThat(extractionCaptor.getValue()).isSameAs(extractionResult);
   }
 }

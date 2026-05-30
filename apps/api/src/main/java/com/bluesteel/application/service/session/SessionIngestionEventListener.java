@@ -1,10 +1,13 @@
 package com.bluesteel.application.service.session;
 
 import com.bluesteel.application.event.SessionSubmittedEvent;
+import com.bluesteel.application.model.ingestion.ExtractionResult;
+import com.bluesteel.application.model.ingestion.ResolvedEntity;
 import com.bluesteel.application.port.out.session.NarrativeBlockRepository;
 import com.bluesteel.application.port.out.session.SessionRepository;
 import com.bluesteel.domain.session.NarrativeBlock;
 import com.bluesteel.domain.session.Session;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -24,14 +27,17 @@ public class SessionIngestionEventListener {
   private final SessionRepository sessionRepository;
   private final NarrativeBlockRepository narrativeBlockRepository;
   private final ExtractionPipelineService extractionPipelineService;
+  private final EntityResolutionService entityResolutionService;
 
   public SessionIngestionEventListener(
       SessionRepository sessionRepository,
       NarrativeBlockRepository narrativeBlockRepository,
-      ExtractionPipelineService extractionPipelineService) {
+      ExtractionPipelineService extractionPipelineService,
+      EntityResolutionService entityResolutionService) {
     this.sessionRepository = sessionRepository;
     this.narrativeBlockRepository = narrativeBlockRepository;
     this.extractionPipelineService = extractionPipelineService;
+    this.entityResolutionService = entityResolutionService;
   }
 
   @EventListener
@@ -54,8 +60,13 @@ public class SessionIngestionEventListener {
                         "NarrativeBlock not found for session: " + event.sessionId()));
 
     // Extraction stage — session transitions to PROCESSING inside the service.
-    // On success: session remains PROCESSING (entity resolution follows in F2.5).
     // On failure: ExtractionPipelineService marks the session FAILED and rethrows.
-    extractionPipelineService.run(session, block.rawSummaryText());
+    ExtractionResult extractionResult =
+        extractionPipelineService.run(session, block.rawSummaryText());
+
+    // Resolution stage — resolved entities held in-memory for conflict detection (F2.6).
+    @SuppressWarnings("unused")
+    List<ResolvedEntity> resolved =
+        entityResolutionService.run(session.campaignId(), extractionResult);
   }
 }

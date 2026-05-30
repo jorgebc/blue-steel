@@ -1089,12 +1089,12 @@ npx shadcn@latest add button input label form card
 | F2.4.4 | NarrativeBlockRepository.findBySessionId (port + adapter extension) | ✅ |
 | F2.4.5 | ExtractionPipelineService (transitions + extract + MDC + fail handling) | ✅ |
 | F2.4.6 | Wire extraction into SessionIngestionEventListener | ✅ |
-| F2.5 | Entity resolution pipeline | 🔲 |
-| F2.5.1 | SimilarityResult model + EntitySimilaritySearchPort | 🔲 |
-| F2.5.2 | EntitySimilaritySearchAdapter (native pgvector retrieval) | 🔲 |
-| F2.5.3 | Real SpringAiEntityResolutionAdapter (LLM call 2, replaces F2.2.4 stub) | 🔲 |
-| F2.5.4 | EntityResolutionService (two-stage orchestration) | 🔲 |
-| F2.5.5 | Wire resolution into SessionIngestionEventListener | 🔲 |
+| F2.5 | Entity resolution pipeline | ✅ |
+| F2.5.1 | SimilarityResult model + EntitySimilaritySearchPort | ✅ |
+| F2.5.2 | EntitySimilaritySearchAdapter (native pgvector retrieval) | ✅ |
+| F2.5.3 | Real SpringAiEntityResolutionAdapter (LLM call 2, replaces F2.2.4 stub) | ✅ |
+| F2.5.4 | EntityResolutionService (two-stage orchestration) | ✅ |
+| F2.5.5 | Wire resolution into SessionIngestionEventListener | ✅ |
 | F2.6 | Conflict detection pipeline | 🔲 |
 | F2.6.1 | Real SpringAiEmbeddingAdapter (fills F2.2.6 stub; enables real embeddings) | 🔲 |
 | F2.6.2 | Real SpringAiConflictDetectionAdapter (LLM call 3, replaces F2.2.5 stub) | 🔲 |
