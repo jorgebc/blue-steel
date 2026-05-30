@@ -1095,11 +1095,11 @@ npx shadcn@latest add button input label form card
 | F2.5.3 | Real SpringAiEntityResolutionAdapter (LLM call 2, replaces F2.2.4 stub) | ✅ |
 | F2.5.4 | EntityResolutionService (two-stage orchestration) | ✅ |
 | F2.5.5 | Wire resolution into SessionIngestionEventListener | ✅ |
-| F2.6 | Conflict detection pipeline | 🔲 |
-| F2.6.1 | Real SpringAiEmbeddingAdapter (fills F2.2.6 stub; enables real embeddings) | 🔲 |
-| F2.6.2 | Real SpringAiConflictDetectionAdapter (LLM call 3, replaces F2.2.5 stub) | 🔲 |
-| F2.6.3 | ConflictDetectionService (MATCH-scoped pgvector context + LLM call) | 🔲 |
-| F2.6.4 | Wire conflict detection into SessionIngestionEventListener | 🔲 |
+| F2.6 | Conflict detection pipeline | ✅ |
+| F2.6.1 | Real SpringAiEmbeddingAdapter (fills F2.2.6 stub; enables real embeddings) | ✅ |
+| F2.6.2 | Real SpringAiConflictDetectionAdapter (LLM call 3, replaces F2.2.5 stub) | ✅ |
+| F2.6.3 | ConflictDetectionService (MATCH-scoped pgvector context + LLM call) | ✅ |
+| F2.6.4 | Wire conflict detection into SessionIngestionEventListener | ✅ |
 | F2.7 | Diff generation + draft API | 🔲 |
 | F2.7.1 | DiffCard sealed interface + EXISTING/NEW/UNCERTAIN card records | 🔲 |
 | F2.7.2 | ConflictCard + DiffPayload aggregate record | 🔲 |
