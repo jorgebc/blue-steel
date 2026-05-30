@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    Annotations are immutable GM/editor notes on world-state entities (ARCHITECTURE §5.6).
+    No updated_at column — once written, never changed.
+  -->
+  <changeSet id="0017-create-annotations" author="jorge">
+
+    <createTable tableName="annotations">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="campaign_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_annotations_campaign"
+                     references="campaigns(id)"/>
+      </column>
+      <!-- Discriminator for the polymorphic entity reference -->
+      <column name="entity_type" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <!-- Polymorphic ref to the annotated entity — no FK -->
+      <column name="entity_id" type="UUID">
+        <constraints nullable="false"/>
+      </column>
+      <column name="author_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_annotations_author"
+                     references="users(id)"/>
+      </column>
+      <column name="content" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <!-- Deliberately no updated_at — annotations are immutable -->
+      <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+
+    <!-- Valid entity types -->
+    <sql>
+      ALTER TABLE annotations
+        ADD CONSTRAINT chk_annotations_entity_type
+        CHECK (entity_type IN ('actor', 'space', 'relation', 'event'));
+    </sql>
+
+    <rollback>
+      <sql>ALTER TABLE annotations DROP CONSTRAINT chk_annotations_entity_type;</sql>
+      <dropTable tableName="annotations"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

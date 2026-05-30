@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!-- Event head table — mirrors actor pattern (D-035, D-021) -->
+  <changeSet id="0012-create-events" author="jorge">
+
+    <createTable tableName="events">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <!-- D-021: all world-state entities carry campaign_id + owner_id -->
+      <column name="campaign_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_events_campaign"
+                     references="campaigns(id)"/>
+      </column>
+      <column name="owner_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_events_owner"
+                     references="users(id)"/>
+      </column>
+      <column name="name" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_in_session_id" type="UUID">
+        <constraints nullable="true"
+                     foreignKeyName="fk_events_created_in_session"
+                     references="sessions(id)"/>
+      </column>
+    </createTable>
+
+    <rollback>
+      <dropTable tableName="events"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

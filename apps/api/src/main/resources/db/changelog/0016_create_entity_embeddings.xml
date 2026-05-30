@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    Entity embeddings for pgvector similarity search (D-062, D-088, D-093).
+    Dimension is configurable: 1536 for Gemini gemini-embedding-001 with outputDimensionality=1536 (llm-real),
+    1024 for Ollama bge-m3 (llm-ollama). Both are within pgvector IVFFlat/HNSW 2000-dim limit.
+    pgvector extension already exists (0001). Never use Spring AI VectorStore — native SQL only (D-062).
+  -->
+  <changeSet id="0016-create-entity-embeddings" author="jorge">
+
+    <createTable tableName="entity_embeddings">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <!-- Discriminator for the polymorphic entity reference -->
+      <column name="entity_type" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <!-- Polymorphic ref to the entity head (actor/space/event/relation) — no FK -->
+      <column name="entity_id" type="UUID">
+        <constraints nullable="false"/>
+      </column>
+      <!-- Polymorphic ref to the specific version that was embedded — no FK -->
+      <column name="entity_version_id" type="UUID">
+        <constraints nullable="true"/>
+      </column>
+      <column name="session_id" type="UUID">
+        <constraints nullable="true"
+                     foreignKeyName="fk_entity_embeddings_session"
+                     references="sessions(id)"/>
+      </column>
+      <!-- Dimension set via Liquibase parameter; default 1536 for Gemini with outputDimensionality=1536 (D-093) -->
+      <column name="embedding" type="vector(${embeddingDimension})">
+        <constraints nullable="false"/>
+      </column>
+      <!-- SHA-256 hash of the content used to generate this embedding -->
+      <column name="content_hash" type="TEXT">
+        <constraints nullable="true"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+
+    <!-- Valid entity types for polymorphic lookup -->
+    <sql>
+      ALTER TABLE entity_embeddings
+        ADD CONSTRAINT chk_entity_embeddings_entity_type
+        CHECK (entity_type IN ('actor', 'space', 'event', 'relation'));
+    </sql>
+
+    <!-- IVFFlat cosine index for approximate nearest-neighbour search -->
+    <sql>
+      CREATE INDEX idx_entity_embeddings_ivfflat
+      ON entity_embeddings
+      USING ivfflat (embedding vector_cosine_ops)
+      WITH (lists = 100);
+    </sql>
+
+    <rollback>
+      <dropIndex tableName="entity_embeddings" indexName="idx_entity_embeddings_ivfflat"/>
+      <sql>ALTER TABLE entity_embeddings DROP CONSTRAINT chk_entity_embeddings_entity_type;</sql>
+      <dropTable tableName="entity_embeddings"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <changeSet id="0006-create-sessions" author="jorge">
+
+    <createTable tableName="sessions">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="campaign_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_sessions_campaign"
+                     references="campaigns(id)"/>
+      </column>
+      <column name="owner_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_sessions_owner"
+                     references="users(id)"/>
+      </column>
+      <!-- Assigned only on commit; NULL until then (D-069) -->
+      <column name="sequence_number" type="INTEGER">
+        <constraints nullable="true"/>
+      </column>
+      <column name="status" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <!-- Populated in draft status; cleared on commit or discard -->
+      <column name="diff_payload" type="JSONB">
+        <constraints nullable="true"/>
+      </column>
+      <column name="failure_reason" type="TEXT">
+        <constraints nullable="true"/>
+      </column>
+      <column name="committed_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="true"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+      <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+
+    <!-- D-069: sequence_number unique per campaign, but NULLs are excluded -->
+    <addUniqueConstraint tableName="sessions"
+                         columnNames="campaign_id, sequence_number"
+                         constraintName="uidx_sessions_campaign_sequence_number"/>
+
+    <!-- Valid session lifecycle states -->
+    <sql>
+      ALTER TABLE sessions
+        ADD CONSTRAINT chk_sessions_status
+        CHECK (status IN ('pending', 'processing', 'draft', 'committed', 'failed', 'discarded'));
+    </sql>
+
+    <!-- D-054: at most one active (processing or draft) session per campaign -->
+    <sql>
+      CREATE UNIQUE INDEX sessions_one_active_per_campaign
+      ON sessions (campaign_id)
+      WHERE status IN ('processing', 'draft');
+    </sql>
+
+    <rollback>
+      <dropIndex tableName="sessions" indexName="sessions_one_active_per_campaign"/>
+      <sql>ALTER TABLE sessions DROP CONSTRAINT chk_sessions_status;</sql>
+      <dropUniqueConstraint tableName="sessions"
+                            constraintName="uidx_sessions_campaign_sequence_number"/>
+      <dropTable tableName="sessions"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

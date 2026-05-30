@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!-- Event version table — append-only history (D-035, D-001, D-003) -->
+  <changeSet id="0013-create-event-versions" author="jorge">
+
+    <createTable tableName="event_versions">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="event_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_event_versions_event"
+                     references="events(id)"/>
+      </column>
+      <column name="session_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_event_versions_session"
+                     references="sessions(id)"/>
+      </column>
+      <column name="version_number" type="INTEGER">
+        <constraints nullable="false"/>
+      </column>
+      <column name="changed_fields" type="JSONB">
+        <constraints nullable="true"/>
+      </column>
+      <column name="full_snapshot" type="JSONB">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+
+    <sql>
+      CREATE INDEX idx_event_versions_event_id ON event_versions (event_id);
+    </sql>
+
+    <rollback>
+      <dropIndex tableName="event_versions" indexName="idx_event_versions_event_id"/>
+      <dropTable tableName="event_versions"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

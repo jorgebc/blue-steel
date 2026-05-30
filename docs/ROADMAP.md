@@ -1054,13 +1054,13 @@ npx shadcn@latest add button input label form card
 
 | # | Feature | Status |
 |---|---|---|
-| F2.1 | World state + session schema migrations | 🔲 |
-| F2.1.1 | Session + narrative-block schema migrations (0006–0007) | 🔲 |
-| F2.1.2 | Actor + space versioned-table migrations (0008–0011) | 🔲 |
-| F2.1.3 | Event + relation versioned-table migrations (0012–0015) | 🔲 |
-| F2.1.4 | Entity-embeddings migration — vector(3072) + IVFFlat (0016) | 🔲 |
-| F2.1.5 | Annotations table migration (0017) | 🔲 |
-| F2.1.6 | Proposals + proposal-votes schema-only migrations (0018–0019) | 🔲 |
+| F2.1 | World state + session schema migrations | ✅ |
+| F2.1.1 | Session + narrative-block schema migrations (0006–0007) | ✅ |
+| F2.1.2 | Actor + space versioned-table migrations (0008–0011) | ✅ |
+| F2.1.3 | Event + relation versioned-table migrations (0012–0015) | ✅ |
+| F2.1.4 | Entity-embeddings migration — vector(1536) + IVFFlat (0016) | ✅ |
+| F2.1.5 | Annotations table migration (0017) | ✅ |
+| F2.1.6 | Proposals + proposal-votes schema-only migrations (0018–0019) | ✅ |
 | F2.2 | Mock LLM + Email adapters (local profile) | 🔲 |
 | F2.2.1 | AI value model — extraction + shared EntityContext | 🔲 |
 | F2.2.2 | AI value model — entity-resolution outcomes | 🔲 |
@@ -1225,8 +1225,8 @@ npx shadcn@latest add button input label form card
 **Goal:** Create `entity_embeddings` with a **configurable-dimension** `vector` column, the IVFFlat cosine index, and the `entity_type` CHECK constraint (ARCHITECTURE.md §5.5, D-062, D-088). The pgvector extension already exists (changeset 0001) — do NOT re-create it.
 
 **Scope (in):**
-- `apps/api/src/main/resources/db/changelog/0016_create_entity_embeddings.xml` — UUID PK; `entity_type TEXT` + raw-SQL `CHECK (entity_type IN ('actor','space','event','relation'))`; `entity_id UUID` (polymorphic — no FK); `entity_version_id UUID`; `session_id` FK→sessions; `embedding vector(${embeddingDimension})` NOT NULL (Liquibase parameter — 3072 for Gemini `gemini-embedding-001` by default, 1024 under the `llm-ollama` profile; D-093, D-088); `content_hash TEXT`; `created_at`; raw-SQL index `USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)`; `<rollback>` for the raw-SQL items.
-- `apps/api/src/main/resources/application.properties` — add `spring.liquibase.parameters.embeddingDimension=${EMBEDDING_DIMENSION:3072}` (base default; per-profile override lives in F2.12).
+- `apps/api/src/main/resources/db/changelog/0016_create_entity_embeddings.xml` — UUID PK; `entity_type TEXT` + raw-SQL `CHECK (entity_type IN ('actor','space','event','relation'))`; `entity_id UUID` (polymorphic — no FK); `entity_version_id UUID`; `session_id` FK→sessions; `embedding vector(${embeddingDimension})` NOT NULL (Liquibase parameter — 1536 for Gemini `gemini-embedding-001` with `outputDimensionality=1536` by default, 1024 under the `llm-ollama` profile; D-093, D-088); `content_hash TEXT`; `created_at`; raw-SQL index `USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)`; `<rollback>` for the raw-SQL items.
+- `apps/api/src/main/resources/application.properties` — add `spring.liquibase.parameters.embeddingDimension=${EMBEDDING_DIMENSION:1536}` (base default; per-profile override lives in F2.12).
 - `apps/api/src/main/resources/db/changelog/db.changelog-master.xml` — append the `<include>` line.
 - `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/EntityEmbeddingSchemaIT.java` — asserts the table exists, the `embedding` column type is `vector` (do NOT hard-assert the dimension — it is parameterized), the IVFFlat index exists (query `pg_indexes`/`pg_class` for `ivfflat`), and the `entity_type` CHECK rejects a bad value.
 
@@ -1367,13 +1367,13 @@ npx shadcn@latest add button input label form card
 
 #### F2.2.6 — Embedding port + mock + stub
 
-**Goal:** Define `EmbeddingPort` and its mock + stub. Mock returns a deterministic `float[3072]` (all zeros except index 0 = 1.0f).
+**Goal:** Define `EmbeddingPort` and its mock + stub. Mock returns a deterministic `float[1536]` (all zeros except index 0 = 1.0f).
 
 **Scope (in):**
 - `apps/api/src/main/java/com/bluesteel/application/port/out/embedding/EmbeddingPort.java` — `float[] embed(String content)`.
 - `apps/api/src/main/java/com/bluesteel/adapters/out/ai/MockEmbeddingAdapter.java` — `@Component @Profile("!llm-real & !llm-ollama")`; deterministic vector.
 - `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiEmbeddingAdapter.java` — `@Component @Profile("llm-real | llm-ollama")`; stub that throws until F2.6 (real impl injects Spring AI `EmbeddingModel` — Gemini or Ollama per profile).
-- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/MockEmbeddingAdapterTest.java` — asserts `length == 3072`, index 0 == 1.0f, rest 0.0f.
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/MockEmbeddingAdapterTest.java` — asserts `length == 1536`, index 0 == 1.0f, rest 0.0f.
 
 **Scope (out):** Real Gemini `EmbeddingModel` call + async post-commit generation (F2.6/D-063).
 
@@ -1835,7 +1835,7 @@ npx shadcn@latest add button input label form card
 
 #### F2.6.1 — Real SpringAiEmbeddingAdapter
 
-**Goal:** Replace the F2.2.6 stub with the real embedding implementation — the first task to enable real embeddings (used by Stage-1 resolution, conflict-context retrieval, and post-commit generation). Provider-neutral: Gemini `gemini-embedding-001`@3072 under `llm-real`, Ollama `bge-m3`@1024 under `llm-ollama` (D-093, D-088).
+**Goal:** Replace the F2.2.6 stub with the real embedding implementation — the first task to enable real embeddings (used by Stage-1 resolution, conflict-context retrieval, and post-commit generation). Provider-neutral: Gemini `gemini-embedding-001`@1536 (outputDimensionality=1536) under `llm-real`, Ollama `bge-m3`@1024 under `llm-ollama` (D-093, D-088).
 
 **Scope (in):**
 - `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiEmbeddingAdapter.java` (**replace the stub body**, F2.2.6) — `@Component @Profile("llm-real | llm-ollama")`; inject the Spring AI `EmbeddingModel` (auto-configured from `spring.ai.google.genai.api-key` set in `application-llm-real.properties`, F2.4.2); `float[] embed(String content)` → `embeddingModel.embed(content)`; ERROR-log + rethrow on provider failure (LOG-02); never log `content`.
@@ -2639,9 +2639,9 @@ npx shadcn@latest add badge checkbox radio-group
 
 > **Umbrella task — run the F2.12.N sub-tasks below, not this.**
 
-**Goal:** Add a third provider selection — the `llm-ollama` Spring profile — that runs the entire ingestion + Query Mode pipeline against local models served by Ollama, fully offline with no API keys and zero cost, including **real semantic Query Mode** (real local embeddings in pgvector). Prod stays Gemini@3072; local becomes Ollama (`bge-m3`@1024 + `qwen2.5:7b`). See D-088.
+**Goal:** Add a third provider selection — the `llm-ollama` Spring profile — that runs the entire ingestion + Query Mode pipeline against local models served by Ollama, fully offline with no API keys and zero cost, including **real semantic Query Mode** (real local embeddings in pgvector). Prod stays Gemini@1536 (outputDimensionality=1536); local becomes Ollama (`bge-m3`@1024 + `qwen2.5:7b`). See D-088.
 
-**Scope (out):** Any domain/application/adapter code change — the `SpringAi*` adapters are already provider-neutral (F2.4–F2.6) and gated `@Profile("llm-real | llm-ollama")`; this task only adds the Ollama starter, profile config, and the profile-selected model beans. Reversing the Gemini@3072 production default (D-088 keeps it).
+**Scope (out):** Any domain/application/adapter code change — the `SpringAi*` adapters are already provider-neutral (F2.4–F2.6) and gated `@Profile("llm-real | llm-ollama")`; this task only adds the Ollama starter, profile config, and the profile-selected model beans. Reversing the Gemini@1536 production default (D-088 keeps it).
 
 > **Why small:** provider selection lives at the `ChatModel`/`EmbeddingModel` bean level in `AiConfig`, and the embedding dimension is already a Liquibase parameter (F2.1.4). Ollama is a configuration concern, not new adapters.
 
