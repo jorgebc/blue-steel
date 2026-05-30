@@ -16,9 +16,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 /**
- * Async listener that drives a submitted session through the ingestion pipeline. Incrementally
- * extended in F2.4–F2.7 as each pipeline stage is wired; failures inside each stage service are
- * already handled — this listener is a pure loader and delegator.
+ * Async listener that drives a submitted session through the ingestion pipeline. Failures inside
+ * each stage service are already handled — this listener is a pure loader and delegator.
  */
 @Component
 public class SessionIngestionEventListener {
@@ -30,18 +29,21 @@ public class SessionIngestionEventListener {
   private final ExtractionPipelineService extractionPipelineService;
   private final EntityResolutionService entityResolutionService;
   private final ConflictDetectionService conflictDetectionService;
+  private final DiffGenerationService diffGenerationService;
 
   public SessionIngestionEventListener(
       SessionRepository sessionRepository,
       NarrativeBlockRepository narrativeBlockRepository,
       ExtractionPipelineService extractionPipelineService,
       EntityResolutionService entityResolutionService,
-      ConflictDetectionService conflictDetectionService) {
+      ConflictDetectionService conflictDetectionService,
+      DiffGenerationService diffGenerationService) {
     this.sessionRepository = sessionRepository;
     this.narrativeBlockRepository = narrativeBlockRepository;
     this.extractionPipelineService = extractionPipelineService;
     this.entityResolutionService = entityResolutionService;
     this.conflictDetectionService = conflictDetectionService;
+    this.diffGenerationService = diffGenerationService;
   }
 
   @EventListener
@@ -71,9 +73,11 @@ public class SessionIngestionEventListener {
     List<ResolvedEntity> resolved =
         entityResolutionService.run(session.campaignId(), extractionResult);
 
-    // Conflict detection stage — warnings held in-memory for diff generation (F2.7).
-    @SuppressWarnings("unused")
+    // Conflict detection stage.
     List<ConflictWarning> conflicts =
         conflictDetectionService.run(session.campaignId(), extractionResult, resolved);
+
+    // Diff generation — session transitions to DRAFT.
+    diffGenerationService.run(session, extractionResult, resolved, conflicts);
   }
 }

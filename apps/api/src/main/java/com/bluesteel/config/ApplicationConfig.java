@@ -1,5 +1,6 @@
 package com.bluesteel.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.util.concurrent.Executor;
 import org.springframework.context.annotation.Bean;
@@ -34,5 +35,10 @@ public class ApplicationConfig {
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
+  }
+
+  @Bean
+  public ObjectMapper objectMapper() {
+    return new ObjectMapper();
   }
 }

@@ -1,10 +1,12 @@
 package com.bluesteel.adapters.in.web.session;
 
 import com.bluesteel.adapters.in.web.ApiResponse;
+import com.bluesteel.application.model.session.DiffPayload;
 import com.bluesteel.application.model.session.SessionStatusView;
 import com.bluesteel.application.model.session.SubmitSessionCommand;
 import com.bluesteel.application.model.session.SubmitSessionResult;
 import com.bluesteel.application.port.in.session.DiscardSessionUseCase;
+import com.bluesteel.application.port.in.session.GetSessionDiffUseCase;
 import com.bluesteel.application.port.in.session.GetSessionStatusUseCase;
 import com.bluesteel.application.port.in.session.SubmitSessionUseCase;
 import jakarta.validation.Valid;
@@ -21,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Handles session intake, status polling, and draft discard for a campaign. */
+/** Handles session intake, status polling, draft discard, and diff retrieval for a campaign. */
 @RestController
 @RequestMapping("/api/v1/campaigns/{id}/sessions")
 public class SessionController {
@@ -29,14 +31,17 @@ public class SessionController {
   private final SubmitSessionUseCase submitSessionUseCase;
   private final GetSessionStatusUseCase getSessionStatusUseCase;
   private final DiscardSessionUseCase discardSessionUseCase;
+  private final GetSessionDiffUseCase getSessionDiffUseCase;
 
   public SessionController(
       SubmitSessionUseCase submitSessionUseCase,
       GetSessionStatusUseCase getSessionStatusUseCase,
-      DiscardSessionUseCase discardSessionUseCase) {
+      DiscardSessionUseCase discardSessionUseCase,
+      GetSessionDiffUseCase getSessionDiffUseCase) {
     this.submitSessionUseCase = submitSessionUseCase;
     this.getSessionStatusUseCase = getSessionStatusUseCase;
     this.discardSessionUseCase = discardSessionUseCase;
+    this.getSessionDiffUseCase = getSessionDiffUseCase;
   }
 
   /** Submits a new session narrative; returns 202 Accepted with sessionId and initial status. */
@@ -69,6 +74,15 @@ public class SessionController {
     UUID callerId = resolveCallerId();
     discardSessionUseCase.discard(sid, callerId, id);
     return ResponseEntity.ok(ApiResponse.success(null));
+  }
+
+  /** Returns the structured diff for a session in DRAFT status (GM or Editor only). */
+  @GetMapping("/{sid}/diff")
+  public ResponseEntity<ApiResponse<DiffPayload>> getDiff(
+      @PathVariable UUID id, @PathVariable UUID sid) {
+    UUID callerId = resolveCallerId();
+    DiffPayload diff = getSessionDiffUseCase.getDiff(callerId, id, sid);
+    return ResponseEntity.ok(ApiResponse.success(diff));
   }
 
   private UUID resolveCallerId() {
