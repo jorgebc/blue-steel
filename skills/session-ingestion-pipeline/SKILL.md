@@ -288,7 +288,7 @@ ingestion flow, diff review, and commit without incurring Anthropic API costs.
 
 To test with real LLMs:
 ```bash
-# Requires ANTHROPIC_API_KEY and OPENAI_API_KEY set in .env.local
+# Requires GEMINI_API_KEY set in .env.local
 mvn spring-boot:run -pl apps/api -Dspring-boot.run.profiles=local,llm-real
 ```
 

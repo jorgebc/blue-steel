@@ -197,8 +197,7 @@ CI does not push to Vercel — Vercel's GitHub integration handles it.
 | Variable | Where it lives |
 |---|---|
 | `DATABASE_URL` | `.env` on Oracle VM, Neon dashboard |
-| `ANTHROPIC_API_KEY` | `.env` on Oracle VM |
-| `OPENAI_API_KEY` | `.env` on Oracle VM |
+| `GEMINI_API_KEY` | Render dashboard env var (D-092, D-093) |
 | `JWT_SECRET` | `.env` on Oracle VM |
 | `EMAIL_API_KEY` | `.env` on Oracle VM |
 

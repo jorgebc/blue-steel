@@ -6,7 +6,6 @@ spring:
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.xml
   ai:
-    openai:
-      api-key: test-placeholder
-    anthropic:
-      api-key: test-placeholder
+    google:
+      genai:
+        api-key: test-placeholder

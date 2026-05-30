@@ -4,7 +4,7 @@ description: >
   Use this skill whenever you are implementing or modifying a Spring AI adapter in `apps/api`:
   `NarrativeExtractionPort`, `EntityResolutionPort`, `ConflictDetectionPort`,
   `QueryAnsweringPort`, or `EmbeddingPort`. Triggers include: "Spring AI", "ChatClient",
-  "EmbeddingModel", "LLM adapter", "Anthropic", "OpenAI embedding", "mock adapter",
+  "EmbeddingModel", "LLM adapter", "Gemini", "Google GenAI", "Anthropic", "OpenAI embedding", "mock adapter",
   "llm-real profile", "AiConfig", "structured output", "prompt engineering", or any task
   touching `adapters/out/ai/`. This skill covers the project's non-standard Spring AI usage:
   ChatClient + EmbeddingModel only; VectorStore never used; mock vs real profile wiring;
@@ -13,8 +13,8 @@ description: >
 
 # Spring AI — LLM Adapter Implementation
 
-Blue Steel uses Spring AI for two concerns only: `ChatClient` (text generation via Anthropic) and
-`EmbeddingModel` (vector generation via OpenAI). Spring AI's `VectorStore` is **never used**
+Blue Steel uses Spring AI for two concerns only: `ChatClient` (text generation via Google Gemini) and
+`EmbeddingModel` (vector generation via Google Gemini). Spring AI's `VectorStore` is **never used**
 (ARCH-04, D-062) — all pgvector queries are native SQL. Both real and mock adapters implement the
 same driven port interfaces.
 
@@ -22,7 +22,8 @@ same driven port interfaces.
 
 **Key decisions:**
 - D-049: Local `spring.profiles = local` activates mock adapters (zero cost). `llm-real` profile activates real adapters.
-- D-088: `llm-ollama` profile runs real LOCAL models via Ollama (offline, zero cost), including real embeddings. Embedding dimension is a per-profile Liquibase parameter (OpenAI@1536 / Ollama `bge-m3`@1024).
+- D-093: real provider is Google Gemini via Spring AI — `gemini-2.5-flash` (chat) + `gemini-embedding-001` (3072 dims), one `GEMINI_API_KEY` (supersedes D-032 Anthropic + D-040 OpenAI).
+- D-088: `llm-ollama` profile runs real LOCAL models via Ollama (offline, zero cost), including real embeddings. Embedding dimension is a per-profile Liquibase parameter (Gemini `gemini-embedding-001`@3072 / Ollama `bge-m3`@1024).
 - D-034: Every LLM call must bound its context. Token budget check before every call.
 - D-062: Spring AI `VectorStore` not used — native pgvector SQL only.
 - ARCH-04: `VectorStore` cannot express domain-specific retrieval (campaign scoping, entity_type filtering, version joins).
@@ -47,8 +48,8 @@ which bean is active. No domain or application code changes when switching.
 @Configuration
 public class AiConfig {
 
-    // EmbeddingModel bean — Spring AI auto-configures via spring.ai.openai.api-key property
-    // ChatClient bean — Spring AI auto-configures via spring.ai.anthropic.api-key property
+    // EmbeddingModel bean — Spring AI auto-configures via spring.ai.google.genai.api-key property
+    // ChatClient bean — Spring AI auto-configures via spring.ai.google.genai.api-key property
 
     // Real adapters are registered as @Component @Profile("llm-real")
     // Mock adapters are registered as @Component @Profile("local")
@@ -59,7 +60,7 @@ public class AiConfig {
 // Real adapter (activated by llm-real profile)
 @Component
 @Profile("llm-real")
-public class AnthropicNarrativeExtractionAdapter implements NarrativeExtractionPort {
+public class SpringAiNarrativeExtractionAdapter implements NarrativeExtractionPort {
     private final ChatClient chatClient;
     // ...
 }
@@ -103,7 +104,7 @@ public class SpringAiNarrativeExtractionAdapter implements NarrativeExtractionPo
 ```
 
 The provider is selected at the **bean** level in `AiConfig`, not by separate adapter classes:
-`@Profile("llm-real")` wires the Anthropic `ChatModel` + OpenAI `EmbeddingModel`; `@Profile("llm-ollama")`
+`@Profile("llm-real")` wires the Gemini `ChatModel` + `EmbeddingModel`; `@Profile("llm-ollama")`
 wires Ollama's `ChatModel` + `EmbeddingModel`. The adapters never change. Ollama models + base-url are
 env-overridable (`OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`).
 
@@ -115,10 +116,10 @@ Use Spring AI's `ChatClient` for all text generation. Request structured Java ob
 using `.entity(ClassName.class)` — Spring AI handles the JSON schema instruction and parsing.
 
 ```java
-// adapters/out/ai/AnthropicNarrativeExtractionAdapter.java
+// adapters/out/ai/SpringAiNarrativeExtractionAdapter.java
 @Component
 @Profile("llm-real")
-public class AnthropicNarrativeExtractionAdapter implements NarrativeExtractionPort {
+public class SpringAiNarrativeExtractionAdapter implements NarrativeExtractionPort {
 
     private final ChatClient chatClient;
     private final LlmCostLogger costLogger;
@@ -168,10 +169,10 @@ public class AnthropicNarrativeExtractionAdapter implements NarrativeExtractionP
 ## EmbeddingModel — Vector Generation Pattern
 
 ```java
-// adapters/out/ai/OpenAiEmbeddingAdapter.java
+// adapters/out/ai/SpringAiEmbeddingAdapter.java
 @Component
-@Profile("llm-real")
-public class OpenAiEmbeddingAdapter implements EmbeddingPort {
+@Profile("llm-real | llm-ollama")
+public class SpringAiEmbeddingAdapter implements EmbeddingPort {
 
     private final EmbeddingModel embeddingModel;
 
@@ -179,8 +180,8 @@ public class OpenAiEmbeddingAdapter implements EmbeddingPort {
     public float[] embed(String content) {
         // EmbeddingModel.embed() returns EmbeddingResponse
         return embeddingModel.embed(content);
-        // text-embedding-3-small: 1536 dimensions (D-040)
-        // Cost: ~$0.02 per 1M tokens — negligible per entity version
+        // gemini-embedding-001: 3072 dimensions (D-093)
+        // Free tier on Google AI Studio — negligible cost per entity version
     }
 }
 
@@ -190,7 +191,7 @@ public class OpenAiEmbeddingAdapter implements EmbeddingPort {
 public class MockEmbeddingAdapter implements EmbeddingPort {
     @Override
     public float[] embed(String content) {
-        return new float[1536];  // zero vector — sufficient for local dev
+        return new float[3072];  // zero vector — sufficient for local dev
     }
 }
 ```
@@ -200,7 +201,7 @@ a `@Async` `@EventListener` handler, not in the commit endpoint itself.
 
 **Embedding dimension is per-profile (D-088).** The `entity_embeddings.embedding` column is
 `vector(${embeddingDimension})` — a Liquibase parameter (`spring.liquibase.parameters.embeddingDimension`,
-default 1536, set 1024 under `llm-ollama` for `bge-m3`). Vectors from different models are NOT
+default 3072 for `gemini-embedding-001`, set 1024 under `llm-ollama` for `bge-m3`). Vectors from different models are NOT
 comparable even at equal dimension, so a single database must use exactly one embedding model. Changing
 `OLLAMA_EMBEDDING_MODEL` to a different-dimension model requires updating `EMBEDDING_DIMENSION` **and**
 recreating the local DB (`docker compose down -v`) — a pgvector column's dimension is fixed at create time.
@@ -286,7 +287,7 @@ public class LlmCostLogger {
     }
 
     private double estimateCostUsd(String stage, int in, int out) {
-        // Claude pricing: ~$3/MTok input, ~$15/MTok output (update when pricing changes)
+        // gemini-2.5-flash pricing: ~$0.30/MTok input, ~$2.50/MTok output (update when pricing changes)
         return (in * 3.0 + out * 15.0) / 1_000_000.0;
     }
 }

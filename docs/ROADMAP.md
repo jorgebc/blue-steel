@@ -1058,7 +1058,7 @@ npx shadcn@latest add button input label form card
 | F2.1.1 | Session + narrative-block schema migrations (0006–0007) | 🔲 |
 | F2.1.2 | Actor + space versioned-table migrations (0008–0011) | 🔲 |
 | F2.1.3 | Event + relation versioned-table migrations (0012–0015) | 🔲 |
-| F2.1.4 | Entity-embeddings migration — vector(1536) + IVFFlat (0016) | 🔲 |
+| F2.1.4 | Entity-embeddings migration — vector(3072) + IVFFlat (0016) | 🔲 |
 | F2.1.5 | Annotations table migration (0017) | 🔲 |
 | F2.1.6 | Proposals + proposal-votes schema-only migrations (0018–0019) | 🔲 |
 | F2.2 | Mock LLM + Email adapters (local profile) | 🔲 |
@@ -1225,8 +1225,8 @@ npx shadcn@latest add button input label form card
 **Goal:** Create `entity_embeddings` with a **configurable-dimension** `vector` column, the IVFFlat cosine index, and the `entity_type` CHECK constraint (ARCHITECTURE.md §5.5, D-062, D-088). The pgvector extension already exists (changeset 0001) — do NOT re-create it.
 
 **Scope (in):**
-- `apps/api/src/main/resources/db/changelog/0016_create_entity_embeddings.xml` — UUID PK; `entity_type TEXT` + raw-SQL `CHECK (entity_type IN ('actor','space','event','relation'))`; `entity_id UUID` (polymorphic — no FK); `entity_version_id UUID`; `session_id` FK→sessions; `embedding vector(${embeddingDimension})` NOT NULL (Liquibase parameter — 1536 for OpenAI `text-embedding-3-small` by default, 1024 under the `llm-ollama` profile; D-040, D-088); `content_hash TEXT`; `created_at`; raw-SQL index `USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)`; `<rollback>` for the raw-SQL items.
-- `apps/api/src/main/resources/application.properties` — add `spring.liquibase.parameters.embeddingDimension=${EMBEDDING_DIMENSION:1536}` (base default; per-profile override lives in F2.12).
+- `apps/api/src/main/resources/db/changelog/0016_create_entity_embeddings.xml` — UUID PK; `entity_type TEXT` + raw-SQL `CHECK (entity_type IN ('actor','space','event','relation'))`; `entity_id UUID` (polymorphic — no FK); `entity_version_id UUID`; `session_id` FK→sessions; `embedding vector(${embeddingDimension})` NOT NULL (Liquibase parameter — 3072 for Gemini `gemini-embedding-001` by default, 1024 under the `llm-ollama` profile; D-093, D-088); `content_hash TEXT`; `created_at`; raw-SQL index `USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)`; `<rollback>` for the raw-SQL items.
+- `apps/api/src/main/resources/application.properties` — add `spring.liquibase.parameters.embeddingDimension=${EMBEDDING_DIMENSION:3072}` (base default; per-profile override lives in F2.12).
 - `apps/api/src/main/resources/db/changelog/db.changelog-master.xml` — append the `<include>` line.
 - `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/EntityEmbeddingSchemaIT.java` — asserts the table exists, the `embedding` column type is `vector` (do NOT hard-assert the dimension — it is parameterized), the IVFFlat index exists (query `pg_indexes`/`pg_class` for `ivfflat`), and the `entity_type` CHECK rejects a bad value.
 
@@ -1326,7 +1326,7 @@ npx shadcn@latest add button input label form card
 - `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiNarrativeExtractionAdapter.java` — `@Component @Profile("llm-real | llm-ollama")`; stub that throws `UnsupportedOperationException("Real LLM adapter not implemented until F2.4")` (F2.4 fills in the real `ChatClient` logic).
 - `apps/api/src/test/java/com/bluesteel/adapters/out/ai/MockNarrativeExtractionAdapterTest.java` — asserts the canned counts (actors/spaces/events/relations) and non-blank header.
 
-**Scope (out):** Real Anthropic ChatClient logic (F2.4); AiConfig wiring (F2.2.8).
+**Scope (out):** Real Gemini ChatClient logic (F2.4); AiConfig wiring (F2.2.8).
 
 **Skills:** `spring-ai-llm-adapter`  **Decisions:** D-032, D-049  **Dependencies:** F2.2.1
 
@@ -1367,15 +1367,15 @@ npx shadcn@latest add button input label form card
 
 #### F2.2.6 — Embedding port + mock + stub
 
-**Goal:** Define `EmbeddingPort` and its mock + stub. Mock returns a deterministic `float[1536]` (all zeros except index 0 = 1.0f).
+**Goal:** Define `EmbeddingPort` and its mock + stub. Mock returns a deterministic `float[3072]` (all zeros except index 0 = 1.0f).
 
 **Scope (in):**
 - `apps/api/src/main/java/com/bluesteel/application/port/out/embedding/EmbeddingPort.java` — `float[] embed(String content)`.
 - `apps/api/src/main/java/com/bluesteel/adapters/out/ai/MockEmbeddingAdapter.java` — `@Component @Profile("!llm-real & !llm-ollama")`; deterministic vector.
-- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiEmbeddingAdapter.java` — `@Component @Profile("llm-real | llm-ollama")`; stub that throws until F2.6 (real impl injects Spring AI `EmbeddingModel` — OpenAI or Ollama per profile).
-- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/MockEmbeddingAdapterTest.java` — asserts `length == 1536`, index 0 == 1.0f, rest 0.0f.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiEmbeddingAdapter.java` — `@Component @Profile("llm-real | llm-ollama")`; stub that throws until F2.6 (real impl injects Spring AI `EmbeddingModel` — Gemini or Ollama per profile).
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/MockEmbeddingAdapterTest.java` — asserts `length == 3072`, index 0 == 1.0f, rest 0.0f.
 
-**Scope (out):** Real OpenAI `EmbeddingModel` call + async post-commit generation (F2.6/D-063).
+**Scope (out):** Real Gemini `EmbeddingModel` call + async post-commit generation (F2.6/D-063).
 
 **Skills:** `spring-ai-llm-adapter`  **Decisions:** D-040, D-049  **Dependencies:** F2.1
 
@@ -1404,7 +1404,7 @@ npx shadcn@latest add button input label form card
 **Goal:** Add the co-located `AiConfig` (home for future real-adapter bean wiring) and a Testcontainers IT proving the `local` Spring context starts with all five mock adapters wired.
 
 **Scope (in):**
-- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/AiConfig.java` — `@Configuration` in `adapters.out.ai` (ArchUnit Rule 4). Documents the three-way profile split — mock (`!llm-real & !llm-ollama`) / `llm-real` (Anthropic+OpenAI) / `llm-ollama` (Ollama, F2.12) — and is the home for profile-selected `ChatClient`/`EmbeddingModel` beans; no real beans yet (deferred to F2.4/F2.12 to avoid requiring API keys at local startup).
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/AiConfig.java` — `@Configuration` in `adapters.out.ai` (ArchUnit Rule 4). Documents the three-way profile split — mock (`!llm-real & !llm-ollama`) / `llm-real` (Gemini) / `llm-ollama` (Ollama, F2.12) — and is the home for profile-selected `ChatClient`/`EmbeddingModel` beans; no real beans yet (deferred to F2.4/F2.12 to avoid requiring API keys at local startup).
 - `apps/api/src/test/java/com/bluesteel/adapters/out/ai/AiAdapterWiringIT.java` — extends `TestcontainersPostgresBaseIT` (already `@ActiveProfiles("local")`, i.e. no real provider profile); `@Autowired` the five ports and assert each resolves to its `Mock*` implementation.
 
 **Scope (out):** Real bean definitions and ChatClient/EmbeddingModel wiring (F2.4–F2.6; Ollama beans F2.12).
@@ -1610,7 +1610,7 @@ npx shadcn@latest add button input label form card
 
 > **Umbrella task — run the F2.4.N sub-tasks below, not this.**
 >
-> **No SETUP required** — the spring-ai-bom + Anthropic/OpenAI starters are already in `pom.xml`
+> **No SETUP required** — the spring-ai-bom + Google GenAI starter are already in `pom.xml`
 > (D-032) and the `llm-real` profile config is a `.properties` file authored by sub-task F2.4.2;
 > no new dependency or tooling is introduced. The mock adapter, ports, value models (F2.2),
 > and the session aggregate/listener (F2.3) are produced by the cited dependencies.
@@ -1630,7 +1630,7 @@ npx shadcn@latest add button input label form card
 **Goal:** Shared LLM-call instrumentation reused by every real Spring AI adapter (F2.4–F2.6): structured cost logging and the pre-call input-token budget guard (D-034, LOG-01, D-072).
 
 **Scope (in):**
-- `apps/api/src/main/java/com/bluesteel/config/LlmCostLogger.java` — `@Component`; `logLlmCall(String stage, int tokensIn, int tokensOut, java.time.Instant start)`; emits one INFO line via `log.atInfo().addKeyValue("stage" / "tokens_in" / "tokens_out" / "cost_usd" / "duration_ms")`; `session_id`/`user_id` come from MDC (set by the caller, F2.4.5); private `estimateCostUsd` per Claude pricing; never logs raw response content.
+- `apps/api/src/main/java/com/bluesteel/config/LlmCostLogger.java` — `@Component`; `logLlmCall(String stage, int tokensIn, int tokensOut, java.time.Instant start)`; emits one INFO line via `log.atInfo().addKeyValue("stage" / "tokens_in" / "tokens_out" / "cost_usd" / "duration_ms")`; `session_id`/`user_id` come from MDC (set by the caller, F2.4.5); private `estimateCostUsd` per Gemini pricing; never logs raw response content.
 - `apps/api/src/main/java/com/bluesteel/adapters/out/ai/TokenEstimator.java` — `public static int estimate(String text)` (≈ `Math.ceil(len / 4.0)`); input-budget only.
 - `apps/api/src/main/java/com/bluesteel/adapters/out/ai/TokenBudgetExceededException.java` — `RuntimeException(int estimated, int max)`; thrown before any `ChatClient` call.
 - `apps/api/src/test/java/com/bluesteel/adapters/out/ai/TokenEstimatorTest.java` — empty/short/long boundary cases.
@@ -1643,15 +1643,15 @@ npx shadcn@latest add button input label form card
 
 #### F2.4.2 — AiConfig real ChatClient (llm-real) + provider config
 
-**Goal:** Provide the `llm-real` `ChatClient` bean (Anthropic) the extraction adapter injects, plus the provider properties and the extraction token-budget envelope. The `llm-ollama` `ChatClient` bean is F2.12.
+**Goal:** Provide the `llm-real` `ChatClient` bean (Gemini) the extraction adapter injects, plus the provider properties and the extraction token-budget envelope. The `llm-ollama` `ChatClient` bean is F2.12.
 
 **Scope (in):**
-- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/AiConfig.java` (**edit**, F2.2.8) — add `@Bean @Profile("llm-real")` `ChatClient` built from the auto-configured Anthropic `ChatModel` (`ChatClient.create(chatModel)`); Javadoc notes the adapter is `@Profile("llm-real | llm-ollama")` so exactly one `ChatClient` bean must be active per profile (Ollama's bean is F2.12).
-- `apps/api/src/main/resources/application-llm-real.properties` (**new**) — `spring.ai.anthropic.api-key=${ANTHROPIC_API_KEY}`, `spring.ai.anthropic.chat.options.model=…`, `…temperature=…`; `spring.ai.openai.api-key=${OPENAI_API_KEY}` (satisfies OpenAI autoconfig under `llm-real`; the real embedding adapter ships later).
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/AiConfig.java` (**edit**, F2.2.8) — add `@Bean @Profile("llm-real")` `ChatClient` built from the auto-configured Gemini `ChatModel` (`ChatClient.create(chatModel)`); Javadoc notes the adapter is `@Profile("llm-real | llm-ollama")` so exactly one `ChatClient` bean must be active per profile (Ollama's bean is F2.12).
+- `apps/api/src/main/resources/application-llm-real.properties` (**new**) — `spring.ai.google.genai.api-key=${GEMINI_API_KEY}`, `spring.ai.google.genai.chat.options.model=gemini-2.5-flash`, `spring.ai.google.genai.embedding.options.model=gemini-embedding-001` (one key serves chat + embeddings under `llm-real`).
 - `apps/api/src/main/resources/application.properties` (**edit**) — add `blue-steel.llm.extraction-max-tokens=${BLUE_STEEL_LLM_EXTRACTION_MAX_TOKENS:4000}` (D-034 envelope); `.env.example` (**edit**) — mirror the new var.
 - `apps/api/src/test/java/com/bluesteel/adapters/out/ai/AiConfigTest.java` — unit test: the bean method returns a non-null `ChatClient` given a mock `ChatModel` (no Spring context start, no API key).
 
-**Scope (out):** Ollama beans + dimension override (F2.12); the real OpenAI `EmbeddingModel` bean (F2.5/F2.6); adapter logic (F2.4.3).
+**Scope (out):** Ollama beans + dimension override (F2.12); the real Gemini `EmbeddingModel` bean (F2.5/F2.6); adapter logic (F2.4.3).
 
 **Skills:** `spring-ai-llm-adapter`  **Decisions:** D-032, D-034, D-088  **Dependencies:** F2.2.8
 
@@ -1835,10 +1835,10 @@ npx shadcn@latest add button input label form card
 
 #### F2.6.1 — Real SpringAiEmbeddingAdapter
 
-**Goal:** Replace the F2.2.6 stub with the real embedding implementation — the first task to enable real embeddings (used by Stage-1 resolution, conflict-context retrieval, and post-commit generation). Provider-neutral: OpenAI `text-embedding-3-small`@1536 under `llm-real`, Ollama `bge-m3`@1024 under `llm-ollama` (D-040, D-088).
+**Goal:** Replace the F2.2.6 stub with the real embedding implementation — the first task to enable real embeddings (used by Stage-1 resolution, conflict-context retrieval, and post-commit generation). Provider-neutral: Gemini `gemini-embedding-001`@3072 under `llm-real`, Ollama `bge-m3`@1024 under `llm-ollama` (D-093, D-088).
 
 **Scope (in):**
-- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiEmbeddingAdapter.java` (**replace the stub body**, F2.2.6) — `@Component @Profile("llm-real | llm-ollama")`; inject the Spring AI `EmbeddingModel` (auto-configured from `spring.ai.openai.api-key` set in `application-llm-real.properties`, F2.4.2); `float[] embed(String content)` → `embeddingModel.embed(content)`; ERROR-log + rethrow on provider failure (LOG-02); never log `content`.
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiEmbeddingAdapter.java` (**replace the stub body**, F2.2.6) — `@Component @Profile("llm-real | llm-ollama")`; inject the Spring AI `EmbeddingModel` (auto-configured from `spring.ai.google.genai.api-key` set in `application-llm-real.properties`, F2.4.2); `float[] embed(String content)` → `embeddingModel.embed(content)`; ERROR-log + rethrow on provider failure (LOG-02); never log `content`.
 - `apps/api/src/test/java/com/bluesteel/adapters/out/ai/SpringAiEmbeddingAdapterTest.java` — mock `EmbeddingModel`; assert `embed` delegates and returns the model's vector.
 
 **Scope (out):** Async post-commit generation into `entity_embeddings` (F2.8, D-063); the Ollama `EmbeddingModel` bean selection (F2.12); similarity *search* (F2.5.2).
@@ -2639,9 +2639,9 @@ npx shadcn@latest add badge checkbox radio-group
 
 > **Umbrella task — run the F2.12.N sub-tasks below, not this.**
 
-**Goal:** Add a third provider selection — the `llm-ollama` Spring profile — that runs the entire ingestion + Query Mode pipeline against local models served by Ollama, fully offline with no API keys and zero cost, including **real semantic Query Mode** (real local embeddings in pgvector). Prod stays OpenAI@1536; local becomes Ollama (`bge-m3`@1024 + `qwen2.5:7b`). See D-088.
+**Goal:** Add a third provider selection — the `llm-ollama` Spring profile — that runs the entire ingestion + Query Mode pipeline against local models served by Ollama, fully offline with no API keys and zero cost, including **real semantic Query Mode** (real local embeddings in pgvector). Prod stays Gemini@3072; local becomes Ollama (`bge-m3`@1024 + `qwen2.5:7b`). See D-088.
 
-**Scope (out):** Any domain/application/adapter code change — the `SpringAi*` adapters are already provider-neutral (F2.4–F2.6) and gated `@Profile("llm-real | llm-ollama")`; this task only adds the Ollama starter, profile config, and the profile-selected model beans. Reversing the OpenAI@1536 production default (D-088 keeps it).
+**Scope (out):** Any domain/application/adapter code change — the `SpringAi*` adapters are already provider-neutral (F2.4–F2.6) and gated `@Profile("llm-real | llm-ollama")`; this task only adds the Ollama starter, profile config, and the profile-selected model beans. Reversing the Gemini@3072 production default (D-088 keeps it).
 
 > **Why small:** provider selection lives at the `ChatModel`/`EmbeddingModel` bean level in `AiConfig`, and the embedding dimension is already a Liquibase parameter (F2.1.4). Ollama is a configuration concern, not new adapters.
 
@@ -2661,7 +2661,7 @@ npx shadcn@latest add badge checkbox radio-group
 
 **Scope (in):**
 - `apps/api/src/main/resources/application-llm-ollama.properties` — all env-overridable with defaults: `spring.ai.ollama.base-url=${OLLAMA_BASE_URL:http://localhost:11434}`; `spring.ai.ollama.chat.options.model=${OLLAMA_CHAT_MODEL:qwen2.5:7b}`; `spring.ai.ollama.embedding.options.model=${OLLAMA_EMBEDDING_MODEL:bge-m3}`; `spring.liquibase.parameters.embeddingDimension=${EMBEDDING_DIMENSION:1024}`; reuse the `local` datasource.
-- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/AiConfig.java` (extend) — `@Profile("llm-ollama")` `@Bean`s exposing the active `ChatClient` (from `OllamaChatModel`) and `EmbeddingModel` (Ollama); ensure no bean ambiguity with the Anthropic/OpenAI auto-config (profile-gate the provider beans so exactly one `ChatModel`/`EmbeddingModel` is active).
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/AiConfig.java` (extend) — `@Profile("llm-ollama")` `@Bean`s exposing the active `ChatClient` (from `OllamaChatModel`) and `EmbeddingModel` (Ollama); ensure no bean ambiguity with the Gemini auto-config (profile-gate the provider beans so exactly one `ChatModel`/`EmbeddingModel` is active).
 - `apps/api/src/test/java/com/bluesteel/adapters/out/ai/OllamaWiringTest.java` — verifies `AiConfig` produces a `ChatClient` + `EmbeddingModel` under `llm-ollama` using a mocked Ollama model (no live Ollama → CI-safe).
 
 **Scope (out):** Live end-to-end run (F2.12.2). Any adapter logic (already in F2.4–F2.6).

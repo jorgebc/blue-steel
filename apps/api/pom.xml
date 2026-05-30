@@ -22,8 +22,8 @@
   <properties>
     <java.version>25</java.version>
 
-    <!-- Spring AI — ChatClient (Anthropic) + EmbeddingModel (OpenAI) -->
-    <spring-ai.version>2.0.0-M7</spring-ai.version>
+    <!-- Spring AI — ChatClient + EmbeddingModel via Google GenAI / Gemini (D-093) -->
+    <spring-ai.version>2.0.0-M8</spring-ai.version>
 
     <!-- Testing -->
     <archunit.version>1.4.2</archunit.version>
@@ -53,7 +53,7 @@
 
   <dependencyManagement>
     <dependencies>
-      <!-- Spring AI BOM — ChatClient + EmbeddingModel (D-032, D-062) -->
+      <!-- Spring AI BOM — ChatClient + EmbeddingModel (D-062, D-093) -->
       <dependency>
         <groupId>org.springframework.ai</groupId>
         <artifactId>spring-ai-bom</artifactId>
@@ -111,16 +111,10 @@
       <artifactId>spring-boot-starter-liquibase</artifactId>
     </dependency>
 
-    <!-- ── Spring AI — Anthropic (text generation, D-032) ─────────────── -->
+    <!-- ── Spring AI — Google GenAI / Gemini: chat + embeddings, one key (D-093) ── -->
     <dependency>
       <groupId>org.springframework.ai</groupId>
-      <artifactId>spring-ai-starter-model-anthropic</artifactId>
-    </dependency>
-
-    <!-- ── Spring AI — OpenAI (text-embedding-3-small, 1536 dims) ─────── -->
-    <dependency>
-      <groupId>org.springframework.ai</groupId>
-      <artifactId>spring-ai-starter-model-openai</artifactId>
+      <artifactId>spring-ai-starter-model-google-genai</artifactId>
     </dependency>
 
     <!-- ── JWT HS256 (nimbus-jose-jwt, D-043) ──────────────────────────── -->
