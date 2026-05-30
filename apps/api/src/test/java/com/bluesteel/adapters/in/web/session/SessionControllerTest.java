@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bluesteel.BlueSteelApplication;
+import com.bluesteel.application.model.session.DiffPayload;
 import com.bluesteel.application.model.session.SessionStatusView;
 import com.bluesteel.application.model.session.SubmitSessionCommand;
 import com.bluesteel.application.model.session.SubmitSessionResult;
@@ -24,6 +25,7 @@ import com.bluesteel.application.port.in.campaign.ListCampaignsUseCase;
 import com.bluesteel.application.port.in.campaign.RemoveMemberUseCase;
 import com.bluesteel.application.port.in.health.CheckHealthUseCase;
 import com.bluesteel.application.port.in.session.DiscardSessionUseCase;
+import com.bluesteel.application.port.in.session.GetSessionDiffUseCase;
 import com.bluesteel.application.port.in.session.GetSessionStatusUseCase;
 import com.bluesteel.application.port.in.session.SubmitSessionUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
@@ -34,6 +36,7 @@ import com.bluesteel.application.port.in.user.SearchUsersUseCase;
 import com.bluesteel.domain.exception.ActiveSessionExistsException;
 import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
 import com.bluesteel.domain.exception.SessionNotFoundException;
+import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.session.SessionStatus;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,6 +86,7 @@ class SessionControllerTest {
   @MockitoBean private SubmitSessionUseCase submitSessionUseCase;
   @MockitoBean private GetSessionStatusUseCase getSessionStatusUseCase;
   @MockitoBean private DiscardSessionUseCase discardSessionUseCase;
+  @MockitoBean private GetSessionDiffUseCase getSessionDiffUseCase;
 
   @Autowired private WebApplicationContext context;
 
@@ -232,5 +236,59 @@ class SessionControllerTest {
         .perform(delete("/api/v1/campaigns/{id}/sessions/{sid}", CAMPAIGN_ID, SESSION_ID))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.errors[0].code").value("SESSION_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("should return 200 with DiffPayload when session is in DRAFT status")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void getDiff_draftSession_returns200WithPayload() throws Exception {
+    DiffPayload diff =
+        new DiffPayload(
+            "Heroes stormed the fortress.",
+            java.util.List.of(),
+            java.util.List.of(),
+            java.util.List.of(),
+            java.util.List.of(),
+            java.util.List.of());
+    when(getSessionDiffUseCase.getDiff(CALLER_ID, CAMPAIGN_ID, SESSION_ID)).thenReturn(diff);
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/sessions/{sid}/diff", CAMPAIGN_ID, SESSION_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.narrativeSummaryHeader").value("Heroes stormed the fortress."));
+  }
+
+  @Test
+  @DisplayName("should return 404 when session diff is not available")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void getDiff_sessionNotFound_returns404() throws Exception {
+    when(getSessionDiffUseCase.getDiff(CALLER_ID, CAMPAIGN_ID, SESSION_ID))
+        .thenThrow(new SessionNotFoundException("Session not found: " + SESSION_ID));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/sessions/{sid}/diff", CAMPAIGN_ID, SESSION_ID))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.errors[0].code").value("SESSION_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("should return 403 when caller is not authorized to view the diff")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void getDiff_unauthorized_returns403() throws Exception {
+    when(getSessionDiffUseCase.getDiff(CALLER_ID, CAMPAIGN_ID, SESSION_ID))
+        .thenThrow(new UnauthorizedException("Only GMs and Editors may view session diffs"));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/sessions/{sid}/diff", CAMPAIGN_ID, SESSION_ID))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errors[0].code").value("FORBIDDEN"));
+  }
+
+  @Test
+  @DisplayName("should return 401 when request is unauthenticated")
+  void getDiff_unauthenticated_returns401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/sessions/{sid}/diff", CAMPAIGN_ID, SESSION_ID))
+        .andExpect(status().isUnauthorized());
   }
 }

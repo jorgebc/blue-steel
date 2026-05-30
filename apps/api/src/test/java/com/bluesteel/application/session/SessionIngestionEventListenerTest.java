@@ -12,6 +12,7 @@ import com.bluesteel.application.model.ingestion.ResolvedEntity;
 import com.bluesteel.application.port.out.session.NarrativeBlockRepository;
 import com.bluesteel.application.port.out.session.SessionRepository;
 import com.bluesteel.application.service.session.ConflictDetectionService;
+import com.bluesteel.application.service.session.DiffGenerationService;
 import com.bluesteel.application.service.session.EntityResolutionService;
 import com.bluesteel.application.service.session.ExtractionPipelineService;
 import com.bluesteel.application.service.session.SessionIngestionEventListener;
@@ -38,6 +39,7 @@ class SessionIngestionEventListenerTest {
   @Mock private ExtractionPipelineService extractionPipelineService;
   @Mock private EntityResolutionService entityResolutionService;
   @Mock private ConflictDetectionService conflictDetectionService;
+  @Mock private DiffGenerationService diffGenerationService;
 
   private SessionIngestionEventListener sut;
 
@@ -49,7 +51,8 @@ class SessionIngestionEventListenerTest {
             narrativeBlockRepository,
             extractionPipelineService,
             entityResolutionService,
-            conflictDetectionService);
+            conflictDetectionService,
+            diffGenerationService);
   }
 
   @Test
@@ -153,5 +156,51 @@ class SessionIngestionEventListenerTest {
     assertThat(campaignIdCaptor.getValue()).isEqualTo(campaignId);
     assertThat(extractionCaptor.getValue()).isSameAs(extractionResult);
     assertThat(resolvedCaptor.getValue()).containsExactly(resolved);
+  }
+
+  @Test
+  @DisplayName(
+      "should invoke DiffGenerationService with session, extraction output, resolved entities, and conflicts after conflict detection")
+  void onSessionSubmitted_delegatesToDiffGenerationServiceAfterConflictDetection() {
+    UUID sessionId = UUID.randomUUID();
+    UUID campaignId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+    String rawText = "The dragon descended upon the village.";
+
+    Session session = Session.create(sessionId, campaignId, ownerId, Instant.now());
+    NarrativeBlock block =
+        NarrativeBlock.create(UUID.randomUUID(), sessionId, rawText, 10, Instant.now());
+    ExtractionResult extractionResult =
+        new ExtractionResult("Dragon attack.", List.of(), List.of(), List.of(), List.of());
+    ResolvedEntity resolved = new ResolvedEntity(null, ResolutionOutcome.NEW, null);
+    ConflictWarning conflict = new ConflictWarning("Dragon", "Unknown origin.");
+
+    when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+    when(narrativeBlockRepository.findBySessionId(sessionId)).thenReturn(Optional.of(block));
+    when(extractionPipelineService.run(session, rawText)).thenReturn(extractionResult);
+    when(entityResolutionService.run(campaignId, extractionResult)).thenReturn(List.of(resolved));
+    when(conflictDetectionService.run(campaignId, extractionResult, List.of(resolved)))
+        .thenReturn(List.of(conflict));
+
+    sut.onSessionSubmitted(new SessionSubmittedEvent(sessionId, campaignId));
+
+    ArgumentCaptor<Session> sessionCaptor = ArgumentCaptor.forClass(Session.class);
+    ArgumentCaptor<ExtractionResult> extractionCaptor =
+        ArgumentCaptor.forClass(ExtractionResult.class);
+    ArgumentCaptor<List<ResolvedEntity>> resolvedCaptor =
+        ArgumentCaptor.forClass((Class<List<ResolvedEntity>>) (Class<?>) List.class);
+    ArgumentCaptor<List<ConflictWarning>> conflictsCaptor =
+        ArgumentCaptor.forClass((Class<List<ConflictWarning>>) (Class<?>) List.class);
+    verify(diffGenerationService)
+        .run(
+            sessionCaptor.capture(),
+            extractionCaptor.capture(),
+            resolvedCaptor.capture(),
+            conflictsCaptor.capture());
+
+    assertThat(sessionCaptor.getValue()).isSameAs(session);
+    assertThat(extractionCaptor.getValue()).isSameAs(extractionResult);
+    assertThat(resolvedCaptor.getValue()).containsExactly(resolved);
+    assertThat(conflictsCaptor.getValue()).containsExactly(conflict);
   }
 }

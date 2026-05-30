@@ -1100,13 +1100,13 @@ npx shadcn@latest add button input label form card
 | F2.6.2 | Real SpringAiConflictDetectionAdapter (LLM call 3, replaces F2.2.5 stub) | ✅ |
 | F2.6.3 | ConflictDetectionService (MATCH-scoped pgvector context + LLM call) | ✅ |
 | F2.6.4 | Wire conflict detection into SessionIngestionEventListener | ✅ |
-| F2.7 | Diff generation + draft API | 🔲 |
-| F2.7.1 | DiffCard sealed interface + EXISTING/NEW/UNCERTAIN card records | 🔲 |
-| F2.7.2 | ConflictCard + DiffPayload aggregate record | 🔲 |
-| F2.7.3 | DiffGenerationService (assemble + persist diff_payload + draft transition) | 🔲 |
-| F2.7.4 | Wire diff generation into SessionIngestionEventListener (final stage) | 🔲 |
-| F2.7.5 | GetSessionDiffUseCase + service (draft-only read) | 🔲 |
-| F2.7.6 | Diff retrieval endpoint (GET .../diff) | 🔲 |
+| F2.7 | Diff generation + draft API | ✅ |
+| F2.7.1 | DiffCard sealed interface + EXISTING/NEW/UNCERTAIN card records | ✅ |
+| F2.7.2 | ConflictCard + DiffPayload aggregate record | ✅ |
+| F2.7.3 | DiffGenerationService (assemble + persist diff_payload + draft transition) | ✅ |
+| F2.7.4 | Wire diff generation into SessionIngestionEventListener (final stage) | ✅ |
+| F2.7.5 | GetSessionDiffUseCase + service (draft-only read) | ✅ |
+| F2.7.6 | Diff retrieval endpoint (GET .../diff) | ✅ |
 | F2.8 | Commit endpoint | 🔲 |
 | F2.8.1 | Commit application model (CommitPayload + nested records, camelCase) | 🔲 |
 | F2.8.2 | Session.commit(sequenceNumber) domain transition | 🔲 |
