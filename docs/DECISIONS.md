@@ -42,7 +42,7 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-029 | Database migration tool: Liquibase | ✅ Active | Definition |
 | D-030 | Frontend stack: React + Vite + TypeScript | ✅ Active | Definition |
 | D-031 | Database: PostgreSQL + pgvector (single instance) | ✅ Active | Definition |
-| D-032 | LLM provider: Anthropic via Spring AI, provider-agnostic boundary | ✅ Active | Definition |
+| D-032 | LLM provider: Anthropic via Spring AI, provider-agnostic boundary | ⚠️ Superseded (D-093) | Definition |
 | D-033 | OQ-2 resolved — Conflict handling: non-blocking surface (Option C) | ✅ Active | Definition |
 | D-034 | LLM cost governance: bounded pipeline + provider-level spend cap | ✅ Active | Definition |
 | D-035 | OQ-3 resolved — World state versioning: per-entity version history | ✅ Active | Definition |
@@ -50,7 +50,7 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-037 | Architecture boundary tests: ArchUnit | ✅ Active | Definition |
 | D-038 | Package structure: domain / application / adapters / config | ✅ Active | Definition |
 | D-039 | Configuration classes co-located with their adapter | ✅ Active | Definition |
-| D-040 | OQ-C resolved — Embedding model: OpenAI text-embedding-3-small | ✅ Active | Definition |
+| D-040 | OQ-C resolved — Embedding model: OpenAI text-embedding-3-small | ⚠️ Superseded (D-093) | Definition |
 | D-041 | OQ-A resolved — Entity resolution: two-stage pgvector + LLM | ✅ Active | Definition |
 | D-042 | OQ-E resolved — Uncertain entity card: resolution required before commit | ✅ Active | Definition |
 | D-043 | Authentication: stateless JWT (auth only); campaign role via DB (authz) | ✅ Active | Definition |
@@ -103,6 +103,7 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-090 | Versioning: Semantic Versioning via annotated Git tags on `main` (repo-wide, pre-1.0) | ✅ Active | Definition |
 | D-091 | Backend hosting: Render free tier (web service, amd64) | ✅ Active | Definition |
 | D-092 | Secret management: Render dashboard env vars + GitHub Actions secrets | ✅ Active | Definition |
+| D-093 | LLM provider migrated to Google AI Studio (Gemini) — chat + embeddings, one key | ✅ Active | Definition |
 
 ---
 
@@ -618,7 +619,7 @@ Polyglot persistence (dedicated vector database + relational database) introduce
 ### D-032 — LLM provider: Anthropic (Claude), provider-agnostic by design
 
 **Date:** 2026-04-06  
-**Status:** Active
+**Status:** ⚠️ Superseded by D-093 — provider migrated to Google Gemini (the provider-agnostic port boundary this decision established is what made the migration a config-only change)
 
 **Decision:**  
 Anthropic (Claude) is the default LLM provider. Integration is provider-agnostic via Spring AI's abstraction layer. The LLM is an external actor behind a driven port. Additional providers (OpenAI, Google Gemini) are not implemented in v1. (A local-dev Ollama wiring — the `llm-ollama` profile — is added by D-088 as a configuration concern only, exactly as this decision's port design intends.)
@@ -772,7 +773,7 @@ Configuration that belongs to an adapter should travel with that adapter. A shar
 ### D-040 — OQ-C resolved: Embedding model — OpenAI text-embedding-3-small
 
 **Date:** 2026-04-06  
-**Status:** Active — embedding model/dimension made configurable per profile by D-088 (OpenAI@1536 remains the production default)
+**Status:** ⚠️ Superseded by D-093 — embedding model migrated to Google `gemini-embedding-001`@3072 (was OpenAI `text-embedding-3-small`@1536; per-profile dimension mechanism from D-088 retained)
 
 **Decision:**  
 The embedding model is OpenAI `text-embedding-3-small` at 1536 dimensions. Embedding calls are routed through the `EmbeddingPort` abstraction via Spring AI — the application layer is unaware of the provider.
@@ -1798,7 +1799,7 @@ Local chat models (7–8B) are weaker than Claude at the strict structured-JSON 
 **Alternatives considered:**
 - Text generation via Ollama but embeddings still OpenAI/mock — rejected; the goal is real semantic Query Mode locally, which requires real local embeddings stored in pgvector.
 - Force a 1536-dimension local embedding model to reuse the existing column — rejected; same-dimension vectors from different models are still not comparable, so reusing the column buys nothing and needlessly constrains model choice. A per-profile dimension is cleaner.
-- Reverse D-040 outright for production — rejected; OpenAI@1536 stays the production default. Ollama is a local-dev option only.
+- Reverse D-040 outright for production — rejected; OpenAI@1536 stayed the production default at the time. Ollama is a local-dev option only. (Update: D-093 later migrated production to Google Gemini `gemini-embedding-001`@3072 — `llm-real` now wires Gemini, not Anthropic+OpenAI. The per-profile-dimension mechanism this decision introduced is unchanged.)
 
 Cross-refs: D-032 (provider-agnostic by design), D-040 (embedding model), D-049 (mock vs real profiles), D-062 (native pgvector).
 
@@ -1886,13 +1887,35 @@ Oracle Cloud Always Free ARM (D-046) is perpetually "out of capacity" and cannot
 **Supersedes:** D-050
 
 **Decision:**
-Runtime secrets (`DATABASE_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `EMAIL_API_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CORS_ALLOWED_ORIGIN`) are stored in the Render dashboard (Service → Environment → Environment Variables). CI-only secrets (`RENDER_DEPLOY_HOOK_URL`, `RENDER_SERVICE_URL`) are stored as GitHub Actions repository secrets. No `.env` file on any server; no secrets committed.
+Runtime secrets (`DATABASE_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `GEMINI_API_KEY`, `EMAIL_API_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CORS_ALLOWED_ORIGIN`) are stored in the Render dashboard (Service → Environment → Environment Variables). CI-only secrets (`RENDER_DEPLOY_HOOK_URL`, `RENDER_SERVICE_URL`) are stored as GitHub Actions repository secrets. No `.env` file on any server; no secrets committed.
 
 **Reason:**
 Replaces the Oracle VM `.env` file approach from D-050. Render containers are ephemeral — there is no VM to SSH into and no persistent filesystem to write an env file to. The Render dashboard provides encrypted secret storage with equivalent security guarantees, and secrets are injected as environment variables at container start. GitHub Actions secrets continue to hold CI-specific values (deploy hook URL, health check base URL). The "never committed" invariant from D-050 is preserved unchanged.
 
 **Alternatives considered:**
 - `.env` file on Render — Render containers are ephemeral; env files cannot be managed via SSH. Dashboard env vars are the canonical, supported approach.
+
+---
+
+### D-093 — LLM provider migrated to Google AI Studio (Gemini)
+
+**Date:** 2026-05-30
+**Status:** Active
+**Supersedes:** D-032 (Anthropic generation), D-040 (OpenAI embeddings)
+
+**Decision:**
+A single LLM provider — Google Gemini via Google AI Studio — now serves both text generation and embeddings, integrated through Spring AI's `spring-ai-starter-model-google-genai` starter under one `GEMINI_API_KEY`. The `llm-real` profile (previously Anthropic + OpenAI) is repurposed to wire Gemini: `gemini-2.5-flash` for generation (`ChatClient`) and `gemini-embedding-001` at **3072** dimensions for embeddings (`EmbeddingModel`). Both model names are env-overridable (`GEMINI_CHAT_MODEL`, `GEMINI_EMBEDDING_MODEL`), and the pgvector column dimension follows via `EMBEDDING_DIMENSION` (default 3072). The Anthropic + OpenAI starters and the `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` variables are removed. The `local` (mock) and `llm-ollama` (offline, `bge-m3`@1024) profiles are unchanged. The hexagonal design is untouched — provider-neutral `SpringAi*` adapters, profile-selected beans in `AiConfig`, native pgvector retrieval (D-062).
+
+**Reason:**
+Centralises the whole LLM stack on one free-tier provider with a single key, keeping the hobby infrastructure 100% free while retaining a large (1M-token) context window suited to long-running campaigns. Gemini exposes both generative and embedding models under one key, removing the second (OpenAI) provider that D-040 required only because Anthropic has no embedding API. By D-032's port design this is a configuration concern: only the Spring AI starter, profile properties, and model beans change — no domain, application, or adapter-logic changes. `gemini-embedding-001` uses Matryoshka representation learning; its native 3072-dimension output is chosen for maximum retrieval quality.
+
+**Alternatives considered:**
+- Keep Anthropic + OpenAI — rejected; two paid providers and two keys, against the zero-cost single-provider goal.
+- Raw Google Gen AI Java SDK (`com.google.genai`) instead of Spring AI — rejected; bypasses the `ChatClient` / `EmbeddingModel` ports the codebase is built on (D-032, D-062), forcing a rewrite for no benefit.
+- `gemini-1.5-flash` / `text-embedding-004` (as originally proposed) — rejected; both are retired/deprecated as of 2026 (Gemini 1.5 returns 404; `text-embedding-004` deprecated 2026-01-14). Current equivalents `gemini-2.5-flash` + `gemini-embedding-001` are used, and model names are env-overridable so future bumps (e.g. a Gemini 3 flash) are config-only.
+- Embedding at 768 / 1536 dims — rejected; 3072 (native) chosen for best quality. Dimension stays per-profile (Ollama `bge-m3`@1024, D-088); changing it requires recreating the vector column.
+
+**Cross-refs:** D-032 (provider boundary, superseded), D-040 (embedding model, superseded), D-062 (native pgvector), D-088 (Ollama local + per-profile dimension), D-034 (cost governance).
 
 ---
 

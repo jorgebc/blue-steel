@@ -14,8 +14,8 @@
 | ORM | Spring Data JPA + Hibernate |
 | Migrations | Liquibase |
 | Auth | Spring Security (JWT HS256) |
-| LLM generation | Spring AI `ChatClient` → Anthropic (`llm-real`) or Ollama (`llm-ollama`, D-088) |
-| LLM embeddings | Spring AI `EmbeddingModel` → OpenAI `text-embedding-3-small` (1536) or Ollama `bge-m3` (1024) per profile (D-088) |
+| LLM generation | Spring AI `ChatClient` → Google Gemini `gemini-2.5-flash` (`llm-real`, D-093) or Ollama (`llm-ollama`, D-088) |
+| LLM embeddings | Spring AI `EmbeddingModel` → Google `gemini-embedding-001` (3072, `llm-real`, D-093) or Ollama `bge-m3` (1024) per profile (D-088) |
 | Vector retrieval | **Native pgvector SQL only** — `VectorStore` never used (D-062) |
 | Testing | JUnit 5, Mockito, Testcontainers, PITest, ArchUnit |
 | Style | Spotless + google-java-format |
@@ -63,7 +63,7 @@ podman compose up -d                              # start Postgres+pgvector (or:
 cd apps/api
 
 mvn spring-boot:run -Dspring-boot.run.profiles=local                  # mock LLMs (zero cost)
-mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-real         # real Anthropic+OpenAI
+mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-real         # real Google Gemini (chat + embeddings, D-093)
 mvn spring-boot:run -Dspring-boot.run.profiles=local,llm-ollama       # real LOCAL models via Ollama — offline, zero cost (D-088)
 
 mvn spotless:check                               # format check (google-java-format)
@@ -135,7 +135,7 @@ A failing ArchUnit test is a layer violation in production code — fix the code
 - Generated async post-commit via `@Async` / `ApplicationEvent` (D-063)
 - Entity versions without embeddings excluded from Query Mode retrieval
 - Commit returns `200` before embeddings are generated
-- Provider + dimension are per-profile: OpenAI@1536 (`llm-real`/prod), Ollama `bge-m3`@1024 (`llm-ollama`, offline). Column is `vector(${embeddingDimension})` via a Liquibase parameter; vectors from different models are not comparable — never mix models in one DB (D-088)
+- Provider + dimension are per-profile: Gemini `gemini-embedding-001`@3072 (`llm-real`/prod, D-093), Ollama `bge-m3`@1024 (`llm-ollama`, offline). Column is `vector(${embeddingDimension})` via a Liquibase parameter; vectors from different models are not comparable — never mix models in one DB (D-088)
 
 ---
 
@@ -169,7 +169,7 @@ Never put business logic in controllers. Never put format validation in services
 
 **SonarQube (local-only):** AI-pipeline BE-engineer gate — `mvn sonar:sonar` (command in §3, setup in repo-root `CLAUDE.md` §6). Filters issues to branch-modified files; ≤2 fix attempts; not in CI.
 
-**LLM profiles (D-049, D-088):** three provider selections layered on `local` — mock (`@Profile("!llm-real & !llm-ollama")`, default dev), `llm-real` (Anthropic + OpenAI), `llm-ollama` (Ollama, offline). Adapters are provider-neutral (`SpringAi*`, `@Profile("llm-real | llm-ollama")`); `AiConfig` picks the active `ChatModel`/`EmbeddingModel` bean per profile. Ollama models + dimension are env-overridable (`OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`, `EMBEDDING_DIMENSION`). Changing the Ollama embedding model to a different dimension → update `EMBEDDING_DIMENSION` and recreate the local DB (`docker compose down -v`).
+**LLM profiles (D-049, D-088, D-093):** three provider selections layered on `local` — mock (`@Profile("!llm-real & !llm-ollama")`, default dev), `llm-real` (Google Gemini — chat + embeddings under one `GEMINI_API_KEY`, D-093), `llm-ollama` (Ollama, offline). Adapters are provider-neutral (`SpringAi*`, `@Profile("llm-real | llm-ollama")`); `AiConfig` picks the active `ChatModel`/`EmbeddingModel` bean per profile. Models + dimension are env-overridable (`GEMINI_CHAT_MODEL`, `GEMINI_EMBEDDING_MODEL`; `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`; `EMBEDDING_DIMENSION`). Changing the embedding model to a different dimension → update `EMBEDDING_DIMENSION` and recreate the DB (`docker compose down -v`).
 
 **Proposals schema (D-016):** `proposals` + `proposal_votes` tables exist from day one but the approval pipeline ships in v2. Do NOT implement proposal approval logic.
 

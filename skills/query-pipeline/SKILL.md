@@ -22,7 +22,7 @@ query is synchronous; the client waits for a complete response (D-052).
 
 ```
 Query (free-text question)
-  → Embed question ─────────── EmbeddingPort (OpenAI text-embedding-3-small)
+  → Embed question ─────────── EmbeddingPort (Gemini gemini-embedding-001)
   → pgvector similarity search ─ retrieve top-N relevant entity version snapshots
                                   from entity_embeddings, scoped to campaign
   → Context assembly ─────────── collect matched entity snapshots + session references
@@ -72,7 +72,7 @@ entity_embeddings
   entity_id UUID
   entity_version_id UUID FK → actor_versions.id (or equivalent)
   session_id UUID FK → sessions.id
-  embedding vector(1536)      -- text-embedding-3-small dimensions
+  embedding vector(3072)      -- gemini-embedding-001 dimensions
   content_hash TEXT           -- detect unchanged content, skip re-embedding
   created_at TIMESTAMP
 ```

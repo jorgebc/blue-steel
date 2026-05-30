@@ -51,8 +51,8 @@ blue-steel/
 | Framework | Spring Boot | 4.0.3 |
 | Build tool | Maven | latest stable |
 | LLM integration | Spring AI (`ChatClient`, `EmbeddingModel`) | aligned with Boot 4.x |
-| LLM provider (generation) | Anthropic (Claude) | via Spring AI `ChatClient` |
-| LLM provider (embeddings) | OpenAI (`text-embedding-3-small`) | via Spring AI `EmbeddingModel` |
+| LLM provider (generation) | Google Gemini (`gemini-2.5-flash`) | via Spring AI `ChatClient` |
+| LLM provider (embeddings) | Google Gemini (`gemini-embedding-001`, 3072) | via Spring AI `EmbeddingModel` |
 | Vector similarity retrieval | Native pgvector queries via Spring Data JPA / `JdbcTemplate` | — |
 | ORM | Spring Data JPA + Hibernate | aligned with Boot 4.x |
 | Database driver | PostgreSQL JDBC | latest stable |
@@ -367,7 +367,7 @@ entity_embeddings
   entity_id UUID
   entity_version_id UUID FK
   session_id UUID FK
-  embedding vector(1536)      ← dimension matches chosen embedding model; per-profile (1536 OpenAI prod / 1024 Ollama local) via a Liquibase parameter (D-088)
+  embedding vector(3072)      ← dimension matches chosen embedding model; per-profile (3072 Gemini prod / 1024 Ollama local) via a Liquibase parameter (D-088, D-093)
   content_hash TEXT           ← detect unchanged content, skip re-embedding
   created_at TIMESTAMP
 ```
@@ -435,20 +435,20 @@ proposal_votes
 
 ### 6.1 Providers
 
-Blue Steel uses two LLM providers with distinct responsibilities. Both are behind ports. Both are swappable independently without domain changes.
+Blue Steel uses a single LLM provider — Google Gemini via Spring AI — for both text generation and embeddings, under one `GEMINI_API_KEY` (D-093). Both concerns sit behind ports and remain independently swappable without domain changes.
 
 | Concern | Provider | Model |
 |---|---|---|
-| Text generation (extraction, conflict detection, query answering) | Anthropic (Claude) | via Spring AI `ChatClient` |
-| Embeddings (entity vectorisation, similarity retrieval) | OpenAI | `text-embedding-3-small`, 1536 dimensions |
+| Text generation (extraction, conflict detection, query answering) | Google Gemini | `gemini-2.5-flash` via Spring AI `ChatClient` |
+| Embeddings (entity vectorisation, similarity retrieval) | Google Gemini | `gemini-embedding-001`, 3072 dimensions |
 
-**Why two providers:** Anthropic does not provide an embedding API — Claude models are generative only. The embedding provider is necessarily separate from the generation provider. This is not a compromise; it is how the ecosystem works. The `EmbeddingPort` abstraction means the application layer is unaware of which provider handles embeddings.
+**Why one provider:** Google Gemini exposes both generative and embedding models under a single API key, so generation and embeddings are centralised on one provider at zero cost on the free tier (D-093). The `EmbeddingPort` and `ChatClient` abstractions still keep the application layer unaware of which provider is wired, so reverting to a split-provider setup (a generative provider with no embedding API plus a separate embedding provider) would touch only adapter wiring.
 
-**Local development provider (D-088):** a third wiring — the `llm-ollama` Spring profile — runs both concerns against local models served by Ollama (chat via `OllamaChatModel`, embeddings via Ollama, default `bge-m3`) for fully offline, zero-cost development, including real semantic Query Mode. Provider selection is purely a matter of which `ChatModel`/`EmbeddingModel` bean is active (`AiConfig`); the `SpringAi*` adapters are provider-neutral. The embedding **dimension is a per-profile setting** — OpenAI@1536 in production, Ollama `bge-m3`@1024 locally (§5.5). Embeddings from different models occupy different vector spaces and are never cross-comparable, so any one database uses exactly one embedding model; a local Ollama database is its own island, never mixed with production.
+**Local development provider (D-088):** a third wiring — the `llm-ollama` Spring profile — runs both concerns against local models served by Ollama (chat via `OllamaChatModel`, embeddings via Ollama, default `bge-m3`) for fully offline, zero-cost development, including real semantic Query Mode. Provider selection is purely a matter of which `ChatModel`/`EmbeddingModel` bean is active (`AiConfig`); the `SpringAi*` adapters are provider-neutral. The embedding **dimension is a per-profile setting** — Gemini `gemini-embedding-001`@3072 in production, Ollama `bge-m3`@1024 locally (§5.5). Embeddings from different models occupy different vector spaces and are never cross-comparable, so any one database uses exactly one embedding model; a local Ollama database is its own island, never mixed with production.
 
 Spring AI is used for two concerns only: `ChatClient` (text generation) and `EmbeddingModel` (vector generation). Spring AI's `VectorStore` abstraction is **not used** — it provides a generic flat similarity search interface that cannot express the domain-specific retrieval queries this system requires (filtering by `entity_type`, joining through `entity_versions → sessions`, scoping by `campaign_id`). All pgvector similarity searches are written as native PostgreSQL queries via Spring Data JPA or `JdbcTemplate`, giving full control over query shape and index usage. See D-062.
 
-The domain never references Anthropic, OpenAI, or any provider directly.
+The domain never references Gemini, Ollama, or any provider directly.
 
 ### 6.2 Port Definition
 
@@ -518,7 +518,7 @@ Session Summary (raw text)
  Token budget check ──── REJECT if oversized
        │
        ▼
- Knowledge Extraction ── LLM call 1  (Anthropic)
+ Knowledge Extraction ── LLM call 1  (Gemini)
  (actors, spaces, events, relations identified as raw mentions;
   narrative summary header generated as co-output — D-005)
        │
@@ -549,7 +549,7 @@ Session Summary (raw text)
        │    HTTP 200 returned to client immediately
        │
        ▼ (async, fire-and-forget)
- Embedding generation ── OpenAI EmbeddingModel called per committed
+ Embedding generation ── Gemini EmbeddingModel called per committed
                           entity version; rows inserted into entity_embeddings
                           Entities without embeddings are excluded from
                           Query Mode context retrieval until generation completes
@@ -584,7 +584,7 @@ Each natural language query runs the following pipeline:
 Query (user question, free text)
        │
        ▼
- Embed question ─────────── EmbeddingPort (OpenAI)
+ Embed question ─────────── EmbeddingPort (Gemini)
        │
        ▼
  pgvector similarity search ─ retrieve top-N relevant entity versions
@@ -595,7 +595,7 @@ Query (user question, free text)
                                 references; enforce context token budget
        │
        ▼
- QueryAnsweringPort ─────────  LLM call (Anthropic)
+ QueryAnsweringPort ─────────  LLM call (Gemini)
                                 system: world state context + citation rule
                                 user: original question
        │
@@ -617,7 +617,7 @@ Cost is controlled at four levels:
 
 | Level | Mechanism |
 |---|---|
-| **Provider level** | Hard monthly spend cap configured in Anthropic console — non-negotiable before first production call |
+| **Provider level** | Hard monthly spend cap configured in the Google AI Studio / Gemini console — non-negotiable before first production call |
 | **Pre-call estimation** | Token count estimated before every LLM call; call rejected if it exceeds configured envelope |
 | **Context bounding** | pgvector similarity search scopes LLM context to relevant chunks only — prevents context growth with campaign size |
 | **Usage logging** | Every LLM call logged: tokens in, tokens out, estimated cost, session, user, pipeline stage |
@@ -1141,7 +1141,7 @@ The Spring Boot backend and Vite dev server run natively — not in Docker. This
 | Profile | Behaviour |
 |---|---|
 | `local` (default) | All LLM ports use in-memory mock implementations. Zero API cost. Canned responses for extraction, resolution, and query pipelines. |
-| `llm-real` | LLM ports use real Anthropic and OpenAI API calls. Activate when testing the extraction or query pipelines end-to-end. |
+| `llm-real` | LLM ports use real Google Gemini API calls (chat + embeddings). Activate when testing the extraction or query pipelines end-to-end. |
 
 Activation: `--spring.profiles.active=local,llm-real`
 
@@ -1197,8 +1197,7 @@ Runtime secrets injected into the backend container:
 | `DATABASE_URL` | Spring Boot — Neon JDBC URL (`jdbc:postgresql://...?sslmode=require`) |
 | `DB_USERNAME` | Spring Boot — Neon database user |
 | `DB_PASSWORD` | Spring Boot — Neon database password |
-| `ANTHROPIC_API_KEY` | Spring AI adapter — text generation |
-| `OPENAI_API_KEY` | Spring AI embedding adapter — text-embedding-3-small |
+| `GEMINI_API_KEY` | Spring AI Google GenAI adapter — Gemini chat + embeddings (D-093) |
 | `JWT_SECRET` | Spring Security — HS256 symmetric secret (min 32 bytes) |
 | `EMAIL_API_KEY` | Email adapter (Resend) — transactional email |
 | `ADMIN_EMAIL` | `AdminBootstrapService` — singleton admin email seeded on first startup (D-073) |

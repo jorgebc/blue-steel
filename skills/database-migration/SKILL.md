@@ -172,8 +172,8 @@ Always append at the bottom — changelogs are applied in inclusion order.
 
 <!-- Column definition for embedding storage -->
 <addColumn tableName="entity_embeddings">
-    <column name="embedding" type="vector(1536)">
-        <!-- 1536 dimensions for text-embedding-3-small (D-040) -->
+    <column name="embedding" type="vector(3072)">
+        <!-- 3072 dimensions for gemini-embedding-001 (D-093) -->
         <constraints nullable="false"/>
     </column>
 </addColumn>
@@ -268,10 +268,10 @@ See `backend-domain-model` skill for the schema template.
   (ARCHITECTURE.md §5.7). Auto-increment integers are not used.
 
 - **Creating pgvector columns before enabling the extension.** `CREATE EXTENSION IF NOT EXISTS vector`
-  must appear in a prior changeset before any `vector(1536)` column is created.
+  must appear in a prior changeset before any `vector(3072)` column is created.
 
-- **Using the wrong dimension count for embeddings.** Blue Steel uses `text-embedding-3-small`
-  with 1536 dimensions (D-040). The column type must be `vector(1536)`. Using a different
+- **Using the wrong dimension count for embeddings.** Blue Steel uses `gemini-embedding-001`
+  with 3072 dimensions (D-093). The column type must be `vector(3072)`. Using a different
   dimension count silently corrupts stored embeddings.
 
 - **Creating a partial unique index with Liquibase `<createIndex>`.** Liquibase's standard

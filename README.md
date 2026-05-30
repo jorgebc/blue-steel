@@ -104,7 +104,7 @@ Frontend starts on `http://localhost:5173`.
 ### Optional: Real LLM profiles
 
 ```bash
-# Anthropic + OpenAI (requires ANTHROPIC_API_KEY + OPENAI_API_KEY in env)
+# Google Gemini — chat + embeddings (requires GEMINI_API_KEY in env)
 mvn spring-boot:run "-Dspring-boot.run.profiles=local,llm-real"
 
 # Local Ollama — offline, zero cost (requires Ollama running on localhost)
