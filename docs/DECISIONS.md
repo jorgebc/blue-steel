@@ -1799,7 +1799,7 @@ Local chat models (7–8B) are weaker than Claude at the strict structured-JSON 
 **Alternatives considered:**
 - Text generation via Ollama but embeddings still OpenAI/mock — rejected; the goal is real semantic Query Mode locally, which requires real local embeddings stored in pgvector.
 - Force a 1536-dimension local embedding model to reuse the existing column — rejected; same-dimension vectors from different models are still not comparable, so reusing the column buys nothing and needlessly constrains model choice. A per-profile dimension is cleaner.
-- Reverse D-040 outright for production — rejected; OpenAI@1536 stays the production default. Ollama is a local-dev option only.
+- Reverse D-040 outright for production — rejected; OpenAI@1536 stayed the production default at the time. Ollama is a local-dev option only. (Update: D-093 later migrated production to Google Gemini `gemini-embedding-001`@3072 — `llm-real` now wires Gemini, not Anthropic+OpenAI. The per-profile-dimension mechanism this decision introduced is unchanged.)
 
 Cross-refs: D-032 (provider-agnostic by design), D-040 (embedding model), D-049 (mock vs real profiles), D-062 (native pgvector).
 
