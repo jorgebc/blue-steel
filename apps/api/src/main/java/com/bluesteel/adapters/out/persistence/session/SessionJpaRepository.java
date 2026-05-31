@@ -1,7 +1,9 @@
 package com.bluesteel.adapters.out.persistence.session;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +15,12 @@ interface SessionJpaRepository extends JpaRepository<SessionJpaEntity, UUID> {
       "SELECT s FROM SessionJpaEntity s WHERE s.campaignId = :campaignId"
           + " AND s.status IN ('processing', 'draft')")
   Optional<SessionJpaEntity> findActiveByCampaignId(@Param("campaignId") UUID campaignId);
+
+  /** Returns one page of the campaign's sessions; ordering is supplied via {@link Pageable}. */
+  List<SessionJpaEntity> findByCampaignId(UUID campaignId, Pageable pageable);
+
+  /** Returns the total number of sessions in the campaign. */
+  long countByCampaignId(UUID campaignId);
 
   /** Returns {@code COALESCE(MAX(sequenceNumber), 0) + 1} across committed sessions (D-069). */
   @Query(

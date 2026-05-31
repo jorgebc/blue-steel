@@ -14,6 +14,11 @@ public record ApiResponse<T>(T data, Object meta, List<ApiError> errors) {
     return new ApiResponse<>(data, Map.of(), List.of());
   }
 
+  /** Success response carrying pagination/tracing metadata in {@code meta}. */
+  public static <T> ApiResponse<T> success(T data, Object meta) {
+    return new ApiResponse<>(data, meta, List.of());
+  }
+
   public static ApiResponse<Void> error(List<ApiError> errors) {
     return new ApiResponse<>(null, Map.of(), errors);
   }

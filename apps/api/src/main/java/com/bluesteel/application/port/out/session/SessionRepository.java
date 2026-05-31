@@ -1,6 +1,7 @@
 package com.bluesteel.application.port.out.session;
 
 import com.bluesteel.domain.session.Session;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,6 +13,15 @@ public interface SessionRepository {
 
   /** Returns the session by id, or empty if not found. */
   Optional<Session> findById(UUID id);
+
+  /**
+   * Returns one offset-paginated page of the campaign's sessions, ordered by sequence number (nulls
+   * last) then creation time. {@code page} is zero-based; {@code size} is the page length (D-055).
+   */
+  List<Session> findByCampaignId(UUID campaignId, int page, int size);
+
+  /** Returns the total number of sessions in the campaign across all pages. */
+  long countByCampaignId(UUID campaignId);
 
   /**
    * Returns the single active session for a campaign (in {@code processing} or {@code draft}
