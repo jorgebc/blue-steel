@@ -92,6 +92,13 @@
 
 #### F1.0 — Repo scaffold + CI/CD pipelines
 
+> **Reconciliation note (2026-05-31):** The "Oracle Cloud Always Free ARM VM", `linux/arm64`, and
+> SSH-based deploy wording in F1.0 and F1.2 below is **historical**. Backend hosting was migrated to
+> **Render** (free web service, `linux/amd64`, triggered via a deploy hook) — see D-091 (supersedes
+> D-046) and `ARCHITECTURE.md §11.2/§11.4`. The shipped `.github/workflows/backend.yml` builds a
+> `linux/amd64` image, pushes to `ghcr.io`, and `POST`s `RENDER_DEPLOY_HOOK_URL`. Read the current
+> workflow + D-091 as authoritative over the arm64/Oracle text in these two blocks.
+
 **Goal:** Establish the full monorepo structure, build tooling, and CI/CD pipeline before any application code exists. A green pipeline with no logic — just scaffold, config, and workflows.
 
 **Scope (in):**
@@ -2680,6 +2687,119 @@ npx shadcn@latest add badge checkbox radio-group
 **Scope (out):** CI wiring — CI stays on mock adapters (`local`). This IT is developer-run only.
 
 **Skills:** `spring-ai-llm-adapter`, `session-ingestion-pipeline`  **Decisions:** D-088  **Dependencies:** F2.12.1
+
+---
+
+### Phase 2.5 — Transition Hardening (Pre-Phase 3 Gate)
+
+> **Origin:** Findings from the 2026-05-31 documentation ↔ code cross-audit of the completed
+> Phases 1 & 2. These items close gaps between what the docs promise and what the code ships, plus
+> one latent bug. **Only TR-3 is a hard blocker for Phase 3** (Query Mode reads `entity_embeddings`);
+> TR-1, TR-2, and TR-4 are correctness/completeness work that should land before Phase 3 begins but
+> do not technically block the Query pipeline.
+>
+> Trivial doc discrepancies surfaced by the audit (ARCHITECTURE §6.3 "Anthropic"→"Gemini",
+> React 19 / Router v7 versions, the §7.8 add-member endpoint, and the Oracle→Render note in F1.0)
+> were already fixed inline during the audit; TR-4 only tracks the residual sweep.
+
+#### Summary
+
+| # | Item | Type | Blocks Phase 3? | Status |
+|---|---|---|---|---|
+| TR-1 | Session list + detail endpoints | Backend (gap) | No | 🔲 |
+| TR-2 | Invitation & membership management UI | Frontend (blind spot) | No | 🔲 |
+| TR-3 | Fix mock embedding dimension mismatch | Backend (bug) | **Yes** | 🔲 |
+| TR-4 | Documentation reconciliation sweep | Docs | No | 🔲 |
+
+---
+
+#### TR-1 — Session list + detail endpoints
+
+**Issue:** `ARCHITECTURE.md §7.6` documents `GET /api/v1/campaigns/{id}/sessions` (list, ordered by
+`sequence_number`, paginated) and `GET /api/v1/campaigns/{id}/sessions/{sid}` (detail), but neither
+exists. The shipped `SessionController` only exposes `POST`, `GET .../{sid}/status`,
+`GET .../{sid}/diff`, `DELETE .../{sid}`, and `POST .../{sid}/commit`. No `ListSessionsUseCase` or
+`GetSessionDetailUseCase` exists.
+
+**Impact:** The frontend has no way to render session history or a committed-session record, and the
+draft-recovery UX (D-054 — "offer Resume before allowing a new submission") has no list endpoint to
+detect an existing active draft from; today it can only discover that via the `409` on submit.
+
+**Proposed solution:** Add `ListSessionsUseCase` + `GetSessionDetailUseCase` (driving ports) with
+their services, a paginated read-model (offset pagination per D-055), two `@GetMapping`s on
+`SessionController`, and Testcontainers ITs. Mirror the existing campaign read-use-case pattern
+(`ListCampaignsService` / `GetCampaignService`) and the §7.6 response shapes. Campaign-member
+authorization via `CampaignMembershipPort`.
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-054, D-055, D-069  **Dependencies:** F2.3
+
+---
+
+#### TR-2 — Invitation & membership management UI
+
+**Issue:** The backend exposes platform invitation (`POST /api/v1/invitations`, admin),
+campaign-scoped invitation (`POST /api/v1/campaigns/{id}/invitations`, gm), role change
+(`PATCH .../members/{uid}`), and member removal (`DELETE .../members/{uid}`). The frontend ships
+**none** of these — `apps/web/src/api/` contains only `auth`, `users`, `campaigns`, `sessions`, and
+`health`; there is no members/invitations client, hook, or feature surface.
+
+**Impact:** Breaks the PRD §3 onboarding flow ("GM invites players and promotes editors") and the
+admin platform-invite step at the UI layer. An admin can create a campaign in the UI but cannot
+invite a user through it, and a GM cannot manage membership at all without calling the API directly.
+The roadmap never scheduled this UI — it is a true blind spot, not a deferred item.
+
+**Proposed solution:** Add `src/api/members.ts` (+ invitations) with typed clients and TanStack
+mutation/query hooks; an admin platform-invite surface; and a GM-only member-management panel on
+`CampaignHomePage` (list members, invite by email, change role, remove). Role-gate with
+`campaignStore.activeRole`; use `InlineBanner` for feedback and `FocusedOverlay` for confirms —
+no toasts/modals (D-082, D-083); axe-tested per frontend convention.
+
+**Skills:** `frontend-api-resource`, `auth`, `ux-inline-feedback`, `ux-focused-overlay`, `frontend-testing`  **Decisions:** D-051, D-064, D-082, D-083  **Dependencies:** F1.11
+
+---
+
+#### TR-3 — Fix mock embedding dimension mismatch  *(hard Phase-3 blocker)*
+
+**Issue:** `MockEmbeddingAdapter` hardcodes a `float[1536]` vector
+(`adapters/out/ai/MockEmbeddingAdapter.java:16`), but the default `local` profile sets the
+`entity_embeddings.embedding` column to `vector(1024)`
+(`application-local.properties:27`, `embeddingDimension=1024` — a literal, not env-derived).
+
+**Impact:** On the default `local` (mock) profile, the async post-commit embedding write produces a
+1536-dimension vector against a 1024-dimension column → pgvector rejects the insert. Because
+embedding generation is fire-and-forget post-commit (D-063), commit still returns `200` and the
+failure is swallowed in the async path — so the local mock pipeline silently writes no embeddings.
+Phase 3 Query Mode retrieves from `entity_embeddings`; without a working local embedding write, the
+Query pipeline cannot be developed or smoke-tested on the default profile. **Fix before Phase 3.**
+
+**Proposed solution:** Make `MockEmbeddingAdapter` size its vector from the configured
+`embeddingDimension` (inject the Liquibase/`EMBEDDING_DIMENSION` property) instead of a hardcoded
+constant, so mock output always matches the active DB column — or, minimally, align
+`application-local.properties` to `1536`. Prefer the configurable approach. Add an integration test
+asserting that a commit under the mock profile writes a row to `entity_embeddings` with the expected
+dimension.
+
+**Skills:** `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-063, D-088, D-093  **Dependencies:** F2.8
+
+---
+
+#### TR-4 — Documentation reconciliation sweep
+
+**Issue:** The audit fixed the high-traffic doc drift inline (ARCHITECTURE §6.3 "Anthropic"→"Gemini";
+React 19 / Router v7 in ARCHITECTURE §4.1 and the `CLAUDE.md` files; the §7.8 add-member row; the
+Oracle→Render note in F1.0). A few residual, lower-traffic references remain, mostly inside
+append-only decision entries that should not be rewritten.
+
+**Impact:** Stale provider/version/host facts in secondary locations can mislead future agents that
+trust the docs as the source of truth.
+
+**Proposed solution:** Sweep for residual stale references and add dated amendment notes (never
+rewrite append-only entries) — e.g. D-034's body still says "Anthropic console" where the live
+spend-cap location is the Google AI Studio / Gemini console (`ARCHITECTURE.md §6.5`). Confirm no
+other doc still asserts React 18 / Router v6 or Oracle-Cloud hosting outside a clearly-historical
+context.
+
+**Skills:** `docs`  **Decisions:** D-032, D-034, D-040, D-091, D-093  **Dependencies:** None
 
 ---
 

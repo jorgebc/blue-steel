@@ -10,12 +10,12 @@
 | Concern | Choice |
 |---|---|
 | Language | TypeScript (latest stable) |
-| Framework | React 18 |
+| Framework | React 19 |
 | Build | Vite |
 | Components | shadcn/ui (primitives in `components/ui/` — **never edit manually**) |
 | Server state | TanStack Query v5 |
 | Client state | Zustand v5 |
-| Routing | React Router v6 |
+| Routing | React Router v7 (`react-router-dom`) |
 | Graph | React Flow v12 (`@xyflow/react`, NOT `reactflow`) |
 | Forms | React Hook Form v7 |
 | HTTP | Fetch API + hand-written typed client (`src/api/client.ts`) |

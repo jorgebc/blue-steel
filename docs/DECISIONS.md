@@ -586,6 +586,7 @@ Developer knows Liquibase. Built-in rollback support is a genuine advantage duri
 ### D-030 — Frontend stack: React + Vite + TypeScript
 
 **Date:** 2026-04-06  
+**Amended:** 2026-05-31  
 **Status:** Active
 
 **Decision:**  
@@ -598,7 +599,8 @@ Blue Steel is an auth-gated SPA with no SEO or SSR requirements. A pure SPA is t
 - Next.js — rejected; SSR and RSC add framework-level complexity that solves no stated requirement. Hard problems live at the component level, not the framework level.
 - Vue 3 + Vite — rejected; smaller ecosystem, less portfolio visibility, no technical advantage for this use case.
 
----
+**Amendment rationale (2026-05-31):**  
+The stack decision (pure React SPA + Vite + TanStack Query + Zustand + React Flow) is unchanged. Only the major versions advanced during scaffolding: the project actually ships **React 19.x** and **react-router-dom 7.x** (verify against `apps/web/package.json`, the authoritative source). The original "React 18 / Router v6" wording is retained above for the historical record; `ARCHITECTURE.md §4.1` and the `CLAUDE.md` files have been updated to the shipped versions.
 
 ### D-031 — Database: PostgreSQL + pgvector
 
