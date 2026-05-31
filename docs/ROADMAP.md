@@ -2706,10 +2706,14 @@ npx shadcn@latest add badge checkbox radio-group
 
 | # | Item | Type | Blocks Phase 3? | Status |
 |---|---|---|---|---|
-| TR-1 | Session list + detail endpoints | Backend (gap) | No | 🔲 |
-| TR-2 | Invitation & membership management UI | Frontend (blind spot) | No | 🔲 |
-| TR-3 | Fix mock embedding dimension mismatch | Backend (bug) | **Yes** | 🔲 |
-| TR-4 | Documentation reconciliation sweep | Docs | No | 🔲 |
+| TR-1 | Session list + detail endpoints | Backend (gap) | No | ✅ |
+| TR-2 | Invitation & membership management UI (+ GET members endpoint) | Backend + Frontend (blind spot) | No | ✅ |
+| TR-3 | Fix mock embedding dimension mismatch | Backend (bug) | **Yes** | ✅ |
+| TR-4 | Documentation reconciliation sweep | Docs | No | ✅ |
+
+> **All Phase 2.5 items were implemented in the 2026-05-31 audit follow-up.** TR-2 additionally
+> required (and added + documented in §7.8) a `GET /api/v1/campaigns/{id}/members` roster endpoint,
+> which the audit found was absent — the membership controller previously had no read side.
 
 ---
 
