@@ -10,6 +10,12 @@ vi.mock('@/api/campaigns', () => ({
   useCampaign: vi.fn(),
 }))
 
+vi.mock('./components/MemberManagementPanel', () => ({
+  MemberManagementPanel: ({ campaignId }: { campaignId: string }) => (
+    <div data-testid="member-panel">members for {campaignId}</div>
+  ),
+}))
+
 const mockedUseCampaign = vi.mocked(useCampaign)
 
 const campaign: CampaignResponse = {
@@ -48,6 +54,22 @@ describe('CampaignHomePage', () => {
     renderPage()
 
     expect(screen.getByText(/use the sidebar/i)).toBeInTheDocument()
+  })
+
+  it('shows the member management panel to a GM', () => {
+    renderPage()
+
+    expect(screen.getByTestId('member-panel')).toBeInTheDocument()
+  })
+
+  it('hides the member management panel from a non-GM member', () => {
+    mockedUseCampaign.mockReturnValue({
+      data: { ...campaign, role: 'player' },
+    } as ReturnType<typeof useCampaign>)
+
+    renderPage()
+
+    expect(screen.queryByTestId('member-panel')).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

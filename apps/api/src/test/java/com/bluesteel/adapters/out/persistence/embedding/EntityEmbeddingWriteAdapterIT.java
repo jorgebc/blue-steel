@@ -10,6 +10,7 @@ import com.bluesteel.adapters.out.persistence.worldstate.WorldStateAdapter;
 import com.bluesteel.application.model.embedding.EntityEmbeddingRow;
 import com.bluesteel.application.model.worldstate.CommittedEntityVersion;
 import com.bluesteel.application.model.worldstate.EntityWriteCommand;
+import com.bluesteel.application.port.out.embedding.EmbeddingPort;
 import com.bluesteel.domain.campaign.Campaign;
 import com.bluesteel.domain.session.Session;
 import com.bluesteel.domain.user.User;
@@ -32,6 +33,7 @@ class EntityEmbeddingWriteAdapterIT extends TestcontainersPostgresBaseIT {
   @Autowired private UserPersistenceAdapter userAdapter;
   @Autowired private CampaignPersistenceAdapter campaignAdapter;
   @Autowired private SessionPersistenceAdapter sessionAdapter;
+  @Autowired private EmbeddingPort embeddingPort;
   @Autowired private JdbcTemplate jdbcTemplate;
 
   private UUID campaignId;
@@ -95,5 +97,31 @@ class EntityEmbeddingWriteAdapterIT extends TestcontainersPostgresBaseIT {
     assertThat(rows.get(0).get("entity_type")).isEqualTo("actor");
     assertThat(rows.get(0).get("entity_version_id")).isEqualTo(entityVersion.entityVersionId());
     assertThat(rows.get(0).get("content_hash")).isEqualTo(entityVersion.contentHash());
+  }
+
+  @Test
+  @DisplayName("mock embedding bean output matches the DB column dimension and persists (TR-3)")
+  void insert_mockEmbeddingBeanOutput_matchesColumnDimension() {
+    // Regression for TR-3: the mock must size its vector from the configured embeddingDimension so
+    // its output fits the live entity_embeddings column (1024 under the local test profile).
+    // A hardcoded 1536-length mock vector would make this insert fail on dimension mismatch.
+    float[] embedding = embeddingPort.embed("Frodo");
+    EntityEmbeddingRow row =
+        new EntityEmbeddingRow(
+            entityVersion.entityType(),
+            entityVersion.entityId(),
+            entityVersion.entityVersionId(),
+            sessionId,
+            embedding,
+            entityVersion.contentHash());
+
+    adapter.insert(row);
+
+    Integer storedDimension =
+        jdbcTemplate.queryForObject(
+            "SELECT vector_dims(embedding) FROM entity_embeddings WHERE entity_version_id = ?",
+            Integer.class,
+            entityVersion.entityVersionId());
+    assertThat(storedDimension).isEqualTo(embedding.length);
   }
 }

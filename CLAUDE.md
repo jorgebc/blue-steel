@@ -25,7 +25,7 @@ Blue Steel is an AI-assisted narrative memory system for tabletop RPG campaigns.
 blue-steel/
 ├── apps/
 │   ├── api/               ← Java 25 / Spring Boot 4.0.3 (Maven)
-│   └── web/               ← React 18 / Vite / TypeScript
+│   └── web/               ← React 19 / Vite / TypeScript
 ├── docs/                  ← PRD, ARCHITECTURE, DECISIONS, ROADMAP (read-only)
 ├── docker-compose.yml     ← PostgreSQL + pgvector (local infra only)
 ├── .github/workflows/     ← backend.yml + frontend.yml (path-filtered)

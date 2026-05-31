@@ -11,7 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.session.DiffPayload;
+import com.bluesteel.application.model.session.SessionDetailView;
+import com.bluesteel.application.model.session.SessionListView;
 import com.bluesteel.application.model.session.SessionStatusView;
+import com.bluesteel.application.model.session.SessionSummaryView;
 import com.bluesteel.application.model.session.SubmitSessionCommand;
 import com.bluesteel.application.model.session.SubmitSessionResult;
 import com.bluesteel.application.port.in.auth.LoginUseCase;
@@ -26,8 +29,10 @@ import com.bluesteel.application.port.in.campaign.RemoveMemberUseCase;
 import com.bluesteel.application.port.in.health.CheckHealthUseCase;
 import com.bluesteel.application.port.in.session.CommitSessionUseCase;
 import com.bluesteel.application.port.in.session.DiscardSessionUseCase;
+import com.bluesteel.application.port.in.session.GetSessionDetailUseCase;
 import com.bluesteel.application.port.in.session.GetSessionDiffUseCase;
 import com.bluesteel.application.port.in.session.GetSessionStatusUseCase;
+import com.bluesteel.application.port.in.session.ListSessionsUseCase;
 import com.bluesteel.application.port.in.session.SubmitSessionUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
@@ -40,6 +45,8 @@ import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
 import com.bluesteel.domain.exception.SessionNotFoundException;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.session.SessionStatus;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -86,6 +93,8 @@ class SessionControllerTest {
   @MockitoBean private CheckHealthUseCase checkHealthUseCase;
   @MockitoBean private SearchUsersUseCase searchUsersUseCase;
   @MockitoBean private SubmitSessionUseCase submitSessionUseCase;
+  @MockitoBean private ListSessionsUseCase listSessionsUseCase;
+  @MockitoBean private GetSessionDetailUseCase getSessionDetailUseCase;
   @MockitoBean private GetSessionStatusUseCase getSessionStatusUseCase;
   @MockitoBean private DiscardSessionUseCase discardSessionUseCase;
   @MockitoBean private GetSessionDiffUseCase getSessionDiffUseCase;
@@ -173,6 +182,17 @@ class SessionControllerTest {
                     { "summaryText": "text" }
                     """))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("should return 400 INVALID_PATH_PARAMETER when campaign id is not a UUID")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void list_malformedCampaignId_returns400() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/campaigns/not-a-uuid/sessions"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[0].code").value("INVALID_PATH_PARAMETER"))
+        .andExpect(jsonPath("$.errors[0].field").value("id"));
   }
 
   @Test
@@ -386,5 +406,73 @@ class SessionControllerTest {
                     """))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.errors[0].code").value("UNCERTAIN_ENTITIES_PRESENT"));
+  }
+
+  @Test
+  @DisplayName("should return 200 with session summaries and pagination meta on list")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void list_validRequest_returns200WithMeta() throws Exception {
+    SessionSummaryView summary =
+        new SessionSummaryView(
+            SESSION_ID, SessionStatus.COMMITTED, 1, Instant.now(), Instant.now());
+    when(listSessionsUseCase.list(CAMPAIGN_ID, CALLER_ID, 0, 20))
+        .thenReturn(new SessionListView(List.of(summary), 1L, 0, 20));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/sessions", CAMPAIGN_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].sessionId").value(SESSION_ID.toString()))
+        .andExpect(jsonPath("$.data[0].status").value("COMMITTED"))
+        .andExpect(jsonPath("$.data[0].sequenceNumber").value(1))
+        .andExpect(jsonPath("$.meta.totalCount").value(1))
+        .andExpect(jsonPath("$.meta.page").value(0))
+        .andExpect(jsonPath("$.meta.size").value(20));
+  }
+
+  @Test
+  @DisplayName("should return 401 when listing sessions while unauthenticated")
+  void list_unauthenticated_returns401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/sessions", CAMPAIGN_ID))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("should return 200 with session detail for a valid session")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void getDetail_validSession_returns200() throws Exception {
+    UUID blockId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    SessionDetailView detail =
+        new SessionDetailView(
+            SESSION_ID,
+            CAMPAIGN_ID,
+            SessionStatus.COMMITTED,
+            2,
+            null,
+            Instant.now(),
+            Instant.now(),
+            Instant.now(),
+            blockId);
+    when(getSessionDetailUseCase.getDetail(SESSION_ID, CALLER_ID, CAMPAIGN_ID)).thenReturn(detail);
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/sessions/{sid}", CAMPAIGN_ID, SESSION_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.sessionId").value(SESSION_ID.toString()))
+        .andExpect(jsonPath("$.data.sequenceNumber").value(2))
+        .andExpect(jsonPath("$.data.narrativeBlockId").value(blockId.toString()));
+  }
+
+  @Test
+  @DisplayName("should return 404 when session detail does not exist")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void getDetail_sessionNotFound_returns404() throws Exception {
+    when(getSessionDetailUseCase.getDetail(SESSION_ID, CALLER_ID, CAMPAIGN_ID))
+        .thenThrow(new SessionNotFoundException("Session not found: " + SESSION_ID));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/sessions/{sid}", CAMPAIGN_ID, SESSION_ID))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.errors[0].code").value("SESSION_NOT_FOUND"));
   }
 }

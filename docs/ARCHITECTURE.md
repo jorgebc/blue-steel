@@ -185,12 +185,12 @@ Configuration classes are co-located with the adapter they configure — not gat
 | Component | Choice | Version |
 |---|---|---|
 | Language | TypeScript | latest stable |
-| Framework | React | 18.x |
+| Framework | React | 19.x |
 | Build tool | Vite | latest stable |
 | Component library | shadcn/ui | latest stable |
 | Server state | TanStack Query | v5 |
 | Client state | Zustand | v5 |
-| Routing | React Router | v6 |
+| Routing | React Router | v7 |
 | Graph visualization | React Flow | v12 |
 | HTTP client | Fetch API + typed client | — |
 
@@ -527,13 +527,13 @@ Session Summary (raw text)
    Stage 1: pgvector similarity search per extracted mention
             → score below floor → classify NEW immediately (no LLM call)
             → score above floor → candidate(s) forwarded to Stage 2
-   Stage 2: LLM call 2  (Anthropic, bounded — only high-score candidates)
+   Stage 2: LLM call 2  (Gemini, bounded — only high-score candidates)
             → MATCH:     attach mention to existing world state entity
             → NEW:       create new entity record
             → UNCERTAIN: surface as dedicated diff card for user resolution
        │
        ▼
- Conflict Detection ───── pgvector retrieval → LLM call 3  (Anthropic, bounded)
+ Conflict Detection ───── pgvector retrieval → LLM call 3  (Gemini, bounded)
  (compare extracted facts against current world state for hard contradictions)
        │
        ▼
@@ -877,7 +877,8 @@ Two distinct invitation endpoints, one per caller context (D-051, D-064):
 | `POST /api/v1/campaigns` | Create campaign and atomically assign the initial GM (D-061) | admin |
 | `GET /api/v1/campaigns` | List campaigns (admin: all; members: own only) | authenticated |
 | `GET /api/v1/campaigns/{id}` | Get campaign detail | campaign member |
-| `POST /api/v1/campaigns/{id}/members` | Add a user to the campaign with a role | gm |
+| `GET /api/v1/campaigns/{id}/members` | List the campaign roster (`userId`, `email`, `role`, `joinedAt`) | campaign member or admin |
+| `POST /api/v1/campaigns/{id}/invitations` | Add a user to the campaign (campaign-scoped invitation; creates the account if new, else adds the existing user). This is the canonical add-member path — there is no separate `POST .../members` endpoint. See §7.7 and D-064. | gm |
 | `PATCH /api/v1/campaigns/{id}/members/{uid}` | Change a member's role | gm |
 | `DELETE /api/v1/campaigns/{id}/members/{uid}` | Remove a member | gm |
 

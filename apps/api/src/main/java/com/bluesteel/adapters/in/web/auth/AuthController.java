@@ -7,6 +7,7 @@ import com.bluesteel.application.model.auth.RefreshResult;
 import com.bluesteel.application.port.in.auth.LoginUseCase;
 import com.bluesteel.application.port.in.auth.LogoutUseCase;
 import com.bluesteel.application.port.in.auth.RefreshTokenUseCase;
+import com.bluesteel.domain.exception.RefreshTokenException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -53,6 +54,9 @@ public class AuthController {
   public ResponseEntity<ApiResponse<RefreshResponse>> refresh(
       HttpServletRequest request, HttpServletResponse response) {
     String rawToken = extractRefreshTokenCookie(request);
+    if (rawToken == null) {
+      throw new RefreshTokenException("REFRESH_TOKEN_MISSING", "Refresh token cookie required");
+    }
     RefreshResult result = refreshTokenUseCase.refresh(rawToken);
     setRefreshTokenCookie(response, result.rawRefreshToken(), THIRTY_DAYS_SECONDS);
     return ResponseEntity.ok(ApiResponse.success(new RefreshResponse(result.accessToken())));

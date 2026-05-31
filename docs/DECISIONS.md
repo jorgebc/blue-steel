@@ -586,6 +586,7 @@ Developer knows Liquibase. Built-in rollback support is a genuine advantage duri
 ### D-030 — Frontend stack: React + Vite + TypeScript
 
 **Date:** 2026-04-06  
+**Amended:** 2026-05-31  
 **Status:** Active
 
 **Decision:**  
@@ -598,7 +599,8 @@ Blue Steel is an auth-gated SPA with no SEO or SSR requirements. A pure SPA is t
 - Next.js — rejected; SSR and RSC add framework-level complexity that solves no stated requirement. Hard problems live at the component level, not the framework level.
 - Vue 3 + Vite — rejected; smaller ecosystem, less portfolio visibility, no technical advantage for this use case.
 
----
+**Amendment rationale (2026-05-31):**  
+The stack decision (pure React SPA + Vite + TanStack Query + Zustand + React Flow) is unchanged. Only the major versions advanced during scaffolding: the project actually ships **React 19.x** and **react-router-dom 7.x** (verify against `apps/web/package.json`, the authoritative source). The original "React 18 / Router v6" wording is retained above for the historical record; `ARCHITECTURE.md §4.1` and the `CLAUDE.md` files have been updated to the shipped versions.
 
 ### D-031 — Database: PostgreSQL + pgvector
 
@@ -659,7 +661,10 @@ Tabletop RPGs contain retcons, resurrections, and deliberate continuity breaks. 
 ### D-034 — LLM cost governance: bounded pipeline + provider-level spend cap
 
 **Date:** 2026-04-06  
+**Amended:** 2026-05-31  
 **Status:** Active
+
+**Amendment note (2026-05-31):** The four-level cost-governance model below is unchanged. Only the provider-level spend cap moved with the provider migration: it now lives in the **Google AI Studio / Gemini console**, not the Anthropic console (D-093). The original "Anthropic console" wording in the Decision text is retained for the historical record; `ARCHITECTURE.md §6.5` already states the Gemini console as the live location.
 
 **Decision:**  
 LLM cost is controlled at four levels: (1) a hard monthly spend cap in the Anthropic console, set before the first production call; (2) token estimation before every LLM call, rejecting calls that exceed a configurable envelope; (3) pgvector similarity search scoping LLM context to relevant chunks only, preventing context growth with campaign size; (4) usage logging of every LLM call with tokens in, tokens out, estimated cost, session, user, and pipeline stage.
@@ -855,7 +860,10 @@ The "stateless" claim in the original decision was imprecise — it conflated au
 ### D-044 — Environment model: local + prod only
 
 **Date:** 2026-04-09
+**Amended:** 2026-05-31
 **Status:** Active
+
+**Amendment note (2026-05-31):** The two-environment model (local + prod, no staging) is unchanged. The prod backend host is now **Render** (not Oracle Cloud) per D-091 — read the `prod` parenthetical below as Render + Vercel + Neon.
 
 **Decision:**
 Two environments only: `local` (Docker Compose on developer machine) and `prod` (Oracle Cloud + Vercel + Neon). No staging environment.

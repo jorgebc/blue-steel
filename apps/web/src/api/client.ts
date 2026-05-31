@@ -13,6 +13,24 @@ export class ApiClientError extends Error {
   }
 }
 
+let envWarningEmitted = false
+
+export function apiBaseUrl(): string {
+  const url = import.meta.env.VITE_API_BASE_URL
+  if (!url) {
+    // Without this, fetch would target "undefined/api/..." and fail opaquely.
+    // Warn once per page load — every fetch hitting this is the same root cause.
+    if (!envWarningEmitted) {
+      envWarningEmitted = true
+      console.error(
+        'VITE_API_BASE_URL is not set. Copy apps/web/.env.example to apps/web/.env.local and restart `npm run dev`.'
+      )
+    }
+    return ''
+  }
+  return url
+}
+
 // Module-level state deduplicates concurrent 401 refresh attempts
 let isRefreshing = false
 let refreshPromise: Promise<boolean> | null = null
@@ -20,7 +38,7 @@ let refreshPromise: Promise<boolean> | null = null
 async function attemptTokenRefresh(): Promise<boolean> {
   if (isRefreshing && refreshPromise !== null) return refreshPromise
   isRefreshing = true
-  refreshPromise = fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/auth/refresh`, {
+  refreshPromise = fetch(`${apiBaseUrl()}/api/v1/auth/refresh`, {
     method: 'POST',
     credentials: 'include',
   })
@@ -47,7 +65,7 @@ async function request<T>(
   retried = false
 ): Promise<ApiEnvelope<T>> {
   const token = useAuthStore.getState().accessToken
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}${path}`, {
+  const response = await fetch(`${apiBaseUrl()}${path}`, {
     method,
     credentials: 'include',
     headers: {

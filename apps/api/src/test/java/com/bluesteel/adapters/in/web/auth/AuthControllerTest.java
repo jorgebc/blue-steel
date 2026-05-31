@@ -138,6 +138,15 @@ class AuthControllerTest {
   }
 
   @Test
+  @DisplayName("should return 401 REFRESH_TOKEN_MISSING when refresh cookie is absent")
+  void refresh_noCookie_returns401() throws Exception {
+    mockMvc
+        .perform(post("/api/v1/auth/refresh"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.errors[0].code").value("REFRESH_TOKEN_MISSING"));
+  }
+
+  @Test
   @DisplayName("should return 200 and clear cookie on logout")
   void logout_authenticated_returns200AndClearsCookie() throws Exception {
     doNothing().when(logoutUseCase).logout("some-token");

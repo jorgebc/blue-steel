@@ -10,6 +10,7 @@ import com.bluesteel.domain.campaign.CampaignRole;
 import com.bluesteel.domain.user.User;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -107,6 +108,31 @@ class CampaignMembershipAdapterIT extends TestcontainersPostgresBaseIT {
     assertThat(adapter.existsByUserIdAndRole(user.id(), CampaignRole.GM)).isTrue();
     assertThat(adapter.existsByUserIdAndRole(user.id(), CampaignRole.PLAYER)).isFalse();
     assertThat(adapter.existsByUserIdAndRole(UUID.randomUUID(), CampaignRole.GM)).isFalse();
+  }
+
+  @Test
+  @DisplayName("should return all members of a campaign ordered by join time")
+  void findByCampaignId_returnsAllMembers() {
+    User gm = savedUser();
+    Campaign campaign = savedCampaign(gm.id());
+    adapter.save(
+        CampaignMember.create(
+            UUID.randomUUID(), campaign.id(), gm.id(), CampaignRole.GM, Instant.now()));
+    User player = savedUser();
+    adapter.save(
+        CampaignMember.create(
+            UUID.randomUUID(), campaign.id(), player.id(), CampaignRole.PLAYER, Instant.now()));
+
+    List<CampaignMember> members = adapter.findByCampaignId(campaign.id());
+
+    assertThat(members).hasSize(2);
+    assertThat(members).extracting(CampaignMember::userId).contains(gm.id(), player.id());
+  }
+
+  @Test
+  @DisplayName("should return an empty list for a campaign with no members")
+  void findByCampaignId_noMembers_returnsEmpty() {
+    assertThat(adapter.findByCampaignId(UUID.randomUUID())).isEmpty();
   }
 
   private User savedUser() {

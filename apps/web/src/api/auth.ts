@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiClient } from './client'
+import { apiBaseUrl, apiClient } from './client'
 import { useAuthStore } from '@/store/authStore'
 import type { ApiEnvelope } from '@/types/api'
 import type { AuthLoginResponse, RefreshResponse, UserMeResponse } from '@/types/auth'
@@ -18,7 +18,7 @@ export const authKeys = {
  */
 export async function initAuth(): Promise<void> {
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/auth/refresh`, {
+    const res = await fetch(`${apiBaseUrl()}/api/v1/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
     })

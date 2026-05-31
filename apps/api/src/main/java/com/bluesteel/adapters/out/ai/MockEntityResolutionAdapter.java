@@ -6,19 +6,17 @@ import com.bluesteel.application.model.ingestion.ResolutionOutcome;
 import com.bluesteel.application.model.ingestion.ResolvedEntity;
 import com.bluesteel.application.port.out.ingestion.EntityResolutionPort;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
- * Returns deterministic, name-based resolution outcomes (zero API cost). "Mira" → MATCH,
- * "Thornwick" → NEW, "Stranger" → UNCERTAIN, all others → NEW.
+ * Returns deterministic, name-based resolution outcomes (zero API cost). "Stranger" → UNCERTAIN,
+ * everything else → NEW. Never returns a MATCH because the local mock pipeline has no seeded world
+ * state to match against — a phantom matched id would FK-fail at commit (D-063).
  */
 @Component
 @Profile("!llm-real & !llm-ollama")
 public class MockEntityResolutionAdapter implements EntityResolutionPort {
-
-  static final UUID MIRA_ENTITY_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
   @Override
   public List<ResolvedEntity> resolve(
@@ -28,7 +26,6 @@ public class MockEntityResolutionAdapter implements EntityResolutionPort {
 
   private ResolvedEntity resolveOne(ExtractedMention mention) {
     return switch (mention.name()) {
-      case "Mira" -> new ResolvedEntity(mention, ResolutionOutcome.MATCH, MIRA_ENTITY_ID);
       case "Stranger" -> new ResolvedEntity(mention, ResolutionOutcome.UNCERTAIN, null);
       default -> new ResolvedEntity(mention, ResolutionOutcome.NEW, null);
     };

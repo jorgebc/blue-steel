@@ -12,6 +12,7 @@ import com.bluesteel.domain.session.SessionStatus;
 import com.bluesteel.domain.user.User;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -177,5 +178,56 @@ class SessionPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
     adapter.save(failed);
 
     assertThat(adapter.nextSequenceNumber(campaignId)).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("should order sessions by sequence number with nulls last")
+  void findByCampaignId_ordersBySequenceNumberNullsLast() {
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    committedSession(1, now);
+    committedSession(2, now);
+    // an active draft has no sequence number yet — it must sort after committed sessions
+    Session draft = Session.create(UUID.randomUUID(), campaignId, ownerId, now);
+    draft.startProcessing();
+    draft.toDraft("{}");
+    adapter.save(draft);
+
+    List<Session> page = adapter.findByCampaignId(campaignId, 0, 10);
+
+    assertThat(page).hasSize(3);
+    assertThat(page.get(0).sequenceNumber()).isEqualTo(1);
+    assertThat(page.get(1).sequenceNumber()).isEqualTo(2);
+    assertThat(page.get(2).sequenceNumber()).isNull();
+  }
+
+  @Test
+  @DisplayName("should paginate sessions by page and size")
+  void findByCampaignId_paginates() {
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    committedSession(1, now);
+    committedSession(2, now);
+    committedSession(3, now);
+
+    assertThat(adapter.findByCampaignId(campaignId, 0, 2)).hasSize(2);
+    assertThat(adapter.findByCampaignId(campaignId, 1, 2)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("should count all sessions for the campaign")
+  void countByCampaignId_returnsTotal() {
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    committedSession(1, now);
+    committedSession(2, now);
+
+    assertThat(adapter.countByCampaignId(campaignId)).isEqualTo(2);
+  }
+
+  private Session committedSession(int sequenceNumber, Instant now) {
+    Session s = Session.create(UUID.randomUUID(), campaignId, ownerId, now);
+    s.startProcessing();
+    s.toDraft("{}");
+    s.commit(sequenceNumber);
+    adapter.save(s);
+    return s;
   }
 }

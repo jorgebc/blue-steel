@@ -10,6 +10,7 @@ import { StatusPage } from '@/features/status/StatusPage'
 import { CampaignListPage } from '@/features/campaigns/CampaignListPage'
 import { CampaignHomePage } from '@/features/campaigns/CampaignHomePage'
 import { CreateCampaignPage } from '@/features/campaigns/CreateCampaignPage'
+import { InvitePlatformUserPage } from '@/features/admin/InvitePlatformUserPage'
 import { SubmitSessionPage } from '@/features/input/SubmitSessionPage'
 import { DiffReviewPage } from '@/features/input/DiffReviewPage'
 import { CampaignContextGuard } from '@/components/domain/CampaignContextGuard'
@@ -51,6 +52,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               }
             >
               <Route path="/" element={<CampaignListPage />} />
+              <Route path="/invite" element={<InvitePlatformUserPage />} />
               <Route path="/campaigns/new" element={<CreateCampaignPage />} />
               <Route path="/campaigns/:campaignId" element={<CampaignContextGuard />}>
                 <Route element={<AppShell />}>
