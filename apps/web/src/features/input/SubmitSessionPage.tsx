@@ -26,12 +26,6 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-interface Banner {
-  variant: 'error' | 'warning'
-  message: string
-  resumeHref?: string
-}
-
 /**
  * Submission form for a raw session summary. Editors and GMs only — a `player`
  * is redirected to campaign home. On a successful submit the form is replaced by
@@ -42,7 +36,11 @@ export function SubmitSessionPage() {
   const activeRole = useCampaignStore((s) => s.activeRole)
   const { mutate: submit, isPending } = useSubmitSession(campaignId ?? '')
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [banner, setBanner] = useState<Banner | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // Draft-recovery target (D-054). Kept separate from the transient error banner
+  // because the resume affordance must persist — a `warning` InlineBanner would
+  // auto-clear after 8s (UX_CONSTITUTION §5) and take the recovery link with it.
+  const [recoverySessionId, setRecoverySessionId] = useState<string | null>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -54,17 +52,15 @@ export function SubmitSessionPage() {
   }
 
   function onSubmit(values: FormValues) {
-    setBanner(null)
+    setErrorMessage(null)
+    setRecoverySessionId(null)
     submit(values, {
       onSuccess(data) {
         setSessionId(data.sessionId)
       },
       onError(err) {
         if (!(err instanceof ApiClientError)) {
-          setBanner({
-            variant: 'error',
-            message: 'An unexpected error occurred. Please try again.',
-          })
+          setErrorMessage('An unexpected error occurred. Please try again.')
           return
         }
         const validation = err.errors.find((e) => e.code === 'VALIDATION_ERROR')
@@ -74,50 +70,52 @@ export function SubmitSessionPage() {
         }
         const tooLarge = err.errors.find((e) => e.code === 'SUMMARY_TOO_LARGE')
         if (tooLarge) {
-          setBanner({ variant: 'error', message: tooLarge.message })
+          setErrorMessage(tooLarge.message)
           return
         }
         const existingSessionId = extractExistingSessionId(err)
         if (existingSessionId) {
-          setBanner({
-            variant: 'warning',
-            message: 'You already have an unfinished session review for this campaign.',
-            resumeHref: `/campaigns/${campaignId}/sessions/${existingSessionId}/diff`,
-          })
+          setRecoverySessionId(existingSessionId)
           return
         }
-        setBanner({ variant: 'error', message: err.errors[0]?.message ?? 'Submission failed.' })
+        setErrorMessage(err.errors[0]?.message ?? 'Submission failed.')
       },
     })
   }
 
   if (sessionId && campaignId) {
     return (
-      <div className="mx-auto max-w-2xl p-6">
+      <div className="mx-auto max-w-2xl p-8">
         <ProcessingStatusView campaignId={campaignId} sessionId={sessionId} />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
-      <div className="rounded-2xl bg-white p-8 shadow-sm">
+    <div className="mx-auto max-w-2xl p-8">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h1 className="mb-6 text-2xl font-semibold text-slate-900">New session</h1>
-        {banner && (
+        {recoverySessionId && (
+          <div
+            role="alert"
+            className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+          >
+            <p>You already have an unfinished session review for this campaign.</p>
+            <Link
+              to={`/campaigns/${campaignId}/sessions/${recoverySessionId}/diff`}
+              className="mt-2 inline-block font-medium underline underline-offset-4"
+            >
+              Resume your unfinished review
+            </Link>
+          </div>
+        )}
+        {errorMessage && (
           <div className="mb-4">
             <InlineBanner
-              variant={banner.variant}
-              message={banner.message}
-              onDismiss={() => setBanner(null)}
+              variant="error"
+              message={errorMessage}
+              onDismiss={() => setErrorMessage(null)}
             />
-            {banner.resumeHref && (
-              <Link
-                to={banner.resumeHref}
-                className="mt-2 inline-block text-sm font-medium text-blue-500 underline-offset-4 hover:underline"
-              >
-                Resume your unfinished review
-              </Link>
-            )}
           </div>
         )}
         <Form {...form}>

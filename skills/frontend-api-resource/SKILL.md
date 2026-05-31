@@ -73,7 +73,9 @@ Add or update the relevant file in `src/types/`. Types mirror the backend DTO sh
 
 ```typescript
 // src/types/session.ts
-export type SessionStatus = 'pending' | 'processing' | 'draft' | 'committed' | 'failed' | 'discarded';
+// SessionStatus mirrors the backend Java enum. Jackson serializes the enum *name*,
+// so these are UPPERCASE on the wire (there is no global lowercasing).
+export type SessionStatus = 'PENDING' | 'PROCESSING' | 'DRAFT' | 'COMMITTED' | 'FAILED' | 'DISCARDED';
 
 export interface Session {
   id: string;        // UUID
@@ -87,7 +89,9 @@ export interface Session {
 export interface SessionStatusResponse {
   sessionId: string;
   status: SessionStatus;
-  failureReason: 'EXTRACTION_FAILED' | 'BUDGET_EXCEEDED' | 'INTERNAL_ERROR' | null;
+  // Free-form code, not a closed union — the backend set grows across phases
+  // (e.g. PIPELINE_NOT_IMPLEMENTED today, extraction/timeout reasons later).
+  failureReason: string | null;
   message: string | null;
 }
 ```
@@ -128,7 +132,7 @@ export async function submitSession(
 ): Promise<{ sessionId: string; status: SessionStatus }> {
   const response = await apiClient.post(
     `/api/v1/campaigns/${campaignId}/sessions`,
-    { summary_text: summaryText }
+    { summaryText }  // request keys are camelCase (D-076), not snake_case
   );
   return response.data;
 }
@@ -152,7 +156,7 @@ export function useSessionStatus(campaignId: string, sessionId: string, enabled 
     refetchInterval: (query) => {
       // Poll every 2s while processing; stop when terminal status reached
       const status = query.state.data?.status;
-      return status === 'processing' ? 2000 : false;
+      return status === 'PROCESSING' ? 2000 : false;
     },
   });
 }
@@ -219,7 +223,7 @@ function SessionStatusPoller({ campaignId, sessionId }) {
   if (error) return <ErrorMessage message="Failed to check session status" />;
   if (!data) return null;
 
-  if (data.status === 'failed') {
+  if (data.status === 'FAILED') {
     return <FailedSessionMessage reason={data.failureReason} message={data.message} />;
   }
 
@@ -254,7 +258,8 @@ invalidation logic co-located with the fetching logic.
 2. `4xx` with `errors[]` — parse `code` for machine-readable handling; display `message`
 3. `422` — likely a UI bug for UNCERTAIN or conflict validation errors; log to console at ERROR
 4. `504 QUERY_TIMEOUT` — user-facing: "Query timed out, try rephrasing" (D-052)
-5. `400 SUMMARY_TOO_LARGE` — user-facing: show `max_tokens` and suggest splitting summary
+5. `400 SUMMARY_TOO_LARGE` — user-facing: the token limit is embedded in the error `message`
+   text only (the envelope has no structured `max_tokens` field); surface `message` verbatim
 
 **Mutation loading states:** Always disable submit buttons while a mutation is in-flight:
 

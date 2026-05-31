@@ -11,7 +11,7 @@ interface Props {
 /** Skeleton mirroring the eventual diff-review header while extraction runs. */
 function ProcessingSkeleton() {
   return (
-    <div className="rounded-2xl bg-white p-8 shadow-sm">
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
       <div className="mb-6 h-6 w-1/3 rounded bg-slate-200 animate-pulse" />
       <div className="space-y-3">
         <div className="h-4 w-3/4 rounded bg-slate-200 animate-pulse" />

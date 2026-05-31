@@ -1118,13 +1118,13 @@ npx shadcn@latest add button input label form card
 | F2.8.8 | CommitService + CommitSessionUseCase + command + SessionCommittedEvent | ✅ |
 | F2.8.9 | EmbeddingGenerationListener (async post-commit, D-063) | ✅ |
 | F2.8.10 | Commit endpoint (controller + request DTO + 422 mapping) | ✅ |
-| F2.9 | Frontend: Input Mode — session submission + status polling | 🔲 |
-| F2.9-SETUP | Frontend scaffolding — `shadcn add textarea` (human step) | 👤 |
-| F2.9.1 | Frontend: session submit + status TypeScript types | 🔲 |
-| F2.9.2 | Frontend: sessions API client + submit/status-polling hooks | 🔲 |
-| F2.9.3 | Frontend: ProcessingStatusView (poll → skeleton → draft/failed) | 🔲 |
-| F2.9.4 | Frontend: SubmitSessionPage form (role guard + error states) | 🔲 |
-| F2.9.5 | Frontend: register `/sessions/new` route behind RequireAuth | 🔲 |
+| F2.9 | Frontend: Input Mode — session submission + status polling | ✅ |
+| F2.9-SETUP | Frontend scaffolding — `shadcn add textarea` (human step) | ✅ |
+| F2.9.1 | Frontend: session submit + status TypeScript types | ✅ |
+| F2.9.2 | Frontend: sessions API client + submit/status-polling hooks | ✅ |
+| F2.9.3 | Frontend: ProcessingStatusView (poll → skeleton → draft/failed) | ✅ |
+| F2.9.4 | Frontend: SubmitSessionPage form (role guard + error states) | ✅ |
+| F2.9.5 | Frontend: register `/sessions/new` route behind RequireAuth | ✅ |
 | F2.10 | Frontend: Input Mode — diff review screen | 🔲 |
 | F2.10-SETUP | Frontend scaffolding — `shadcn add badge checkbox radio-group` (human step) | 👤 |
 | F2.10.1 | Frontend: DiffPayload read TypeScript types (§7.6) | 🔲 |
