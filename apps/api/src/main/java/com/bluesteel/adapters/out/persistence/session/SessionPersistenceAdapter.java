@@ -33,6 +33,11 @@ public class SessionPersistenceAdapter implements SessionRepository {
     return jpaRepository.findActiveByCampaignId(campaignId).map(this::toDomain);
   }
 
+  @Override
+  public int nextSequenceNumber(UUID campaignId) {
+    return jpaRepository.nextSequenceNumber(campaignId);
+  }
+
   private Session toDomain(SessionJpaEntity e) {
     return Session.reconstitute(
         e.getId(),

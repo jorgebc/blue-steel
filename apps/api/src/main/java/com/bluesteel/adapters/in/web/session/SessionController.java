@@ -1,15 +1,24 @@
 package com.bluesteel.adapters.in.web.session;
 
 import com.bluesteel.adapters.in.web.ApiResponse;
+import com.bluesteel.application.model.commit.AcknowledgedConflict;
+import com.bluesteel.application.model.commit.CardAction;
+import com.bluesteel.application.model.commit.CardDecision;
+import com.bluesteel.application.model.commit.CommitPayload;
+import com.bluesteel.application.model.commit.ResolutionType;
+import com.bluesteel.application.model.commit.UncertainResolution;
+import com.bluesteel.application.model.session.CommitSessionCommand;
 import com.bluesteel.application.model.session.DiffPayload;
 import com.bluesteel.application.model.session.SessionStatusView;
 import com.bluesteel.application.model.session.SubmitSessionCommand;
 import com.bluesteel.application.model.session.SubmitSessionResult;
+import com.bluesteel.application.port.in.session.CommitSessionUseCase;
 import com.bluesteel.application.port.in.session.DiscardSessionUseCase;
 import com.bluesteel.application.port.in.session.GetSessionDiffUseCase;
 import com.bluesteel.application.port.in.session.GetSessionStatusUseCase;
 import com.bluesteel.application.port.in.session.SubmitSessionUseCase;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +32,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Handles session intake, status polling, draft discard, and diff retrieval for a campaign. */
+/**
+ * Handles session intake, status polling, draft discard, diff retrieval, and commit for a campaign.
+ */
 @RestController
 @RequestMapping("/api/v1/campaigns/{id}/sessions")
 public class SessionController {
@@ -32,16 +43,19 @@ public class SessionController {
   private final GetSessionStatusUseCase getSessionStatusUseCase;
   private final DiscardSessionUseCase discardSessionUseCase;
   private final GetSessionDiffUseCase getSessionDiffUseCase;
+  private final CommitSessionUseCase commitSessionUseCase;
 
   public SessionController(
       SubmitSessionUseCase submitSessionUseCase,
       GetSessionStatusUseCase getSessionStatusUseCase,
       DiscardSessionUseCase discardSessionUseCase,
-      GetSessionDiffUseCase getSessionDiffUseCase) {
+      GetSessionDiffUseCase getSessionDiffUseCase,
+      CommitSessionUseCase commitSessionUseCase) {
     this.submitSessionUseCase = submitSessionUseCase;
     this.getSessionStatusUseCase = getSessionStatusUseCase;
     this.discardSessionUseCase = discardSessionUseCase;
     this.getSessionDiffUseCase = getSessionDiffUseCase;
+    this.commitSessionUseCase = commitSessionUseCase;
   }
 
   /** Submits a new session narrative; returns 202 Accepted with sessionId and initial status. */
@@ -83,6 +97,50 @@ public class SessionController {
     UUID callerId = resolveCallerId();
     DiffPayload diff = getSessionDiffUseCase.getDiff(callerId, id, sid);
     return ResponseEntity.ok(ApiResponse.success(diff));
+  }
+
+  /** Commits a reviewed draft session to world state; returns 200 on success. */
+  @PostMapping("/{sid}/commit")
+  public ResponseEntity<ApiResponse<Void>> commit(
+      @PathVariable UUID id,
+      @PathVariable UUID sid,
+      @Valid @RequestBody CommitSessionRequest request) {
+    UUID callerId = resolveCallerId();
+    commitSessionUseCase.commit(new CommitSessionCommand(callerId, id, sid, mapToPayload(request)));
+    return ResponseEntity.ok(ApiResponse.success(null));
+  }
+
+  private static CommitPayload mapToPayload(CommitSessionRequest request) {
+    List<CardDecision> decisions =
+        request.cardDecisions() == null
+            ? List.of()
+            : request.cardDecisions().stream()
+                .map(
+                    d ->
+                        new CardDecision(
+                            d.cardId(), CardAction.fromJson(d.action()), d.editedFields()))
+                .toList();
+
+    List<UncertainResolution> resolutions =
+        request.uncertainResolutions() == null
+            ? List.of()
+            : request.uncertainResolutions().stream()
+                .map(
+                    r ->
+                        new UncertainResolution(
+                            r.cardId(),
+                            ResolutionType.valueOf(r.resolution().toUpperCase()),
+                            r.matchedEntityId()))
+                .toList();
+
+    List<AcknowledgedConflict> acknowledged =
+        request.acknowledgedConflicts() == null
+            ? List.of()
+            : request.acknowledgedConflicts().stream()
+                .map(a -> new AcknowledgedConflict(a.conflictId()))
+                .toList();
+
+    return new CommitPayload(decisions, resolutions, acknowledged);
   }
 
   private UUID resolveCallerId() {

@@ -18,4 +18,11 @@ public interface SessionRepository {
    * status), or empty if none exists. Backs the D-054 single-active-session enforcement.
    */
   Optional<Session> findActiveByCampaignId(UUID campaignId);
+
+  /**
+   * Returns {@code MAX(sequence_number) + 1} across committed sessions for the campaign (D-069).
+   * Returns {@code 1} when no committed sessions exist. Must be called inside the commit
+   * {@code @Transactional} boundary so the result is serialized by the one-active-draft lock.
+   */
+  int nextSequenceNumber(UUID campaignId);
 }

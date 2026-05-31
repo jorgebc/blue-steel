@@ -74,13 +74,16 @@ class SessionTest {
   }
 
   @Test
-  @DisplayName("should transition DRAFT → COMMITTED and set committedAt on commit")
-  void commit_fromDraft_setsCommittedAt() {
+  @DisplayName(
+      "should transition DRAFT → COMMITTED, set sequenceNumber, clear diffPayload on commit")
+  void commit_fromDraft_setsFieldsAndClearsDiff() {
     session.startProcessing();
     session.toDraft("{\"cards\":[]}");
-    session.commit();
+    session.commit(3);
     assertThat(session.status()).isEqualTo(SessionStatus.COMMITTED);
     assertThat(session.committedAt()).isNotNull();
+    assertThat(session.sequenceNumber()).isEqualTo(3);
+    assertThat(session.diffPayload()).isNull();
   }
 
   @Test
@@ -130,7 +133,7 @@ class SessionTest {
   void markFailed_fromCommitted_throws() {
     session.startProcessing();
     session.toDraft("{}");
-    session.commit();
+    session.commit(1);
     assertThatThrownBy(() -> session.markFailed("reason"))
         .isInstanceOf(InvalidSessionStateTransitionException.class);
   }
@@ -156,14 +159,15 @@ class SessionTest {
   void discard_fromCommitted_throws() {
     session.startProcessing();
     session.toDraft("{}");
-    session.commit();
+    session.commit(1);
     assertThatThrownBy(session::discard).isInstanceOf(InvalidSessionStateTransitionException.class);
   }
 
   @Test
   @DisplayName("should throw when commit is called from PENDING")
   void commit_fromPending_throws() {
-    assertThatThrownBy(session::commit).isInstanceOf(InvalidSessionStateTransitionException.class);
+    assertThatThrownBy(() -> session.commit(1))
+        .isInstanceOf(InvalidSessionStateTransitionException.class);
   }
 
   @Test
@@ -171,8 +175,9 @@ class SessionTest {
   void commit_fromCommitted_throws() {
     session.startProcessing();
     session.toDraft("{}");
-    session.commit();
-    assertThatThrownBy(session::commit).isInstanceOf(InvalidSessionStateTransitionException.class);
+    session.commit(1);
+    assertThatThrownBy(() -> session.commit(1))
+        .isInstanceOf(InvalidSessionStateTransitionException.class);
   }
 
   @Test
@@ -181,6 +186,7 @@ class SessionTest {
     session.startProcessing();
     session.toDraft("{}");
     session.discard();
-    assertThatThrownBy(session::commit).isInstanceOf(InvalidSessionStateTransitionException.class);
+    assertThatThrownBy(() -> session.commit(1))
+        .isInstanceOf(InvalidSessionStateTransitionException.class);
   }
 }
