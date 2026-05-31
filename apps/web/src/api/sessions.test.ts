@@ -6,14 +6,16 @@ import { createElement, type ReactNode } from 'react'
 import { apiClient, ApiClientError } from './client'
 import {
   extractExistingSessionId,
+  getSessionDiff,
   getSessionStatus,
   sessionKeys,
   submitSession,
+  useSessionDiff,
   useSessionStatus,
   useSubmitSession,
 } from './sessions'
 import { createTestQueryClient } from '@/test/createTestQueryClient'
-import type { SessionAcceptedResponse, SessionStatus } from '@/types/session'
+import type { DiffPayload, SessionAcceptedResponse, SessionStatus } from '@/types/session'
 
 vi.mock('./client', () => ({
   apiClient: { get: vi.fn(), post: vi.fn() },
@@ -55,10 +57,20 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+const diffPayload: DiffPayload = {
+  narrativeSummaryHeader: 'The party reached Barovia.',
+  actors: [],
+  spaces: [],
+  events: [],
+  relations: [],
+  detectedConflicts: [],
+}
+
 describe('sessionKeys', () => {
-  it('scopes the status key under the campaign session list key', () => {
+  it('scopes the status and diff keys under the campaign session list key', () => {
     expect(sessionKeys.all('c1')).toEqual(['sessions', 'c1'])
     expect(sessionKeys.status('c1', 's1')).toEqual(['sessions', 'c1', 's1', 'status'])
+    expect(sessionKeys.diff('c1', 's1')).toEqual(['sessions', 'c1', 's1', 'diff'])
   })
 })
 
@@ -84,6 +96,53 @@ describe('getSessionStatus', () => {
 
     expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/sessions/s1/status')
     expect(result).toEqual(status)
+  })
+})
+
+describe('getSessionDiff', () => {
+  it('GETs the diff endpoint and unwraps the envelope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(diffPayload))
+
+    const result = await getSessionDiff('c1', 's1')
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/sessions/s1/diff')
+    expect(result).toEqual(diffPayload)
+  })
+
+  it('propagates the error when the draft is missing (404)', async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(
+      new ApiClientError('not found', 404, [
+        { code: 'SESSION_NOT_FOUND', message: 'No draft', field: null },
+      ])
+    )
+
+    await expect(getSessionDiff('c1', 's1')).rejects.toBeInstanceOf(ApiClientError)
+  })
+})
+
+describe('useSessionDiff', () => {
+  it('returns the diff payload on success', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(diffPayload))
+
+    const { result } = renderHook(() => useSessionDiff('c1', 's1'), { wrapper })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/sessions/s1/diff')
+    expect(result.current.data).toEqual(diffPayload)
+  })
+
+  it('surfaces the error state when the diff request rejects', async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('boom'))
+
+    const { result } = renderHook(() => useSessionDiff('c1', 's1'), { wrapper })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+  })
+
+  it('does not fetch when disabled', () => {
+    renderHook(() => useSessionDiff('c1', 's1', false), { wrapper })
+
+    expect(apiClient.get).not.toHaveBeenCalled()
   })
 })
 

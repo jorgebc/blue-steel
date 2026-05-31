@@ -11,6 +11,7 @@ import { CampaignListPage } from '@/features/campaigns/CampaignListPage'
 import { CampaignHomePage } from '@/features/campaigns/CampaignHomePage'
 import { CreateCampaignPage } from '@/features/campaigns/CreateCampaignPage'
 import { SubmitSessionPage } from '@/features/input/SubmitSessionPage'
+import { DiffReviewPage } from '@/features/input/DiffReviewPage'
 import { CampaignContextGuard } from '@/components/domain/CampaignContextGuard'
 import { AppShell } from '@/components/domain/AppShell'
 import { AuthenticatedLayout } from '@/components/domain/AuthenticatedLayout'
@@ -55,6 +56,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 <Route element={<AppShell />}>
                   <Route index element={<CampaignHomePage />} />
                   <Route path="sessions/new" element={<SubmitSessionPage />} />
+                  <Route path="sessions/:sessionId/diff" element={<DiffReviewPage />} />
                 </Route>
               </Route>
             </Route>

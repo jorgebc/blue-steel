@@ -30,3 +30,64 @@ export interface SessionStatusResponse {
   failureReason: string | null
   message: string | null
 }
+
+// ─── Diff review (ARCHITECTURE §7.6) ─────────────────────────────────────────
+// Read-only payload returned by GET .../diff when a session is in DRAFT. Mirrors
+// the F2.7 Java records exactly. Never POSTed back (the commit payload is a
+// separate derived shape — F2.11). All keys camelCase (D-076).
+
+/** DiffCard discriminator — UPPERCASE on the wire (Jackson @JsonTypeInfo name). */
+export type CardType = 'EXISTING' | 'NEW' | 'UNCERTAIN'
+
+/** Entity category — LOWERCASE on the wire (differs from CardType per §7.6). */
+export type EntityType = 'actor' | 'space' | 'event' | 'relation'
+
+/** Entity already in world state; shows the changed fields only (D-006). */
+export interface ExistingDiffCard {
+  cardId: string
+  cardType: 'EXISTING'
+  entityId: string
+  entityType: EntityType
+  name: string
+  changedFields: Record<string, unknown>
+}
+
+/** Entity appearing for the first time; shows the full extracted profile (D-007). */
+export interface NewDiffCard {
+  cardId: string
+  cardType: 'NEW'
+  entityType: EntityType
+  name: string
+  fullProfile: Record<string, unknown>
+}
+
+/** AI could not decide match-vs-new; user must resolve MATCH or NEW (D-042). */
+export interface UncertainDiffCard {
+  cardId: string
+  cardType: 'UNCERTAIN'
+  entityType: EntityType
+  extractedMention: string
+  candidateEntityId: string
+  candidateEntityName: string
+}
+
+export type DiffCard = ExistingDiffCard | NewDiffCard | UncertainDiffCard
+
+/** A detected contradiction. Non-blocking but must be acknowledged (D-033). Not part of the DiffCard union (no `cardType`). */
+export interface ConflictCard {
+  conflictId: string
+  entityId: string
+  entityType: EntityType
+  description: string
+  extractedFact: string
+  existingFact: string
+}
+
+export interface DiffPayload {
+  narrativeSummaryHeader: string
+  actors: DiffCard[]
+  spaces: DiffCard[]
+  events: DiffCard[]
+  relations: DiffCard[]
+  detectedConflicts: ConflictCard[]
+}

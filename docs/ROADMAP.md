@@ -1125,20 +1125,20 @@ npx shadcn@latest add button input label form card
 | F2.9.3 | Frontend: ProcessingStatusView (poll → skeleton → draft/failed) | ✅ |
 | F2.9.4 | Frontend: SubmitSessionPage form (role guard + error states) | ✅ |
 | F2.9.5 | Frontend: register `/sessions/new` route behind RequireAuth | ✅ |
-| F2.10 | Frontend: Input Mode — diff review screen | 🔲 |
-| F2.10-SETUP | Frontend scaffolding — `shadcn add badge checkbox radio-group` (human step) | 👤 |
-| F2.10.1 | Frontend: DiffPayload read TypeScript types (§7.6) | 🔲 |
-| F2.10.2 | Frontend: useSessionDiff query hook | 🔲 |
-| F2.10.3 | Frontend: FocusedOverlay primitive + useEscapeKey (no-modal) | 🔲 |
-| F2.10.4 | Frontend: useDiffState reducer hook (decisions/resolutions/acks) | 🔲 |
-| F2.10.5 | Frontend: DeltaCard + NewEntityCard (entity decision cards) | 🔲 |
-| F2.10.6 | Frontend: UncertainCard (inline MATCH/NEW resolution) | 🔲 |
-| F2.10.7 | Frontend: ConflictWarningCard (acknowledge, non-blocking) | 🔲 |
-| F2.10.8 | Frontend: EditCardOverlay (FocusedOverlay-based field edit) | 🔲 |
-| F2.10.9 | Frontend: NarrativeSummaryHeader + DiffCategorySection | 🔲 |
-| F2.10.10 | Frontend: CommitButton (controlled disabled guard) | 🔲 |
-| F2.10.11 | Frontend: DiffReviewPage container (fetch + skeleton + assemble) | 🔲 |
-| F2.10.12 | Frontend: register `/sessions/:sessionId/diff` route | 🔲 |
+| F2.10 | Frontend: Input Mode — diff review screen | ✅ |
+| F2.10-SETUP | Frontend scaffolding — `shadcn add badge checkbox radio-group` (human step) | ✅ |
+| F2.10.1 | Frontend: DiffPayload read TypeScript types (§7.6) | ✅ |
+| F2.10.2 | Frontend: useSessionDiff query hook | ✅ |
+| F2.10.3 | Frontend: FocusedOverlay primitive + useEscapeKey (no-modal) | ✅ |
+| F2.10.4 | Frontend: useDiffState reducer hook (decisions/resolutions/acks) | ✅ |
+| F2.10.5 | Frontend: DeltaCard + NewEntityCard (entity decision cards) | ✅ |
+| F2.10.6 | Frontend: UncertainCard (inline MATCH/NEW resolution) | ✅ |
+| F2.10.7 | Frontend: ConflictWarningCard (acknowledge, non-blocking) | ✅ |
+| F2.10.8 | Frontend: EditCardOverlay (FocusedOverlay-based field edit) | ✅ |
+| F2.10.9 | Frontend: NarrativeSummaryHeader + DiffCategorySection | ✅ |
+| F2.10.10 | Frontend: CommitButton (controlled disabled guard) | ✅ |
+| F2.10.11 | Frontend: DiffReviewPage container (fetch + skeleton + assemble) | ✅ |
+| F2.10.12 | Frontend: register `/sessions/:sessionId/diff` route | ✅ |
 | F2.11 | Frontend: Input Mode — commit flow + draft recovery | 🔲 |
 | F2.11.1 | Frontend: CommitPayload wire TypeScript types (§7.6) | 🔲 |
 | F2.11.2 | Frontend: buildCommitPayload pure builder (state → payload) | 🔲 |
