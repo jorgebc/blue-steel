@@ -85,16 +85,16 @@ public class SubmitSessionService implements SubmitSessionUseCase {
     UUID blockId = UUID.randomUUID();
     Instant now = Instant.now();
 
-    NarrativeBlock block =
-        NarrativeBlock.create(blockId, sessionId, command.summaryText(), estimatedTokens, now);
-    narrativeBlockRepository.save(block);
-
     Session session = Session.create(sessionId, command.campaignId(), command.callerId(), now);
     try {
       sessionRepository.save(session);
     } catch (DataIntegrityViolationException e) {
       throw new ActiveSessionExistsException(null);
     }
+
+    NarrativeBlock block =
+        NarrativeBlock.create(blockId, sessionId, command.summaryText(), estimatedTokens, now);
+    narrativeBlockRepository.save(block);
 
     eventPublisher.publishEvent(new SessionSubmittedEvent(sessionId, command.campaignId()));
 

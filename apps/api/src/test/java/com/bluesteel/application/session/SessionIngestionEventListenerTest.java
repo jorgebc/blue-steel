@@ -52,7 +52,8 @@ class SessionIngestionEventListenerTest {
             extractionPipelineService,
             entityResolutionService,
             conflictDetectionService,
-            diffGenerationService);
+            diffGenerationService,
+            Runnable::run);
   }
 
   @Test
