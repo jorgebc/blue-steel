@@ -117,6 +117,12 @@
       <artifactId>spring-ai-starter-model-google-genai</artifactId>
     </dependency>
 
+    <!-- ── Spring AI — Ollama: local chat + embeddings, offline (D-088) ── -->
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-starter-model-ollama</artifactId>
+    </dependency>
+
     <!-- ── JWT HS256 (nimbus-jose-jwt, D-043) ──────────────────────────── -->
     <dependency>
       <groupId>com.nimbusds</groupId>

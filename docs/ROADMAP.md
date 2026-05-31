@@ -1146,10 +1146,10 @@ npx shadcn@latest add button input label form card
 | F2.11.4 | Frontend: DiscardConfirmOverlay (FocusedOverlay confirm) | ✅ |
 | F2.11.5 | Frontend: DiffReviewPage commit wiring (+ 422 handling) | ✅ |
 | F2.11.6 | Frontend: DiffReviewPage GM-only discard wiring | ✅ |
-| F2.12 | Local LLM via Ollama (offline real pipeline) | 🔲 |
-| F2.12-SETUP | Human: add Ollama starter, install Ollama, pull models | 🔲 |
-| F2.12.1 | Ollama profile config + AiConfig model-bean wiring | 🔲 |
-| F2.12.2 | Offline pipeline smoke test (env-gated, manual/local) | 🔲 |
+| F2.12 | Local LLM via Ollama (offline real pipeline) | ✅ |
+| F2.12-SETUP | Human: add Ollama starter, install Ollama, pull models | ✅ |
+| F2.12.1 | Ollama profile config + AiConfig model-bean wiring | ✅ |
+| F2.12.2 | Offline pipeline smoke test (env-gated, manual/local) | ✅ |
 
 ---
 
@@ -2647,7 +2647,7 @@ npx shadcn@latest add badge checkbox radio-group
 
 #### F2.12-SETUP (human — run by hand before the sub-tasks)
 
-- [ ] `apps/api/pom.xml`: add `<dependency>` `org.springframework.ai:spring-ai-starter-model-ollama` (version managed by the existing Spring AI BOM).
+- [x] `apps/api/pom.xml`: add `<dependency>` `org.springframework.ai:spring-ai-starter-model-ollama` (version managed by the existing Spring AI BOM).
 - [ ] Install Ollama (https://ollama.com) and start it (serves `http://localhost:11434`).
 - [ ] `ollama pull bge-m3` (embeddings, 1024 dims) and `ollama pull qwen2.5:7b` (chat).
 - [ ] (optional) `docker-compose.yml`: add an `ollama` service (`image: ollama/ollama`, port `11434`, named volume) for one-command bring-up.
