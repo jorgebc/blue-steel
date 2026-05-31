@@ -3,12 +3,14 @@ package com.bluesteel.adapters.in.web.campaign;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bluesteel.BlueSteelApplication;
+import com.bluesteel.application.model.campaign.CampaignMemberView;
 import com.bluesteel.application.model.campaign.ChangeMemberRoleCommand;
 import com.bluesteel.application.model.campaign.InviteCampaignMemberCommand;
 import com.bluesteel.application.model.campaign.RemoveMemberCommand;
@@ -16,6 +18,7 @@ import com.bluesteel.application.port.in.campaign.ChangeMemberRoleUseCase;
 import com.bluesteel.application.port.in.campaign.CreateCampaignUseCase;
 import com.bluesteel.application.port.in.campaign.GetCampaignUseCase;
 import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
+import com.bluesteel.application.port.in.campaign.ListCampaignMembersUseCase;
 import com.bluesteel.application.port.in.campaign.ListCampaignsUseCase;
 import com.bluesteel.application.port.in.campaign.RemoveMemberUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
@@ -26,6 +29,8 @@ import com.bluesteel.application.port.in.user.SearchUsersUseCase;
 import com.bluesteel.domain.campaign.CampaignRole;
 import com.bluesteel.domain.exception.AlreadyCampaignMemberException;
 import com.bluesteel.domain.exception.CannotRemoveGmException;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -65,6 +70,7 @@ class CampaignMembershipControllerTest {
   @MockitoBean private GetCampaignUseCase getCampaignUseCase;
   @MockitoBean private ListCampaignsUseCase listCampaignsUseCase;
   @MockitoBean private InviteCampaignMemberUseCase inviteCampaignMemberUseCase;
+  @MockitoBean private ListCampaignMembersUseCase listCampaignMembersUseCase;
   @MockitoBean private ChangeMemberRoleUseCase changeMemberRoleUseCase;
   @MockitoBean private RemoveMemberUseCase removeMemberUseCase;
 
@@ -222,6 +228,45 @@ class CampaignMembershipControllerTest {
             post("/api/v1/campaigns/{id}/invitations", CAMPAIGN_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{ \"email\": \"new@example.com\", \"role\": \"EDITOR\" }"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("should return 200 with the member roster for a campaign member")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void listMembers_member_returns200WithRoster() throws Exception {
+    when(listCampaignMembersUseCase.list(CAMPAIGN_ID, CALLER_ID, false))
+        .thenReturn(
+            List.of(
+                new CampaignMemberView(
+                    TARGET_ID, "player@example.com", CampaignRole.PLAYER, Instant.now())));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/members", CAMPAIGN_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].userId").value(TARGET_ID.toString()))
+        .andExpect(jsonPath("$.data[0].email").value("player@example.com"))
+        .andExpect(jsonPath("$.data[0].role").value("player"));
+  }
+
+  @Test
+  @DisplayName("should return 403 when a non-member lists campaign members")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void listMembers_nonMember_returns403() throws Exception {
+    when(listCampaignMembersUseCase.list(CAMPAIGN_ID, CALLER_ID, false))
+        .thenThrow(new com.bluesteel.domain.exception.UnauthorizedException("not a member"));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/members", CAMPAIGN_ID))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errors[0].code").value("FORBIDDEN"));
+  }
+
+  @Test
+  @DisplayName("should return 401 when listing members while unauthenticated")
+  void listMembers_unauthenticated_returns401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/members", CAMPAIGN_ID))
         .andExpect(status().isUnauthorized());
   }
 }

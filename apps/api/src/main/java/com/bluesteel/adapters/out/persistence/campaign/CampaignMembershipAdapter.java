@@ -4,6 +4,7 @@ import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipRepository;
 import com.bluesteel.domain.campaign.CampaignMember;
 import com.bluesteel.domain.campaign.CampaignRole;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.context.annotation.Lazy;
@@ -38,6 +39,13 @@ public class CampaignMembershipAdapter
   @Override
   public Optional<CampaignMember> findByCampaignIdAndUserId(UUID campaignId, UUID userId) {
     return jpaRepository.findByCampaignIdAndUserId(campaignId, userId).map(this::toDomain);
+  }
+
+  @Override
+  public List<CampaignMember> findByCampaignId(UUID campaignId) {
+    return jpaRepository.findByCampaignIdOrderByJoinedAtAsc(campaignId).stream()
+        .map(this::toDomain)
+        .toList();
   }
 
   @Override

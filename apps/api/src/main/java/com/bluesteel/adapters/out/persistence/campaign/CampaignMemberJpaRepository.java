@@ -1,5 +1,6 @@
 package com.bluesteel.adapters.out.persistence.campaign;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 interface CampaignMemberJpaRepository extends JpaRepository<CampaignMemberJpaEntity, UUID> {
 
   Optional<CampaignMemberJpaEntity> findByCampaignIdAndUserId(UUID campaignId, UUID userId);
+
+  List<CampaignMemberJpaEntity> findByCampaignIdOrderByJoinedAtAsc(UUID campaignId);
 
   @Modifying
   @Transactional

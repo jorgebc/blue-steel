@@ -877,6 +877,7 @@ Two distinct invitation endpoints, one per caller context (D-051, D-064):
 | `POST /api/v1/campaigns` | Create campaign and atomically assign the initial GM (D-061) | admin |
 | `GET /api/v1/campaigns` | List campaigns (admin: all; members: own only) | authenticated |
 | `GET /api/v1/campaigns/{id}` | Get campaign detail | campaign member |
+| `GET /api/v1/campaigns/{id}/members` | List the campaign roster (`userId`, `email`, `role`, `joinedAt`) | campaign member or admin |
 | `POST /api/v1/campaigns/{id}/invitations` | Add a user to the campaign (campaign-scoped invitation; creates the account if new, else adds the existing user). This is the canonical add-member path — there is no separate `POST .../members` endpoint. See §7.7 and D-064. | gm |
 | `PATCH /api/v1/campaigns/{id}/members/{uid}` | Change a member's role | gm |
 | `DELETE /api/v1/campaigns/{id}/members/{uid}` | Remove a member | gm |
