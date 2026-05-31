@@ -5,20 +5,29 @@ import { QueryClientProvider, type QueryKey } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 import { apiClient, ApiClientError } from './client'
 import {
+  commitSession,
+  discardSession,
   extractExistingSessionId,
   getSessionDiff,
   getSessionStatus,
   sessionKeys,
   submitSession,
+  useCommitSession,
+  useDiscardSession,
   useSessionDiff,
   useSessionStatus,
   useSubmitSession,
 } from './sessions'
 import { createTestQueryClient } from '@/test/createTestQueryClient'
-import type { DiffPayload, SessionAcceptedResponse, SessionStatus } from '@/types/session'
+import type {
+  CommitPayload,
+  DiffPayload,
+  SessionAcceptedResponse,
+  SessionStatus,
+} from '@/types/session'
 
 vi.mock('./client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn() },
+  apiClient: { get: vi.fn(), post: vi.fn(), delete: vi.fn() },
   ApiClientError: class ApiClientError extends Error {
     constructor(
       message: string,
@@ -156,6 +165,87 @@ describe('useSubmitSession', () => {
 
     const { result } = renderHook(() => useSubmitSession('c1'), { wrapper: localWrapper })
     result.current.mutate({ summaryText: 'hello' })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sessionKeys.all('c1') })
+  })
+})
+
+const commitPayload: CommitPayload = {
+  cardDecisions: [{ cardId: 'e1', action: 'accept' }],
+  uncertainResolutions: [],
+  acknowledgedConflicts: [],
+}
+
+describe('commitSession', () => {
+  it('POSTs the payload to the commit endpoint', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null))
+
+    await commitSession('c1', 's1', commitPayload)
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/api/v1/campaigns/c1/sessions/s1/commit',
+      commitPayload
+    )
+  })
+
+  it('propagates a 422 commit error to the caller', async () => {
+    vi.mocked(apiClient.post).mockRejectedValue(
+      new ApiClientError('uncertain', 422, [
+        { code: 'UNCERTAIN_ENTITIES_PRESENT', message: 'Resolve first', field: null },
+      ])
+    )
+
+    await expect(commitSession('c1', 's1', commitPayload)).rejects.toBeInstanceOf(ApiClientError)
+  })
+})
+
+describe('discardSession', () => {
+  it('DELETEs the session endpoint', async () => {
+    vi.mocked(apiClient.delete).mockResolvedValue(envelope(null))
+
+    await discardSession('c1', 's1')
+
+    expect(apiClient.delete).toHaveBeenCalledWith('/api/v1/campaigns/c1/sessions/s1')
+  })
+
+  it('propagates a 409 invalid-state error to the caller', async () => {
+    vi.mocked(apiClient.delete).mockRejectedValue(
+      new ApiClientError('bad state', 409, [
+        { code: 'INVALID_SESSION_STATE', message: 'Not a draft', field: null },
+      ])
+    )
+
+    await expect(discardSession('c1', 's1')).rejects.toBeInstanceOf(ApiClientError)
+  })
+})
+
+describe('useCommitSession', () => {
+  it('invalidates the campaign session cache on success', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null))
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    const localWrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children)
+
+    const { result } = renderHook(() => useCommitSession('c1', 's1'), { wrapper: localWrapper })
+    result.current.mutate(commitPayload)
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sessionKeys.all('c1') })
+  })
+})
+
+describe('useDiscardSession', () => {
+  it('invalidates the campaign session cache on success', async () => {
+    vi.mocked(apiClient.delete).mockResolvedValue(envelope(null))
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    const localWrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children)
+
+    const { result } = renderHook(() => useDiscardSession('c1', 's1'), { wrapper: localWrapper })
+    result.current.mutate()
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sessionKeys.all('c1') })

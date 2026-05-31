@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import { EditCardOverlay } from './EditCardOverlay'
-import type { ExistingDiffCard } from '@/types/session'
+import type { ExistingDiffCard, NewDiffCard } from '@/types/session'
 
 const card: ExistingDiffCard = {
   cardId: 'e1',
@@ -41,6 +41,44 @@ describe('EditCardOverlay', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(onSave).toHaveBeenCalledWith({ title: 'Lord' })
+  })
+
+  it('round-trips a numeric field as a number', async () => {
+    const numericCard: ExistingDiffCard = {
+      cardId: 'e2',
+      cardType: 'EXISTING',
+      entityId: 'ent-2',
+      entityType: 'actor',
+      name: 'Rahadin',
+      changedFields: { level: 12 },
+    }
+    const onSave = vi.fn()
+    render(<EditCardOverlay card={numericCard} open onClose={vi.fn()} onSave={onSave} />)
+
+    const input = screen.getByLabelText('level')
+    expect(input).toHaveValue('12')
+    await userEvent.clear(input)
+    await userEvent.type(input, '13')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onSave).toHaveBeenCalledWith({ level: 13 })
+  })
+
+  it('round-trips an object field as an object', async () => {
+    const objectCard: NewDiffCard = {
+      cardId: 'n2',
+      cardType: 'NEW',
+      entityType: 'space',
+      name: 'Hidden Vault',
+      fullProfile: { coords: { x: 1, y: 2 } },
+    }
+    const onSave = vi.fn()
+    render(<EditCardOverlay card={objectCard} open onClose={vi.fn()} onSave={onSave} />)
+
+    expect(screen.getByLabelText('coords')).toHaveValue('{"x":1,"y":2}')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onSave).toHaveBeenCalledWith({ coords: { x: 1, y: 2 } })
   })
 
   it('closes without saving on Cancel', async () => {

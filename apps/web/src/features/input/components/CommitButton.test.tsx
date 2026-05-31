@@ -56,6 +56,21 @@ describe('CommitButton', () => {
     expect(screen.getByText('1 item require your decision')).toBeInTheDocument()
   })
 
+  it('is disabled with a no-entities note when there are no committable cards', () => {
+    render(
+      <CommitButton
+        unresolvedUncertainCount={0}
+        unacknowledgedConflictCount={0}
+        isPending={false}
+        hasCommittableCards={false}
+        onCommit={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: /commit to world state/i })).toBeDisabled()
+    expect(screen.getByText('No entities to commit.')).toBeInTheDocument()
+  })
+
   it('is disabled and shows a spinner while a commit is pending', () => {
     render(
       <CommitButton
