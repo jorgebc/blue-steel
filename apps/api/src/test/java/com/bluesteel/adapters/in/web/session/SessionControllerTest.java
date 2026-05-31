@@ -185,6 +185,17 @@ class SessionControllerTest {
   }
 
   @Test
+  @DisplayName("should return 400 INVALID_PATH_PARAMETER when campaign id is not a UUID")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void list_malformedCampaignId_returns400() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/campaigns/not-a-uuid/sessions"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[0].code").value("INVALID_PATH_PARAMETER"))
+        .andExpect(jsonPath("$.errors[0].field").value("id"));
+  }
+
+  @Test
   @DisplayName("should return 200 with session status for a valid session")
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
   void getStatus_validSession_returns200() throws Exception {

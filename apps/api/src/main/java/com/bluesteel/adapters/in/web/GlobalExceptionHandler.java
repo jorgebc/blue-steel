@@ -25,6 +25,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
  * Maps exceptions to the standard error envelope ({@code { "errors": [...] }}) defined in ERR-01.
@@ -116,6 +117,21 @@ public class GlobalExceptionHandler {
   public ApiResponse<Void> handleUnreadableBody(HttpMessageNotReadableException ex) {
     return ApiResponse.error(
         ApiError.of("MALFORMED_REQUEST", "Request body is malformed or missing"));
+  }
+
+  /**
+   * Path or query parameter that cannot be coerced to the declared type (e.g. a non-UUID string in
+   * a {@code @PathVariable UUID} slot). Spring would otherwise let this fall to the 500 catch-all.
+   */
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ApiResponse<Void> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+    String type = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "value";
+    return ApiResponse.error(
+        ApiError.ofField(
+            "INVALID_PATH_PARAMETER",
+            "Parameter '%s' is not a valid %s".formatted(ex.getName(), type),
+            ex.getName()));
   }
 
   @ExceptionHandler(SummaryTooLargeException.class)

@@ -4,8 +4,10 @@ import com.bluesteel.application.model.campaign.CampaignMemberView;
 import com.bluesteel.application.port.in.campaign.ListCampaignMembersUseCase;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipRepository;
+import com.bluesteel.application.port.out.campaign.CampaignRepository;
 import com.bluesteel.application.port.out.user.UserRepository;
 import com.bluesteel.domain.campaign.CampaignMember;
+import com.bluesteel.domain.exception.CampaignNotFoundException;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import java.util.List;
 import java.util.UUID;
@@ -19,14 +21,17 @@ public class ListCampaignMembersService implements ListCampaignMembersUseCase {
 
   private static final Logger log = LoggerFactory.getLogger(ListCampaignMembersService.class);
 
+  private final CampaignRepository campaignRepository;
   private final CampaignMembershipPort membershipPort;
   private final CampaignMembershipRepository membershipRepository;
   private final UserRepository userRepository;
 
   public ListCampaignMembersService(
+      CampaignRepository campaignRepository,
       CampaignMembershipPort membershipPort,
       CampaignMembershipRepository membershipRepository,
       UserRepository userRepository) {
+    this.campaignRepository = campaignRepository;
     this.membershipPort = membershipPort;
     this.membershipRepository = membershipRepository;
     this.userRepository = userRepository;
@@ -35,6 +40,10 @@ public class ListCampaignMembersService implements ListCampaignMembersUseCase {
   @Override
   public List<CampaignMemberView> list(UUID campaignId, UUID callerId, boolean callerIsAdmin) {
     log.info("Listing members campaignId={} callerId={}", campaignId, callerId);
+
+    campaignRepository
+        .findById(campaignId)
+        .orElseThrow(() -> new CampaignNotFoundException(campaignId));
 
     boolean isMember = membershipPort.resolveRole(campaignId, callerId).isPresent();
     if (!callerIsAdmin && !isMember) {

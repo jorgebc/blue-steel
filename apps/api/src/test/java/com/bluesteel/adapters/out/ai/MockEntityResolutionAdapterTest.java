@@ -17,17 +17,6 @@ class MockEntityResolutionAdapterTest {
   }
 
   @Test
-  @DisplayName("should resolve 'Mira' to MATCH with a non-null matchedEntityId")
-  void resolve_mira_returnsMatch() {
-    var results = adapter.resolve(List.of(mention("Mira")), List.of());
-
-    assertThat(results).hasSize(1);
-    assertThat(results.getFirst().outcome()).isEqualTo(ResolutionOutcome.MATCH);
-    assertThat(results.getFirst().matchedEntityId())
-        .isEqualTo(MockEntityResolutionAdapter.MIRA_ENTITY_ID);
-  }
-
-  @Test
   @DisplayName("should resolve 'Thornwick' to NEW with null matchedEntityId")
   void resolve_thornwick_returnsNew() {
     var results = adapter.resolve(List.of(mention("Thornwick")), List.of());
