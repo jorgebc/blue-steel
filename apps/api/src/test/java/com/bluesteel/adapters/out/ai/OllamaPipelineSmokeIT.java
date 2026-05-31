@@ -151,7 +151,7 @@ class OllamaPipelineSmokeIT {
     String status = pollUntilDraftOrFailed(campaignId, sessionId, accessToken, 120);
     assertThat(status)
         .as("session should reach draft — verify Ollama is running and models are pulled")
-        .isEqualTo("draft");
+        .isEqualTo("DRAFT");
 
     // ── 6. Retrieve diff ──────────────────────────────────────────────────────
     ResponseEntity<Map> diffResponse =
@@ -199,7 +199,7 @@ class OllamaPipelineSmokeIT {
               new HttpEntity<>(authHeaders(token)),
               Map.class);
       String status = (String) data(statusResponse).get("status");
-      if ("draft".equals(status) || "failed".equals(status)) {
+      if ("DRAFT".equals(status) || "FAILED".equals(status)) {
         return status;
       }
       Thread.sleep(1_000);

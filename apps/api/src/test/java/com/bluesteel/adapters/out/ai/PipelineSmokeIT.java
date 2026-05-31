@@ -141,7 +141,7 @@ class PipelineSmokeIT {
     String status = pollUntilDraftOrFailed(campaignId, sessionId, accessToken, 30);
     assertThat(status)
         .as("session should reach draft status — check ingestion pipeline for errors")
-        .isEqualTo("draft");
+        .isEqualTo("DRAFT");
 
     // ── 6. Retrieve diff ─────────────────────────────────────────────────────
     ResponseEntity<Map> diffResponse =
@@ -194,7 +194,7 @@ class PipelineSmokeIT {
               new HttpEntity<>(authHeaders(token)),
               Map.class);
       String status = (String) data(statusResponse).get("status");
-      if ("draft".equals(status) || "failed".equals(status)) {
+      if ("DRAFT".equals(status) || "FAILED".equals(status)) {
         return status;
       }
       Thread.sleep(1_000);
