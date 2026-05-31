@@ -3,7 +3,7 @@
 > Reusable prompt. **Edit only the TASK line**, then run. Everything below is standing
 > context that works for any Phase task, backend or frontend.
 
-**TASK:** F1.7.10
+**TASK:** F2.12 and all subtasks
 
 ---
 
@@ -31,6 +31,7 @@ mergeable standard. Work from the project's own docs — never from memory or as
    skill file, not from memory.
 6. Look up each **D-NNN** the task cites in `docs/DECISIONS.md`; read the `docs/ARCHITECTURE.md`
    sections they reference.
+7. Create a new branch
 
 ## Step 2 — Turn the task into acceptance criteria
 Restate Scope (in) as a short checklist of verifiable outcomes (files, behaviours, tests). Scope

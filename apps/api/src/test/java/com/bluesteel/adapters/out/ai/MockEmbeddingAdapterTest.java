@@ -7,14 +7,16 @@ import org.junit.jupiter.api.Test;
 
 class MockEmbeddingAdapterTest {
 
-  private final MockEmbeddingAdapter adapter = new MockEmbeddingAdapter();
+  private static final int DIMENSION = 1024;
+
+  private final MockEmbeddingAdapter adapter = new MockEmbeddingAdapter(DIMENSION);
 
   @Test
-  @DisplayName("should return a vector of length 1536")
-  void embed_returnsVectorOfCorrectDimension() {
+  @DisplayName("should return a vector sized to the configured embedding dimension")
+  void embed_returnsVectorOfConfiguredDimension() {
     var vector = adapter.embed("some content");
 
-    assertThat(vector).hasSize(MockEmbeddingAdapter.EMBEDDING_DIMENSION);
+    assertThat(vector).hasSize(DIMENSION);
   }
 
   @Test
