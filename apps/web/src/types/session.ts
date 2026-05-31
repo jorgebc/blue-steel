@@ -91,3 +91,31 @@ export interface DiffPayload {
   relations: DiffCard[]
   detectedConflicts: ConflictCard[]
 }
+
+// ─── Commit (ARCHITECTURE §7.6) ──────────────────────────────────────────────
+// Derived write shape POSTed to .../commit. Mirrors the F2.8 CommitSessionRequest
+// exactly. All keys camelCase (D-076).
+
+/** Per-card decision. `editedFields` is present + non-empty only when `action === 'edit'`. */
+export interface CardDecisionPayload {
+  cardId: string
+  action: 'accept' | 'edit' | 'delete'
+  editedFields?: Record<string, unknown>
+}
+
+/** Resolution of an UNCERTAIN card. `matchedEntityId` is non-null only for MATCH. */
+export interface UncertainResolutionPayload {
+  cardId: string
+  resolution: 'MATCH' | 'NEW'
+  matchedEntityId: string | null
+}
+
+export interface AcknowledgedConflictPayload {
+  conflictId: string
+}
+
+export interface CommitPayload {
+  cardDecisions: CardDecisionPayload[]
+  uncertainResolutions: UncertainResolutionPayload[]
+  acknowledgedConflicts: AcknowledgedConflictPayload[]
+}

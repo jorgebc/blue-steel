@@ -1139,13 +1139,13 @@ npx shadcn@latest add button input label form card
 | F2.10.10 | Frontend: CommitButton (controlled disabled guard) | ✅ |
 | F2.10.11 | Frontend: DiffReviewPage container (fetch + skeleton + assemble) | ✅ |
 | F2.10.12 | Frontend: register `/sessions/:sessionId/diff` route | ✅ |
-| F2.11 | Frontend: Input Mode — commit flow + draft recovery | 🔲 |
-| F2.11.1 | Frontend: CommitPayload wire TypeScript types (§7.6) | 🔲 |
-| F2.11.2 | Frontend: buildCommitPayload pure builder (state → payload) | 🔲 |
-| F2.11.3 | Frontend: commit + discard API client + mutation hooks | 🔲 |
-| F2.11.4 | Frontend: DiscardConfirmOverlay (FocusedOverlay confirm) | 🔲 |
-| F2.11.5 | Frontend: DiffReviewPage commit wiring (+ 422 handling) | 🔲 |
-| F2.11.6 | Frontend: DiffReviewPage GM-only discard wiring | 🔲 |
+| F2.11 | Frontend: Input Mode — commit flow + draft recovery | ✅ |
+| F2.11.1 | Frontend: CommitPayload wire TypeScript types (§7.6) | ✅ |
+| F2.11.2 | Frontend: buildCommitPayload pure builder (state → payload) | ✅ |
+| F2.11.3 | Frontend: commit + discard API client + mutation hooks | ✅ |
+| F2.11.4 | Frontend: DiscardConfirmOverlay (FocusedOverlay confirm) | ✅ |
+| F2.11.5 | Frontend: DiffReviewPage commit wiring (+ 422 handling) | ✅ |
+| F2.11.6 | Frontend: DiffReviewPage GM-only discard wiring | ✅ |
 | F2.12 | Local LLM via Ollama (offline real pipeline) | 🔲 |
 | F2.12-SETUP | Human: add Ollama starter, install Ollama, pull models | 🔲 |
 | F2.12.1 | Ollama profile config + AiConfig model-bean wiring | 🔲 |

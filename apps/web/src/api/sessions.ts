@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, ApiClientError } from './client'
 import type {
+  CommitPayload,
   DiffPayload,
   SessionAcceptedResponse,
   SessionStatusResponse,
@@ -47,6 +48,23 @@ export async function getSessionDiff(campaignId: string, sessionId: string): Pro
   return res.data
 }
 
+/** Commits a reviewed draft to world state (200; response body is empty). */
+export async function commitSession(
+  campaignId: string,
+  sessionId: string,
+  payload: CommitPayload
+): Promise<void> {
+  await apiClient.post<void>(
+    `/api/v1/campaigns/${campaignId}/sessions/${sessionId}/commit`,
+    payload
+  )
+}
+
+/** Discards a draft session (GM only; 200; response body is empty). */
+export async function discardSession(campaignId: string, sessionId: string): Promise<void> {
+  await apiClient.delete<void>(`/api/v1/campaigns/${campaignId}/sessions/${sessionId}`)
+}
+
 /** Submits a session and refreshes the campaign's session cache on success. */
 export function useSubmitSession(campaignId: string) {
   const queryClient = useQueryClient()
@@ -78,6 +96,24 @@ export function useSessionDiff(campaignId: string, sessionId: string, enabled = 
     queryKey: sessionKeys.diff(campaignId, sessionId),
     queryFn: () => getSessionDiff(campaignId, sessionId),
     enabled,
+  })
+}
+
+/** Commits a draft and refreshes the campaign's session cache on success. */
+export function useCommitSession(campaignId: string, sessionId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: CommitPayload) => commitSession(campaignId, sessionId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all(campaignId) }),
+  })
+}
+
+/** Discards a draft and refreshes the campaign's session cache on success. */
+export function useDiscardSession(campaignId: string, sessionId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => discardSession(campaignId, sessionId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all(campaignId) }),
   })
 }
 

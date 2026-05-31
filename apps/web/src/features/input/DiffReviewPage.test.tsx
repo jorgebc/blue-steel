@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
 import { DiffReviewPage } from './DiffReviewPage'
-import { useSessionDiff } from '@/api/sessions'
+import { useSessionDiff, useCommitSession, useDiscardSession } from '@/api/sessions'
+import { ApiClientError } from '@/api/client'
+import { useCampaignStore } from '@/store/campaignStore'
+import { createTestQueryClient } from '@/test/createTestQueryClient'
+import type { CampaignRole } from '@/types/campaign'
 import type {
   ConflictCard,
   DiffPayload,
@@ -14,12 +19,35 @@ import type {
 
 vi.mock('@/api/sessions')
 
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>()
+  return { ...actual, useNavigate: () => mockNavigate }
+})
+
 const mockUseSessionDiff = vi.mocked(useSessionDiff)
+const mockUseCommitSession = vi.mocked(useCommitSession)
+const mockUseDiscardSession = vi.mocked(useDiscardSession)
 
 type DiffResult = Partial<ReturnType<typeof useSessionDiff>>
+type MutateOpts = { onSuccess?: () => void; onError?: (err: unknown) => void }
 
 function mockDiff(result: DiffResult) {
   mockUseSessionDiff.mockReturnValue(result as ReturnType<typeof useSessionDiff>)
+}
+
+function mockCommit(impl: (vars: unknown, opts?: MutateOpts) => void, isPending = false) {
+  mockUseCommitSession.mockReturnValue({
+    mutate: vi.fn(impl),
+    isPending,
+  } as unknown as ReturnType<typeof useCommitSession>)
+}
+
+function mockDiscard(impl: (vars: unknown, opts?: MutateOpts) => void, isPending = false) {
+  mockUseDiscardSession.mockReturnValue({
+    mutate: vi.fn(impl),
+    isPending,
+  } as unknown as ReturnType<typeof useDiscardSession>)
 }
 
 const existing: ExistingDiffCard = {
@@ -61,21 +89,27 @@ function fullDiff(overrides: Partial<DiffPayload> = {}): DiffPayload {
   }
 }
 
-function renderPage() {
+function renderPage(role: CampaignRole | null = 'editor') {
+  if (role) useCampaignStore.getState().setCampaign('c1', role)
   return render(
-    <MemoryRouter initialEntries={['/campaigns/c1/sessions/s1/diff']}>
-      <Routes>
-        <Route
-          path="/campaigns/:campaignId/sessions/:sessionId/diff"
-          element={<DiffReviewPage />}
-        />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={createTestQueryClient()}>
+      <MemoryRouter initialEntries={['/campaigns/c1/sessions/s1/diff']}>
+        <Routes>
+          <Route
+            path="/campaigns/:campaignId/sessions/:sessionId/diff"
+            element={<DiffReviewPage />}
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   )
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useCampaignStore.getState().clearCampaign()
+  mockCommit(() => {})
+  mockDiscard(() => {})
 })
 
 describe('DiffReviewPage', () => {
@@ -120,6 +154,21 @@ describe('DiffReviewPage', () => {
     expect(commit).toBeEnabled()
   })
 
+  it('disables commit with a no-entities note when the diff has only UNCERTAIN cards', async () => {
+    mockDiff({
+      data: fullDiff({ actors: [uncertain], detectedConflicts: [] }),
+      isLoading: false,
+      isError: false,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('radio', { name: /same entity/i }))
+
+    expect(screen.getByRole('button', { name: /commit to world state/i })).toBeDisabled()
+    expect(screen.getByText('No entities to commit.')).toBeInTheDocument()
+  })
+
   it('opens the edit overlay and records an edit decision on save', async () => {
     mockDiff({
       data: fullDiff({ detectedConflicts: [], actors: [existing] }),
@@ -137,6 +186,71 @@ describe('DiffReviewPage', () => {
 
     // Overlay closed after save
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('commits and navigates to the campaign home on success', async () => {
+    mockDiff({
+      data: fullDiff({ actors: [existing], detectedConflicts: [] }),
+      isLoading: false,
+      isError: false,
+    })
+    mockCommit((_payload, opts) => opts?.onSuccess?.())
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: /commit to world state/i }))
+
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('/campaigns/c1', { replace: true })
+    )
+  })
+
+  it('treats a 422 commit error as a UI bug: logs it and shows a generic banner', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockDiff({
+      data: fullDiff({ actors: [existing], detectedConflicts: [] }),
+      isLoading: false,
+      isError: false,
+    })
+    mockCommit((_payload, opts) =>
+      opts?.onError?.(
+        new ApiClientError('uncertain', 422, [
+          { code: 'UNCERTAIN_ENTITIES_PRESENT', message: 'Resolve first', field: null },
+        ])
+      )
+    )
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: /commit to world state/i }))
+
+    expect(
+      await screen.findByText(/something went wrong committing this review/i)
+    ).toBeInTheDocument()
+    expect(errorSpy).toHaveBeenCalled()
+    expect(mockNavigate).not.toHaveBeenCalled()
+    errorSpy.mockRestore()
+  })
+
+  it('hides the discard button for a non-GM role', () => {
+    mockDiff({ data: fullDiff(), isLoading: false, isError: false })
+
+    renderPage('editor')
+
+    expect(screen.queryByRole('button', { name: /discard draft/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the discard button for a GM and discards then navigates to a new session', async () => {
+    mockDiff({ data: fullDiff(), isLoading: false, isError: false })
+    mockDiscard((_vars, opts) => opts?.onSuccess?.())
+
+    renderPage('gm')
+
+    await userEvent.click(screen.getByRole('button', { name: /discard draft/i }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: /discard draft/i }))
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/campaigns/c1/sessions/new'))
   })
 
   it('has no accessibility violations on the loaded screen', async () => {

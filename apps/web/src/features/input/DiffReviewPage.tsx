@@ -1,13 +1,19 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { useSessionDiff } from '@/api/sessions'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCommitSession, useDiscardSession, useSessionDiff } from '@/api/sessions'
+import { campaignKeys } from '@/api/campaigns'
+import { useCampaignStore } from '@/store/campaignStore'
 import { InlineBanner } from '@/components/domain/InlineBanner'
+import { Button } from '@/components/ui/button'
 import type { DiffCard, DiffPayload, ExistingDiffCard, NewDiffCard } from '@/types/session'
 import { useDiffState } from './hooks/useDiffState'
+import { buildCommitPayload } from './hooks/useCommitPayload'
 import { CommitButton } from './components/CommitButton'
 import { ConflictWarningCard } from './components/ConflictWarningCard'
 import { DeltaCard } from './components/DeltaCard'
 import { DiffCategorySection } from './components/DiffCategorySection'
+import { DiscardConfirmOverlay } from './components/DiscardConfirmOverlay'
 import { EditCardOverlay } from './components/EditCardOverlay'
 import { NarrativeSummaryHeader } from './components/NarrativeSummaryHeader'
 import { NewEntityCard } from './components/NewEntityCard'
@@ -33,11 +39,17 @@ function DiffReviewSkeleton() {
 }
 
 interface ContentProps {
+  campaignId: string
+  sessionId: string
   diff: DiffPayload
 }
 
 /** Inner content rendered only once the diff is loaded, so `useDiffState` gets a defined payload. */
-function DiffReviewContent({ diff }: ContentProps) {
+function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const activeRole = useCampaignStore((s) => s.activeRole)
+  const diffState = useDiffState(diff)
   const {
     decisions,
     uncertainResolutions,
@@ -47,8 +59,14 @@ function DiffReviewContent({ diff }: ContentProps) {
     acknowledgeConflict,
     unresolvedUncertainCount,
     unacknowledgedConflictCount,
-  } = useDiffState(diff)
+  } = diffState
   const [editingCard, setEditingCard] = useState<EditableCard | null>(null)
+  const [discardOpen, setDiscardOpen] = useState(false)
+  const [commitError, setCommitError] = useState<string | null>(null)
+  const [discardError, setDiscardError] = useState<string | null>(null)
+
+  const { mutate: commit, isPending: isCommitting } = useCommitSession(campaignId, sessionId)
+  const { mutate: discard, isPending: isDiscarding } = useDiscardSession(campaignId, sessionId)
 
   const categories: { title: string; cards: DiffCard[] }[] = [
     { title: 'Actors', cards: diff.actors },
@@ -56,6 +74,10 @@ function DiffReviewContent({ diff }: ContentProps) {
     { title: 'Events', cards: diff.events },
     { title: 'Relations', cards: diff.relations },
   ]
+  // Backend rejects an empty cardDecisions (@NotEmpty) — only reachable with an all-UNCERTAIN diff.
+  const hasCommittableCards = categories.some((c) =>
+    c.cards.some((card) => card.cardType !== 'UNCERTAIN')
+  )
 
   function renderCard(card: DiffCard) {
     switch (card.cardType) {
@@ -92,7 +114,34 @@ function DiffReviewContent({ diff }: ContentProps) {
   }
 
   function handleCommit() {
-    /* The commit mutation is wired in F2.11 — this is a placeholder. */
+    setCommitError(null)
+    commit(buildCommitPayload(diff, diffState), {
+      onSuccess() {
+        // Refresh the campaign home (it reflects the new world state) and leave the
+        // review — the session is no longer DRAFT, so GET .../diff would now 404.
+        queryClient.invalidateQueries({ queryKey: campaignKeys.detail(campaignId) })
+        navigate(`/campaigns/${campaignId}`, { replace: true })
+      },
+      onError(err) {
+        // The disabled button should have prevented any 422 — treat it as a UI bug.
+        console.error('Commit failed', err)
+        setCommitError('Something went wrong committing this review. Please try again.')
+      },
+    })
+  }
+
+  function handleDiscardConfirm() {
+    setDiscardError(null)
+    discard(undefined, {
+      onSuccess() {
+        navigate(`/campaigns/${campaignId}/sessions/new`)
+      },
+      onError(err) {
+        console.error('Discard failed', err)
+        setDiscardOpen(false)
+        setDiscardError("We couldn't discard this draft. Please try again.")
+      },
+    })
   }
 
   return (
@@ -136,11 +185,46 @@ function DiffReviewContent({ diff }: ContentProps) {
         />
       )}
 
-      <CommitButton
-        unresolvedUncertainCount={unresolvedUncertainCount}
-        unacknowledgedConflictCount={unacknowledgedConflictCount}
-        isPending={false}
-        onCommit={handleCommit}
+      {commitError && (
+        <InlineBanner
+          variant="error"
+          message={commitError}
+          onDismiss={() => setCommitError(null)}
+        />
+      )}
+      {discardError && (
+        <InlineBanner
+          variant="error"
+          message={discardError}
+          onDismiss={() => setDiscardError(null)}
+        />
+      )}
+
+      <div className="flex items-center justify-between gap-3">
+        <CommitButton
+          unresolvedUncertainCount={unresolvedUncertainCount}
+          unacknowledgedConflictCount={unacknowledgedConflictCount}
+          isPending={isCommitting}
+          hasCommittableCards={hasCommittableCards}
+          onCommit={handleCommit}
+        />
+        {activeRole === 'gm' && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDiscardOpen(true)}
+            className="border-red-200 text-red-600 hover:bg-red-50"
+          >
+            Discard draft
+          </Button>
+        )}
+      </div>
+
+      <DiscardConfirmOverlay
+        open={discardOpen}
+        isPending={isDiscarding}
+        onConfirm={handleDiscardConfirm}
+        onClose={() => setDiscardOpen(false)}
       />
     </div>
   )
@@ -149,8 +233,7 @@ function DiffReviewContent({ diff }: ContentProps) {
 /**
  * Diff review screen: fetches the draft diff, shows a skeleton while loading, an
  * error banner on failure/404, and otherwise the narrative header, conflicts, and
- * per-category decision cards with the commit guard. The commit mutation itself is
- * F2.11 (here `onCommit` is a placeholder).
+ * per-category decision cards with the commit guard, commit wiring, and GM discard.
  */
 export function DiffReviewPage() {
   const { campaignId, sessionId } = useParams<{ campaignId: string; sessionId: string }>()
@@ -167,7 +250,9 @@ export function DiffReviewPage() {
           onDismiss={() => setErrorDismissed(true)}
         />
       )}
-      {diff && <DiffReviewContent diff={diff} />}
+      {diff && (
+        <DiffReviewContent campaignId={campaignId ?? ''} sessionId={sessionId ?? ''} diff={diff} />
+      )}
     </main>
   )
 }

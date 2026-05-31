@@ -20,10 +20,10 @@ let refreshPromise: Promise<boolean> | null = null
 async function attemptTokenRefresh(): Promise<boolean> {
   if (isRefreshing && refreshPromise !== null) return refreshPromise
   isRefreshing = true
-  refreshPromise = fetch(
-    `${import.meta.env.VITE_API_BASE_URL}/api/v1/auth/refresh`,
-    { method: 'POST', credentials: 'include' }
-  )
+  refreshPromise = fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+  })
     .then(async (res) => {
       if (!res.ok) return false
       const envelope = (await res.json()) as ApiEnvelope<RefreshResponse>
@@ -75,10 +75,10 @@ async function request<T>(
 }
 
 export const apiClient = {
-  get: <T>(path: string): Promise<ApiEnvelope<T>> =>
-    request<T>('GET', path),
+  get: <T>(path: string): Promise<ApiEnvelope<T>> => request<T>('GET', path),
   post: <T>(path: string, body?: unknown): Promise<ApiEnvelope<T>> =>
     request<T>('POST', path, body),
   patch: <T>(path: string, body?: unknown): Promise<ApiEnvelope<T>> =>
     request<T>('PATCH', path, body),
+  delete: <T>(path: string): Promise<ApiEnvelope<T>> => request<T>('DELETE', path),
 }

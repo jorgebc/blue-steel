@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { ExistingDiffCard, NewDiffCard } from '@/types/session'
-import { formatFieldValue } from './fieldFormat'
+import { decodeFieldValue, encodeFieldValue } from './fieldFormat'
 
 interface Props {
   card: ExistingDiffCard | NewDiffCard
@@ -20,16 +20,16 @@ function editableFields(card: ExistingDiffCard | NewDiffCard): Record<string, un
 
 /**
  * Edits the editable fields of a Delta/New card inside a {@link FocusedOverlay}
- * (no modal, D-082). Save emits the edited fields; Cancel/ESC/backdrop closes
- * without saving. Only the diff's editable fields are shown — not a full entity
- * form (D-006/D-007).
+ * (no modal, D-082). Save emits the edited fields (preserving each field's
+ * original type); Cancel/ESC/backdrop closes without saving. Only the diff's
+ * editable fields are shown — not a full entity form (D-006/D-007).
  */
 export function EditCardOverlay({ card, open, onClose, onSave }: Props) {
   const fields = editableFields(card)
   const keys = useMemo(() => Object.keys(fields), [fields])
 
   const defaultValues = useMemo(
-    () => Object.fromEntries(keys.map((k) => [k, formatFieldValue(fields[k])])),
+    () => Object.fromEntries(keys.map((k) => [k, encodeFieldValue(fields[k])])),
     [keys, fields]
   )
 
@@ -41,7 +41,10 @@ export function EditCardOverlay({ card, open, onClose, onSave }: Props) {
   }, [card.cardId, defaultValues, reset])
 
   function onSubmit(values: Record<string, string>) {
-    onSave(values)
+    const editedFields = Object.fromEntries(
+      keys.map((k) => [k, decodeFieldValue(values[k], fields[k])])
+    )
+    onSave(editedFields)
   }
 
   return (
