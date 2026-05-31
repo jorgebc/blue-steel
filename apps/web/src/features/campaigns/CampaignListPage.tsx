@@ -39,12 +39,20 @@ export function CampaignListPage() {
       <div className="mb-6 flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Your campaigns</h1>
         {isAdmin && campaigns && campaigns.length > 0 && (
-          <Link
-            to="/campaigns/new"
-            className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
-          >
-            New campaign
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/invite"
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Invite user
+            </Link>
+            <Link
+              to="/campaigns/new"
+              className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+            >
+              New campaign
+            </Link>
+          </div>
         )}
       </div>
 

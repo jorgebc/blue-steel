@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom'
 import { Sparkles } from 'lucide-react'
 import { useCampaign } from '@/api/campaigns'
+import { MemberManagementPanel } from './components/MemberManagementPanel'
 
 /**
  * Per-campaign landing page reached on entering a campaign (and after a
@@ -24,6 +25,8 @@ export function CampaignHomePage() {
           </p>
         </div>
       </div>
+
+      {campaignId && campaign?.role === 'gm' && <MemberManagementPanel campaignId={campaignId} />}
     </main>
   )
 }
