@@ -10,6 +10,7 @@ import { StatusPage } from '@/features/status/StatusPage'
 import { CampaignListPage } from '@/features/campaigns/CampaignListPage'
 import { CampaignHomePage } from '@/features/campaigns/CampaignHomePage'
 import { CreateCampaignPage } from '@/features/campaigns/CreateCampaignPage'
+import { SubmitSessionPage } from '@/features/input/SubmitSessionPage'
 import { CampaignContextGuard } from '@/components/domain/CampaignContextGuard'
 import { AppShell } from '@/components/domain/AppShell'
 import { AuthenticatedLayout } from '@/components/domain/AuthenticatedLayout'
@@ -53,6 +54,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <Route path="/campaigns/:campaignId" element={<CampaignContextGuard />}>
                 <Route element={<AppShell />}>
                   <Route index element={<CampaignHomePage />} />
+                  <Route path="sessions/new" element={<SubmitSessionPage />} />
                 </Route>
               </Route>
             </Route>
