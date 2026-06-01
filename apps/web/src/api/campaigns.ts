@@ -63,11 +63,12 @@ export async function deleteCampaign(id: string): Promise<void> {
   await apiClient.delete(`/api/v1/campaigns/${id}`)
 }
 
-/** Deletes a campaign and invalidates the campaign list cache on success. */
+/** Deletes a campaign and purges the full campaigns cache subtree on success. */
 export function useDeleteCampaign() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: deleteCampaign,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: campaignKeys.all }),
+    onSuccess: () =>
+      queryClient.removeQueries({ queryKey: campaignKeys.all }),
   })
 }
