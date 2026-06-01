@@ -3,11 +3,23 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { axe } from 'vitest-axe'
 import { CampaignHomePage } from './CampaignHomePage'
-import { useCampaign } from '@/api/campaigns'
+import { useCampaign, useDeleteCampaign } from '@/api/campaigns'
+import { useAuthStore } from '@/store/authStore'
+import { useCampaignStore } from '@/store/campaignStore'
 import type { CampaignResponse } from '@/types/campaign'
+import type { UseMutationResult } from '@tanstack/react-query'
 
 vi.mock('@/api/campaigns', () => ({
   useCampaign: vi.fn(),
+  useDeleteCampaign: vi.fn(),
+}))
+
+vi.mock('@/store/authStore', () => ({
+  useAuthStore: vi.fn(),
+}))
+
+vi.mock('@/store/campaignStore', () => ({
+  useCampaignStore: vi.fn(),
 }))
 
 vi.mock('./components/MemberManagementPanel', () => ({
@@ -16,7 +28,15 @@ vi.mock('./components/MemberManagementPanel', () => ({
   ),
 }))
 
+vi.mock('./components/DeleteCampaignConfirmOverlay', () => ({
+  DeleteCampaignConfirmOverlay: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="delete-overlay" /> : null,
+}))
+
 const mockedUseCampaign = vi.mocked(useCampaign)
+const mockedUseDeleteCampaign = vi.mocked(useDeleteCampaign)
+const mockedUseAuthStore = vi.mocked(useAuthStore)
+const mockedUseCampaignStore = vi.mocked(useCampaignStore)
 
 const campaign: CampaignResponse = {
   id: 'c1',
@@ -42,6 +62,12 @@ describe('CampaignHomePage', () => {
     mockedUseCampaign.mockReturnValue({
       data: campaign,
     } as ReturnType<typeof useCampaign>)
+    mockedUseDeleteCampaign.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as UseMutationResult<void, Error, string>)
+    mockedUseAuthStore.mockReturnValue(false)
+    mockedUseCampaignStore.mockReturnValue(vi.fn())
   })
 
   it('shows the campaign name as the page heading', () => {
@@ -70,6 +96,23 @@ describe('CampaignHomePage', () => {
     renderPage()
 
     expect(screen.queryByTestId('member-panel')).not.toBeInTheDocument()
+  })
+
+  it('shows the danger zone section for admins', () => {
+    mockedUseAuthStore.mockReturnValue(true)
+
+    renderPage()
+
+    expect(screen.getByText('Danger zone')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /delete campaign/i })).toBeInTheDocument()
+  })
+
+  it('hides the danger zone section for non-admins', () => {
+    mockedUseAuthStore.mockReturnValue(false)
+
+    renderPage()
+
+    expect(screen.queryByText('Danger zone')).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

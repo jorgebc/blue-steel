@@ -57,3 +57,17 @@ export function useCreateCampaign() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: campaignKeys.all }),
   })
 }
+
+/** Permanently deletes a campaign and all its data (admin-only on the backend). */
+export async function deleteCampaign(id: string): Promise<void> {
+  await apiClient.delete(`/api/v1/campaigns/${id}`)
+}
+
+/** Deletes a campaign and invalidates the campaign list cache on success. */
+export function useDeleteCampaign() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: deleteCampaign,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: campaignKeys.all }),
+  })
+}

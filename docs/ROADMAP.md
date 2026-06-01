@@ -2841,6 +2841,7 @@ context.
 - Commit payload "add" action — manually introduce missed entities (D-053)
 - Q&A log — campaign history of queries and answers, history panel in Query Mode (D-058)
 - Query streaming / SSE if synchronous model cannot meet latency target (D-052)
+- Campaign export — download full campaign data (actors, events, spaces, relations, annotations, sessions) in an interactive/portable format before deletion (D-TBD)
 
 ---
 

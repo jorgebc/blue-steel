@@ -43,4 +43,7 @@
   <include file="db/changelog/0018_create_proposals.xml"/>
   <include file="db/changelog/0019_create_proposal_votes.xml"/>
 
+  <!-- Add ON DELETE CASCADE to all campaign_id FKs to support campaign deletion -->
+  <include file="db/changelog/0020_campaign_cascade_delete.xml"/>
+
 </databaseChangeLog>

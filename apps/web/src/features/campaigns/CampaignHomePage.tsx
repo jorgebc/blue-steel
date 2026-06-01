@@ -1,7 +1,13 @@
-import { useParams } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Sparkles } from 'lucide-react'
-import { useCampaign } from '@/api/campaigns'
+import { useCampaign, useDeleteCampaign } from '@/api/campaigns'
+import { useAuthStore } from '@/store/authStore'
+import { useCampaignStore } from '@/store/campaignStore'
+import { InlineBanner } from '@/components/domain/InlineBanner'
+import { Button } from '@/components/ui/button'
 import { MemberManagementPanel } from './components/MemberManagementPanel'
+import { DeleteCampaignConfirmOverlay } from './components/DeleteCampaignConfirmOverlay'
 
 /**
  * Per-campaign landing page reached on entering a campaign (and after a
@@ -11,6 +17,26 @@ import { MemberManagementPanel } from './components/MemberManagementPanel'
 export function CampaignHomePage() {
   const { campaignId } = useParams<{ campaignId: string }>()
   const { data: campaign } = useCampaign(campaignId)
+  const navigate = useNavigate()
+  const isAdmin = useAuthStore((s) => s.currentUser?.isAdmin)
+  const clearCampaign = useCampaignStore((s) => s.clearCampaign)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState(false)
+  const { mutate: doDelete, isPending } = useDeleteCampaign()
+
+  function handleDeleteConfirm() {
+    if (!campaignId) return
+    doDelete(campaignId, {
+      onSuccess() {
+        clearCampaign()
+        navigate('/')
+      },
+      onError() {
+        setDeleteOpen(false)
+        setDeleteError(true)
+      },
+    })
+  }
 
   return (
     <main className="mx-auto max-w-3xl p-8">
@@ -27,6 +53,39 @@ export function CampaignHomePage() {
       </div>
 
       {campaignId && campaign?.role === 'gm' && <MemberManagementPanel campaignId={campaignId} />}
+
+      {isAdmin && campaignId && (
+        <div className="mt-10 border-t border-red-100 pt-6">
+          <h2 className="mb-1 text-sm font-medium text-red-700">Danger zone</h2>
+          <p className="mb-4 text-sm text-slate-500">
+            Permanently delete this campaign and all its data. This cannot be undone.
+          </p>
+          {deleteError && (
+            <div className="mb-4">
+              <InlineBanner
+                variant="error"
+                message="Failed to delete the campaign. Please try again."
+                onDismiss={() => setDeleteError(false)}
+              />
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            className="border-red-300 text-red-700 hover:bg-red-50"
+            onClick={() => setDeleteOpen(true)}
+          >
+            Delete campaign
+          </Button>
+          <DeleteCampaignConfirmOverlay
+            open={deleteOpen}
+            campaignName={campaign?.name ?? ''}
+            onClose={() => setDeleteOpen(false)}
+            onConfirm={handleDeleteConfirm}
+            isPending={isPending}
+          />
+        </div>
+      )}
     </main>
   )
 }
