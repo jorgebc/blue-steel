@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    narrative_blocks.session_id was missing from the campaign cascade chain.
+    Sessions cascade-delete when a campaign is deleted (0020), but narrative_blocks
+    blocked that delete because its FK to sessions had no ON DELETE CASCADE.
+  -->
+  <changeSet id="0021-narrative-blocks-cascade-session" author="jorge">
+    <dropForeignKeyConstraint baseTableName="narrative_blocks"
+                              constraintName="fk_narrative_blocks_session"/>
+    <addForeignKeyConstraint baseTableName="narrative_blocks"
+                             baseColumnNames="session_id"
+                             referencedTableName="sessions"
+                             referencedColumnNames="id"
+                             constraintName="fk_narrative_blocks_session"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+</databaseChangeLog>
