@@ -5,8 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { useCreateCampaign } from '@/api/campaigns'
-import { useUserSearch } from '@/api/users'
+import { useUserSearch, USER_SEARCH_MIN_LENGTH } from '@/api/users'
 import { ApiClientError } from '@/api/client'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useAuthStore } from '@/store/authStore'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Button } from '@/components/ui/button'
@@ -45,7 +46,9 @@ export function CreateCampaignPage() {
     defaultValues: { name: '', gmUserId: '' },
   })
 
-  const { data: gmResults = [] } = useUserSearch(gmQuery, gmQuery.length > 0)
+  const debouncedGmQuery = useDebouncedValue(gmQuery.trim())
+  const { data: gmResults = [], isFetching: isSearching } = useUserSearch(debouncedGmQuery)
+  const searchActive = debouncedGmQuery.length >= USER_SEARCH_MIN_LENGTH
 
   if (!isAdmin) return <Navigate to="/" replace />
 
@@ -124,8 +127,9 @@ export function CreateCampaignPage() {
               <>
                 <Input
                   id="gm-search"
-                  type="email"
-                  placeholder="Search by email"
+                  type="text"
+                  inputMode="email"
+                  placeholder="Search users by email"
                   autoComplete="off"
                   value={gmQuery}
                   onChange={(e) => setGmQuery(e.target.value)}
@@ -144,6 +148,9 @@ export function CreateCampaignPage() {
                       </li>
                     ))}
                   </ul>
+                )}
+                {searchActive && !isSearching && gmResults.length === 0 && (
+                  <p className="text-sm text-slate-500">No users found for “{debouncedGmQuery}”.</p>
                 )}
               </>
             )}

@@ -1200,7 +1200,7 @@ Runtime secrets injected into the backend container:
 | `DB_PASSWORD` | Spring Boot — Neon database password |
 | `GEMINI_API_KEY` | Spring AI Google GenAI adapter — Gemini chat + embeddings (D-093) |
 | `JWT_SECRET` | Spring Security — HS256 symmetric secret (min 32 bytes) |
-| `EMAIL_API_KEY` | Email adapter (Resend) — transactional email |
+| `GMAIL_APP_PASSWORD` | Email adapter (Gmail SMTP) — transactional email; sender + SMTP login = `ADMIN_EMAIL` |
 | `ADMIN_EMAIL` | `AdminBootstrapService` — singleton admin email seeded on first startup (D-073) |
 | `ADMIN_PASSWORD` | `AdminBootstrapService` — initial plaintext password; BCrypt-hashed before storage; change after first login |
 | `CORS_ALLOWED_ORIGIN` | CORS — frontend origin allowed by the backend (Vercel URL) |

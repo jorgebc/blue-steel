@@ -43,4 +43,13 @@
   <include file="db/changelog/0018_create_proposals.xml"/>
   <include file="db/changelog/0019_create_proposal_votes.xml"/>
 
+  <!-- Add ON DELETE CASCADE to all campaign_id FKs to support campaign deletion -->
+  <include file="db/changelog/0020_campaign_cascade_delete.xml"/>
+
+  <!-- Fix missing cascade: narrative_blocks blocked session deletes (campaign cascade) -->
+  <include file="db/changelog/0021_narrative_blocks_cascade_delete.xml"/>
+
+  <!-- Complete cascade chain: world-state version tables, entity_embeddings, proposal_votes -->
+  <include file="db/changelog/0022_world_state_cascade_delete.xml"/>
+
 </databaseChangeLog>

@@ -1,7 +1,9 @@
 package com.bluesteel.adapters.in.web.campaign;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -11,6 +13,7 @@ import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.campaign.CampaignView;
 import com.bluesteel.application.model.campaign.CreateCampaignCommand;
 import com.bluesteel.application.port.in.campaign.CreateCampaignUseCase;
+import com.bluesteel.application.port.in.campaign.DeleteCampaignUseCase;
 import com.bluesteel.application.port.in.campaign.GetCampaignUseCase;
 import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.campaign.ListCampaignsUseCase;
@@ -59,6 +62,7 @@ class CampaignControllerTest {
   @MockitoBean private GetCurrentUserUseCase getCurrentUserUseCase;
   @MockitoBean private ChangePasswordUseCase changePasswordUseCase;
   @MockitoBean private CreateCampaignUseCase createCampaignUseCase;
+  @MockitoBean private DeleteCampaignUseCase deleteCampaignUseCase;
   @MockitoBean private GetCampaignUseCase getCampaignUseCase;
   @MockitoBean private ListCampaignsUseCase listCampaignsUseCase;
 
@@ -203,5 +207,37 @@ class CampaignControllerTest {
     mockMvc
         .perform(get("/api/v1/campaigns/{id}", CAMPAIGN_ID))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("should return 200 when admin deletes an existing campaign")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "ADMIN")
+  void delete_admin_returns200() throws Exception {
+    mockMvc.perform(delete("/api/v1/campaigns/{id}", CAMPAIGN_ID)).andExpect(status().isOk());
+
+    verify(deleteCampaignUseCase).delete(CAMPAIGN_ID, CALLER_ID, true);
+  }
+
+  @Test
+  @DisplayName("should return 403 when non-admin tries to delete a campaign")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void delete_nonAdmin_returns403() throws Exception {
+    mockMvc
+        .perform(delete("/api/v1/campaigns/{id}", CAMPAIGN_ID))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @DisplayName("should return 404 when admin deletes a non-existent campaign")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "ADMIN")
+  void delete_campaignNotFound_returns404() throws Exception {
+    org.mockito.Mockito.doThrow(new CampaignNotFoundException(CAMPAIGN_ID))
+        .when(deleteCampaignUseCase)
+        .delete(CAMPAIGN_ID, CALLER_ID, true);
+
+    mockMvc
+        .perform(delete("/api/v1/campaigns/{id}", CAMPAIGN_ID))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.errors[0].code").value("CAMPAIGN_NOT_FOUND"));
   }
 }

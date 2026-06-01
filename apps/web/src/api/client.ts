@@ -76,6 +76,16 @@ async function request<T>(
   })
 
   if (response.status === 401) {
+    // A 401 on the login endpoint means bad credentials, not an expired
+    // session — skip the refresh+redirect cycle and surface the error body.
+    if (path === '/api/v1/auth/login') {
+      const envelope = (await response.json()) as ApiEnvelope<T>
+      throw new ApiClientError(
+        envelope.errors?.[0]?.message ?? 'Invalid email or password.',
+        401,
+        envelope.errors ?? []
+      )
+    }
     if (!retried) {
       const refreshed = await attemptTokenRefresh()
       if (refreshed) return request<T>(method, path, body, true)

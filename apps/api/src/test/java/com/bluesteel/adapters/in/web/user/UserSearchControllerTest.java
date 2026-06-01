@@ -71,17 +71,21 @@ class UserSearchControllerTest {
   }
 
   @Test
-  @DisplayName("should return 200 with the matching user when caller is an admin")
+  @DisplayName("should return 200 with all matching users for a partial email when caller is admin")
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "ADMIN")
   void search_adminMatch_returns200() throws Exception {
-    when(searchUsersUseCase.searchByEmail("found@example.com", CALLER_ID, true))
-        .thenReturn(List.of(new UserProfile(FOUND_ID, "found@example.com", false, false)));
+    when(searchUsersUseCase.searchByEmail("jor", CALLER_ID, true))
+        .thenReturn(
+            List.of(
+                new UserProfile(FOUND_ID, "jorge@example.com", false, false),
+                new UserProfile(UUID.randomUUID(), "jordan@example.com", false, false)));
 
     mockMvc
-        .perform(get("/api/v1/users").param("email", "found@example.com"))
+        .perform(get("/api/v1/users").param("email", "jor"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[0].id").value(FOUND_ID.toString()))
-        .andExpect(jsonPath("$.data[0].email").value("found@example.com"));
+        .andExpect(jsonPath("$.data[0].email").value("jorge@example.com"))
+        .andExpect(jsonPath("$.data[1].email").value("jordan@example.com"));
   }
 
   @Test

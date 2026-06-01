@@ -14,8 +14,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Looks up existing platform users by exact email. Admin-or-GM authorization is enforced in the
- * use-case service (D-043, D-064), so no {@code @PreAuthorize} guards this endpoint.
+ * Looks up existing platform users by partial email (typeahead). Admin-or-GM authorization is
+ * enforced in the use-case service (D-043, D-064), so no {@code @PreAuthorize} guards this
+ * endpoint.
  */
 @RestController
 @RequestMapping("/api/v1/users")

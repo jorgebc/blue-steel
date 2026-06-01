@@ -38,6 +38,11 @@ public class CampaignPersistenceAdapter implements CampaignRepository {
     return jpaRepository.findAllByMemberId(userId).stream().map(this::toDomain).toList();
   }
 
+  @Override
+  public void deleteById(UUID id) {
+    jpaRepository.deleteById(id);
+  }
+
   private Campaign toDomain(CampaignJpaEntity e) {
     return Campaign.create(e.getId(), e.getName(), e.getCreatedBy(), e.getCreatedAt());
   }

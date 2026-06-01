@@ -14,6 +14,7 @@ import com.bluesteel.application.port.out.campaign.CampaignMembershipRepository;
 import com.bluesteel.application.port.out.email.EmailPort;
 import com.bluesteel.application.port.out.user.UserRepository;
 import com.bluesteel.application.service.campaign.InviteCampaignMemberService;
+import com.bluesteel.application.service.email.InvitationEmailFactory;
 import com.bluesteel.application.service.user.TemporaryPasswordGenerator;
 import com.bluesteel.domain.campaign.CampaignMember;
 import com.bluesteel.domain.campaign.CampaignRole;
@@ -59,7 +60,8 @@ class InviteCampaignMemberServiceTest {
             userRepository,
             emailPort,
             passwordEncoder,
-            temporaryPasswordGenerator);
+            temporaryPasswordGenerator,
+            new InvitationEmailFactory("https://app.bluesteel.test"));
   }
 
   private InviteCampaignMemberCommand command() {
@@ -123,7 +125,7 @@ class InviteCampaignMemberServiceTest {
     ArgumentCaptor<EmailMessage> emailCaptor = ArgumentCaptor.forClass(EmailMessage.class);
     verify(emailPort).send(emailCaptor.capture());
     assertThat(emailCaptor.getValue().to()).isEqualTo(EMAIL);
-    assertThat(emailCaptor.getValue().body()).contains(TEMP_PASSWORD);
+    assertThat(emailCaptor.getValue().textBody()).contains(TEMP_PASSWORD);
   }
 
   @Test

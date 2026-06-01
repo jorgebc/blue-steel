@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    Complete the campaign-delete cascade chain. Migrations 0020–0021 added
+    CASCADE to the direct campaign_id FKs and to narrative_blocks→sessions.
+    The remaining tables also need CASCADE on their session or parent-entity
+    FKs so that deleting a campaign (which cascades to sessions, actors,
+    spaces, events, relations, and proposals) does not leave orphaned rows.
+
+    Tables referencing sessions (created_in_session / session_id FKs):
+      actors, actor_versions, spaces, space_versions,
+      events, event_versions, relations, relation_versions, entity_embeddings
+
+    Tables referencing their parent world-state entity:
+      actor_versions→actors, space_versions→spaces,
+      event_versions→events, relation_versions→relations
+
+    Table referencing proposals:
+      proposal_votes→proposals
+  -->
+
+  <!-- actors.created_in_session_id → sessions -->
+  <changeSet id="0022-actors-cascade-session" author="jorge">
+    <dropForeignKeyConstraint baseTableName="actors"
+                              constraintName="fk_actors_created_in_session"/>
+    <addForeignKeyConstraint baseTableName="actors"
+                             baseColumnNames="created_in_session_id"
+                             referencedTableName="sessions"
+                             referencedColumnNames="id"
+                             constraintName="fk_actors_created_in_session"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- actor_versions.session_id → sessions -->
+  <changeSet id="0022-actor-versions-cascade-session" author="jorge">
+    <dropForeignKeyConstraint baseTableName="actor_versions"
+                              constraintName="fk_actor_versions_session"/>
+    <addForeignKeyConstraint baseTableName="actor_versions"
+                             baseColumnNames="session_id"
+                             referencedTableName="sessions"
+                             referencedColumnNames="id"
+                             constraintName="fk_actor_versions_session"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- actor_versions.actor_id → actors -->
+  <changeSet id="0022-actor-versions-cascade-actor" author="jorge">
+    <dropForeignKeyConstraint baseTableName="actor_versions"
+                              constraintName="fk_actor_versions_actor"/>
+    <addForeignKeyConstraint baseTableName="actor_versions"
+                             baseColumnNames="actor_id"
+                             referencedTableName="actors"
+                             referencedColumnNames="id"
+                             constraintName="fk_actor_versions_actor"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- spaces.created_in_session_id → sessions -->
+  <changeSet id="0022-spaces-cascade-session" author="jorge">
+    <dropForeignKeyConstraint baseTableName="spaces"
+                              constraintName="fk_spaces_created_in_session"/>
+    <addForeignKeyConstraint baseTableName="spaces"
+                             baseColumnNames="created_in_session_id"
+                             referencedTableName="sessions"
+                             referencedColumnNames="id"
+                             constraintName="fk_spaces_created_in_session"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- space_versions.session_id → sessions -->
+  <changeSet id="0022-space-versions-cascade-session" author="jorge">
+    <dropForeignKeyConstraint baseTableName="space_versions"
+                              constraintName="fk_space_versions_session"/>
+    <addForeignKeyConstraint baseTableName="space_versions"
+                             baseColumnNames="session_id"
+                             referencedTableName="sessions"
+                             referencedColumnNames="id"
+                             constraintName="fk_space_versions_session"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- space_versions.space_id → spaces -->
+  <changeSet id="0022-space-versions-cascade-space" author="jorge">
+    <dropForeignKeyConstraint baseTableName="space_versions"
+                              constraintName="fk_space_versions_space"/>
+    <addForeignKeyConstraint baseTableName="space_versions"
+                             baseColumnNames="space_id"
+                             referencedTableName="spaces"
+                             referencedColumnNames="id"
+                             constraintName="fk_space_versions_space"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- events.created_in_session_id → sessions -->
+  <changeSet id="0022-events-cascade-session" author="jorge">
+    <dropForeignKeyConstraint baseTableName="events"
+                              constraintName="fk_events_created_in_session"/>
+    <addForeignKeyConstraint baseTableName="events"
+                             baseColumnNames="created_in_session_id"
+                             referencedTableName="sessions"
+                             referencedColumnNames="id"
+                             constraintName="fk_events_created_in_session"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- event_versions.session_id → sessions -->
+  <changeSet id="0022-event-versions-cascade-session" author="jorge">
+    <dropForeignKeyConstraint baseTableName="event_versions"
+                              constraintName="fk_event_versions_session"/>
+    <addForeignKeyConstraint baseTableName="event_versions"
+                             baseColumnNames="session_id"
+                             referencedTableName="sessions"
+                             referencedColumnNames="id"
+                             constraintName="fk_event_versions_session"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- event_versions.event_id → events -->
+  <changeSet id="0022-event-versions-cascade-event" author="jorge">
+    <dropForeignKeyConstraint baseTableName="event_versions"
+                              constraintName="fk_event_versions_event"/>
+    <addForeignKeyConstraint baseTableName="event_versions"
+                             baseColumnNames="event_id"
+                             referencedTableName="events"
+                             referencedColumnNames="id"
+                             constraintName="fk_event_versions_event"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- relations.created_in_session_id → sessions -->
+  <changeSet id="0022-relations-cascade-session" author="jorge">
+    <dropForeignKeyConstraint baseTableName="relations"
+                              constraintName="fk_relations_created_in_session"/>
+    <addForeignKeyConstraint baseTableName="relations"
+                             baseColumnNames="created_in_session_id"
+                             referencedTableName="sessions"
+                             referencedColumnNames="id"
+                             constraintName="fk_relations_created_in_session"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- relation_versions.session_id → sessions -->
+  <changeSet id="0022-relation-versions-cascade-session" author="jorge">
+    <dropForeignKeyConstraint baseTableName="relation_versions"
+                              constraintName="fk_relation_versions_session"/>
+    <addForeignKeyConstraint baseTableName="relation_versions"
+                             baseColumnNames="session_id"
+                             referencedTableName="sessions"
+                             referencedColumnNames="id"
+                             constraintName="fk_relation_versions_session"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- relation_versions.relation_id → relations -->
+  <changeSet id="0022-relation-versions-cascade-relation" author="jorge">
+    <dropForeignKeyConstraint baseTableName="relation_versions"
+                              constraintName="fk_relation_versions_relation"/>
+    <addForeignKeyConstraint baseTableName="relation_versions"
+                             baseColumnNames="relation_id"
+                             referencedTableName="relations"
+                             referencedColumnNames="id"
+                             constraintName="fk_relation_versions_relation"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- entity_embeddings.session_id → sessions -->
+  <changeSet id="0022-entity-embeddings-cascade-session" author="jorge">
+    <dropForeignKeyConstraint baseTableName="entity_embeddings"
+                              constraintName="fk_entity_embeddings_session"/>
+    <addForeignKeyConstraint baseTableName="entity_embeddings"
+                             baseColumnNames="session_id"
+                             referencedTableName="sessions"
+                             referencedColumnNames="id"
+                             constraintName="fk_entity_embeddings_session"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- proposal_votes.proposal_id → proposals -->
+  <changeSet id="0022-proposal-votes-cascade-proposal" author="jorge">
+    <dropForeignKeyConstraint baseTableName="proposal_votes"
+                              constraintName="fk_proposal_votes_proposal"/>
+    <addForeignKeyConstraint baseTableName="proposal_votes"
+                             baseColumnNames="proposal_id"
+                             referencedTableName="proposals"
+                             referencedColumnNames="id"
+                             constraintName="fk_proposal_votes_proposal"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+</databaseChangeLog>

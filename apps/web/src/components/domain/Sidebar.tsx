@@ -11,6 +11,13 @@ import {
 import { useCampaign } from '@/api/campaigns'
 import { useCampaignStore } from '@/store/campaignStore'
 import { useUiStore } from '@/store/uiStore'
+import type { CampaignRole } from '@/types/campaign'
+
+const ROLE_LABEL: Record<CampaignRole, string> = {
+  gm: 'GM',
+  editor: 'Editor',
+  player: 'Player',
+}
 
 const activeLinkClass = 'bg-blue-50 text-blue-600 border-r-2 border-blue-500 font-medium'
 const inactiveLinkClass = 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -69,6 +76,11 @@ export function Sidebar() {
             <p className="truncate text-sm font-semibold text-slate-900">
               {campaign?.name ?? 'Campaign'}
             </p>
+            {activeRole && (
+              <span className="mt-0.5 self-start rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                {ROLE_LABEL[activeRole]}
+              </span>
+            )}
             <Link to="/" className="text-xs text-blue-500 underline-offset-4 hover:underline">
               Switch campaign
             </Link>

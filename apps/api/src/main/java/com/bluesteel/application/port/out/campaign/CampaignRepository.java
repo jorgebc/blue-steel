@@ -16,4 +16,7 @@ public interface CampaignRepository {
 
   /** Returns campaigns where the given user is a member. */
   List<Campaign> findAllByMemberId(UUID userId);
+
+  /** Permanently deletes the campaign row; DB cascades remove all related data. */
+  void deleteById(UUID id);
 }

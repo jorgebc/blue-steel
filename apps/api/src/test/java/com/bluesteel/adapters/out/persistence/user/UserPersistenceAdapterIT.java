@@ -6,6 +6,7 @@ import com.bluesteel.TestcontainersPostgresBaseIT;
 import com.bluesteel.domain.user.User;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -57,6 +58,39 @@ class UserPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
   }
 
   @Test
+  @DisplayName("should find users by a case-insensitive email fragment, ordered alphabetically")
+  void searchByEmail_matchesFragmentCaseInsensitive() {
+    String tag = "frag" + UUID.randomUUID().toString().replace("-", "");
+    save("amy-" + tag + "@example.com");
+    save("zoe-" + tag + "@example.com");
+    save("other-" + UUID.randomUUID() + "@example.com");
+
+    // Upper-cased fragment must still match the lower-cased stored emails (ILIKE).
+    List<User> found = adapter.searchByEmail(tag.toUpperCase());
+
+    assertThat(found)
+        .extracting(User::email)
+        .containsExactly("amy-" + tag + "@example.com", "zoe-" + tag + "@example.com");
+  }
+
+  @Test
+  @DisplayName("should cap email-fragment search results at 10")
+  void searchByEmail_capsResultsAtTen() {
+    String tag = "cap" + UUID.randomUUID().toString().replace("-", "");
+    for (int i = 0; i < 12; i++) {
+      save("user-" + i + "-" + tag + "@example.com");
+    }
+
+    assertThat(adapter.searchByEmail(tag)).hasSize(10);
+  }
+
+  @Test
+  @DisplayName("should return empty when no email matches the fragment")
+  void searchByEmail_noMatch_returnsEmpty() {
+    assertThat(adapter.searchByEmail("definitely-no-such-fragment")).isEmpty();
+  }
+
+  @Test
   @DisplayName("should return empty when user is not found by id")
   void findById_notFound_returnsEmpty() {
     Optional<User> found = adapter.findById(UUID.randomUUID());
@@ -98,5 +132,16 @@ class UserPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
     assertThat(found).isPresent();
     assertThat(found.get().passwordHash()).isEqualTo("$2a$10$newhash");
     assertThat(found.get().forcePasswordChange()).isFalse();
+  }
+
+  private void save(String email) {
+    adapter.save(
+        User.create(
+            UUID.randomUUID(),
+            email,
+            "$2a$10$hash",
+            false,
+            false,
+            Instant.now().truncatedTo(ChronoUnit.MICROS)));
   }
 }

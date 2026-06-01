@@ -1,12 +1,12 @@
 package com.bluesteel.application.service.campaign;
 
 import com.bluesteel.application.model.campaign.InviteCampaignMemberCommand;
-import com.bluesteel.application.model.email.EmailMessage;
 import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipRepository;
 import com.bluesteel.application.port.out.email.EmailPort;
 import com.bluesteel.application.port.out.user.UserRepository;
+import com.bluesteel.application.service.email.InvitationEmailFactory;
 import com.bluesteel.application.service.user.TemporaryPasswordGenerator;
 import com.bluesteel.domain.campaign.CampaignMember;
 import com.bluesteel.domain.campaign.CampaignRole;
@@ -37,6 +37,7 @@ public class InviteCampaignMemberService implements InviteCampaignMemberUseCase 
   private final EmailPort emailPort;
   private final PasswordEncoder passwordEncoder;
   private final TemporaryPasswordGenerator temporaryPasswordGenerator;
+  private final InvitationEmailFactory invitationEmailFactory;
 
   public InviteCampaignMemberService(
       CampaignMembershipPort membershipPort,
@@ -44,13 +45,15 @@ public class InviteCampaignMemberService implements InviteCampaignMemberUseCase 
       UserRepository userRepository,
       EmailPort emailPort,
       PasswordEncoder passwordEncoder,
-      TemporaryPasswordGenerator temporaryPasswordGenerator) {
+      TemporaryPasswordGenerator temporaryPasswordGenerator,
+      InvitationEmailFactory invitationEmailFactory) {
     this.membershipPort = membershipPort;
     this.membershipRepository = membershipRepository;
     this.userRepository = userRepository;
     this.emailPort = emailPort;
     this.passwordEncoder = passwordEncoder;
     this.temporaryPasswordGenerator = temporaryPasswordGenerator;
+    this.invitationEmailFactory = invitationEmailFactory;
   }
 
   @Override
@@ -84,11 +87,7 @@ public class InviteCampaignMemberService implements InviteCampaignMemberUseCase 
         CampaignMember.create(
             UUID.randomUUID(), command.campaignId(), user.id(), command.role(), Instant.now()));
 
-    emailPort.send(
-        new EmailMessage(
-            command.email(),
-            "Your Blue Steel campaign invitation",
-            buildEmailBody(command.email(), tempPassword)));
+    emailPort.send(invitationEmailFactory.campaignInvitation(command.email(), tempPassword));
 
     log.info(
         "Invited member email={} campaignId={} role={} created={}",
@@ -108,18 +107,5 @@ public class InviteCampaignMemberService implements InviteCampaignMemberUseCase 
     if (role != CampaignRole.GM) {
       throw new UnauthorizedException("Only the GM may invite campaign members");
     }
-  }
-
-  private String buildEmailBody(String email, String tempPassword) {
-    return String.format(
-        """
-        You have been invited to a Blue Steel campaign.
-
-        Email: %s
-        Temporary password: %s
-
-        Please log in and change your password immediately.
-        """,
-        email, tempPassword);
   }
 }

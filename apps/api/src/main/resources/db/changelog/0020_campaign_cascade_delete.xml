@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    Add ON DELETE CASCADE to all foreign keys referencing campaigns.id so that
+    deleting a campaign atomically removes all related rows (members, sessions,
+    actors, spaces, events, relations, annotations, proposals). Version tables
+    (actor_versions, space_versions, etc.) and proposal_votes already cascade
+    via their parent-entity foreign keys.
+  -->
+
+  <changeSet id="0020-campaign-cascade-campaign-members" author="jorge">
+    <dropForeignKeyConstraint baseTableName="campaign_members"
+                              constraintName="fk_campaign_members_campaign"/>
+    <addForeignKeyConstraint baseTableName="campaign_members"
+                             baseColumnNames="campaign_id"
+                             referencedTableName="campaigns"
+                             referencedColumnNames="id"
+                             constraintName="fk_campaign_members_campaign"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <changeSet id="0020-campaign-cascade-sessions" author="jorge">
+    <dropForeignKeyConstraint baseTableName="sessions"
+                              constraintName="fk_sessions_campaign"/>
+    <addForeignKeyConstraint baseTableName="sessions"
+                             baseColumnNames="campaign_id"
+                             referencedTableName="campaigns"
+                             referencedColumnNames="id"
+                             constraintName="fk_sessions_campaign"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <changeSet id="0020-campaign-cascade-actors" author="jorge">
+    <dropForeignKeyConstraint baseTableName="actors"
+                              constraintName="fk_actors_campaign"/>
+    <addForeignKeyConstraint baseTableName="actors"
+                             baseColumnNames="campaign_id"
+                             referencedTableName="campaigns"
+                             referencedColumnNames="id"
+                             constraintName="fk_actors_campaign"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <changeSet id="0020-campaign-cascade-spaces" author="jorge">
+    <dropForeignKeyConstraint baseTableName="spaces"
+                              constraintName="fk_spaces_campaign"/>
+    <addForeignKeyConstraint baseTableName="spaces"
+                             baseColumnNames="campaign_id"
+                             referencedTableName="campaigns"
+                             referencedColumnNames="id"
+                             constraintName="fk_spaces_campaign"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <changeSet id="0020-campaign-cascade-events" author="jorge">
+    <dropForeignKeyConstraint baseTableName="events"
+                              constraintName="fk_events_campaign"/>
+    <addForeignKeyConstraint baseTableName="events"
+                             baseColumnNames="campaign_id"
+                             referencedTableName="campaigns"
+                             referencedColumnNames="id"
+                             constraintName="fk_events_campaign"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <changeSet id="0020-campaign-cascade-relations" author="jorge">
+    <dropForeignKeyConstraint baseTableName="relations"
+                              constraintName="fk_relations_campaign"/>
+    <addForeignKeyConstraint baseTableName="relations"
+                             baseColumnNames="campaign_id"
+                             referencedTableName="campaigns"
+                             referencedColumnNames="id"
+                             constraintName="fk_relations_campaign"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <changeSet id="0020-campaign-cascade-annotations" author="jorge">
+    <dropForeignKeyConstraint baseTableName="annotations"
+                              constraintName="fk_annotations_campaign"/>
+    <addForeignKeyConstraint baseTableName="annotations"
+                             baseColumnNames="campaign_id"
+                             referencedTableName="campaigns"
+                             referencedColumnNames="id"
+                             constraintName="fk_annotations_campaign"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <changeSet id="0020-campaign-cascade-proposals" author="jorge">
+    <dropForeignKeyConstraint baseTableName="proposals"
+                              constraintName="fk_proposals_campaign"/>
+    <addForeignKeyConstraint baseTableName="proposals"
+                             baseColumnNames="campaign_id"
+                             referencedTableName="campaigns"
+                             referencedColumnNames="id"
+                             constraintName="fk_proposals_campaign"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+</databaseChangeLog>

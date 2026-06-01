@@ -6,6 +6,7 @@ import com.bluesteel.domain.exception.CampaignNotFoundException;
 import com.bluesteel.domain.exception.CannotRemoveGmException;
 import com.bluesteel.domain.exception.CommitValidationException;
 import com.bluesteel.domain.exception.DomainException;
+import com.bluesteel.domain.exception.EmailDeliveryException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
 import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
@@ -168,6 +169,17 @@ public class GlobalExceptionHandler {
   public ApiResponse<Void> handleDomainException(DomainException ex) {
     log.warn("Domain invariant violation: {}", ex.getMessage());
     return ApiResponse.error(ApiError.of("DOMAIN_ERROR", ex.getMessage()));
+  }
+
+  /**
+   * Email provider failure — the surrounding invite transaction has rolled back; admin may retry.
+   */
+  @ExceptionHandler(EmailDeliveryException.class)
+  @ResponseStatus(HttpStatus.BAD_GATEWAY)
+  public ApiResponse<Void> handleEmailDelivery(EmailDeliveryException ex) {
+    log.error("Email delivery failed", ex);
+    return ApiResponse.error(
+        ApiError.of("EMAIL_DELIVERY_FAILED", "Could not send the email. Please try again."));
   }
 
   @ExceptionHandler(RuntimeException.class)

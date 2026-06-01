@@ -11,6 +11,7 @@ import { Brand } from './Brand'
 export function AppBar() {
   const navigate = useNavigate()
   const email = useAuthStore((s) => s.currentUser?.email)
+  const isAdmin = useAuthStore((s) => s.currentUser?.isAdmin)
 
   function handleLogout() {
     useAuthStore.getState().logout()
@@ -23,6 +24,11 @@ export function AppBar() {
         <Brand size="sm" />
       </Link>
       <div className="flex items-center gap-4">
+        {isAdmin && (
+          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+            Admin
+          </span>
+        )}
         {email && <span className="hidden text-sm text-slate-600 sm:inline">{email}</span>}
         <button
           type="button"
