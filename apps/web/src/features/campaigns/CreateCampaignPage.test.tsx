@@ -66,6 +66,18 @@ describe('CreateCampaignPage', () => {
     expect(screen.getByRole('button', { name: /change/i })).toBeInTheDocument()
   })
 
+  it('shows an empty state when a search returns no users', async () => {
+    mockUseUserSearch.mockReturnValue({
+      data: [],
+      isFetching: false,
+    } as unknown as ReturnType<typeof useUserSearch>)
+
+    renderPage()
+    await userEvent.type(screen.getByLabelText(/game master/i), 'zzz')
+
+    await waitFor(() => expect(screen.getByText(/no users found/i)).toBeInTheDocument())
+  })
+
   it('creates the campaign and navigates to its home on success', async () => {
     const mutate = vi.fn((_vars: unknown, opts?: { onSuccess?: (c: { id: string }) => void }) => {
       opts?.onSuccess?.({ id: 'new-campaign' })

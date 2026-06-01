@@ -2,6 +2,7 @@ package com.bluesteel.adapters.out.persistence.user;
 
 import com.bluesteel.application.port.out.user.UserRepository;
 import com.bluesteel.domain.user.User;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.context.annotation.Lazy;
@@ -25,6 +26,13 @@ public class UserPersistenceAdapter implements UserRepository {
   @Override
   public Optional<User> findByEmail(String email) {
     return jpaRepository.findByEmail(email).map(this::toDomain);
+  }
+
+  @Override
+  public List<User> searchByEmail(String emailFragment) {
+    return jpaRepository.findTop10ByEmailContainingIgnoreCaseOrderByEmailAsc(emailFragment).stream()
+        .map(this::toDomain)
+        .toList();
   }
 
   @Override

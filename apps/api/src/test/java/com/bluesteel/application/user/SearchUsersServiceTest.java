@@ -15,7 +15,6 @@ import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.user.User;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,7 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class SearchUsersServiceTest {
 
   private static final UUID CALLER_ID = UUID.randomUUID();
-  private static final String EMAIL = "found@example.com";
+  private static final String FRAGMENT = "jor";
 
   @Mock private UserRepository userRepository;
   @Mock private CampaignMembershipRepository campaignMembershipRepository;
@@ -41,37 +40,47 @@ class SearchUsersServiceTest {
     service = new SearchUsersService(userRepository, campaignMembershipRepository);
   }
 
-  private User user() {
-    return User.create(UUID.randomUUID(), EMAIL, "$2a$10$hash", false, false, Instant.now());
+  private User user(String email) {
+    return User.create(UUID.randomUUID(), email, "$2a$10$hash", false, false, Instant.now());
   }
 
   @Test
-  @DisplayName("should return the matching user when caller is an admin")
-  void searchByEmail_adminMatch_returnsUser() {
-    User found = user();
-    when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(found));
+  @DisplayName("should return all matching users when caller is an admin")
+  void searchByEmail_adminMatches_returnsUsers() {
+    when(userRepository.searchByEmail(FRAGMENT))
+        .thenReturn(List.of(user("jorge@example.com"), user("jordan@example.com")));
 
-    List<UserProfile> result = service.searchByEmail(EMAIL, CALLER_ID, true);
+    List<UserProfile> result = service.searchByEmail(FRAGMENT, CALLER_ID, true);
 
-    assertThat(result).singleElement().satisfies(p -> assertThat(p.email()).isEqualTo(EMAIL));
+    assertThat(result)
+        .extracting(UserProfile::email)
+        .containsExactly("jorge@example.com", "jordan@example.com");
   }
 
   @Test
   @DisplayName("should return an empty list when admin search finds no user")
   void searchByEmail_adminNoMatch_returnsEmpty() {
-    when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+    when(userRepository.searchByEmail(FRAGMENT)).thenReturn(List.of());
 
-    assertThat(service.searchByEmail(EMAIL, CALLER_ID, true)).isEmpty();
+    assertThat(service.searchByEmail(FRAGMENT, CALLER_ID, true)).isEmpty();
   }
 
   @Test
-  @DisplayName("should return the matching user when caller is a GM of any campaign")
-  void searchByEmail_gmAnywhereMatch_returnsUser() {
+  @DisplayName("should return matching users when caller is a GM of any campaign")
+  void searchByEmail_gmAnywhereMatch_returnsUsers() {
     when(campaignMembershipRepository.existsByUserIdAndRole(CALLER_ID, CampaignRole.GM))
         .thenReturn(true);
-    when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user()));
+    when(userRepository.searchByEmail(FRAGMENT)).thenReturn(List.of(user("jorge@example.com")));
 
-    assertThat(service.searchByEmail(EMAIL, CALLER_ID, false)).hasSize(1);
+    assertThat(service.searchByEmail(FRAGMENT, CALLER_ID, false)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("should return an empty list without querying when the fragment is shorter than 2")
+  void searchByEmail_fragmentTooShort_returnsEmptyWithoutQuery() {
+    assertThat(service.searchByEmail(" j ", CALLER_ID, true)).isEmpty();
+
+    verify(userRepository, never()).searchByEmail("j");
   }
 
   @Test
@@ -80,9 +89,9 @@ class SearchUsersServiceTest {
     when(campaignMembershipRepository.existsByUserIdAndRole(CALLER_ID, CampaignRole.GM))
         .thenReturn(false);
 
-    assertThatThrownBy(() -> service.searchByEmail(EMAIL, CALLER_ID, false))
+    assertThatThrownBy(() -> service.searchByEmail(FRAGMENT, CALLER_ID, false))
         .isInstanceOf(UnauthorizedException.class);
 
-    verify(userRepository, never()).findByEmail(EMAIL);
+    verify(userRepository, never()).searchByEmail(FRAGMENT);
   }
 }

@@ -20,14 +20,18 @@ export async function searchUsers(email: string): Promise<UserSearchResult[]> {
   return res.data
 }
 
+/** Shortest fragment that triggers a search — mirrors the backend minimum. */
+export const USER_SEARCH_MIN_LENGTH = 2
+
 /**
- * Looks up users matching {@code email}. Disabled while the query is empty (or
- * when {@code enabled} is false) so it never fires a wildcard search.
+ * Looks up users whose email contains {@code email}. Disabled until the fragment
+ * reaches {@link USER_SEARCH_MIN_LENGTH} (or when {@code enabled} is false) so it
+ * never fires an overly broad search.
  */
 export function useUserSearch(email: string, enabled = true) {
   return useQuery({
     queryKey: ['users', 'search', email],
     queryFn: () => searchUsers(email),
-    enabled: enabled && email.length > 0,
+    enabled: enabled && email.length >= USER_SEARCH_MIN_LENGTH,
   })
 }
