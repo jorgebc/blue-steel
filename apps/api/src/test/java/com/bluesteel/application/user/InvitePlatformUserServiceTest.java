@@ -10,6 +10,7 @@ import com.bluesteel.application.model.user.InvitationResult;
 import com.bluesteel.application.model.user.InvitePlatformUserCommand;
 import com.bluesteel.application.port.out.email.EmailPort;
 import com.bluesteel.application.port.out.user.UserRepository;
+import com.bluesteel.application.service.email.InvitationEmailFactory;
 import com.bluesteel.application.service.user.InvitePlatformUserService;
 import com.bluesteel.application.service.user.TemporaryPasswordGenerator;
 import com.bluesteel.domain.exception.UnauthorizedException;
@@ -43,7 +44,11 @@ class InvitePlatformUserServiceTest {
   void setUp() {
     service =
         new InvitePlatformUserService(
-            userRepository, emailPort, passwordEncoder, temporaryPasswordGenerator);
+            userRepository,
+            emailPort,
+            passwordEncoder,
+            temporaryPasswordGenerator,
+            new InvitationEmailFactory("https://app.bluesteel.test"));
   }
 
   @Test
@@ -80,7 +85,7 @@ class InvitePlatformUserServiceTest {
     verify(emailPort).send(emailCaptor.capture());
     assertThat(emailCaptor.getValue().to()).isEqualTo("new@example.com");
     assertThat(emailCaptor.getValue().subject()).isEqualTo("Your Blue Steel invitation");
-    assertThat(emailCaptor.getValue().body()).contains(TEMP_PASSWORD);
+    assertThat(emailCaptor.getValue().textBody()).contains(TEMP_PASSWORD);
   }
 
   @Test

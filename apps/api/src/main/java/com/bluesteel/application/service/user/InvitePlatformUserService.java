@@ -1,11 +1,11 @@
 package com.bluesteel.application.service.user;
 
-import com.bluesteel.application.model.email.EmailMessage;
 import com.bluesteel.application.model.user.InvitationResult;
 import com.bluesteel.application.model.user.InvitePlatformUserCommand;
 import com.bluesteel.application.port.in.user.InvitePlatformUserUseCase;
 import com.bluesteel.application.port.out.email.EmailPort;
 import com.bluesteel.application.port.out.user.UserRepository;
+import com.bluesteel.application.service.email.InvitationEmailFactory;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.user.User;
 import java.time.Instant;
@@ -29,16 +29,19 @@ public class InvitePlatformUserService implements InvitePlatformUserUseCase {
   private final EmailPort emailPort;
   private final PasswordEncoder passwordEncoder;
   private final TemporaryPasswordGenerator temporaryPasswordGenerator;
+  private final InvitationEmailFactory invitationEmailFactory;
 
   public InvitePlatformUserService(
       UserRepository userRepository,
       EmailPort emailPort,
       PasswordEncoder passwordEncoder,
-      TemporaryPasswordGenerator temporaryPasswordGenerator) {
+      TemporaryPasswordGenerator temporaryPasswordGenerator,
+      InvitationEmailFactory invitationEmailFactory) {
     this.userRepository = userRepository;
     this.emailPort = emailPort;
     this.passwordEncoder = passwordEncoder;
     this.temporaryPasswordGenerator = temporaryPasswordGenerator;
+    this.invitationEmailFactory = invitationEmailFactory;
   }
 
   @Override
@@ -67,25 +70,8 @@ public class InvitePlatformUserService implements InvitePlatformUserUseCase {
       log.info("Created invited user email={}", command.email());
     }
 
-    emailPort.send(
-        new EmailMessage(
-            command.email(),
-            "Your Blue Steel invitation",
-            buildEmailBody(command.email(), tempPassword)));
+    emailPort.send(invitationEmailFactory.platformInvitation(command.email(), tempPassword));
 
     return result;
-  }
-
-  private String buildEmailBody(String email, String tempPassword) {
-    return String.format(
-        """
-        You have been invited to Blue Steel.
-
-        Email: %s
-        Temporary password: %s
-
-        Please log in and change your password immediately.
-        """,
-        email, tempPassword);
   }
 }
