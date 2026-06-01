@@ -1,5 +1,6 @@
 package com.bluesteel.adapters.in.web.campaign;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -213,6 +214,8 @@ class CampaignControllerTest {
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "ADMIN")
   void delete_admin_returns200() throws Exception {
     mockMvc.perform(delete("/api/v1/campaigns/{id}", CAMPAIGN_ID)).andExpect(status().isOk());
+
+    verify(deleteCampaignUseCase).delete(CAMPAIGN_ID, CALLER_ID, true);
   }
 
   @Test

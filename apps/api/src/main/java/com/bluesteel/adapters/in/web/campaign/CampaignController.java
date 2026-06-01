@@ -69,7 +69,7 @@ public class CampaignController {
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
     UUID callerId = resolveUserId();
-    deleteCampaignUseCase.delete(id, callerId, true);
+    deleteCampaignUseCase.delete(id, callerId, isAdmin());
     return ResponseEntity.ok(ApiResponse.success(null));
   }
 
