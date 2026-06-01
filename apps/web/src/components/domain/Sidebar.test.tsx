@@ -33,6 +33,28 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /switch campaign/i })).toHaveAttribute('href', '/')
   })
 
+  it('shows GM badge for gm role', () => {
+    setup('gm')
+    expect(screen.getByText('GM')).toBeInTheDocument()
+  })
+
+  it('shows Editor badge for editor role', () => {
+    setup('editor')
+    expect(screen.getByText('Editor')).toBeInTheDocument()
+  })
+
+  it('shows Player badge for player role', () => {
+    setup('player')
+    expect(screen.getByText('Player')).toBeInTheDocument()
+  })
+
+  it('hides role badge when activeRole is null', () => {
+    setup(null)
+    expect(screen.queryByText('GM')).not.toBeInTheDocument()
+    expect(screen.queryByText('Editor')).not.toBeInTheDocument()
+    expect(screen.queryByText('Player')).not.toBeInTheDocument()
+  })
+
   it('shows the Input mode link pointing at the new-session route for gm', () => {
     setup('gm')
     expect(screen.getByRole('link', { name: /input/i })).toHaveAttribute(
