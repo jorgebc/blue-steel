@@ -27,19 +27,21 @@ export function FocusedOverlay({ open, onClose, children, className, ariaLabel }
         onClick={onClose}
         aria-hidden="true"
       />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        className={[
-          'relative z-50 rounded-2xl shadow-xl ring-2 ring-blue-500/50',
-          'transition-shadow duration-200 ease-out',
-          className,
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        {children}
+      <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={ariaLabel}
+          className={[
+            'pointer-events-auto overflow-hidden rounded-2xl shadow-xl ring-2 ring-blue-500/50',
+            'transition-shadow duration-200 ease-out',
+            className,
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {children}
+        </div>
       </div>
     </>
   )
