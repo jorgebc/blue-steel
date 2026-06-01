@@ -49,4 +49,7 @@
   <!-- Fix missing cascade: narrative_blocks blocked session deletes (campaign cascade) -->
   <include file="db/changelog/0021_narrative_blocks_cascade_delete.xml"/>
 
+  <!-- Complete cascade chain: world-state version tables, entity_embeddings, proposal_votes -->
+  <include file="db/changelog/0022_world_state_cascade_delete.xml"/>
+
 </databaseChangeLog>
