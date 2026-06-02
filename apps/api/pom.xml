@@ -30,7 +30,7 @@
     <testcontainers.version>1.21.3</testcontainers.version>
 
     <!-- JWT -->
-    <nimbus-jose-jwt.version>10.9</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
 
     <!-- Structured logging -->
     <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
