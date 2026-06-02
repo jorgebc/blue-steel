@@ -82,7 +82,7 @@ The backend follows Cockburn's Ports & Adapters pattern strictly. The domain nev
 │   (repository interfaces, LLM port, email port)     │
 ├─────────────────────────────────────────────────────┤
 │                   DRIVEN ADAPTERS                   │
-│  (JPA repositories, Spring AI adapter, SMTP, etc.)  │
+│  (JPA repositories, Spring AI adapter, HTTP APIs)   │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -500,7 +500,7 @@ interface QueryAnsweringPort {
 interface EmailPort {
     void send(EmailMessage message);
     // EmailMessage carries: to, subject, body (plain text + HTML)
-    // Adapter: transactional email provider (Resend / Brevo) via HTTP API
+    // Adapter: Brevo transactional email API over HTTPS (D-075)
     // D-060: email delivery is the one infrastructure concern deliberately outsourced
 }
 ```
@@ -1200,7 +1200,7 @@ Runtime secrets injected into the backend container:
 | `DB_PASSWORD` | Spring Boot — Neon database password |
 | `GEMINI_API_KEY` | Spring AI Google GenAI adapter — Gemini chat + embeddings (D-093) |
 | `JWT_SECRET` | Spring Security — HS256 symmetric secret (min 32 bytes) |
-| `GMAIL_APP_PASSWORD` | Email adapter (Gmail SMTP) — transactional email; sender + SMTP login = `ADMIN_EMAIL` |
+| `BREVO_API_KEY` | Email adapter (Brevo HTTP API) — transactional email; sender address = `ADMIN_EMAIL` (must be verified in Brevo dashboard) |
 | `ADMIN_EMAIL` | `AdminBootstrapService` — singleton admin email seeded on first startup (D-073) |
 | `ADMIN_PASSWORD` | `AdminBootstrapService` — initial plaintext password; BCrypt-hashed before storage; change after first login |
 | `CORS_ALLOWED_ORIGIN` | CORS — frontend origin allowed by the backend (Vercel URL) |

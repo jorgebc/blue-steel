@@ -76,7 +76,7 @@ npm test              # Vitest (CI mode)
 | `OLLAMA_EMBEDDING_MODEL` | Local embedding model — `llm-ollama` (default `bge-m3`, 1024 dims) |
 | `EMBEDDING_DIMENSION` | pgvector embedding column dimension (default 1536 under `llm-real`; set 1024 under `llm-ollama`) |
 | `JWT_SECRET` | HS256 symmetric secret (min 32 bytes) |
-| `GMAIL_APP_PASSWORD` | Gmail App Password for SMTP transactional email — real send on `email-real`/`prod` profile (D-075). NOT the account password (requires 2-Step Verification). SMTP login + sender = `ADMIN_EMAIL` |
+| `BREVO_API_KEY` | Brevo API key for transactional email — real send on `email-real`/`prod` profile (D-075). Get at brevo.com → SMTP & API → API Keys (free, no domain required). Sender address = `ADMIN_EMAIL` (must be verified in Brevo dashboard) |
 | `VITE_API_BASE_URL` | Backend URL for frontend (e.g. `http://localhost:8080`) |
 | `SONAR_TOKEN` | Local SonarQube user token (Podman container `sonarqube-local`). Required by `.ai/pipeline` BE engineer Sonar gate. Never commit (D-050). |
 

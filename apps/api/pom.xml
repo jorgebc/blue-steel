@@ -92,12 +92,6 @@
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
 
-    <!-- ── Mail (Gmail SMTP transactional email, email-real profile) ─────── -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-mail</artifactId>
-    </dependency>
-
     <!-- ── Data JPA + Hibernate ────────────────────────────────────────── -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

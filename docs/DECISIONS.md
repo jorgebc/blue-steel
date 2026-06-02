@@ -1209,7 +1209,7 @@ HS256 is the natural fit for a single-server deployment — no key infrastructur
 **Decision:**
 Authentication and user management are self-implemented on top of Spring Security and a JWT library (`nimbus-jose-jwt`, already a Spring Security transitive dependency). No external auth service (Clerk, Auth0) is used.
 
-Email delivery (invitation emails, future password reset) is outsourced to an external transactional email provider (Resend or Brevo, both with generous free tiers) behind a dedicated `EmailPort` in the application layer. The provider is an adapter detail — the domain never references it.
+Email delivery (invitation emails, future password reset) is outsourced to Brevo (free tier, no custom domain required) behind a dedicated `EmailPort` in the application layer. The provider is an adapter detail — the domain never references it.
 
 **Reason:**
 The "don't roll your own auth" principle applies to cryptographic primitives, not to wiring established components together. Spring Security handles the filter chain and JWT validation. The token signing uses `nimbus-jose-jwt` (same library Spring uses internally). Our code contributes the refresh token rotation logic (~100–150 lines) and the invitation flow — neither involves custom cryptography.
@@ -1217,15 +1217,15 @@ The "don't roll your own auth" principle applies to cryptographic primitives, no
 External auth services (Clerk, Auth0) were evaluated and rejected for this project:
 - This is a controlled-usage platform with a handful of users, not a self-serve SaaS. The primary value these services deliver (scaling user management to thousands of signups) is irrelevant here.
 - Self-implementing auth behind a port is a more meaningful portfolio demonstration than delegating to a third-party SDK.
-- The `EmailPort` abstraction isolates the one genuinely painful self-hosting concern (SMTP delivery) without adding vendor lock-in at the auth layer.
+- The `EmailPort` abstraction isolates the one genuinely painful self-hosting concern (reliable email delivery) without adding vendor lock-in at the auth layer.
 
-Email delivery is the one concern deliberately outsourced — running a reliable SMTP server is operationally non-trivial and offers no learning or portfolio value. A transactional email API behind a port is the correct boundary.
+Email delivery is the one concern deliberately outsourced — reliable email delivery from cloud hosts is blocked at the network level (SMTP ports 25/465/587 are typically blocked). A transactional email HTTP API behind a port is the correct boundary.
 
 **Alternatives considered:**
 - Clerk — rejected; designed for self-serve SaaS, adds hard vendor dependency, obscures auth implementation in a portfolio context.
 - Auth0 — rejected; same reasons. Free tier limits (7,500 MAU) are irrelevant at this scale but the integration complexity is not.
 - Spring Authorization Server — rejected; OAuth2/OIDC infrastructure is designed for multi-service token delegation scenarios. A single Spring Boot monolith serving one SPA has no such requirement.
-- Self-hosted SMTP — rejected; operational overhead with no offsetting benefit. `EmailPort` keeps the option open without forcing it.
+- Self-hosted SMTP / direct Gmail SMTP — rejected; cloud hosting providers (including Render) block outbound SMTP ports at the network level. `EmailPort` keeps the provider swappable without forcing a specific choice.
 
 ---
 
@@ -1542,8 +1542,8 @@ Profile combinations:
 A developer testing the extraction pipeline in local dev does not want to send real emails. Conversely, a developer testing the invitation flow does not need real LLM calls. Coupling both behind a single profile forces developers to choose between incurring LLM cost when testing email, or forgoing email testing when validating the pipeline. Separate profiles give fine-grained control. This follows D-049's principle of safe defaults (local profile = all mocked) extended to the email channel.
 
 **Constraints this imposes on the implementation:**  
-- `EMAIL_API_KEY` must be in `.env.example` with a comment indicating it is only required with `email-real` profile.
-- The real `EmailAdapter` is a stub in Phase 1 — it implements `EmailPort` and throws `UnsupportedOperationException("Activate email-real profile and configure EMAIL_API_KEY")` unless a provider is wired. Provider selection (Resend recommended) is a Phase 1 delivery task.
+- `BREVO_API_KEY` must be in `.env.example` with a comment indicating it is only required with `email-real` profile.
+- `BrevoEmailAdapter` is the real provider: calls `POST https://api.brevo.com/v3/smtp/email` via `RestClient` over HTTPS. Sender address (`admin.email`) must be verified in the Brevo dashboard. Free tier (9,000 emails/month) requires no custom domain.
 - The `MockEmailAdapter` must log the full `EmailMessage` (recipient, subject, body) at INFO level so developers can verify invitation flows locally.
 
 **Alternatives considered:**  
@@ -1895,7 +1895,7 @@ Oracle Cloud Always Free ARM (D-046) is perpetually "out of capacity" and cannot
 **Supersedes:** D-050
 
 **Decision:**
-Runtime secrets (`DATABASE_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `GEMINI_API_KEY`, `EMAIL_API_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CORS_ALLOWED_ORIGIN`) are stored in the Render dashboard (Service → Environment → Environment Variables). CI-only secrets (`RENDER_DEPLOY_HOOK_URL`, `RENDER_SERVICE_URL`) are stored as GitHub Actions repository secrets. No `.env` file on any server; no secrets committed.
+Runtime secrets (`DATABASE_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `GEMINI_API_KEY`, `BREVO_API_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CORS_ALLOWED_ORIGIN`) are stored in the Render dashboard (Service → Environment → Environment Variables). CI-only secrets (`RENDER_DEPLOY_HOOK_URL`, `RENDER_SERVICE_URL`) are stored as GitHub Actions repository secrets. No `.env` file on any server; no secrets committed.
 
 **Reason:**
 Replaces the Oracle VM `.env` file approach from D-050. Render containers are ephemeral — there is no VM to SSH into and no persistent filesystem to write an env file to. The Render dashboard provides encrypted secret storage with equivalent security guarantees, and secrets are injected as environment variables at container start. GitHub Actions secrets continue to hold CI-specific values (deploy hook URL, health check base URL). The "never committed" invariant from D-050 is preserved unchanged.
