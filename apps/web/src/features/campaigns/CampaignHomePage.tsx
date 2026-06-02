@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { Sparkles } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { History, Sparkles } from 'lucide-react'
 import { useCampaign, useDeleteCampaign } from '@/api/campaigns'
 import { useAuthStore } from '@/store/authStore'
 import { useCampaignStore } from '@/store/campaignStore'
@@ -51,6 +51,23 @@ export function CampaignHomePage() {
           </p>
         </div>
       </div>
+
+      {campaignId && (
+        <div className="mt-8">
+          <Link
+            to={`/campaigns/${campaignId}/sessions`}
+            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+              <History className="h-5 w-5" aria-hidden />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-900">Session history</p>
+              <p className="text-xs text-slate-500">Browse past and in-progress sessions.</p>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {campaignId && campaign?.role === 'gm' && <MemberManagementPanel campaignId={campaignId} />}
 
