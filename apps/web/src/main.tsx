@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import { initAuth } from '@/api/auth'
@@ -14,6 +14,11 @@ import { InvitePlatformUserPage } from '@/features/admin/InvitePlatformUserPage'
 import { SubmitSessionPage } from '@/features/input/SubmitSessionPage'
 import { DiffReviewPage } from '@/features/input/DiffReviewPage'
 import { SessionsListPage } from '@/features/input/SessionsListPage'
+import { ExplorationLayout } from '@/features/exploration/ExplorationLayout'
+import { EntitiesPage } from '@/features/exploration/entities/EntitiesPage'
+import { EntityProfilePage } from '@/features/exploration/entities/EntityProfilePage'
+import { SpacesPage } from '@/features/exploration/spaces/SpacesPage'
+import { SpaceProfilePage } from '@/features/exploration/spaces/SpaceProfilePage'
 import { CampaignContextGuard } from '@/components/domain/CampaignContextGuard'
 import { AppShell } from '@/components/domain/AppShell'
 import { AuthenticatedLayout } from '@/components/domain/AuthenticatedLayout'
@@ -61,6 +66,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                   <Route path="sessions" element={<SessionsListPage />} />
                   <Route path="sessions/new" element={<SubmitSessionPage />} />
                   <Route path="sessions/:sessionId/diff" element={<DiffReviewPage />} />
+                  <Route path="explore" element={<ExplorationLayout />}>
+                    <Route index element={<Navigate to="entities" replace />} />
+                    <Route path="entities" element={<EntitiesPage />} />
+                    <Route path="entities/:entityId" element={<EntityProfilePage />} />
+                    <Route path="spaces" element={<SpacesPage />} />
+                    <Route path="spaces/:spaceId" element={<SpaceProfilePage />} />
+                  </Route>
                 </Route>
               </Route>
             </Route>

@@ -106,7 +106,17 @@ export function Sidebar() {
           </NavLink>
         )}
         <ComingSoonItem label="Query" icon={Search} expanded={expanded} />
-        <ComingSoonItem label="Exploration" icon={Compass} expanded={expanded} />
+        {activeCampaignId && (
+          <NavLink
+            to={`/campaigns/${activeCampaignId}/explore`}
+            className={({ isActive }) =>
+              `${itemBaseClass} ${isActive ? activeLinkClass : inactiveLinkClass}`
+            }
+          >
+            <Compass className="h-5 w-5 shrink-0" aria-hidden />
+            {expanded && <span>Exploration</span>}
+          </NavLink>
+        )}
         <ComingSoonItem label="Settings" icon={Settings} expanded={expanded} />
       </div>
 
