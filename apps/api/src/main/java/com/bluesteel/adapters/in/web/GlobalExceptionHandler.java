@@ -7,6 +7,7 @@ import com.bluesteel.domain.exception.CannotRemoveGmException;
 import com.bluesteel.domain.exception.CommitValidationException;
 import com.bluesteel.domain.exception.DomainException;
 import com.bluesteel.domain.exception.EmailDeliveryException;
+import com.bluesteel.domain.exception.EntityNotFoundException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
 import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
@@ -158,6 +159,12 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ApiResponse<Void> handleSessionNotFound(SessionNotFoundException ex) {
     return ApiResponse.error(ApiError.of("SESSION_NOT_FOUND", ex.getMessage()));
+  }
+
+  @ExceptionHandler(EntityNotFoundException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public ApiResponse<Void> handleEntityNotFound(EntityNotFoundException ex) {
+    return ApiResponse.error(ApiError.of("ENTITY_NOT_FOUND", ex.getMessage()));
   }
 
   /**

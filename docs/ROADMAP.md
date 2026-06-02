@@ -3308,21 +3308,21 @@ no modals (D-082), no Q&A history (D-058).
 
 | # | Feature | Status |
 |---|---|---|
-| F4.1 | Actors, Spaces, Events endpoints + views (offset pagination, version history, D-055) | 🔲 |
-| F4.1.1 | Backend: shared world-state read models + WorldStateReadPort | 🔲 |
-| F4.1.2 | Backend: WorldStateReadAdapter (native SQL list + detail-with-history) + IT | 🔲 |
-| F4.1.3 | Backend: ListEntities + GetEntityDetail use cases + service + EntityNotFoundException | 🔲 |
-| F4.1.4 | Backend: WorldStateExplorationController (actors/spaces/events) + DTOs + 404 | 🔲 |
+| F4.1 | Actors, Spaces, Events endpoints + views (offset pagination, version history, D-055) | ✅ |
+| F4.1.1 | Backend: shared world-state read models + WorldStateReadPort | ✅ |
+| F4.1.2 | Backend: WorldStateReadAdapter (native SQL list + detail-with-history) + IT | ✅ |
+| F4.1.3 | Backend: ListEntities + GetEntityDetail use cases + service + EntityNotFoundException | ✅ |
+| F4.1.4 | Backend: WorldStateExplorationController (actors/spaces/events) + DTOs + 404 | ✅ |
 | F4.1-SETUP | Frontend scaffolding — verified read contracts; no new shadcn (human step) | 👤 |
-| F4.1.5 | Frontend: world-state TypeScript types (worldstate.ts) | 🔲 |
-| F4.1.6 | Frontend: world-state API client + entity list/detail hooks | 🔲 |
-| F4.1.7 | Frontend: ExplorationLayout shared view nav | 🔲 |
-| F4.1.8 | Frontend: EntityList + EntityProfile skeletons | 🔲 |
-| F4.1.9 | Frontend: EntityVersionHistory domain component | 🔲 |
-| F4.1.10 | Frontend: EntitiesPage (actor list, offset pagination) | 🔲 |
-| F4.1.11 | Frontend: EntityProfilePage (actor: snapshot + history + slots) | 🔲 |
-| F4.1.12 | Frontend: SpacesPage + SpaceProfilePage | 🔲 |
-| F4.1.13 | Frontend: exploration route wiring + Sidebar Exploration activation | 🔲 |
+| F4.1.5 | Frontend: world-state TypeScript types (worldstate.ts) | ✅ |
+| F4.1.6 | Frontend: world-state API client + entity list/detail hooks | ✅ |
+| F4.1.7 | Frontend: ExplorationLayout shared view nav | ✅ |
+| F4.1.8 | Frontend: EntityList + EntityProfile skeletons | ✅ |
+| F4.1.9 | Frontend: EntityVersionHistory domain component | ✅ |
+| F4.1.10 | Frontend: EntitiesPage (actor list, offset pagination) | ✅ |
+| F4.1.11 | Frontend: EntityProfilePage (actor: snapshot + history + slots) | ✅ |
+| F4.1.12 | Frontend: SpacesPage + SpaceProfilePage | ✅ |
+| F4.1.13 | Frontend: exploration route wiring + Sidebar Exploration activation | ✅ |
 | F4.2 | Timeline endpoint + view (keyset pagination, D-055, D-009) | 🔲 |
 | F4.2.1 | Backend: timeline read model + TimelineReadPort (keyset) | 🔲 |
 | F4.2.2 | Backend: TimelineReadAdapter (native SQL keyset + JSONB filters) + IT | 🔲 |
