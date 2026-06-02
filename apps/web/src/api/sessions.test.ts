@@ -10,11 +10,13 @@ import {
   extractExistingSessionId,
   getSessionDiff,
   getSessionStatus,
+  getSessions,
   sessionKeys,
   submitSession,
   useCommitSession,
   useDiscardSession,
   useSessionDiff,
+  useSessions,
   useSessionStatus,
   useSubmitSession,
 } from './sessions'
@@ -24,6 +26,7 @@ import type {
   DiffPayload,
   SessionAcceptedResponse,
   SessionStatus,
+  SessionSummary,
 } from '@/types/session'
 
 vi.mock('./client', () => ({
@@ -78,6 +81,7 @@ const diffPayload: DiffPayload = {
 describe('sessionKeys', () => {
   it('scopes the status and diff keys under the campaign session list key', () => {
     expect(sessionKeys.all('c1')).toEqual(['sessions', 'c1'])
+    expect(sessionKeys.list('c1', 0)).toEqual(['sessions', 'c1', 'list', 0])
     expect(sessionKeys.status('c1', 's1')).toEqual(['sessions', 'c1', 's1', 'status'])
     expect(sessionKeys.diff('c1', 's1')).toEqual(['sessions', 'c1', 's1', 'diff'])
   })
@@ -280,6 +284,61 @@ describe('useSessionStatus refetchInterval', () => {
   it('does not fetch when disabled', () => {
     renderHook(() => useSessionStatus('c1', 's1', false), { wrapper })
     expect(apiClient.get).not.toHaveBeenCalled()
+  })
+})
+
+const summaries: SessionSummary[] = [
+  {
+    sessionId: 's1',
+    status: 'COMMITTED',
+    sequenceNumber: 1,
+    committedAt: '2026-01-01T10:00:00Z',
+    createdAt: '2026-01-01T09:00:00Z',
+  },
+  {
+    sessionId: 's2',
+    status: 'DRAFT',
+    sequenceNumber: 2,
+    committedAt: null,
+    createdAt: '2026-01-02T09:00:00Z',
+  },
+]
+
+describe('getSessions', () => {
+  it('GETs the sessions endpoint with page/size params and unwraps the envelope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(summaries))
+
+    const result = await getSessions('c1', 0)
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/sessions?page=0&size=20')
+    expect(result).toEqual(summaries)
+  })
+
+  it('uses the correct page when fetching page 2', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope([]))
+
+    await getSessions('c1', 2)
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/sessions?page=2&size=20')
+  })
+})
+
+describe('useSessions', () => {
+  it('returns the session summary list on success', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(summaries))
+
+    const { result } = renderHook(() => useSessions('c1', 0), { wrapper })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual(summaries)
+  })
+
+  it('surfaces the error state when the list request rejects', async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('network failure'))
+
+    const { result } = renderHook(() => useSessions('c1', 0), { wrapper })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
   })
 })
 

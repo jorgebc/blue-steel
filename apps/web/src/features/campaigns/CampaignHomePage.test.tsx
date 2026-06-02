@@ -82,6 +82,13 @@ describe('CampaignHomePage', () => {
     expect(screen.getByText(/use the sidebar/i)).toBeInTheDocument()
   })
 
+  it('renders a Session history link pointing to the campaign sessions page', () => {
+    renderPage()
+
+    const link = screen.getByRole('link', { name: /session history/i })
+    expect(link).toHaveAttribute('href', '/campaigns/c1/sessions')
+  })
+
   it('shows the member management panel to a GM', () => {
     renderPage()
 

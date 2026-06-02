@@ -5,12 +5,15 @@ import type {
   DiffPayload,
   SessionAcceptedResponse,
   SessionStatusResponse,
+  SessionSummary,
   SubmitSessionRequest,
 } from '@/types/session'
 
 /** Query-key factory for session queries, scoped per campaign. */
 export const sessionKeys = {
   all: (campaignId: string) => ['sessions', campaignId] as const,
+  list: (campaignId: string, page: number) =>
+    [...sessionKeys.all(campaignId), 'list', page] as const,
   status: (campaignId: string, sessionId: string) =>
     [...sessionKeys.all(campaignId), sessionId, 'status'] as const,
   diff: (campaignId: string, sessionId: string) =>
@@ -114,6 +117,25 @@ export function useDiscardSession(campaignId: string, sessionId: string) {
   return useMutation({
     mutationFn: () => discardSession(campaignId, sessionId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all(campaignId) }),
+  })
+}
+
+/** Fetches a page of session summaries for a campaign (offset pagination, D-055, page size 20). */
+export async function getSessions(
+  campaignId: string,
+  page: number
+): Promise<SessionSummary[]> {
+  const res = await apiClient.get<SessionSummary[]>(
+    `/api/v1/campaigns/${campaignId}/sessions?page=${page}&size=20`
+  )
+  return res.data
+}
+
+/** Offset-paginated session list. Page is zero-based. */
+export function useSessions(campaignId: string, page: number) {
+  return useQuery({
+    queryKey: sessionKeys.list(campaignId, page),
+    queryFn: () => getSessions(campaignId, page),
   })
 }
 

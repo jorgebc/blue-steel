@@ -119,3 +119,14 @@ export interface CommitPayload {
   uncertainResolutions: UncertainResolutionPayload[]
   acknowledgedConflicts: AcknowledgedConflictPayload[]
 }
+
+// ─── Session list (F2.13, TR-1) ──────────────────────────────────────────────
+
+/** Summary row returned by GET /campaigns/{id}/sessions (offset-paginated, D-055). */
+export interface SessionSummary {
+  sessionId: string
+  status: SessionStatus
+  sequenceNumber: number
+  committedAt: string | null
+  createdAt: string
+}

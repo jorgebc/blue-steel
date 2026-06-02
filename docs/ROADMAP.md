@@ -1165,11 +1165,11 @@ npx shadcn@latest add button input label form card
 | F2.12-SETUP | Human: add Ollama starter, install Ollama, pull models | ✅ |
 | F2.12.1 | Ollama profile config + AiConfig model-bean wiring | ✅ |
 | F2.12.2 | Offline pipeline smoke test (env-gated, manual/local) | ✅ |
-| F2.13 | Frontend: session history view (list + draft resume/discard) | 🔲 |
+| F2.13 | Frontend: session history view (list + draft resume/discard) | ✅ |
 | F2.13-SETUP | Frontend scaffolding — verified session-list contract; no new shadcn (human step) | 👤 |
-| F2.13.1 | Frontend: session list types + useSessions list hook | 🔲 |
-| F2.13.2 | Frontend: SessionsListPage (status badges, skeleton, empty/error) | 🔲 |
-| F2.13.3 | Frontend: draft Resume/Discard actions + route + CampaignHome link | 🔲 |
+| F2.13.1 | Frontend: session list types + useSessions list hook | ✅ |
+| F2.13.2 | Frontend: SessionsListPage (status badges, skeleton, empty/error) | ✅ |
+| F2.13.3 | Frontend: draft Resume/Discard actions + route + CampaignHome link | ✅ |
 
 ---
 
