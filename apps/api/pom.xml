@@ -37,7 +37,7 @@
 
     <!-- Code style -->
     <google-java-format.version>1.28.0</google-java-format.version>
-    <spotless-maven-plugin.version>3.5.1</spotless-maven-plugin.version>
+    <spotless-maven-plugin.version>3.6.0</spotless-maven-plugin.version>
 
     <!-- Mutation testing -->
     <pitest-maven.version>1.25.3</pitest-maven.version>
