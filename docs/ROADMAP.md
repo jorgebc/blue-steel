@@ -4,6 +4,14 @@
 
 ## Phases
 
+> **Build sequence (D-094):** Phases 0–2.5 are ✅ complete. The remaining v1 work is built in this
+> order: **F2.13 (session history) → Phase 4 (Exploration Mode) → Phase 3 (Query Mode)**. Exploration
+> ships before Query — it is read-only over already-committed world state (no per-request LLM cost,
+> lower latency risk) and visually validates extraction quality before the grounded-answer pipeline
+> is built. Phase/task **IDs are stable** (Query stays `F3.x`, Exploration stays `F4.x`); only the
+> build order differs from the numeric order. Within Exploration, the data-foundation umbrellas
+> **F4.6** (event links) and **F4.3** (relation endpoints) precede the **F4.7** cross-link profiles.
+
 ### Phase 0 — Pre-Development Validation (Gate)
 
 **Purpose:** Eliminate the highest-risk unknown before writing production code.
@@ -1157,6 +1165,11 @@ npx shadcn@latest add button input label form card
 | F2.12-SETUP | Human: add Ollama starter, install Ollama, pull models | ✅ |
 | F2.12.1 | Ollama profile config + AiConfig model-bean wiring | ✅ |
 | F2.12.2 | Offline pipeline smoke test (env-gated, manual/local) | ✅ |
+| F2.13 | Frontend: session history view (list + draft resume/discard) | 🔲 |
+| F2.13-SETUP | Frontend scaffolding — verified session-list contract; no new shadcn (human step) | 👤 |
+| F2.13.1 | Frontend: session list types + useSessions list hook | 🔲 |
+| F2.13.2 | Frontend: SessionsListPage (status badges, skeleton, empty/error) | 🔲 |
+| F2.13.3 | Frontend: draft Resume/Discard actions + route + CampaignHome link | 🔲 |
 
 ---
 
@@ -2690,6 +2703,71 @@ npx shadcn@latest add badge checkbox radio-group
 
 ---
 
+#### F2.13 — Frontend: session history view
+
+> **Umbrella task — run the F2.13.N sub-tasks below, not this.**
+
+**Goal:** A browsable list of a campaign's sessions (committed/draft/failed/processing) so GMs and editors can review history, open a committed session, and resume or discard the active draft from a list — not only reactively via the `409` on a new submission (D-054). Backend already exists (TR-1: `GET /sessions`, `GET /sessions/{sid}`).
+
+**Scope (out):** Backend (shipped, TR-1); the diff/commit screens (F2.10/F2.11); Query/Exploration.
+
+**Skills:** `frontend-api-resource`, `frontend-testing`, `ux-skeleton-crafting`  **Decisions:** D-054, D-055  **Dependencies:** TR-1, F2.11
+
+---
+
+#### F2.13-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** No new shadcn — `badge`/`card` exist; draft discard reuses the existing `DiscardConfirmOverlay` (F2.10) and `InlineBanner`.
+
+> **Backend contract (verified, TR-1) — envelope `{ data, meta, errors }`:**
+> - `GET /api/v1/campaigns/{id}/sessions?page=0&size=20` → `data: SessionSummaryResponse[]` = `[{ sessionId, status, sequenceNumber, committedAt, createdAt }]`, `meta: { page, size, totalCount }`
+> - `GET /api/v1/campaigns/{id}/sessions/{sid}` is already mirrored by `SessionDetailResponse` (Phase 3, F3.4.6)
+
+---
+
+#### F2.13.1 — Session list types + useSessions hook
+
+**Goal:** Mirror the list DTO and add the list query hook.
+
+**Scope (in):**
+- `apps/web/src/types/session.ts` (edit) — add `SessionSummary` (`sessionId, status, sequenceNumber, committedAt, createdAt`)
+- `apps/web/src/api/sessions.ts` (edit) + `sessions.test.ts` — add `useSessions(campaignId, page)` (offset) + a `list` query key
+
+**Scope (out):** UI (F2.13.2).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-055  **Dependencies:** F2.13-SETUP
+
+---
+
+#### F2.13.2 — SessionsListPage
+
+**Goal:** The list screen.
+
+**Scope (in):**
+- `apps/web/src/features/input/SessionsListPage.tsx` (+ test) — `useSessions`, status `Badge`s, DTO-derived skeleton, empty state ("No sessions yet"), `InlineBanner` on error, each row links to the session detail; axe
+
+**Scope (out):** Resume/Discard actions + routing (F2.13.3).
+
+**Skills:** `frontend-exploration`, `ux-skeleton-crafting`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-055  **Dependencies:** F2.13.1
+
+---
+
+#### F2.13.3 — Draft Resume/Discard + route + CampaignHome link
+
+**Goal:** Wire the draft actions and surface the page.
+
+**Scope (in):**
+- `apps/web/src/features/input/SessionsListPage.tsx` (edit) — for a `draft` session: **Resume** → `/campaigns/{id}/sessions/{sid}/diff`; **Discard** via the existing `DiscardConfirmOverlay` + `useDiscardSession`; `InlineBanner` feedback
+- `apps/web/src/main.tsx` — register the `sessions` route under `AppShell`
+- `apps/web/src/features/campaigns/CampaignHomePage.tsx` (edit) — add a "Session history" entry card/link
+- updated tests
+
+**Scope (out):** New backend.
+
+**Skills:** `ux-focused-overlay`, `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-054  **Dependencies:** F2.13.2
+
+---
+
 ### Phase 2.5 — Transition Hardening (Pre-Phase 3 Gate)
 
 > **Origin:** Findings from the 2026-05-31 documentation ↔ code cross-audit of the completed
@@ -2809,24 +2887,1414 @@ context.
 
 ### Phase 3 — Query Mode
 
-| # | Block | Status |
+> **Build order (D-094):** Phase 3 (Query) is built **after** Phase 4 (Exploration). IDs are stable; only the sequence differs from the numeric order.
+
+> **Principle:** Backend skeleton first (mock-wired, synchronous), retrieval second, real LLM third,
+> frontend last. Each sub-task is single-layer, compiles on its own against its declared
+> dependencies, and ships with its test. Much of the Phase 2 scaffolding already exists and is
+> **reused, not recreated**: `QueryAnsweringPort` + `QueryResponse`/`Citation`/`EntityContext`
+> records, `MockQueryAnsweringAdapter`, the `SpringAiQueryAnsweringAdapter` stub, `EmbeddingPort`,
+> and `TokenEstimator`. The `Citation` record field is **`snippet`** (not `claim`); the
+> `query-pipeline` / `frontend-query-mode` skills' `claim` naming is illustrative only.
+
+#### Summary
+
+| # | Feature | Status |
 |---|---|---|
-| 3.1 | **Query endpoint skeleton** — synchronous pipeline, 504 on timeout (D-052). | 🔲 |
-| 3.2 | **pgvector similarity retrieval** — embed question → retrieve top-N relevant entity versions from `entity_embeddings`. | 🔲 |
-| 3.3 | **`QueryAnsweringPort` + LLM call + citation grounding** — context assembly, LLM call, structured response with `citations` (D-003). | 🔲 |
-| 3.4 | **Query Mode UI** — question input, answer display, session citation links (frontend). | 🔲 |
+| F3.1 | Query endpoint skeleton — synchronous pipeline, 504 on timeout (D-052) | 🔲 |
+| F3.1.1 | Backend: AnswerQueryUseCase driving port + QueryTimeoutException | 🔲 |
+| F3.1.2 | Backend: QueryService (member auth + synchronous timeout enforcement) | 🔲 |
+| F3.1.3 | Backend: GlobalExceptionHandler 504 QUERY_TIMEOUT mapping | 🔲 |
+| F3.1.4 | Backend: QueryController + request/response DTOs (POST /queries) | 🔲 |
+| F3.2 | pgvector similarity retrieval — embed question → top-N entity versions | 🔲 |
+| F3.2.1 | Backend: QueryContextRetrievalPort driven port | 🔲 |
+| F3.2.2 | Backend: EntityQueryRetrievalAdapter (native cross-type pgvector search) + IT | 🔲 |
+| F3.2.3 | Backend: wire embed + retrieval into QueryService | 🔲 |
+| F3.3 | QueryAnsweringPort + LLM call + citation grounding | 🔲 |
+| F3.3.1 | Backend: QueryPromptAssembler + QueryResponseParser (context format + JSON parse) | 🔲 |
+| F3.3.2 | Backend: real SpringAiQueryAnsweringAdapter (LLM call + cost log, replaces stub) | 🔲 |
+| F3.4 | Query Mode UI — question input, answer, citation links (frontend) | 🔲 |
+| F3.4-SETUP | Frontend scaffolding — verified contract + notes; no new shadcn components (human step) | 👤 |
+| F3.4.1 | Frontend: Query TypeScript types (query.ts) | 🔲 |
+| F3.4.2 | Frontend: queries API client + useSubmitQuery mutation hook | 🔲 |
+| F3.4.3 | Frontend: QueryAnswerSkeleton loading component | 🔲 |
+| F3.4.4 | Frontend: QuestionForm component | 🔲 |
+| F3.4.5 | Frontend: AnswerDisplay + CitationList components | 🔲 |
+| F3.4.6 | Frontend: minimal SessionDetailPage + getSessionDetail hook (citation target) | 🔲 |
+| F3.4.7 | Frontend: QueryPage container (form + skeleton + InlineBanner + answer) | 🔲 |
+| F3.4.8 | Frontend: query route wiring + Sidebar Query nav activation | 🔲 |
+| F3.5 | Backend: Query rate-limit + daily cost cap (D-096) | 🔲 |
+| F3.5.1 | Backend: per-user/per-campaign query rate limit + 429 mapping | 🔲 |
+| F3.5.2 | Backend: daily LLM cost cap guard (reuses cost logging) | 🔲 |
+
+---
+
+#### F3.1 — Query endpoint skeleton
+
+> **Umbrella task — run the F3.1.N sub-tasks below, not this.**
+
+**Goal:** A synchronous `POST /api/v1/campaigns/{id}/queries` wired end-to-end against the existing
+`MockQueryAnsweringAdapter`, with campaign-member authorization and a hard request deadline that
+returns `504 QUERY_TIMEOUT` (D-052). Retrieval (F3.2) and the real LLM (F3.3) plug into this
+skeleton without changing its shape.
+
+**Scope (out):** pgvector retrieval (F3.2); real LLM adapter (F3.3); any frontend (F3.4).
+
+**Skills:** `query-pipeline`, `backend-endpoint`, `error-handling`  **Decisions:** D-052, D-043, D-058  **Dependencies:** F2.5, TR-3
+
+---
+
+#### F3.1.1 — AnswerQueryUseCase driving port + QueryTimeoutException
+
+**Goal:** The driving port the controller calls, plus the timeout exception the service throws. No runtime logic.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/query/AnswerQueryUseCase.java` — `QueryResponse answer(UUID campaignId, UUID callerId, String question)` (returns the existing `application.model.query.QueryResponse`)
+- `apps/api/src/main/java/com/bluesteel/domain/exception/QueryTimeoutException.java` — plain `RuntimeException` subclass (ARCH-01: no Spring/JPA imports)
+
+**Scope (out):** Service, controller, handler. No runtime test — `mvn compile` is the verification for this declarations-only sub-task.
+
+**Skills:** `query-pipeline`  **Decisions:** D-052  **Dependencies:** (existing `application.model.query.*`)
+
+---
+
+#### F3.1.2 — QueryService (member auth + synchronous timeout)
+
+**Goal:** Implement `AnswerQueryUseCase`: authorize the caller as a campaign member (or admin) via `CampaignMembershipPort` (mirror `ListSessionsService`), then call `QueryAnsweringPort.answer(question, List.of())` — empty context placeholder; real retrieval is injected in F3.2.3 — inside a `CompletableFuture.get(timeout, SECONDS)` deadline; on `TimeoutException` throw `QueryTimeoutException`. INFO on entry/exit (LOG-02).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/query/QueryService.java` — timeout from `@Value("${query.timeout-seconds:20}")`
+- `apps/api/src/test/java/com/bluesteel/application/service/query/QueryServiceTest.java` — Mockito: asserts member-gate (non-member → `UnauthorizedException`), timeout → `QueryTimeoutException`, and delegation of the port result
+
+**Scope (out):** Embedding/retrieval wiring (F3.2.3); HTTP layer (F3.1.4).
+
+**Skills:** `query-pipeline`, `backend-testing`  **Decisions:** D-052, D-043  **Dependencies:** F3.1.1
+
+---
+
+#### F3.1.3 — GlobalExceptionHandler 504 mapping
+
+**Goal:** Map `QueryTimeoutException` to `504 QUERY_TIMEOUT` in the standard error envelope.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/GlobalExceptionHandler.java` — add `@ExceptionHandler(QueryTimeoutException.class)` → `@ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)` → `ApiError.of("QUERY_TIMEOUT", …)`
+- Extend the existing handler test with the 504 case
+
+**Scope (out):** Controller (F3.1.4).
+
+**Skills:** `error-handling`, `backend-testing`  **Decisions:** D-052  **Dependencies:** F3.1.1
+
+---
+
+#### F3.1.4 — QueryController + DTOs
+
+**Goal:** Expose `POST /api/v1/campaigns/{id}/queries` returning the answer + citations in the `{ data, meta, errors }` envelope.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/query/QueryController.java` — `resolveCallerId()` pattern; returns `ApiResponse<QueryAnswerResponse>`
+- `.../adapters/in/web/query/QueryRequest.java` — `@NotBlank @Size(max = 2000) String question`
+- `.../adapters/in/web/query/QueryAnswerResponse.java` — `String answer, List<CitationResponse> citations`
+- `.../adapters/in/web/query/CitationResponse.java` — `UUID sessionId, int sequenceNumber, String snippet`
+- `apps/api/src/test/java/com/bluesteel/adapters/in/web/query/QueryControllerTest.java` — `@WebMvcTest`, mocked `AnswerQueryUseCase`: 200 envelope, 504 timeout, 400 blank question
+
+**Scope (out):** Retrieval/LLM internals.
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-052, D-058  **Dependencies:** F3.1.2, F3.1.3
+
+---
+
+#### F3.2 — pgvector similarity retrieval
+
+> **Umbrella task — run the F3.2.N sub-tasks below, not this.**
+
+**Goal:** Embed the question and retrieve the top-N most similar **committed** entity-version
+snapshots across all four entity types, scoped to the campaign, as `EntityContext` for the LLM.
+Native pgvector SQL only (ARCH-04, D-062); versions without an `entity_embeddings` row are excluded
+(D-063); context is bounded by top-N (D-034).
+
+**Scope (out):** LLM call/prompt assembly (F3.3); frontend (F3.4).
+
+**Skills:** `query-pipeline`, `backend-testing`  **Decisions:** D-062, D-063, D-034, D-093, D-088  **Dependencies:** F3.1.2
+
+---
+
+#### F3.2.1 — QueryContextRetrievalPort driven port
+
+**Goal:** Driven port for cross-type query retrieval, returning the existing `EntityContext`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/query/QueryContextRetrievalPort.java` — `List<EntityContext> retrieveRelevantContext(UUID campaignId, float[] queryEmbedding, int topN)`
+
+**Scope (out):** The adapter (F3.2.2). Compile is the verification.
+
+**Skills:** `query-pipeline`  **Decisions:** D-062  **Dependencies:** F3.1.1
+
+---
+
+#### F3.2.2 — EntityQueryRetrievalAdapter (native cross-type pgvector) + IT
+
+**Goal:** Implement the port with one native `JdbcTemplate` query: a cross-type `LEFT JOIN` of `entity_embeddings` to the four `*_versions` tables (for `full_snapshot`, `version_number`) and the four head tables (for `name`) with `COALESCE`, joined to `sessions`, `WHERE s.campaign_id = ? AND s.status = 'committed'`, `ORDER BY ee.embedding <=> ?::vector`, `LIMIT ?`; map rows → `EntityContext`. Render the vector literal in the `EntitySimilaritySearchAdapter.toVectorLiteral` style.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/embedding/EntityQueryRetrievalAdapter.java`
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/embedding/EntityQueryRetrievalAdapterIT.java` — Testcontainers + pgvector; seed committed sessions + embeddings across ≥2 entity types; assert cosine ordering, campaign scoping, committed-only, and no-embedding exclusion
+
+**Scope (out):** Reusing `EntitySimilaritySearchPort` 4× then merging (rejected — keep the Query path decoupled from the ingestion Stage-1 path).
+
+**Skills:** `query-pipeline`, `backend-testing`, `database-migration`  **Decisions:** D-062, D-063, D-093, D-088  **Dependencies:** F3.2.1
+
+---
+
+#### F3.2.3 — Wire embed + retrieval into QueryService
+
+**Goal:** Replace the empty-context placeholder: inject `EmbeddingPort` + `QueryContextRetrievalPort`; embed the question, retrieve top-N (`@Value("${query.retrieval.top-n:8}")`), and pass the real `List<EntityContext>` to `QueryAnsweringPort`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/query/QueryService.java` (edit)
+- `apps/api/src/test/java/com/bluesteel/application/service/query/QueryServiceTest.java` (update) — verify embed → retrieve → answer order; empty retrieval still answers
+
+**Scope (out):** Prompt assembly + token budgeting inside the adapter (F3.3).
+
+**Skills:** `query-pipeline`, `backend-testing`  **Decisions:** D-062, D-034  **Dependencies:** F3.1.2, F3.2.1
+
+---
+
+#### F3.3 — QueryAnsweringPort + LLM call + citation grounding
+
+> **Umbrella task — run the F3.3.N sub-tasks below, not this.**
+
+**Goal:** Replace the throwing `SpringAiQueryAnsweringAdapter` stub with a real Spring AI
+`ChatClient` call that answers strictly from the provided context and returns grounded `citations`
+(D-003), under a bounded token envelope (D-034), with cost logging (LOG-01). Active on
+`llm-real | llm-ollama`; the mock stays for `local`.
+
+**Scope (out):** Retrieval (F3.2); frontend (F3.4).
+
+**Skills:** `spring-ai-llm-adapter`, `query-pipeline`, `backend-testing`  **Decisions:** D-003, D-052, D-034  **Dependencies:** F3.2.3
+
+---
+
+#### F3.3.1 — QueryPromptAssembler + QueryResponseParser
+
+**Goal:** Two pure, easily-tested helpers. The assembler builds the system prompt — numbered `EntityContext` snapshots, each labelled with its `session_id`, plus the "cite every claim / omit any claim you cannot ground" rule — and enforces the token envelope via the existing `TokenEstimator` (truncate least-relevant, or throw `TokenBudgetExceededException`). The parser maps the LLM JSON (`{ answer, citations: [{ session_id, sequence_number, snippet }] }`) → `QueryResponse`; on parse failure it logs at ERROR and throws (never silently returns empty citations).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/QueryPromptAssembler.java` (+ unit test)
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/QueryResponseParser.java` (+ unit test)
+
+**Scope (out):** The `ChatClient` call (F3.3.2).
+
+**Skills:** `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-003, D-034  **Dependencies:** F3.2.1
+
+---
+
+#### F3.3.2 — Real SpringAiQueryAnsweringAdapter
+
+**Goal:** Replace the stub body with the real call using the `ChatClient` bean from `AiConfig` and the F3.3.1 helpers; log `tokens_in`/`tokens_out`/`cost_usd`/campaign/stage at INFO (LOG-01). Keep `@Profile("llm-real | llm-ollama")`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiQueryAnsweringAdapter.java` (replace stub)
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/SpringAiQueryAnsweringAdapterTest.java` — mock `ChatModel`/`ChatClient`; assert context grounding, citation parsing, and profile activation
+
+**Scope (out):** Service wiring (already via the port).
+
+**Skills:** `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-003, D-052, LOG-01  **Dependencies:** F3.3.1
+
+---
+
+#### F3.4 — Query Mode UI
+
+> **Umbrella task — run the F3.4.N sub-tasks below, not this.**
+
+**Goal:** A stateless Query Mode screen: ask a question → synchronous answer with navigable session
+citations. Loading is a skeleton (D-086), feedback and the `504` timeout use `InlineBanner` (D-083),
+no modals (D-082), no Q&A history (D-058).
+
+**Scope (out):** Exploration Mode (Phase 4); any query history/persistence.
+
+**Skills:** `frontend-query-mode`, `frontend-api-resource`, `frontend-testing`, `ux-skeleton-crafting`, `ux-inline-feedback`, `ux-navigation-logic`  **Decisions:** D-052, D-058, D-003, D-082, D-083, D-086  **Dependencies:** F3.1.4, F1.11
+
+---
+
+#### F3.4-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** No new shadcn components are required — `textarea` and
+> `button` (`src/components/ui/`) and `InlineBanner` (`src/components/domain/`) already exist. This
+> block records the verified facts the sub-tasks rely on.
+
+> **Notes for all sub-tasks (verified against the repo — these override the skills):**
+> - Campaign id comes from `useCampaignStore((s) => s.activeCampaignId)` — the field is
+>   **`activeCampaignId`**, not `campaignId` as the `frontend-query-mode` skill shows.
+> - HTTP goes through **`apiClient.{get,post}`** + **`ApiClientError`** from `src/api/client.ts`
+>   (the skill's `fetchWithAuth` / `QueryApiError` are illustrative). Detect the timeout via
+>   `error instanceof ApiClientError && error.status === 504`.
+> - The citation field is **`snippet`** (skill says `claim`).
+
+> **Backend contract (verified against `apps/api`) — envelope `{ data, meta, errors: [{ code, message, field }] }`:**
+> - `POST /api/v1/campaigns/{id}/queries` `{ question }` → `data: { answer, citations: [{ sessionId, sequenceNumber, snippet }] }`; `504 QUERY_TIMEOUT`; `400` on blank question
+> - `GET /api/v1/campaigns/{id}/sessions/{sid}` → `data: { sessionId, campaignId, status, sequenceNumber, failureReason, committedAt, createdAt, updatedAt, narrativeBlockId }` (the F3.4.6 citation target; endpoint shipped in TR-1)
+
+---
+
+#### F3.4.1 — Query TypeScript types
+
+**Goal:** Hand-written mirrors of the query DTOs so later sub-tasks import real, compiling symbols.
+
+**Scope (in):**
+- `apps/web/src/types/query.ts` — `QueryRequest` (`{ question: string }`), `Citation` (`{ sessionId: string; sequenceNumber: number; snippet: string }`), `QueryResponse` (`{ answer: string; citations: Citation[] }`)
+
+**Scope (out):** Fetch logic, hooks, components. No runtime test — `npm run type-check` is the verification.
+
+**Skills:** `frontend-query-mode`  **Decisions:** D-003  **Dependencies:** F3.4-SETUP
+
+---
+
+#### F3.4.2 — Queries API client + useSubmitQuery hook
+
+**Goal:** Typed `submitQuery` + a TanStack mutation hook. Stateless — no cache key, no invalidation (D-058).
+
+**Scope (in):**
+- `apps/web/src/api/queries.ts` (+ `queries.test.ts`) — `submitQuery(campaignId, question): Promise<QueryResponse>` via `apiClient.post`; `useSubmitQuery(campaignId)` mutation; the `504` surfaces via `ApiClientError.status` for the page to branch on
+
+**Scope (out):** UI components (F3.4.4–F3.4.7). No query caching.
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-052, D-058  **Dependencies:** F3.4-SETUP, F3.4.1
+
+---
+
+#### F3.4.3 — QueryAnswerSkeleton loading component
+
+**Goal:** DTO-derived loading skeleton for the answer area — no spinner (D-086).
+
+**Scope (in):**
+- `apps/web/src/features/query/components/QueryAnswerSkeleton.tsx` (+ test) — answer block + a few citation lines, `animate-pulse`, zero layout shift; axe assertion
+
+**Scope (out):** The page that renders it (F3.4.7).
+
+**Skills:** `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-086  **Dependencies:** F3.4-SETUP
+
+---
+
+#### F3.4.4 — QuestionForm component
+
+**Goal:** Controlled question input + submit, disabled while a query is in flight.
+
+**Scope (in):**
+- `apps/web/src/features/query/components/QuestionForm.tsx` (+ test) — `Textarea` + `Button` (`@/components/ui/*`), visually-hidden label, trims/ignores empty input, `disabled` while pending; axe assertion
+
+**Scope (out):** The mutation call (F3.4.7 owns submit wiring).
+
+**Skills:** `frontend-query-mode`, `frontend-testing`  **Decisions:** D-052  **Dependencies:** F3.4-SETUP
+
+---
+
+#### F3.4.5 — AnswerDisplay + CitationList components
+
+**Goal:** Render the answer text and its citations as navigable links.
+
+**Scope (in):**
+- `apps/web/src/features/query/components/AnswerDisplay.tsx` (+ test) — answer in `whitespace-pre-wrap`; **never** `dangerouslySetInnerHTML`; omits the citation section when `citations` is empty
+- `apps/web/src/features/query/components/CitationList.tsx` (+ test) — each citation a `<Link to={`/campaigns/${campaignId}/sessions/${sessionId}`}>` (target page in F3.4.6, route in F3.4.8); descriptive `aria-label`; axe assertions
+
+**Scope (out):** Container/state (F3.4.7).
+
+**Skills:** `frontend-query-mode`, `frontend-testing`  **Decisions:** D-003  **Dependencies:** F3.4.1
+
+---
+
+#### F3.4.6 — Minimal SessionDetailPage + getSessionDetail hook
+
+**Goal:** A read-only session-detail view so citation links resolve to a real page (citations target `/campaigns/{id}/sessions/{sid}`). The backend `GET …/sessions/{sid}` endpoint already exists (TR-1).
+
+**Scope (in):**
+- `apps/web/src/types/session.ts` (edit) — add `SessionDetailResponse` (`{ sessionId; campaignId; status; sequenceNumber; failureReason; committedAt; createdAt; updatedAt; narrativeBlockId }`)
+- `apps/web/src/api/sessions.ts` (edit) — add `getSessionDetail(campaignId, sessionId)` + `useSessionDetail` hook + a `detail` query key
+- `apps/web/src/features/input/SessionDetailPage.tsx` (+ test) — reads `:sessionId`; renders status / sequence / timestamps; skeleton while loading; axe assertion
+
+**Scope (out):** Route registration (F3.4.8); annotations / version history (Phase 4).
+
+**Skills:** `frontend-api-resource`, `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-055, D-003  **Dependencies:** F3.4-SETUP
+
+---
+
+#### F3.4.7 — QueryPage container
+
+**Goal:** Compose the form, loading skeleton, feedback banner, and answer; stateless local state (D-058).
+
+**Scope (in):**
+- `apps/web/src/features/query/QueryPage.tsx` (+ test) — `useCampaignStore((s) => s.activeCampaignId)`; `QuestionForm`; `useSubmitQuery`; `QueryAnswerSkeleton` while pending; `InlineBanner` for `504 QUERY_TIMEOUT` (rephrase suggestion) and generic errors; `AnswerDisplay` on success; `useState` for the answer (no cache); resets prior state on each submit; axe assertion
+
+**Scope (out):** Route wiring + nav (F3.4.8).
+
+**Skills:** `frontend-query-mode`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-052, D-058, D-083  **Dependencies:** F3.4.2, F3.4.3, F3.4.4, F3.4.5
+
+---
+
+#### F3.4.8 — Query route wiring + Sidebar Query nav activation
+
+**Goal:** Register the routes and turn the inert Query nav item into a live link.
+
+**Scope (in):**
+- `apps/web/src/main.tsx` (edit) — under `AppShell`, add `<Route path="query" element={<QueryPage />} />` and `<Route path="sessions/:sessionId" element={<SessionDetailPage />} />`
+- `apps/web/src/components/domain/Sidebar.tsx` (+ `Sidebar.test.tsx` update) — replace the Query `ComingSoonItem` with a `NavLink` to `/campaigns/${activeCampaignId}/query` (visible to all roles, including `player`)
+
+**Scope (out):** Exploration / Settings nav (still stubbed).
+
+**Skills:** `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-052  **Dependencies:** F3.4.6, F3.4.7
+
+---
+
+#### F3.5 — Backend: Query rate-limit + daily cost cap
+
+> **Umbrella task — run the F3.5.N sub-tasks below, not this.**
+
+**Goal:** App-level safeguards on the per-question LLM call: a per-user/per-campaign request rate limit and a daily LLM cost cap, so a single user cannot drive runaway cost or abuse (D-096). Sits in front of `POST /api/v1/campaigns/{id}/queries` (F3.1.4).
+
+**Scope (out):** Provider-level spend governance (D-034, already configured); ingestion rate limits.
+
+**Skills:** `backend-endpoint`, `security-hardening`, `backend-testing`  **Decisions:** D-096, D-052, D-034  **Dependencies:** F3.1.4
+
+---
+
+#### F3.5.1 — Per-user/per-campaign query rate limit
+
+**Goal:** Reject queries above a configured rate with `429`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/query/QueryRateLimiter.java` — in-memory sliding window keyed by `(userId, campaignId)`; window/limit from `@Value("${query.rate-limit.*}")`
+- enforce in `QueryController` (F3.1.4) or a `HandlerInterceptor`; `RateLimitExceededException` → `429 QUERY_RATE_LIMITED` in `GlobalExceptionHandler`
+- `apps/api/src/test/java/com/bluesteel/adapters/in/web/query/QueryRateLimiterTest.java` (+ controller 429 case)
+
+**Scope (out):** Cost cap (F3.5.2).
+
+**Skills:** `security-hardening`, `error-handling`, `backend-testing`  **Decisions:** D-096  **Dependencies:** F3.1.4
+
+---
+
+#### F3.5.2 — Daily LLM cost cap guard
+
+**Goal:** Block queries once the configured daily LLM cost is exceeded.
+
+**Scope (in):**
+- a cost-accounting port + adapter reading the existing LLM cost logging (LOG-01) / an in-memory daily tally; `query.cost-cap.daily-usd` config
+- guard in `QueryService` (F3.1.2) → `CostCapExceededException` → `429`/`503 QUERY_COST_CAP` in `GlobalExceptionHandler`
+- unit test
+
+**Scope (out):** Ingestion cost caps; billing.
+
+**Skills:** `security-hardening`, `backend-testing`  **Decisions:** D-096, D-034  **Dependencies:** F3.1.2, F3.5.1
 
 ---
 
 ### Phase 4 — Exploration Mode
 
-| # | Block | Status |
+> **Build order (D-094):** Exploration (Phase 4) is built **before** Phase 3 (Query). The data-foundation umbrellas **F4.6** (event links) and **F4.3** (relation endpoints) run before the **F4.7** cross-link profiles; IDs are stable.
+
+> **Principle:** Exploration Mode is the **read-only** face of world state (D-010). Backend read
+> foundation first, then per-view backend + frontend, frontend last within each view. A single
+> generic `WorldStateReadPort` + `WorldStateReadAdapter` (native SQL, table-pair routing — mirrors
+> the write-side `WorldStateAdapter`, D-089) serves actors/spaces/events list+detail; Timeline
+> (keyset) and Relations (structured endpoints) add their own ports/adapters reusing the shared read
+> models. All type-specific fields (event type, involved actors, relation kind) live in the version
+> `full_snapshot` JSONB — the head tables carry only `id, campaign_id, owner_id, name, created_at,
+> created_in_session_id`. Role is resolved from campaign membership, never the JWT (D-043).
+>
+> **Scope increase (F4.3, confirmed):** relations currently have **no** structured source/target —
+> extraction yields only `ExtractedMention(name, description, rawText)`. F4.3 extends the committed
+> ingestion pipeline (extraction → resolution → commit) to give relations real endpoint columns so
+> the graph can draw reliable edges. These changes are surgical and the migration is append-only.
+
+#### Summary
+
+| # | Feature | Status |
 |---|---|---|
-| 4.1 | **Actors, Spaces, Events endpoints + views** — list (offset pagination) and detail with full version history (D-055). | 🔲 |
-| 4.2 | **Timeline endpoint + view** — ordered event feed, filterable by actor/space/event type, keyset pagination (D-055, D-009). | 🔲 |
-| 4.3 | **Relations graph** — React Flow graph view, actors and spaces as nodes, relations as edges (D-030, D-009). | 🔲 |
-| 4.4 | **Annotations** — create, list, delete; non-canonical, visible to all campaign members (D-011). | 🔲 |
-| 4.5 | **"Propose a change" affordance** — visible on every entity, space, and relation; pipeline inactive until v2 (D-012). | 🔲 |
+| F4.1 | Actors, Spaces, Events endpoints + views (offset pagination, version history, D-055) | 🔲 |
+| F4.1.1 | Backend: shared world-state read models + WorldStateReadPort | 🔲 |
+| F4.1.2 | Backend: WorldStateReadAdapter (native SQL list + detail-with-history) + IT | 🔲 |
+| F4.1.3 | Backend: ListEntities + GetEntityDetail use cases + service + EntityNotFoundException | 🔲 |
+| F4.1.4 | Backend: WorldStateExplorationController (actors/spaces/events) + DTOs + 404 | 🔲 |
+| F4.1-SETUP | Frontend scaffolding — verified read contracts; no new shadcn (human step) | 👤 |
+| F4.1.5 | Frontend: world-state TypeScript types (worldstate.ts) | 🔲 |
+| F4.1.6 | Frontend: world-state API client + entity list/detail hooks | 🔲 |
+| F4.1.7 | Frontend: ExplorationLayout shared view nav | 🔲 |
+| F4.1.8 | Frontend: EntityList + EntityProfile skeletons | 🔲 |
+| F4.1.9 | Frontend: EntityVersionHistory domain component | 🔲 |
+| F4.1.10 | Frontend: EntitiesPage (actor list, offset pagination) | 🔲 |
+| F4.1.11 | Frontend: EntityProfilePage (actor: snapshot + history + slots) | 🔲 |
+| F4.1.12 | Frontend: SpacesPage + SpaceProfilePage | 🔲 |
+| F4.1.13 | Frontend: exploration route wiring + Sidebar Exploration activation | 🔲 |
+| F4.2 | Timeline endpoint + view (keyset pagination, D-055, D-009) | 🔲 |
+| F4.2.1 | Backend: timeline read model + TimelineReadPort (keyset) | 🔲 |
+| F4.2.2 | Backend: TimelineReadAdapter (native SQL keyset + JSONB filters) + IT | 🔲 |
+| F4.2.3 | Backend: GetTimelineUseCase + service | 🔲 |
+| F4.2.4 | Backend: TimelineController (cursor + filters) + DTOs | 🔲 |
+| F4.2-SETUP | Frontend scaffolding — verified timeline (keyset) contract (human step) | 👤 |
+| F4.2.5 | Frontend: timeline TypeScript types | 🔲 |
+| F4.2.6 | Frontend: timeline API client (useInfiniteQuery, keyset) | 🔲 |
+| F4.2.7 | Frontend: TimelineSkeleton | 🔲 |
+| F4.2.8 | Frontend: EventCard component | 🔲 |
+| F4.2.9 | Frontend: TimelinePage (infinite feed + Load more + filters) | 🔲 |
+| F4.2.10 | Frontend: EventDetailPage (timeline click-through) | 🔲 |
+| F4.2.11 | Frontend: timeline + event routes (index → timeline) | 🔲 |
+| F4.3 | Relations graph — structured endpoints + React Flow (D-030, D-009) | 🔲 |
+| F4.3.1 | Backend: migration 0023 — relation source/target endpoint columns | 🔲 |
+| F4.3.2 | Backend: ExtractedRelation model + ExtractionResult signature change | 🔲 |
+| F4.3.3 | Backend: mock + real extraction adapters emit relation endpoints | 🔲 |
+| F4.3.4 | Backend: resolve + persist relation endpoints at commit (EntityWriteCommand + WorldStateAdapter) | 🔲 |
+| F4.3.5 | Backend: relation read model + port + adapter (endpoints + history) + IT | 🔲 |
+| F4.3.6 | Backend: GetRelations use cases + service + RelationsController + DTOs | 🔲 |
+| F4.3-SETUP | Frontend scaffolding — relations contract + React Flow notes (human step) | 👤 |
+| F4.3.7 | Frontend: relation TypeScript types | 🔲 |
+| F4.3.8 | Frontend: relations API client + hooks | 🔲 |
+| F4.3.9 | Frontend: graphTransform util (actors/spaces/relations → nodes/edges) | 🔲 |
+| F4.3.10 | Frontend: RelationNode + RelationEdge custom components | 🔲 |
+| F4.3.11 | Frontend: RelationsGraphSkeleton + accessible relations list | 🔲 |
+| F4.3.12 | Frontend: RelationsPage (React Flow container, read-only) | 🔲 |
+| F4.3.13 | Frontend: relations route | 🔲 |
+| F4.4 | Annotations — create, list, delete; non-canonical (D-011) | 🔲 |
+| F4.4.1 | Backend: Annotation domain + use-case ports + repository port + models | 🔲 |
+| F4.4.2 | Backend: annotation persistence adapter (JPA) + IT | 🔲 |
+| F4.4.3 | Backend: AnnotationService (create/list/delete + role rules) | 🔲 |
+| F4.4.4 | Backend: AnnotationController + DTOs + handler mappings | 🔲 |
+| F4.4-SETUP | Frontend scaffolding — verified annotation contracts; no new shadcn (human step) | 👤 |
+| F4.4.5 | Frontend: annotation TypeScript types | 🔲 |
+| F4.4.6 | Frontend: annotations API client + hooks (post/list/delete) | 🔲 |
+| F4.4.7 | Frontend: AnnotationCard + AnnotationInput components | 🔲 |
+| F4.4.8 | Frontend: AnnotationThread domain component (delete confirm via FocusedOverlay) | 🔲 |
+| F4.4.9 | Frontend: mount AnnotationThread in entity/space/event/relation profiles | 🔲 |
+| F4.5 | "Propose a change" affordance — visible, inactive in v1 (D-012) | 🔲 |
+| F4.5-SETUP | Frontend scaffolding — npx shadcn@latest add tooltip (human step) | 👤 |
+| F4.5.1 | Frontend: ProposeChangeButton domain component (disabled + tooltip) | 🔲 |
+| F4.5.2 | Frontend: mount ProposeChangeButton in entity/space/relation profiles | 🔲 |
+| F4.6 | Event relational links — structured event↔space / event↔actor (Phase-2 pipeline extension, D-095) | 🔲 |
+| F4.6.1 | Backend: migration 0024 — events.space_id + event_involved_actors join | 🔲 |
+| F4.6.2 | Backend: ExtractedEvent model (space + involved actors) + ExtractionResult change | 🔲 |
+| F4.6.3 | Backend: mock + real extraction adapters emit event links | 🔲 |
+| F4.6.4 | Backend: resolve + persist event links at commit | 🔲 |
+| F4.7 | Profile cross-links — "living record" relational sections + navigation (D-009) | 🔲 |
+| F4.7.1 | Backend: EntityLinksReadPort + adapter (relations/events/appearances) + IT | 🔲 |
+| F4.7.2 | Backend: GetEntityLinks use case + service + endpoint | 🔲 |
+| F4.7-SETUP | Frontend scaffolding — verified entity-links contract; no new shadcn (human step) | 👤 |
+| F4.7.3 | Frontend: entity-links types + API hook | 🔲 |
+| F4.7.4 | Frontend: EntityLinks sections wired into entity/space profiles | 🔲 |
+
+---
+
+#### F4.1 — Actors, Spaces, Events endpoints + views
+
+> **Umbrella task — run the F4.1.N sub-tasks below, not this.**
+
+**Goal:** Read-only list + detail (with full version history, D-001/D-003) endpoints for the three
+core world-state entity types, and the Entities (actors) and Spaces frontend views. Offset
+pagination (D-055). Events get backend list+detail per ARCHITECTURE §7.9 but no standalone view —
+the Timeline (F4.2) is the event view; event detail is reached via timeline click-through.
+
+**Scope (out):** Timeline feed (F4.2); relations (F4.3); annotations (F4.4); propose-change (F4.5).
+
+**Skills:** `backend-endpoint`, `backend-domain-model`, `backend-testing`, `frontend-exploration`  **Decisions:** D-009, D-010, D-055, D-043, D-089  **Dependencies:** F2.8 (committed world state), F1.11
+
+---
+
+#### F4.1.1 — Shared world-state read models + WorldStateReadPort
+
+**Goal:** The read-side value types and the driven port for generic entity reads. No logic.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/worldstate/EntitySummaryView.java` — `entityId, entityType, name, latestVersionNumber, currentSnapshot (Map<String,Object>), lastUpdatedSessionId, createdAt`
+- `.../model/worldstate/EntityVersionView.java` — `versionId, versionNumber, sessionId, sessionSequenceNumber, changedFields (Map), fullSnapshot (Map), createdAt`
+- `.../model/worldstate/EntityDetailView.java` — `entityId, entityType, name, ownerId, createdAt, List<EntityVersionView> versions`
+- `.../model/worldstate/EntityListPage.java` — `List<EntitySummaryView> items, int page, int size, long totalCount`
+- `.../model/worldstate/EntityListFilter.java` — `String nameContains, String status` (both nullable)
+- `apps/api/src/main/java/com/bluesteel/application/port/out/worldstate/WorldStateReadPort.java` — `EntityListPage list(String entityType, UUID campaignId, EntityListFilter filter, int page, int size)`, `EntityDetailView getWithHistory(String entityType, UUID campaignId, UUID entityId)`
+
+**Scope (out):** Adapter (F4.1.2), use cases (F4.1.3). Timeline/relation read models (F4.2/F4.3). Compile is the verification.
+
+**Skills:** `backend-domain-model`  **Decisions:** D-001, D-009, D-055  **Dependencies:** (existing world-state schema, F2.1)
+
+---
+
+#### F4.1.2 — WorldStateReadAdapter (native SQL) + IT
+
+**Goal:** Implement `WorldStateReadPort` with native SQL and whitelisted table-pair routing (mirror `WorldStateAdapter`): list returns the latest version per head row (offset-paginated + total count); detail returns the head plus all versions ordered by `version_number`, each joined to `sessions` for `sequence_number`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/worldstate/WorldStateReadAdapter.java`
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/worldstate/WorldStateReadAdapterIT.java` — Testcontainers; seed actors/spaces with ≥2 versions; assert latest-version-in-list, full ordered history in detail, campaign scoping, offset paging + totalCount
+
+**Scope (out):** Timeline keyset (F4.2.2); relation endpoints (F4.3.5).
+
+**Skills:** `database-migration`, `backend-testing`  **Decisions:** D-055, D-089  **Dependencies:** F4.1.1
+
+---
+
+#### F4.1.3 — ListEntities + GetEntityDetail use cases + service
+
+**Goal:** Driving ports and the application service that authorizes the caller as a campaign member (mirror `ListSessionsService`) and delegates to the read port; a missing entity yields `EntityNotFoundException`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/worldstate/ListEntitiesUseCase.java`, `GetEntityDetailUseCase.java`
+- `apps/api/src/main/java/com/bluesteel/application/service/worldstate/WorldStateExplorationService.java`
+- `apps/api/src/main/java/com/bluesteel/domain/exception/EntityNotFoundException.java`
+- `apps/api/src/test/java/com/bluesteel/application/service/worldstate/WorldStateExplorationServiceTest.java` — Mockito: member-gate, not-found, delegation
+
+**Scope (out):** HTTP (F4.1.4); timeline/relations services.
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-010, D-043  **Dependencies:** F4.1.1
+
+---
+
+#### F4.1.4 — WorldStateExplorationController + DTOs + 404
+
+**Goal:** Read endpoints for actors, spaces, and events.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/exploration/WorldStateExplorationController.java` — `GET /actors`, `/actors/{aid}`, `/spaces`, `/spaces/{sid}`, `/events`, `/events/{eid}` (each list returns `meta {page,size,totalCount}`)
+- DTOs `EntitySummaryResponse`, `EntityVersionResponse`, `EntityDetailResponse` in the same package
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/GlobalExceptionHandler.java` — add `ENTITY_NOT_FOUND` → 404
+- `apps/api/src/test/java/com/bluesteel/adapters/in/web/exploration/WorldStateExplorationControllerTest.java` — `@WebMvcTest`: list envelope+meta, detail, 404
+
+**Scope (out):** Timeline/relations/annotations controllers.
+
+**Skills:** `backend-endpoint`, `backend-testing`, `error-handling`  **Decisions:** D-009, D-010, D-055  **Dependencies:** F4.1.2, F4.1.3
+
+---
+
+#### F4.1-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** No new shadcn components — `card`, `badge`, `button`
+> already exist. Records the verified read contracts the FE mirrors.
+
+> **Notes (verified against the repo):** campaign id via `useCampaignStore((s) => s.activeCampaignId)`;
+> HTTP via `apiClient`/`ApiClientError` (`src/api/client.ts`); skeletons hand-rolled with
+> `animate-pulse` (no shadcn skeleton primitive in this repo).
+
+> **Backend contract (verified against F4.1.4) — envelope `{ data, meta, errors }`:**
+> - `GET /api/v1/campaigns/{id}/actors?page=0&size=20` (also `/spaces`, `/events`) → `data: EntitySummaryResponse[]` = `[{ entityId, entityType, name, latestVersionNumber, currentSnapshot, lastUpdatedSessionId, createdAt }]`, `meta: { page, size, totalCount }`
+> - `GET /api/v1/campaigns/{id}/actors/{aid}` (also `/spaces/{sid}`, `/events/{eid}`) → `data: EntityDetailResponse` = `{ entityId, entityType, name, ownerId, createdAt, versions: [{ versionId, versionNumber, sessionId, sessionSequenceNumber, changedFields, fullSnapshot, createdAt }] }`
+> - `currentSnapshot` / `fullSnapshot` are freeform JSON objects (entity-type-specific keys) — render generically.
+
+---
+
+#### F4.1.5 — World-state TypeScript types
+
+**Goal:** Hand-written mirrors of the entity read DTOs.
+
+**Scope (in):**
+- `apps/web/src/types/worldstate.ts` — `EntityType` (`'actor'|'space'|'event'|'relation'`), `EntitySummary`, `EntityVersion`, `EntityDetail`, `EntityListPage` (items + `page/size/totalCount` meta), snapshots typed as `Record<string, unknown>`
+
+**Scope (out):** Timeline/relation/annotation types. No runtime test — `npm run type-check` verifies.
+
+**Skills:** `frontend-exploration`  **Decisions:** D-009  **Dependencies:** F4.1-SETUP
+
+---
+
+#### F4.1.6 — World-state API client + hooks
+
+**Goal:** Typed fetchers + TanStack hooks for entity list (offset) and detail.
+
+**Scope (in):**
+- `apps/web/src/api/worldstate.ts` (+ `worldstate.test.ts`) — `useEntityList(entityType, page)`, `useEntityDetail(entityType, entityId)`; key factories scoped per campaign+type; list reads `meta` for paging
+
+**Scope (out):** Timeline (F4.2.6), relations (F4.3.8), annotations (F4.4.6).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-055  **Dependencies:** F4.1.5, F4.1.4
+
+---
+
+#### F4.1.7 — ExplorationLayout shared view nav
+
+**Goal:** Shared layout with navigation between the four views; `<Outlet/>` for the active view; index redirects to `entities` (changed to `timeline` in F4.2.11).
+
+**Scope (in):**
+- `apps/web/src/features/exploration/ExplorationLayout.tsx` (+ test) — `NavLink`s for Timeline/Entities/Spaces/Relations (links to not-yet-mounted views are allowed; routes arrive incrementally)
+
+**Scope (out):** The view pages; route registration (F4.1.13).
+
+**Skills:** `frontend-exploration`, `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-009  **Dependencies:** F4.1-SETUP
+
+---
+
+#### F4.1.8 — Entity list + profile skeletons
+
+**Goal:** DTO-derived loading skeletons (no spinners, D-086).
+
+**Scope (in):**
+- `apps/web/src/features/exploration/components/EntityListSkeleton.tsx` (+ test)
+- `apps/web/src/features/exploration/components/EntityProfileSkeleton.tsx` (+ test) — `animate-pulse`, zero layout shift, axe
+
+**Scope (out):** Timeline/relations skeletons (F4.2.7/F4.3.11).
+
+**Skills:** `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-086  **Dependencies:** F4.1.5
+
+---
+
+#### F4.1.9 — EntityVersionHistory domain component
+
+**Goal:** Shared collapsible version-history list (used by actor, space, event, relation profiles).
+
+**Scope (in):**
+- `apps/web/src/components/domain/EntityVersionHistory.tsx` (+ test) — renders `EntityVersion[]`; each row shows version number + originating session reference; `changedFields` summarised; axe
+
+**Scope (out):** Profile composition (F4.1.11).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-001, D-003  **Dependencies:** F4.1.5
+
+---
+
+#### F4.1.10 — EntitiesPage (actor list)
+
+**Goal:** Offset-paginated actor list.
+
+**Scope (in):**
+- `apps/web/src/features/exploration/entities/EntitiesPage.tsx` (+ test) — `useEntityList('actor', page)`, `EntityListSkeleton` while loading, `InlineBanner` on error, prev/next paging from `meta`, rows link to the profile route; axe
+
+**Scope (out):** Profile (F4.1.11); spaces (F4.1.12).
+
+**Skills:** `frontend-exploration`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-055, D-010  **Dependencies:** F4.1.6, F4.1.8
+
+---
+
+#### F4.1.11 — EntityProfilePage (actor)
+
+**Goal:** Actor profile: current state (latest `fullSnapshot`) + version history; reserves slots for the annotation thread (F4.4) and propose-change affordance (F4.5).
+
+**Scope (in):**
+- `apps/web/src/features/exploration/entities/EntityProfilePage.tsx` (+ test) — `useEntityDetail('actor', id)`, `EntityProfileSkeleton`, `EntityVersionHistory`, `InlineBanner` on error; explicit comment-marked slots for `AnnotationThread`/`ProposeChangeButton`; axe
+
+**Scope (out):** Annotation thread + propose-change content (F4.4.9/F4.5.2); spaces (F4.1.12).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-001, D-010, D-012  **Dependencies:** F4.1.6, F4.1.8, F4.1.9
+
+---
+
+#### F4.1.12 — SpacesPage + SpaceProfilePage
+
+**Goal:** Spaces list + profile, reusing the actor patterns with `entityType='space'`.
+
+**Scope (in):**
+- `apps/web/src/features/exploration/spaces/SpacesPage.tsx` (+ test)
+- `apps/web/src/features/exploration/spaces/SpaceProfilePage.tsx` (+ test) — reuse `EntityListSkeleton`/`EntityProfileSkeleton`/`EntityVersionHistory`; same slots; axe
+
+**Scope (out):** Events list view (none — Timeline is the event view); route registration (F4.1.13).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-009, D-055  **Dependencies:** F4.1.10, F4.1.11
+
+---
+
+#### F4.1.13 — Exploration route wiring + Sidebar activation
+
+**Goal:** Register the exploration route subtree and turn the inert Exploration nav item into a live link.
+
+**Scope (in):**
+- `apps/web/src/main.tsx` — under `AppShell`: `explore` → `ExplorationLayout` with children `entities`, `entities/:entityId`, `spaces`, `spaces/:spaceId` (index → `entities`)
+- `apps/web/src/components/domain/Sidebar.tsx` (+ test update) — replace the Exploration `ComingSoonItem` with a `NavLink` to `/campaigns/${activeCampaignId}/explore` (all roles)
+
+**Scope (out):** Timeline/relations routes (F4.2.11/F4.3.13).
+
+**Skills:** `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-009  **Dependencies:** F4.1.7, F4.1.11, F4.1.12
+
+---
+
+#### F4.2 — Timeline endpoint + view
+
+> **Umbrella task — run the F4.2.N sub-tasks below, not this.**
+
+**Goal:** An ordered event feed across all committed sessions, filterable by actor/space/event type,
+with **keyset (cursor) pagination** (D-055). Frontend renders an infinite feed and an event detail
+page reached by click-through. Event type / involved actors / space are read from
+`event_versions.full_snapshot` JSONB.
+
+**Scope (out):** Actor/space lists (F4.1); relations (F4.3); annotations (F4.4).
+
+**Skills:** `backend-endpoint`, `backend-testing`, `frontend-exploration`  **Decisions:** D-009, D-055  **Dependencies:** F4.1
+
+---
+
+#### F4.2.1 — Timeline read model + TimelineReadPort (keyset)
+
+**Goal:** Read model + keyset port for the event feed.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/worldstate/TimelineEntryView.java` — `eventId, name, eventType, involvedActorNames (List), spaceName, sessionId, sessionSequenceNumber, fullSnapshot (Map), createdAt`
+- `.../model/worldstate/TimelinePage.java` — `List<TimelineEntryView> events, String nextCursor`
+- `apps/api/src/main/java/com/bluesteel/application/port/out/worldstate/TimelineReadPort.java` — `TimelinePage page(UUID campaignId, String cursor, int limit, TimelineFilter filter)` (filter: actor/space/eventType, all nullable)
+
+**Scope (out):** Adapter (F4.2.2). Compile verifies.
+
+**Skills:** `backend-domain-model`  **Decisions:** D-055, D-009  **Dependencies:** F4.1.1
+
+---
+
+#### F4.2.2 — TimelineReadAdapter (native SQL keyset) + IT
+
+**Goal:** Native SQL feed: events' latest versions ordered by `(session.sequence_number, event_id)`, keyset cursor encoding the last `(sequence_number, event_id)`, `committed` sessions only, JSONB filters for actor/space/eventType.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/worldstate/TimelineReadAdapter.java`
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/worldstate/TimelineReadAdapterIT.java` — Testcontainers; seed multi-session events; assert ordering, cursor continuation (no overlap/gap), filter correctness
+
+**Scope (out):** Use case (F4.2.3).
+
+**Skills:** `database-migration`, `backend-testing`  **Decisions:** D-055  **Dependencies:** F4.2.1
+
+---
+
+#### F4.2.3 — GetTimelineUseCase + service
+
+**Goal:** Member-authorized timeline read.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/worldstate/GetTimelineUseCase.java`
+- `apps/api/src/main/java/com/bluesteel/application/service/worldstate/TimelineService.java`
+- `apps/api/src/test/java/com/bluesteel/application/service/worldstate/TimelineServiceTest.java` — Mockito: member-gate, cursor/filter pass-through
+
+**Scope (out):** HTTP (F4.2.4).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-010, D-043  **Dependencies:** F4.2.1
+
+---
+
+#### F4.2.4 — TimelineController + DTOs
+
+**Goal:** `GET /api/v1/campaigns/{id}/timeline?cursor=&limit=&actor=&space=&eventType=`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/exploration/TimelineController.java` — returns `data: events[]`, `meta: { nextCursor }`
+- `TimelineEventResponse` DTO in the same package
+- `apps/api/src/test/java/com/bluesteel/adapters/in/web/exploration/TimelineControllerTest.java` — `@WebMvcTest`: envelope + `nextCursor`, filter params
+
+**Scope (out):** Frontend.
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-055, D-009  **Dependencies:** F4.2.2, F4.2.3
+
+---
+
+#### F4.2-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** No new shadcn components.
+
+> **Backend contract (verified against F4.2.4):**
+> - `GET /api/v1/campaigns/{id}/timeline?cursor=&limit=&actor=&space=&eventType=` → `data: { events: TimelineEvent[] }` where `TimelineEvent = { eventId, name, eventType, involvedActorNames, spaceName, sessionId, sessionSequenceNumber, createdAt }`, `meta: { nextCursor: string | null }` (null = no more pages).
+
+---
+
+#### F4.2.5 — Timeline TypeScript types
+
+**Scope (in):**
+- `apps/web/src/types/timeline.ts` — `TimelineEvent`, `TimelinePage` (`events`, `nextCursor`)
+
+**Scope (out):** API/hooks. Type-check verifies.
+
+**Skills:** `frontend-exploration`  **Decisions:** D-055  **Dependencies:** F4.2-SETUP
+
+---
+
+#### F4.2.6 — Timeline API client (keyset infinite query)
+
+**Goal:** `useInfiniteQuery` keyed by cursor.
+
+**Scope (in):**
+- `apps/web/src/api/timeline.ts` (+ test) — `useTimeline(campaignId, filters?)`; `getNextPageParam = (last) => last.nextCursor ?? undefined`; `initialPageParam: undefined`
+
+**Scope (out):** Offset patterns (those are entity lists). UI.
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-055  **Dependencies:** F4.2.5, F4.2.4
+
+---
+
+#### F4.2.7 — TimelineSkeleton
+
+**Scope (in):**
+- `apps/web/src/features/exploration/components/TimelineSkeleton.tsx` (+ test) — feed-row skeleton, `animate-pulse`, axe
+
+**Scope (out):** The page (F4.2.9).
+
+**Skills:** `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-086  **Dependencies:** F4.2.5
+
+---
+
+#### F4.2.8 — EventCard component
+
+**Scope (in):**
+- `apps/web/src/features/exploration/timeline/EventCard.tsx` (+ test) — single event row (name, type, involved actors, space, session ref); links to the event detail route; axe
+
+**Scope (out):** Feed container (F4.2.9).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-009  **Dependencies:** F4.2.5
+
+---
+
+#### F4.2.9 — TimelinePage (infinite feed)
+
+**Scope (in):**
+- `apps/web/src/features/exploration/timeline/TimelinePage.tsx` (+ test) — `useTimeline`, renders `EventCard` list, "Load more" using `fetchNextPage`/`hasNextPage`, `TimelineSkeleton` on initial load, `InlineBanner` on error, optional actor/space/eventType filter controls; axe
+
+**Scope (out):** Event detail (F4.2.10); routes (F4.2.11).
+
+**Skills:** `frontend-exploration`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-055, D-009  **Dependencies:** F4.2.6, F4.2.7, F4.2.8
+
+---
+
+#### F4.2.10 — EventDetailPage (click-through)
+
+**Scope (in):**
+- `apps/web/src/features/exploration/timeline/EventDetailPage.tsx` (+ test) — `useEntityDetail('event', eventId)` + `EntityVersionHistory`; `EntityProfileSkeleton` on load; reserves annotation slot (F4.4.9); axe
+
+**Scope (out):** Annotation content; routes.
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-001, D-009  **Dependencies:** F4.1.6, F4.1.9
+
+---
+
+#### F4.2.11 — Timeline + event routes
+
+**Scope (in):**
+- `apps/web/src/main.tsx` — add `explore/timeline` → `TimelinePage` and `explore/events/:eventId` → `EventDetailPage`; change `ExplorationLayout` index redirect to `timeline`
+
+**Scope (out):** Relations route (F4.3.13).
+
+**Skills:** `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-009  **Dependencies:** F4.1.13, F4.2.9, F4.2.10
+
+---
+
+#### F4.3 — Relations graph
+
+> **Umbrella task — run the F4.3.N sub-tasks below, not this.**
+>
+> **Scope increase (confirmed):** relations have no structured endpoints today. F4.3.1–F4.3.4 extend
+> the committed ingestion pipeline (migration → extraction model → extraction adapters → resolve +
+> persist at commit) so each relation carries `source_entity_id/type` + `target_entity_id/type`.
+> The migration is **append-only**; the pipeline edits are surgical extensions of F2.4/F2.7/F2.8.
+
+**Goal:** Give relations real graph endpoints, expose them via read endpoints, and render an
+interactive read-only React Flow v12 graph (actors/spaces as nodes, relations as edges) with an
+accessible relations-list alternative.
+
+**Scope (out):** v2 proposal pipeline; world-state edits from the graph (D-010).
+
+**Skills:** `database-migration`, `session-ingestion-pipeline`, `spring-ai-llm-adapter`, `backend-endpoint`, `frontend-exploration`  **Decisions:** D-009, D-030, D-010, D-021, D-035, D-089, D-095  **Dependencies:** F4.1, F2.8
+
+---
+
+#### F4.3.1 — Migration 0023: relation endpoint columns
+
+**Goal:** Append-only schema change adding the relation graph endpoints.
+
+**Scope (in):**
+- `apps/api/src/main/resources/db/changelog/0023_add_relation_endpoints.xml` — add nullable `source_entity_id UUID`, `source_entity_type TEXT`, `target_entity_id UUID`, `target_entity_type TEXT` to `relations`; indexes on `source_entity_id` and `target_entity_id`; CHECK constraint on the `*_entity_type` values (`actor`/`space`)
+- register the changeset in `db.changelog-master.xml`
+
+**Scope (out):** Populating the columns (F4.3.4).
+
+**Skills:** `database-migration`  **Decisions:** D-021, D-035  **Dependencies:** (existing 0014)
+
+---
+
+#### F4.3.2 — ExtractedRelation model + ExtractionResult change
+
+**Goal:** Carry structured endpoint mentions out of extraction.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/ingestion/ExtractedRelation.java` — `name, description, sourceMention, targetMention, rawText`
+- change `application/model/ingestion/ExtractionResult.java` `relations()` component to `List<ExtractedRelation>`; update `NarrativeExtractionPort` Javadoc; fix compile of all callers (relation diff-card construction in the F2.7 diff path)
+
+**Scope (out):** Adapter prompts (F4.3.3); persistence (F4.3.4).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-009  **Dependencies:** F4.3.1
+
+---
+
+#### F4.3.3 — Extraction adapters emit endpoints
+
+**Goal:** Mock + real extraction produce relation endpoints.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/MockNarrativeExtractionAdapter.java` — emit `ExtractedRelation`s with `sourceMention`/`targetMention` referencing the mock actors/spaces
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiNarrativeExtractionAdapter.java` — extend prompt + structured parsing to capture relation endpoints
+- update the affected adapter tests
+
+**Scope (out):** Resolution/persistence (F4.3.4).
+
+**Skills:** `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-009  **Dependencies:** F4.3.2
+
+---
+
+#### F4.3.4 — Resolve + persist relation endpoints at commit
+
+**Goal:** At commit, resolve a relation's source/target mentions to committed/existing entity IDs (best-effort name match within the campaign) and persist them.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/worldstate/EntityWriteCommand.java` — add optional `sourceEntityId`, `sourceEntityType`, `targetEntityId`, `targetEntityType`
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/worldstate/WorldStateAdapter.java` — relation INSERT writes the four endpoint columns
+- the commit path (`application/service/.../CommitService` or its world-state mapping step) — populate endpoints by name-match; null when unresolved
+- update the affected unit/IT tests
+
+**Scope (out):** Read side (F4.3.5).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-089, D-035  **Dependencies:** F4.3.1, F4.3.2
+
+---
+
+#### F4.3.5 — Relation read model + port + adapter + IT
+
+**Goal:** Relation list (filterable by actor) and detail-with-history exposing the endpoints.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/worldstate/RelationSummaryView.java` (+ `RelationDetailView` if richer than `EntityDetailView`) — includes `sourceEntityId/Type`, `targetEntityId/Type`, relation `kind` (from snapshot)
+- `apps/api/src/main/java/com/bluesteel/application/port/out/worldstate/RelationReadPort.java`
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/worldstate/RelationReadAdapter.java` + IT (Testcontainers): list scoped to campaign, optional actor filter on either endpoint, detail with full version history
+
+**Scope (out):** Controller (F4.3.6).
+
+**Skills:** `database-migration`, `backend-testing`  **Decisions:** D-030, D-089  **Dependencies:** F4.3.1, F4.1.1
+
+---
+
+#### F4.3.6 — GetRelations use cases + service + controller
+
+**Goal:** Member-authorized relation read endpoints.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/worldstate/{ListRelationsUseCase,GetRelationDetailUseCase}.java` + a service (extend `WorldStateExplorationService` or `RelationExplorationService`) + unit test
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/exploration/RelationsController.java` — `GET /relations`, `/relations/{rid}` + `RelationResponse`/`RelationDetailResponse` DTOs + `@WebMvcTest`
+
+**Scope (out):** Frontend.
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-030, D-010  **Dependencies:** F4.3.5
+
+---
+
+#### F4.3-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** `@xyflow/react@^12.3.0` is **already installed** — do
+> not reinstall. No new shadcn components.
+
+> **React Flow notes:** import from `@xyflow/react` (NOT `reactflow`); `import
+> '@xyflow/react/dist/style.css'`; define `nodeTypes` outside the component or via `useMemo`;
+> disable editing (no drag-to-connect, no double-click edit) — clicking a node navigates to the
+> entity profile (D-010).
+
+> **Backend contract (verified against F4.3.6):**
+> - `GET /api/v1/campaigns/{id}/relations` → `data: Relation[]` = `[{ relationId, name, kind, sourceEntityId, sourceEntityType, targetEntityId, targetEntityType, sessionId }]` (`sourceEntityId`/`targetEntityId` may be null when unresolved)
+> - `GET /api/v1/campaigns/{id}/relations/{rid}` → `data: RelationDetail` (+ `versions[]` like `EntityDetailResponse`)
+
+---
+
+#### F4.3.7 — Relation TypeScript types
+
+**Scope (in):**
+- `apps/web/src/types/relation.ts` — `Relation`, `RelationDetail`, and graph `NodeData`/`EdgeData` helper types
+
+**Scope (out):** API/components. Type-check verifies.
+
+**Skills:** `frontend-exploration`  **Decisions:** D-030  **Dependencies:** F4.3-SETUP
+
+---
+
+#### F4.3.8 — Relations API client + hooks
+
+**Scope (in):**
+- `apps/web/src/api/relations.ts` (+ test) — `useRelations(campaignId)`, `useRelationDetail(campaignId, rid)` (offset/all-list per backend)
+
+**Scope (out):** Graph transform (F4.3.9). Actors/spaces for nodes come from `useEntityList` (F4.1.6).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-030  **Dependencies:** F4.3.7, F4.3.6
+
+---
+
+#### F4.3.9 — graphTransform util
+
+**Goal:** Pure transform from actors + spaces + relations to React Flow `{ nodes, edges }`.
+
+**Scope (in):**
+- `apps/web/src/features/exploration/relations/graphTransform.ts` (+ test) — nodes from actors/spaces; an edge is emitted only when both relation endpoints resolve to a known node id; unresolved relations are returned separately for the accessible list
+
+**Scope (out):** Rendering (F4.3.12).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-030  **Dependencies:** F4.3.7
+
+---
+
+#### F4.3.10 — RelationNode + RelationEdge components
+
+**Scope (in):**
+- `apps/web/src/features/exploration/relations/RelationNode.tsx` (+ test) — `@xyflow/react` `Handle`/`Position`; node click navigates to the entity profile
+- `apps/web/src/features/exploration/relations/RelationEdge.tsx` (+ test) — labelled edge (relation kind)
+
+**Scope (out):** Container/layout (F4.3.12).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-030, D-010  **Dependencies:** F4.3-SETUP
+
+---
+
+#### F4.3.11 — RelationsGraphSkeleton + accessible list
+
+**Scope (in):**
+- `apps/web/src/features/exploration/relations/RelationsGraphSkeleton.tsx` (+ test)
+- `apps/web/src/features/exploration/relations/RelationsList.tsx` (+ test) — screen-reader text alternative to the SVG graph (accessible list of relations); axe
+
+**Scope (out):** Container (F4.3.12).
+
+**Skills:** `ux-skeleton-crafting`, `frontend-exploration`, `frontend-testing`  **Decisions:** D-086, D-030  **Dependencies:** F4.3.7
+
+---
+
+#### F4.3.12 — RelationsPage (React Flow container)
+
+**Scope (in):**
+- `apps/web/src/features/exploration/relations/RelationsPage.tsx` (+ test) — loads actors/spaces (`useEntityList`) + relations (`useRelations`), `graphTransform`, `ReactFlow` with memoized `nodeTypes`/`edgeTypes`, read-only interactions, renders `RelationsList` alongside, `RelationsGraphSkeleton` on load, `InlineBanner` on error; axe
+
+**Scope (out):** Route (F4.3.13).
+
+**Skills:** `frontend-exploration`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-030, D-010, D-009  **Dependencies:** F4.3.8, F4.3.9, F4.3.10, F4.3.11, F4.1.6
+
+---
+
+#### F4.3.13 — Relations route
+
+**Scope (in):**
+- `apps/web/src/main.tsx` — add `explore/relations` → `RelationsPage`
+
+**Scope (out):** —
+
+**Skills:** `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-009  **Dependencies:** F4.1.13, F4.3.12
+
+---
+
+#### F4.4 — Annotations
+
+> **Umbrella task — run the F4.4.N sub-tasks below, not this.**
+
+**Goal:** First-class non-canonical annotations (D-011): any campaign member can post on any
+entity/space/event/relation; annotations are immutable (no edit); author or GM can delete. Visible
+to all members and clearly distinguished from canonical world-state content.
+
+**Scope (out):** v2 proposals; editing annotations (immutable by design); world-state edits.
+
+**Skills:** `backend-domain-model`, `backend-endpoint`, `backend-testing`, `frontend-exploration`  **Decisions:** D-011, D-043, D-010  **Dependencies:** F4.1 (profiles to host the thread), F2.1.5 (annotations schema)
+
+---
+
+#### F4.4.1 — Annotation domain + ports + models
+
+**Goal:** The domain entity and the in/out ports + value types.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/domain/annotation/Annotation.java` — immutable; `content` non-blank; `entityType` whitelist (actor/space/event/relation); no `updatedAt`
+- `apps/api/src/main/java/com/bluesteel/domain/exception/AnnotationNotFoundException.java`
+- `apps/api/src/main/java/com/bluesteel/application/port/in/annotation/{CreateAnnotationUseCase,ListAnnotationsUseCase,DeleteAnnotationUseCase}.java`
+- `apps/api/src/main/java/com/bluesteel/application/port/out/annotation/AnnotationRepository.java`
+- `apps/api/src/main/java/com/bluesteel/application/model/annotation/{AnnotationView,CreateAnnotationCommand}.java`
+- `apps/api/src/test/java/com/bluesteel/domain/annotation/AnnotationTest.java`
+
+**Scope (out):** Persistence (F4.4.2); service (F4.4.3).
+
+**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-011  **Dependencies:** F2.1.5
+
+---
+
+#### F4.4.2 — Annotation persistence adapter + IT
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/annotation/{AnnotationJpaEntity,AnnotationJpaRepository,AnnotationPersistenceAdapter}.java`
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/annotation/AnnotationPersistenceAdapterIT.java` — Testcontainers: insert, list by `entity_type`+`entity_id`, delete by id
+
+**Scope (out):** Service (F4.4.3).
+
+**Skills:** `database-migration`, `backend-testing`  **Decisions:** D-011  **Dependencies:** F4.4.1
+
+---
+
+#### F4.4.3 — AnnotationService (role rules)
+
+**Goal:** Create (any campaign member), list (by entity), delete (author or GM) — all via `CampaignMembershipPort`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/annotation/AnnotationService.java`
+- `apps/api/src/test/java/com/bluesteel/application/service/annotation/AnnotationServiceTest.java` — Mockito: member-gate on create/list; author-or-GM delete; non-author non-GM delete → `UnauthorizedException`; missing → `AnnotationNotFoundException`
+
+**Scope (out):** HTTP (F4.4.4).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-011, D-043  **Dependencies:** F4.4.1
+
+---
+
+#### F4.4.4 — AnnotationController + DTOs
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/annotation/AnnotationController.java` — `POST /api/v1/campaigns/{id}/annotations`, `GET …?entityType=&entityId=`, `DELETE …/{aid}`
+- `CreateAnnotationRequest`, `AnnotationResponse` DTOs in the same package
+- `GlobalExceptionHandler` — `ANNOTATION_NOT_FOUND` 404 (delete-forbidden reuses 403)
+- `apps/api/src/test/java/com/bluesteel/adapters/in/web/annotation/AnnotationControllerTest.java` — `@WebMvcTest`
+
+**Scope (out):** Frontend.
+
+**Skills:** `backend-endpoint`, `backend-testing`, `error-handling`  **Decisions:** D-011  **Dependencies:** F4.4.2, F4.4.3
+
+---
+
+#### F4.4-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** No new shadcn components — `textarea`/`button` and the
+> `FocusedOverlay` domain primitive already exist (delete confirm uses `FocusedOverlay`, not a modal).
+
+> **Backend contract (verified against F4.4.4):**
+> - `POST /api/v1/campaigns/{id}/annotations` `{ entityType, entityId, content }` → `data: AnnotationResponse` = `{ id, entityType, entityId, authorId, content, createdAt }`
+> - `GET /api/v1/campaigns/{id}/annotations?entityType=&entityId=` → `data: AnnotationResponse[]`
+> - `DELETE /api/v1/campaigns/{id}/annotations/{aid}` → `data: null` (403 if not author/GM)
+
+---
+
+#### F4.4.5 — Annotation TypeScript types
+
+**Scope (in):**
+- `apps/web/src/types/annotation.ts` — `Annotation`, `CreateAnnotationRequest`
+
+**Scope (out):** API/components. Type-check verifies.
+
+**Skills:** `frontend-exploration`  **Decisions:** D-011  **Dependencies:** F4.4-SETUP
+
+---
+
+#### F4.4.6 — Annotations API client + hooks
+
+**Scope (in):**
+- `apps/web/src/api/annotations.ts` (+ test) — `useAnnotations(campaignId, entityType, entityId)`, `usePostAnnotation(campaignId)`, `useDeleteAnnotation(campaignId)`; list invalidation on post/delete
+
+**Scope (out):** UI (F4.4.7/F4.4.8).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-011  **Dependencies:** F4.4.5, F4.4.4
+
+---
+
+#### F4.4.7 — AnnotationCard + AnnotationInput
+
+**Scope (in):**
+- `apps/web/src/components/domain/AnnotationCard.tsx` (+ test) — immutable display; **no edit**; delete button only when author or GM; no `updatedAt`
+- `apps/web/src/components/domain/AnnotationInput.tsx` (+ test) — `Textarea` + submit; clears on success; axe
+
+**Scope (out):** Thread composition + delete confirm (F4.4.8).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-011  **Dependencies:** F4.4.5
+
+---
+
+#### F4.4.8 — AnnotationThread domain component
+
+**Goal:** Compose list + input + delete confirmation (via `FocusedOverlay`) + feedback (via `InlineBanner`), visually marked non-canonical.
+
+**Scope (in):**
+- `apps/web/src/components/domain/AnnotationThread.tsx` (+ test) — `useAnnotations`/`usePostAnnotation`/`useDeleteAnnotation`; delete opens a `FocusedOverlay` confirm; `InlineBanner` for post/delete feedback; clear visual separator from canonical content; role-aware delete; axe
+
+**Scope (out):** Mounting in profiles (F4.4.9).
+
+**Skills:** `frontend-exploration`, `ux-focused-overlay`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-011, D-043  **Dependencies:** F4.4.6, F4.4.7
+
+---
+
+#### F4.4.9 — Mount AnnotationThread in profiles
+
+**Scope (in):**
+- edit `apps/web/src/features/exploration/entities/EntityProfilePage.tsx`, `spaces/SpaceProfilePage.tsx`, `timeline/EventDetailPage.tsx`, and the relation detail surface to mount `AnnotationThread` with the correct `entityType`/`entityId` (+ updated tests)
+
+**Scope (out):** Propose-change (F4.5).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-011  **Dependencies:** F4.4.8, F4.1.11, F4.1.12, F4.2.10, F4.3.12
+
+---
+
+#### F4.5 — "Propose a change" affordance
+
+> **Umbrella task — run the F4.5.N sub-tasks below, not this.**
+
+**Goal:** A visible but **inert** "Propose a change" affordance on every entity, space, and relation
+profile (D-012). The approval pipeline is v2 — the button is cosmetic, wired to no endpoint.
+
+**Scope (out):** Any proposal form/workflow/endpoint (v2).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-012  **Dependencies:** F4.1
+
+---
+
+#### F4.5-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** A single deterministic command.
+
+```bash
+cd apps/web
+npx shadcn@latest add tooltip --yes      # writes src/components/ui/tooltip.tsx
+```
+
+---
+
+#### F4.5.1 — ProposeChangeButton domain component
+
+**Scope (in):**
+- `apps/web/src/components/domain/ProposeChangeButton.tsx` (+ test) — disabled `Button` wrapped in `Tooltip` ("Proposal system coming in a future update"); `aria-disabled="true"`; wired to no endpoint; axe
+
+**Scope (out):** Mounting (F4.5.2).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-012  **Dependencies:** F4.5-SETUP
+
+---
+
+#### F4.5.2 — Mount ProposeChangeButton in profiles
+
+**Scope (in):**
+- edit `EntityProfilePage.tsx`, `SpaceProfilePage.tsx`, and the relation detail surface to render `ProposeChangeButton` (+ updated tests)
+
+**Scope (out):** —
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-012  **Dependencies:** F4.5.1, F4.1.11, F4.1.12, F4.3.12
+
+---
+
+#### F4.6 — Event relational links (Phase-2 pipeline extension)
+
+> **Umbrella task — run the F4.6.N sub-tasks below, not this.**
+>
+> **Scope increase (D-095):** mirrors F4.3 for events. Events have no structured space/actor links today (only freeform `full_snapshot`). This extends the committed ingestion pipeline so each event records the space it occurred in and the actors it involved — enabling reliable "events here" / "events involving" cross-links (F4.7) and trustworthy Timeline filters (F4.2). Migration is append-only.
+
+**Goal:** Give events structured `space_id` and a many-to-many involved-actors link, populated at commit.
+
+**Scope (out):** Read/UI of these links (F4.7, F4.2); relation endpoints (F4.3).
+
+**Skills:** `database-migration`, `session-ingestion-pipeline`, `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-095, D-021, D-035, D-089, D-009  **Dependencies:** F2.8, F4.3
+
+---
+
+#### F4.6.1 — Migration 0024: event space + involved-actors
+
+**Goal:** Append-only schema for event location + participants.
+
+**Scope (in):**
+- `apps/api/src/main/resources/db/changelog/0024_add_event_links.xml` (+ master include) — add nullable `space_id UUID` to `events` (+ index); new `event_involved_actors` join table (`event_id`, `actor_id`, composite PK, FKs to `events`/`actors`, indexes)
+
+**Scope (out):** Populating them (F4.6.4).
+
+**Skills:** `database-migration`  **Decisions:** D-021, D-035  **Dependencies:** (existing 0012/0008)
+
+---
+
+#### F4.6.2 — ExtractedEvent model + ExtractionResult change
+
+**Goal:** Carry event location + participant mentions out of extraction.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/ingestion/ExtractedEvent.java` — `name, description, spaceMention, involvedActorMentions (List), rawText`
+- change `application/model/ingestion/ExtractionResult.java` `events()` to `List<ExtractedEvent>`; update `NarrativeExtractionPort` Javadoc; fix compile of the F2.7 event-card construction
+
+**Scope (out):** Adapters (F4.6.3); persistence (F4.6.4).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-095, D-009  **Dependencies:** F4.6.1, F4.3.2
+
+---
+
+#### F4.6.3 — Extraction adapters emit event links
+
+**Goal:** Mock + real extraction produce event space/actors.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/MockNarrativeExtractionAdapter.java` — emit `ExtractedEvent`s with `spaceMention`/`involvedActorMentions` referencing the mock space/actors
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiNarrativeExtractionAdapter.java` — extend prompt + parsing to capture event space/actors
+- updated adapter tests
+
+**Scope (out):** Persistence (F4.6.4).
+
+**Skills:** `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-095  **Dependencies:** F4.6.2, F4.3.3
+
+---
+
+#### F4.6.4 — Resolve + persist event links at commit
+
+**Goal:** Resolve event space/actor mentions to entity IDs and persist them.
+
+**Scope (in):**
+- extend `application/model/worldstate/EntityWriteCommand.java` with optional event `spaceId` + `involvedActorIds`
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/worldstate/WorldStateAdapter.java` — on event write set `events.space_id` and insert `event_involved_actors` rows
+- the commit path — resolve space/actor mentions → IDs (best-effort name-match within campaign; null/empty when unresolved)
+- updated unit/IT tests
+
+**Scope (out):** Read side (F4.7).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-095, D-089  **Dependencies:** F4.6.1, F4.6.2, F4.3.4
+
+---
+
+#### F4.7 — Profile cross-links ("living record")
+
+> **Umbrella task — run the F4.7.N sub-tasks below, not this.**
+
+**Goal:** Fill the relational content the PRD §6.3 describes and the F4.1 profiles reserve slots for: an entity's session appearances, the relations it participates in, and the events linked to it (for spaces: events that occurred there; for actors: events involving it) — each navigable. Turns profiles from a snapshot dump into the PRD's "living record" (Success Criterion 3).
+
+**Scope (out):** The profile shells (F4.1.11/F4.1.12, already shipped); annotations (F4.4).
+
+**Skills:** `backend-endpoint`, `frontend-exploration`, `frontend-testing`  **Decisions:** D-009, D-095, D-030, D-001  **Dependencies:** F4.1, F4.3, F4.6
+
+---
+
+#### F4.7.1 — EntityLinksReadPort + adapter + IT
+
+**Goal:** Native-SQL read of an entity's relations, linked events, related entities, and session appearances.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/worldstate/EntityLinks.java` — `List<RelationSummaryView> relations, List<EntitySummaryView> relatedEntities, List<TimelineEntryView> events, List<UUID> appearanceSessionIds`
+- `apps/api/src/main/java/com/bluesteel/application/port/out/worldstate/EntityLinksReadPort.java`
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/worldstate/EntityLinksReadAdapter.java` + IT — relations referencing the entity (via F4.3 endpoints), events referencing it (via F4.6 `space_id`/`event_involved_actors`), distinct session appearances (from its version rows)
+
+**Scope (out):** Use case/endpoint (F4.7.2).
+
+**Skills:** `database-migration`, `backend-testing`  **Decisions:** D-009, D-095, D-030  **Dependencies:** F4.3.5, F4.6.4, F4.1.1
+
+---
+
+#### F4.7.2 — GetEntityLinks use case + service + endpoint
+
+**Goal:** Member-authorized cross-link read endpoints.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/worldstate/GetEntityLinksUseCase.java` + service (extend `WorldStateExplorationService`) + unit test
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/exploration/WorldStateExplorationController.java` (edit) — `GET /actors/{aid}/links`, `/spaces/{sid}/links` + `EntityLinksResponse` DTO + `@WebMvcTest`
+
+**Scope (out):** Frontend.
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-009, D-010  **Dependencies:** F4.7.1, F4.1.4
+
+---
+
+#### F4.7-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** No new shadcn components.
+
+> **Backend contract (verified against F4.7.2):**
+> - `GET /api/v1/campaigns/{id}/actors/{aid}/links` (and `/spaces/{sid}/links`) → `data: { relations: Relation[], relatedEntities: EntitySummary[], events: TimelineEvent[], appearanceSessionIds: string[] }`
+
+---
+
+#### F4.7.3 — Entity-links types + API hook
+
+**Scope (in):**
+- `apps/web/src/types/worldstate.ts` (edit) — add `EntityLinks`
+- `apps/web/src/api/worldstate.ts` (edit) + test — `useEntityLinks(entityType, entityId)`
+
+**Scope (out):** UI (F4.7.4).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-009  **Dependencies:** F4.7-SETUP, F4.1.6
+
+---
+
+#### F4.7.4 — EntityLinks sections in profiles
+
+**Goal:** Render the cross-link sections in the reserved profile slots, each item navigable.
+
+**Scope (in):**
+- `apps/web/src/features/exploration/components/EntityLinks.tsx` (+ test) — "Relations", "Related entities", "Events", "Appears in sessions" sections; items link to entity profile / relation / event detail / session detail
+- edit `apps/web/src/features/exploration/entities/EntityProfilePage.tsx` and `spaces/SpaceProfilePage.tsx` to render `EntityLinks` in the reserved slot
+- axe; updated tests
+
+**Scope (out):** Annotations/propose (F4.4/F4.5).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-009, D-001  **Dependencies:** F4.7.3, F4.1.11, F4.1.12
 
 ---
 
