@@ -4,6 +4,14 @@
 
 ## Phases
 
+> **Build sequence (D-094):** Phases 0–2.5 are ✅ complete. The remaining v1 work is built in this
+> order: **F2.13 (session history) → Phase 4 (Exploration Mode) → Phase 3 (Query Mode)**. Exploration
+> ships before Query — it is read-only over already-committed world state (no per-request LLM cost,
+> lower latency risk) and visually validates extraction quality before the grounded-answer pipeline
+> is built. Phase/task **IDs are stable** (Query stays `F3.x`, Exploration stays `F4.x`); only the
+> build order differs from the numeric order. Within Exploration, the data-foundation umbrellas
+> **F4.6** (event links) and **F4.3** (relation endpoints) precede the **F4.7** cross-link profiles.
+
 ### Phase 0 — Pre-Development Validation (Gate)
 
 **Purpose:** Eliminate the highest-risk unknown before writing production code.
@@ -1157,6 +1165,11 @@ npx shadcn@latest add button input label form card
 | F2.12-SETUP | Human: add Ollama starter, install Ollama, pull models | ✅ |
 | F2.12.1 | Ollama profile config + AiConfig model-bean wiring | ✅ |
 | F2.12.2 | Offline pipeline smoke test (env-gated, manual/local) | ✅ |
+| F2.13 | Frontend: session history view (list + draft resume/discard) | 🔲 |
+| F2.13-SETUP | Frontend scaffolding — verified session-list contract; no new shadcn (human step) | 👤 |
+| F2.13.1 | Frontend: session list types + useSessions list hook | 🔲 |
+| F2.13.2 | Frontend: SessionsListPage (status badges, skeleton, empty/error) | 🔲 |
+| F2.13.3 | Frontend: draft Resume/Discard actions + route + CampaignHome link | 🔲 |
 
 ---
 
@@ -2690,6 +2703,71 @@ npx shadcn@latest add badge checkbox radio-group
 
 ---
 
+#### F2.13 — Frontend: session history view
+
+> **Umbrella task — run the F2.13.N sub-tasks below, not this.**
+
+**Goal:** A browsable list of a campaign's sessions (committed/draft/failed/processing) so GMs and editors can review history, open a committed session, and resume or discard the active draft from a list — not only reactively via the `409` on a new submission (D-054). Backend already exists (TR-1: `GET /sessions`, `GET /sessions/{sid}`).
+
+**Scope (out):** Backend (shipped, TR-1); the diff/commit screens (F2.10/F2.11); Query/Exploration.
+
+**Skills:** `frontend-api-resource`, `frontend-testing`, `ux-skeleton-crafting`  **Decisions:** D-054, D-055  **Dependencies:** TR-1, F2.11
+
+---
+
+#### F2.13-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** No new shadcn — `badge`/`card` exist; draft discard reuses the existing `DiscardConfirmOverlay` (F2.10) and `InlineBanner`.
+
+> **Backend contract (verified, TR-1) — envelope `{ data, meta, errors }`:**
+> - `GET /api/v1/campaigns/{id}/sessions?page=0&size=20` → `data: SessionSummaryResponse[]` = `[{ sessionId, status, sequenceNumber, committedAt, createdAt }]`, `meta: { page, size, totalCount }`
+> - `GET /api/v1/campaigns/{id}/sessions/{sid}` is already mirrored by `SessionDetailResponse` (Phase 3, F3.4.6)
+
+---
+
+#### F2.13.1 — Session list types + useSessions hook
+
+**Goal:** Mirror the list DTO and add the list query hook.
+
+**Scope (in):**
+- `apps/web/src/types/session.ts` (edit) — add `SessionSummary` (`sessionId, status, sequenceNumber, committedAt, createdAt`)
+- `apps/web/src/api/sessions.ts` (edit) + `sessions.test.ts` — add `useSessions(campaignId, page)` (offset) + a `list` query key
+
+**Scope (out):** UI (F2.13.2).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-055  **Dependencies:** F2.13-SETUP
+
+---
+
+#### F2.13.2 — SessionsListPage
+
+**Goal:** The list screen.
+
+**Scope (in):**
+- `apps/web/src/features/input/SessionsListPage.tsx` (+ test) — `useSessions`, status `Badge`s, DTO-derived skeleton, empty state ("No sessions yet"), `InlineBanner` on error, each row links to the session detail; axe
+
+**Scope (out):** Resume/Discard actions + routing (F2.13.3).
+
+**Skills:** `frontend-exploration`, `ux-skeleton-crafting`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-055  **Dependencies:** F2.13.1
+
+---
+
+#### F2.13.3 — Draft Resume/Discard + route + CampaignHome link
+
+**Goal:** Wire the draft actions and surface the page.
+
+**Scope (in):**
+- `apps/web/src/features/input/SessionsListPage.tsx` (edit) — for a `draft` session: **Resume** → `/campaigns/{id}/sessions/{sid}/diff`; **Discard** via the existing `DiscardConfirmOverlay` + `useDiscardSession`; `InlineBanner` feedback
+- `apps/web/src/main.tsx` — register the `sessions` route under `AppShell`
+- `apps/web/src/features/campaigns/CampaignHomePage.tsx` (edit) — add a "Session history" entry card/link
+- updated tests
+
+**Scope (out):** New backend.
+
+**Skills:** `ux-focused-overlay`, `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-054  **Dependencies:** F2.13.2
+
+---
+
 ### Phase 2.5 — Transition Hardening (Pre-Phase 3 Gate)
 
 > **Origin:** Findings from the 2026-05-31 documentation ↔ code cross-audit of the completed
@@ -2809,6 +2887,8 @@ context.
 
 ### Phase 3 — Query Mode
 
+> **Build order (D-094):** Phase 3 (Query) is built **after** Phase 4 (Exploration). IDs are stable; only the sequence differs from the numeric order.
+
 > **Principle:** Backend skeleton first (mock-wired, synchronous), retrieval second, real LLM third,
 > frontend last. Each sub-task is single-layer, compiles on its own against its declared
 > dependencies, and ships with its test. Much of the Phase 2 scaffolding already exists and is
@@ -2843,6 +2923,9 @@ context.
 | F3.4.6 | Frontend: minimal SessionDetailPage + getSessionDetail hook (citation target) | 🔲 |
 | F3.4.7 | Frontend: QueryPage container (form + skeleton + InlineBanner + answer) | 🔲 |
 | F3.4.8 | Frontend: query route wiring + Sidebar Query nav activation | 🔲 |
+| F3.5 | Backend: Query rate-limit + daily cost cap (D-096) | 🔲 |
+| F3.5.1 | Backend: per-user/per-campaign query rate limit + 429 mapping | 🔲 |
+| F3.5.2 | Backend: daily LLM cost cap guard (reuses cost logging) | 🔲 |
 
 ---
 
@@ -3161,7 +3244,51 @@ no modals (D-082), no Q&A history (D-058).
 
 ---
 
+#### F3.5 — Backend: Query rate-limit + daily cost cap
+
+> **Umbrella task — run the F3.5.N sub-tasks below, not this.**
+
+**Goal:** App-level safeguards on the per-question LLM call: a per-user/per-campaign request rate limit and a daily LLM cost cap, so a single user cannot drive runaway cost or abuse (D-096). Sits in front of `POST /api/v1/campaigns/{id}/queries` (F3.1.4).
+
+**Scope (out):** Provider-level spend governance (D-034, already configured); ingestion rate limits.
+
+**Skills:** `backend-endpoint`, `security-hardening`, `backend-testing`  **Decisions:** D-096, D-052, D-034  **Dependencies:** F3.1.4
+
+---
+
+#### F3.5.1 — Per-user/per-campaign query rate limit
+
+**Goal:** Reject queries above a configured rate with `429`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/query/QueryRateLimiter.java` — in-memory sliding window keyed by `(userId, campaignId)`; window/limit from `@Value("${query.rate-limit.*}")`
+- enforce in `QueryController` (F3.1.4) or a `HandlerInterceptor`; `RateLimitExceededException` → `429 QUERY_RATE_LIMITED` in `GlobalExceptionHandler`
+- `apps/api/src/test/java/com/bluesteel/adapters/in/web/query/QueryRateLimiterTest.java` (+ controller 429 case)
+
+**Scope (out):** Cost cap (F3.5.2).
+
+**Skills:** `security-hardening`, `error-handling`, `backend-testing`  **Decisions:** D-096  **Dependencies:** F3.1.4
+
+---
+
+#### F3.5.2 — Daily LLM cost cap guard
+
+**Goal:** Block queries once the configured daily LLM cost is exceeded.
+
+**Scope (in):**
+- a cost-accounting port + adapter reading the existing LLM cost logging (LOG-01) / an in-memory daily tally; `query.cost-cap.daily-usd` config
+- guard in `QueryService` (F3.1.2) → `CostCapExceededException` → `429`/`503 QUERY_COST_CAP` in `GlobalExceptionHandler`
+- unit test
+
+**Scope (out):** Ingestion cost caps; billing.
+
+**Skills:** `security-hardening`, `backend-testing`  **Decisions:** D-096, D-034  **Dependencies:** F3.1.2, F3.5.1
+
+---
+
 ### Phase 4 — Exploration Mode
+
+> **Build order (D-094):** Exploration (Phase 4) is built **before** Phase 3 (Query). The data-foundation umbrellas **F4.6** (event links) and **F4.3** (relation endpoints) run before the **F4.7** cross-link profiles; IDs are stable.
 
 > **Principle:** Exploration Mode is the **read-only** face of world state (D-010). Backend read
 > foundation first, then per-view backend + frontend, frontend last within each view. A single
@@ -3239,6 +3366,17 @@ no modals (D-082), no Q&A history (D-058).
 | F4.5-SETUP | Frontend scaffolding — npx shadcn@latest add tooltip (human step) | 👤 |
 | F4.5.1 | Frontend: ProposeChangeButton domain component (disabled + tooltip) | 🔲 |
 | F4.5.2 | Frontend: mount ProposeChangeButton in entity/space/relation profiles | 🔲 |
+| F4.6 | Event relational links — structured event↔space / event↔actor (Phase-2 pipeline extension, D-095) | 🔲 |
+| F4.6.1 | Backend: migration 0024 — events.space_id + event_involved_actors join | 🔲 |
+| F4.6.2 | Backend: ExtractedEvent model (space + involved actors) + ExtractionResult change | 🔲 |
+| F4.6.3 | Backend: mock + real extraction adapters emit event links | 🔲 |
+| F4.6.4 | Backend: resolve + persist event links at commit | 🔲 |
+| F4.7 | Profile cross-links — "living record" relational sections + navigation (D-009) | 🔲 |
+| F4.7.1 | Backend: EntityLinksReadPort + adapter (relations/events/appearances) + IT | 🔲 |
+| F4.7.2 | Backend: GetEntityLinks use case + service + endpoint | 🔲 |
+| F4.7-SETUP | Frontend scaffolding — verified entity-links contract; no new shadcn (human step) | 👤 |
+| F4.7.3 | Frontend: entity-links types + API hook | 🔲 |
+| F4.7.4 | Frontend: EntityLinks sections wired into entity/space profiles | 🔲 |
 
 ---
 
@@ -3634,7 +3772,7 @@ accessible relations-list alternative.
 
 **Scope (out):** v2 proposal pipeline; world-state edits from the graph (D-010).
 
-**Skills:** `database-migration`, `session-ingestion-pipeline`, `spring-ai-llm-adapter`, `backend-endpoint`, `frontend-exploration`  **Decisions:** D-009, D-030, D-010, D-021, D-035, D-089  **Dependencies:** F4.1, F2.8
+**Skills:** `database-migration`, `session-ingestion-pipeline`, `spring-ai-llm-adapter`, `backend-endpoint`, `frontend-exploration`  **Decisions:** D-009, D-030, D-010, D-021, D-035, D-089, D-095  **Dependencies:** F4.1, F2.8
 
 ---
 
@@ -4008,6 +4146,155 @@ npx shadcn@latest add tooltip --yes      # writes src/components/ui/tooltip.tsx
 **Scope (out):** —
 
 **Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-012  **Dependencies:** F4.5.1, F4.1.11, F4.1.12, F4.3.12
+
+---
+
+#### F4.6 — Event relational links (Phase-2 pipeline extension)
+
+> **Umbrella task — run the F4.6.N sub-tasks below, not this.**
+>
+> **Scope increase (D-095):** mirrors F4.3 for events. Events have no structured space/actor links today (only freeform `full_snapshot`). This extends the committed ingestion pipeline so each event records the space it occurred in and the actors it involved — enabling reliable "events here" / "events involving" cross-links (F4.7) and trustworthy Timeline filters (F4.2). Migration is append-only.
+
+**Goal:** Give events structured `space_id` and a many-to-many involved-actors link, populated at commit.
+
+**Scope (out):** Read/UI of these links (F4.7, F4.2); relation endpoints (F4.3).
+
+**Skills:** `database-migration`, `session-ingestion-pipeline`, `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-095, D-021, D-035, D-089, D-009  **Dependencies:** F2.8, F4.3
+
+---
+
+#### F4.6.1 — Migration 0024: event space + involved-actors
+
+**Goal:** Append-only schema for event location + participants.
+
+**Scope (in):**
+- `apps/api/src/main/resources/db/changelog/0024_add_event_links.xml` (+ master include) — add nullable `space_id UUID` to `events` (+ index); new `event_involved_actors` join table (`event_id`, `actor_id`, composite PK, FKs to `events`/`actors`, indexes)
+
+**Scope (out):** Populating them (F4.6.4).
+
+**Skills:** `database-migration`  **Decisions:** D-021, D-035  **Dependencies:** (existing 0012/0008)
+
+---
+
+#### F4.6.2 — ExtractedEvent model + ExtractionResult change
+
+**Goal:** Carry event location + participant mentions out of extraction.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/ingestion/ExtractedEvent.java` — `name, description, spaceMention, involvedActorMentions (List), rawText`
+- change `application/model/ingestion/ExtractionResult.java` `events()` to `List<ExtractedEvent>`; update `NarrativeExtractionPort` Javadoc; fix compile of the F2.7 event-card construction
+
+**Scope (out):** Adapters (F4.6.3); persistence (F4.6.4).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-095, D-009  **Dependencies:** F4.6.1, F4.3.2
+
+---
+
+#### F4.6.3 — Extraction adapters emit event links
+
+**Goal:** Mock + real extraction produce event space/actors.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/MockNarrativeExtractionAdapter.java` — emit `ExtractedEvent`s with `spaceMention`/`involvedActorMentions` referencing the mock space/actors
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiNarrativeExtractionAdapter.java` — extend prompt + parsing to capture event space/actors
+- updated adapter tests
+
+**Scope (out):** Persistence (F4.6.4).
+
+**Skills:** `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-095  **Dependencies:** F4.6.2, F4.3.3
+
+---
+
+#### F4.6.4 — Resolve + persist event links at commit
+
+**Goal:** Resolve event space/actor mentions to entity IDs and persist them.
+
+**Scope (in):**
+- extend `application/model/worldstate/EntityWriteCommand.java` with optional event `spaceId` + `involvedActorIds`
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/worldstate/WorldStateAdapter.java` — on event write set `events.space_id` and insert `event_involved_actors` rows
+- the commit path — resolve space/actor mentions → IDs (best-effort name-match within campaign; null/empty when unresolved)
+- updated unit/IT tests
+
+**Scope (out):** Read side (F4.7).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-095, D-089  **Dependencies:** F4.6.1, F4.6.2, F4.3.4
+
+---
+
+#### F4.7 — Profile cross-links ("living record")
+
+> **Umbrella task — run the F4.7.N sub-tasks below, not this.**
+
+**Goal:** Fill the relational content the PRD §6.3 describes and the F4.1 profiles reserve slots for: an entity's session appearances, the relations it participates in, and the events linked to it (for spaces: events that occurred there; for actors: events involving it) — each navigable. Turns profiles from a snapshot dump into the PRD's "living record" (Success Criterion 3).
+
+**Scope (out):** The profile shells (F4.1.11/F4.1.12, already shipped); annotations (F4.4).
+
+**Skills:** `backend-endpoint`, `frontend-exploration`, `frontend-testing`  **Decisions:** D-009, D-095, D-030, D-001  **Dependencies:** F4.1, F4.3, F4.6
+
+---
+
+#### F4.7.1 — EntityLinksReadPort + adapter + IT
+
+**Goal:** Native-SQL read of an entity's relations, linked events, related entities, and session appearances.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/worldstate/EntityLinks.java` — `List<RelationSummaryView> relations, List<EntitySummaryView> relatedEntities, List<TimelineEntryView> events, List<UUID> appearanceSessionIds`
+- `apps/api/src/main/java/com/bluesteel/application/port/out/worldstate/EntityLinksReadPort.java`
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/worldstate/EntityLinksReadAdapter.java` + IT — relations referencing the entity (via F4.3 endpoints), events referencing it (via F4.6 `space_id`/`event_involved_actors`), distinct session appearances (from its version rows)
+
+**Scope (out):** Use case/endpoint (F4.7.2).
+
+**Skills:** `database-migration`, `backend-testing`  **Decisions:** D-009, D-095, D-030  **Dependencies:** F4.3.5, F4.6.4, F4.1.1
+
+---
+
+#### F4.7.2 — GetEntityLinks use case + service + endpoint
+
+**Goal:** Member-authorized cross-link read endpoints.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/worldstate/GetEntityLinksUseCase.java` + service (extend `WorldStateExplorationService`) + unit test
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/exploration/WorldStateExplorationController.java` (edit) — `GET /actors/{aid}/links`, `/spaces/{sid}/links` + `EntityLinksResponse` DTO + `@WebMvcTest`
+
+**Scope (out):** Frontend.
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-009, D-010  **Dependencies:** F4.7.1, F4.1.4
+
+---
+
+#### F4.7-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** No new shadcn components.
+
+> **Backend contract (verified against F4.7.2):**
+> - `GET /api/v1/campaigns/{id}/actors/{aid}/links` (and `/spaces/{sid}/links`) → `data: { relations: Relation[], relatedEntities: EntitySummary[], events: TimelineEvent[], appearanceSessionIds: string[] }`
+
+---
+
+#### F4.7.3 — Entity-links types + API hook
+
+**Scope (in):**
+- `apps/web/src/types/worldstate.ts` (edit) — add `EntityLinks`
+- `apps/web/src/api/worldstate.ts` (edit) + test — `useEntityLinks(entityType, entityId)`
+
+**Scope (out):** UI (F4.7.4).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-009  **Dependencies:** F4.7-SETUP, F4.1.6
+
+---
+
+#### F4.7.4 — EntityLinks sections in profiles
+
+**Goal:** Render the cross-link sections in the reserved profile slots, each item navigable.
+
+**Scope (in):**
+- `apps/web/src/features/exploration/components/EntityLinks.tsx` (+ test) — "Relations", "Related entities", "Events", "Appears in sessions" sections; items link to entity profile / relation / event detail / session detail
+- edit `apps/web/src/features/exploration/entities/EntityProfilePage.tsx` and `spaces/SpaceProfilePage.tsx` to render `EntityLinks` in the reserved slot
+- axe; updated tests
+
+**Scope (out):** Annotations/propose (F4.4/F4.5).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-009, D-001  **Dependencies:** F4.7.3, F4.1.11, F4.1.12
 
 ---
 

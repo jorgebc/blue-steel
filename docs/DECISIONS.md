@@ -104,6 +104,9 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-091 | Backend hosting: Render free tier (web service, amd64) | ✅ Active | Definition |
 | D-092 | Secret management: Render dashboard env vars + GitHub Actions secrets | ✅ Active | Definition |
 | D-093 | LLM provider migrated to Google AI Studio (Gemini) — chat + embeddings, one key | ✅ Active | Definition |
+| D-094 | Exploration Mode (Phase 4) built before Query Mode (Phase 3) | ✅ Active | Phase 4 |
+| D-095 | Relations and events carry structured entity links | ✅ Active | Phase 4 |
+| D-096 | Query Mode app-level rate limit + daily cost cap | ✅ Active | Phase 3 |
 
 ---
 
@@ -1924,6 +1927,56 @@ Centralises the whole LLM stack on one free-tier provider with a single key, kee
 - Embedding at 768 / 1536 dims — rejected; 3072 (native) chosen for best quality. Dimension stays per-profile (Ollama `bge-m3`@1024, D-088); changing it requires recreating the vector column.
 
 **Cross-refs:** D-032 (provider boundary, superseded), D-040 (embedding model, superseded), D-062 (native pgvector), D-088 (Ollama local + per-profile dimension), D-034 (cost governance).
+
+---
+
+### D-094 — Exploration Mode (Phase 4) built before Query Mode (Phase 3)
+
+**Date:** 2026-06-02
+**Status:** Active
+
+**Decision:**
+v1 build order is resequenced: after the session-history view (F2.13), **Phase 4 (Exploration Mode) is implemented before Phase 3 (Query Mode)**. Task IDs are left unchanged — Query stays `F3.x`, Exploration stays `F4.x`; only the build sequence differs from the numeric order, recorded as a directive in ROADMAP.md. Within Exploration, the data-foundation umbrellas F4.6 (event links) and F4.3 (relation endpoints) precede the F4.7 cross-link profiles.
+
+**Reason:**
+Exploration is read-only over already-committed world state: it adds no per-request LLM cost, has lower latency risk than the synchronous Query pipeline (D-052), and renders the extracted actors/spaces/events/relations visually — surfacing extraction-quality problems before effort is spent on grounded answers. Renumbering was rejected to avoid churning the two already-committed decompositions and their cross-references; the pipeline keys off task IDs, not file order.
+
+**Cross-refs:** D-009 (four exploration views), D-052 (synchronous query), D-055 (pagination).
+
+---
+
+### D-095 — Relations and events carry structured entity links
+
+**Date:** 2026-06-02
+**Status:** Active
+
+**Decision:**
+World-state relations gain real graph endpoints (`source_entity_id/type`, `target_entity_id/type` on `relations`, migration 0023) and events gain a structured location + participant set (`events.space_id` and the `event_involved_actors` join table, migration 0024). The ingestion pipeline is extended end-to-end to populate them: extraction emits `ExtractedRelation` (source/target mentions) and `ExtractedEvent` (space + involved-actor mentions); at commit those mentions are resolved best-effort by name-match within the campaign to committed/existing entity IDs and persisted (null/empty when unresolved). Both migrations are append-only and the new columns are nullable for back-compat. Implemented as F4.3 (relations) and F4.6 (events); consumed by the Relations graph (F4.3) and profile cross-links (F4.7).
+
+**Reason:**
+The Relations graph (D-030) and the PRD §6.3 "living record" profile cross-links — "connected actors", "events that occurred here", "events involving this actor" — require structured links between entities. Originally relations and events were extracted as freeform `ExtractedMention(name, description, rawText)` with all type-specific data in `full_snapshot` JSONB, which cannot reliably express graph edges or entity-to-event references. Structuring the links at the schema + extraction + commit layers is the smallest change that makes the graph edges and profile cross-links trustworthy. Name-match resolution is best-effort by design; unresolved endpoints are left null rather than guessed.
+
+**Alternatives considered:**
+- Best-effort derivation from `full_snapshot` text at read time — rejected; unreliable (mislinks/misses) and pushes parsing into every read.
+- Relation-as-node graph (no endpoints) — rejected; less faithful to "relations as edges" (D-009, D-030).
+- Defer to v2 — rejected; the user opted to ship a faithful graph and rich profiles in v1.
+
+**Cross-refs:** D-009 (four views), D-030 (relations graph), D-021/D-035 (world-state entity invariants/versioning), D-089 (native-SQL world-state writes).
+
+---
+
+### D-096 — Query Mode app-level rate limit + daily cost cap
+
+**Date:** 2026-06-02
+**Status:** Active
+
+**Decision:**
+`POST /api/v1/campaigns/{id}/queries` is guarded by two app-level limits in addition to the provider spend cap (D-034): a per-user/per-campaign request rate limit (sliding window, config `query.rate-limit.*`) returning `429 QUERY_RATE_LIMITED`, and a daily LLM cost cap (config `query.cost-cap.daily-usd`, accounted from the LOG-01 cost logging) returning `429`/`503 QUERY_COST_CAP`. Implemented as F3.5.
+
+**Reason:**
+Every Query is a live, billable LLM call. Provider-level spend governance (D-034) caps the total bill but does not stop a single user from exhausting the budget or degrading service for others; an app-level per-principal limit and a daily cap give early, attributable backpressure and protect both cost and availability for a free-tier hobby deployment.
+
+**Cross-refs:** D-052 (synchronous query), D-034 (provider cost governance), LOG-01 (LLM cost logging).
 
 ---
 
