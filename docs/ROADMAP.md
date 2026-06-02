@@ -2809,12 +2809,355 @@ context.
 
 ### Phase 3 — Query Mode
 
-| # | Block | Status |
+> **Principle:** Backend skeleton first (mock-wired, synchronous), retrieval second, real LLM third,
+> frontend last. Each sub-task is single-layer, compiles on its own against its declared
+> dependencies, and ships with its test. Much of the Phase 2 scaffolding already exists and is
+> **reused, not recreated**: `QueryAnsweringPort` + `QueryResponse`/`Citation`/`EntityContext`
+> records, `MockQueryAnsweringAdapter`, the `SpringAiQueryAnsweringAdapter` stub, `EmbeddingPort`,
+> and `TokenEstimator`. The `Citation` record field is **`snippet`** (not `claim`); the
+> `query-pipeline` / `frontend-query-mode` skills' `claim` naming is illustrative only.
+
+#### Summary
+
+| # | Feature | Status |
 |---|---|---|
-| 3.1 | **Query endpoint skeleton** — synchronous pipeline, 504 on timeout (D-052). | 🔲 |
-| 3.2 | **pgvector similarity retrieval** — embed question → retrieve top-N relevant entity versions from `entity_embeddings`. | 🔲 |
-| 3.3 | **`QueryAnsweringPort` + LLM call + citation grounding** — context assembly, LLM call, structured response with `citations` (D-003). | 🔲 |
-| 3.4 | **Query Mode UI** — question input, answer display, session citation links (frontend). | 🔲 |
+| F3.1 | Query endpoint skeleton — synchronous pipeline, 504 on timeout (D-052) | 🔲 |
+| F3.1.1 | Backend: AnswerQueryUseCase driving port + QueryTimeoutException | 🔲 |
+| F3.1.2 | Backend: QueryService (member auth + synchronous timeout enforcement) | 🔲 |
+| F3.1.3 | Backend: GlobalExceptionHandler 504 QUERY_TIMEOUT mapping | 🔲 |
+| F3.1.4 | Backend: QueryController + request/response DTOs (POST /queries) | 🔲 |
+| F3.2 | pgvector similarity retrieval — embed question → top-N entity versions | 🔲 |
+| F3.2.1 | Backend: QueryContextRetrievalPort driven port | 🔲 |
+| F3.2.2 | Backend: EntityQueryRetrievalAdapter (native cross-type pgvector search) + IT | 🔲 |
+| F3.2.3 | Backend: wire embed + retrieval into QueryService | 🔲 |
+| F3.3 | QueryAnsweringPort + LLM call + citation grounding | 🔲 |
+| F3.3.1 | Backend: QueryPromptAssembler + QueryResponseParser (context format + JSON parse) | 🔲 |
+| F3.3.2 | Backend: real SpringAiQueryAnsweringAdapter (LLM call + cost log, replaces stub) | 🔲 |
+| F3.4 | Query Mode UI — question input, answer, citation links (frontend) | 🔲 |
+| F3.4-SETUP | Frontend scaffolding — verified contract + notes; no new shadcn components (human step) | 👤 |
+| F3.4.1 | Frontend: Query TypeScript types (query.ts) | 🔲 |
+| F3.4.2 | Frontend: queries API client + useSubmitQuery mutation hook | 🔲 |
+| F3.4.3 | Frontend: QueryAnswerSkeleton loading component | 🔲 |
+| F3.4.4 | Frontend: QuestionForm component | 🔲 |
+| F3.4.5 | Frontend: AnswerDisplay + CitationList components | 🔲 |
+| F3.4.6 | Frontend: minimal SessionDetailPage + getSessionDetail hook (citation target) | 🔲 |
+| F3.4.7 | Frontend: QueryPage container (form + skeleton + InlineBanner + answer) | 🔲 |
+| F3.4.8 | Frontend: query route wiring + Sidebar Query nav activation | 🔲 |
+
+---
+
+#### F3.1 — Query endpoint skeleton
+
+> **Umbrella task — run the F3.1.N sub-tasks below, not this.**
+
+**Goal:** A synchronous `POST /api/v1/campaigns/{id}/queries` wired end-to-end against the existing
+`MockQueryAnsweringAdapter`, with campaign-member authorization and a hard request deadline that
+returns `504 QUERY_TIMEOUT` (D-052). Retrieval (F3.2) and the real LLM (F3.3) plug into this
+skeleton without changing its shape.
+
+**Scope (out):** pgvector retrieval (F3.2); real LLM adapter (F3.3); any frontend (F3.4).
+
+**Skills:** `query-pipeline`, `backend-endpoint`, `error-handling`  **Decisions:** D-052, D-043, D-058  **Dependencies:** F2.5, TR-3
+
+---
+
+#### F3.1.1 — AnswerQueryUseCase driving port + QueryTimeoutException
+
+**Goal:** The driving port the controller calls, plus the timeout exception the service throws. No runtime logic.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/query/AnswerQueryUseCase.java` — `QueryResponse answer(UUID campaignId, UUID callerId, String question)` (returns the existing `application.model.query.QueryResponse`)
+- `apps/api/src/main/java/com/bluesteel/domain/exception/QueryTimeoutException.java` — plain `RuntimeException` subclass (ARCH-01: no Spring/JPA imports)
+
+**Scope (out):** Service, controller, handler. No runtime test — `mvn compile` is the verification for this declarations-only sub-task.
+
+**Skills:** `query-pipeline`  **Decisions:** D-052  **Dependencies:** (existing `application.model.query.*`)
+
+---
+
+#### F3.1.2 — QueryService (member auth + synchronous timeout)
+
+**Goal:** Implement `AnswerQueryUseCase`: authorize the caller as a campaign member (or admin) via `CampaignMembershipPort` (mirror `ListSessionsService`), then call `QueryAnsweringPort.answer(question, List.of())` — empty context placeholder; real retrieval is injected in F3.2.3 — inside a `CompletableFuture.get(timeout, SECONDS)` deadline; on `TimeoutException` throw `QueryTimeoutException`. INFO on entry/exit (LOG-02).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/query/QueryService.java` — timeout from `@Value("${query.timeout-seconds:20}")`
+- `apps/api/src/test/java/com/bluesteel/application/service/query/QueryServiceTest.java` — Mockito: asserts member-gate (non-member → `UnauthorizedException`), timeout → `QueryTimeoutException`, and delegation of the port result
+
+**Scope (out):** Embedding/retrieval wiring (F3.2.3); HTTP layer (F3.1.4).
+
+**Skills:** `query-pipeline`, `backend-testing`  **Decisions:** D-052, D-043  **Dependencies:** F3.1.1
+
+---
+
+#### F3.1.3 — GlobalExceptionHandler 504 mapping
+
+**Goal:** Map `QueryTimeoutException` to `504 QUERY_TIMEOUT` in the standard error envelope.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/GlobalExceptionHandler.java` — add `@ExceptionHandler(QueryTimeoutException.class)` → `@ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)` → `ApiError.of("QUERY_TIMEOUT", …)`
+- Extend the existing handler test with the 504 case
+
+**Scope (out):** Controller (F3.1.4).
+
+**Skills:** `error-handling`, `backend-testing`  **Decisions:** D-052  **Dependencies:** F3.1.1
+
+---
+
+#### F3.1.4 — QueryController + DTOs
+
+**Goal:** Expose `POST /api/v1/campaigns/{id}/queries` returning the answer + citations in the `{ data, meta, errors }` envelope.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/query/QueryController.java` — `resolveCallerId()` pattern; returns `ApiResponse<QueryAnswerResponse>`
+- `.../adapters/in/web/query/QueryRequest.java` — `@NotBlank @Size(max = 2000) String question`
+- `.../adapters/in/web/query/QueryAnswerResponse.java` — `String answer, List<CitationResponse> citations`
+- `.../adapters/in/web/query/CitationResponse.java` — `UUID sessionId, int sequenceNumber, String snippet`
+- `apps/api/src/test/java/com/bluesteel/adapters/in/web/query/QueryControllerTest.java` — `@WebMvcTest`, mocked `AnswerQueryUseCase`: 200 envelope, 504 timeout, 400 blank question
+
+**Scope (out):** Retrieval/LLM internals.
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-052, D-058  **Dependencies:** F3.1.2, F3.1.3
+
+---
+
+#### F3.2 — pgvector similarity retrieval
+
+> **Umbrella task — run the F3.2.N sub-tasks below, not this.**
+
+**Goal:** Embed the question and retrieve the top-N most similar **committed** entity-version
+snapshots across all four entity types, scoped to the campaign, as `EntityContext` for the LLM.
+Native pgvector SQL only (ARCH-04, D-062); versions without an `entity_embeddings` row are excluded
+(D-063); context is bounded by top-N (D-034).
+
+**Scope (out):** LLM call/prompt assembly (F3.3); frontend (F3.4).
+
+**Skills:** `query-pipeline`, `backend-testing`  **Decisions:** D-062, D-063, D-034, D-093, D-088  **Dependencies:** F3.1.2
+
+---
+
+#### F3.2.1 — QueryContextRetrievalPort driven port
+
+**Goal:** Driven port for cross-type query retrieval, returning the existing `EntityContext`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/query/QueryContextRetrievalPort.java` — `List<EntityContext> retrieveRelevantContext(UUID campaignId, float[] queryEmbedding, int topN)`
+
+**Scope (out):** The adapter (F3.2.2). Compile is the verification.
+
+**Skills:** `query-pipeline`  **Decisions:** D-062  **Dependencies:** F3.1.1
+
+---
+
+#### F3.2.2 — EntityQueryRetrievalAdapter (native cross-type pgvector) + IT
+
+**Goal:** Implement the port with one native `JdbcTemplate` query: a cross-type `LEFT JOIN` of `entity_embeddings` to the four `*_versions` tables (for `full_snapshot`, `version_number`) and the four head tables (for `name`) with `COALESCE`, joined to `sessions`, `WHERE s.campaign_id = ? AND s.status = 'committed'`, `ORDER BY ee.embedding <=> ?::vector`, `LIMIT ?`; map rows → `EntityContext`. Render the vector literal in the `EntitySimilaritySearchAdapter.toVectorLiteral` style.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/embedding/EntityQueryRetrievalAdapter.java`
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/embedding/EntityQueryRetrievalAdapterIT.java` — Testcontainers + pgvector; seed committed sessions + embeddings across ≥2 entity types; assert cosine ordering, campaign scoping, committed-only, and no-embedding exclusion
+
+**Scope (out):** Reusing `EntitySimilaritySearchPort` 4× then merging (rejected — keep the Query path decoupled from the ingestion Stage-1 path).
+
+**Skills:** `query-pipeline`, `backend-testing`, `database-migration`  **Decisions:** D-062, D-063, D-093, D-088  **Dependencies:** F3.2.1
+
+---
+
+#### F3.2.3 — Wire embed + retrieval into QueryService
+
+**Goal:** Replace the empty-context placeholder: inject `EmbeddingPort` + `QueryContextRetrievalPort`; embed the question, retrieve top-N (`@Value("${query.retrieval.top-n:8}")`), and pass the real `List<EntityContext>` to `QueryAnsweringPort`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/query/QueryService.java` (edit)
+- `apps/api/src/test/java/com/bluesteel/application/service/query/QueryServiceTest.java` (update) — verify embed → retrieve → answer order; empty retrieval still answers
+
+**Scope (out):** Prompt assembly + token budgeting inside the adapter (F3.3).
+
+**Skills:** `query-pipeline`, `backend-testing`  **Decisions:** D-062, D-034  **Dependencies:** F3.1.2, F3.2.1
+
+---
+
+#### F3.3 — QueryAnsweringPort + LLM call + citation grounding
+
+> **Umbrella task — run the F3.3.N sub-tasks below, not this.**
+
+**Goal:** Replace the throwing `SpringAiQueryAnsweringAdapter` stub with a real Spring AI
+`ChatClient` call that answers strictly from the provided context and returns grounded `citations`
+(D-003), under a bounded token envelope (D-034), with cost logging (LOG-01). Active on
+`llm-real | llm-ollama`; the mock stays for `local`.
+
+**Scope (out):** Retrieval (F3.2); frontend (F3.4).
+
+**Skills:** `spring-ai-llm-adapter`, `query-pipeline`, `backend-testing`  **Decisions:** D-003, D-052, D-034  **Dependencies:** F3.2.3
+
+---
+
+#### F3.3.1 — QueryPromptAssembler + QueryResponseParser
+
+**Goal:** Two pure, easily-tested helpers. The assembler builds the system prompt — numbered `EntityContext` snapshots, each labelled with its `session_id`, plus the "cite every claim / omit any claim you cannot ground" rule — and enforces the token envelope via the existing `TokenEstimator` (truncate least-relevant, or throw `TokenBudgetExceededException`). The parser maps the LLM JSON (`{ answer, citations: [{ session_id, sequence_number, snippet }] }`) → `QueryResponse`; on parse failure it logs at ERROR and throws (never silently returns empty citations).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/QueryPromptAssembler.java` (+ unit test)
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/QueryResponseParser.java` (+ unit test)
+
+**Scope (out):** The `ChatClient` call (F3.3.2).
+
+**Skills:** `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-003, D-034  **Dependencies:** F3.2.1
+
+---
+
+#### F3.3.2 — Real SpringAiQueryAnsweringAdapter
+
+**Goal:** Replace the stub body with the real call using the `ChatClient` bean from `AiConfig` and the F3.3.1 helpers; log `tokens_in`/`tokens_out`/`cost_usd`/campaign/stage at INFO (LOG-01). Keep `@Profile("llm-real | llm-ollama")`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/ai/SpringAiQueryAnsweringAdapter.java` (replace stub)
+- `apps/api/src/test/java/com/bluesteel/adapters/out/ai/SpringAiQueryAnsweringAdapterTest.java` — mock `ChatModel`/`ChatClient`; assert context grounding, citation parsing, and profile activation
+
+**Scope (out):** Service wiring (already via the port).
+
+**Skills:** `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-003, D-052, LOG-01  **Dependencies:** F3.3.1
+
+---
+
+#### F3.4 — Query Mode UI
+
+> **Umbrella task — run the F3.4.N sub-tasks below, not this.**
+
+**Goal:** A stateless Query Mode screen: ask a question → synchronous answer with navigable session
+citations. Loading is a skeleton (D-086), feedback and the `504` timeout use `InlineBanner` (D-083),
+no modals (D-082), no Q&A history (D-058).
+
+**Scope (out):** Exploration Mode (Phase 4); any query history/persistence.
+
+**Skills:** `frontend-query-mode`, `frontend-api-resource`, `frontend-testing`, `ux-skeleton-crafting`, `ux-inline-feedback`, `ux-navigation-logic`  **Decisions:** D-052, D-058, D-003, D-082, D-083, D-086  **Dependencies:** F3.1.4, F1.11
+
+---
+
+#### F3.4-SETUP — Frontend scaffolding (human runs by hand, once)
+
+> **Human step — not a pipeline sub-task.** No new shadcn components are required — `textarea` and
+> `button` (`src/components/ui/`) and `InlineBanner` (`src/components/domain/`) already exist. This
+> block records the verified facts the sub-tasks rely on.
+
+> **Notes for all sub-tasks (verified against the repo — these override the skills):**
+> - Campaign id comes from `useCampaignStore((s) => s.activeCampaignId)` — the field is
+>   **`activeCampaignId`**, not `campaignId` as the `frontend-query-mode` skill shows.
+> - HTTP goes through **`apiClient.{get,post}`** + **`ApiClientError`** from `src/api/client.ts`
+>   (the skill's `fetchWithAuth` / `QueryApiError` are illustrative). Detect the timeout via
+>   `error instanceof ApiClientError && error.status === 504`.
+> - The citation field is **`snippet`** (skill says `claim`).
+
+> **Backend contract (verified against `apps/api`) — envelope `{ data, meta, errors: [{ code, message, field }] }`:**
+> - `POST /api/v1/campaigns/{id}/queries` `{ question }` → `data: { answer, citations: [{ sessionId, sequenceNumber, snippet }] }`; `504 QUERY_TIMEOUT`; `400` on blank question
+> - `GET /api/v1/campaigns/{id}/sessions/{sid}` → `data: { sessionId, campaignId, status, sequenceNumber, failureReason, committedAt, createdAt, updatedAt, narrativeBlockId }` (the F3.4.6 citation target; endpoint shipped in TR-1)
+
+---
+
+#### F3.4.1 — Query TypeScript types
+
+**Goal:** Hand-written mirrors of the query DTOs so later sub-tasks import real, compiling symbols.
+
+**Scope (in):**
+- `apps/web/src/types/query.ts` — `QueryRequest` (`{ question: string }`), `Citation` (`{ sessionId: string; sequenceNumber: number; snippet: string }`), `QueryResponse` (`{ answer: string; citations: Citation[] }`)
+
+**Scope (out):** Fetch logic, hooks, components. No runtime test — `npm run type-check` is the verification.
+
+**Skills:** `frontend-query-mode`  **Decisions:** D-003  **Dependencies:** F3.4-SETUP
+
+---
+
+#### F3.4.2 — Queries API client + useSubmitQuery hook
+
+**Goal:** Typed `submitQuery` + a TanStack mutation hook. Stateless — no cache key, no invalidation (D-058).
+
+**Scope (in):**
+- `apps/web/src/api/queries.ts` (+ `queries.test.ts`) — `submitQuery(campaignId, question): Promise<QueryResponse>` via `apiClient.post`; `useSubmitQuery(campaignId)` mutation; the `504` surfaces via `ApiClientError.status` for the page to branch on
+
+**Scope (out):** UI components (F3.4.4–F3.4.7). No query caching.
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-052, D-058  **Dependencies:** F3.4-SETUP, F3.4.1
+
+---
+
+#### F3.4.3 — QueryAnswerSkeleton loading component
+
+**Goal:** DTO-derived loading skeleton for the answer area — no spinner (D-086).
+
+**Scope (in):**
+- `apps/web/src/features/query/components/QueryAnswerSkeleton.tsx` (+ test) — answer block + a few citation lines, `animate-pulse`, zero layout shift; axe assertion
+
+**Scope (out):** The page that renders it (F3.4.7).
+
+**Skills:** `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-086  **Dependencies:** F3.4-SETUP
+
+---
+
+#### F3.4.4 — QuestionForm component
+
+**Goal:** Controlled question input + submit, disabled while a query is in flight.
+
+**Scope (in):**
+- `apps/web/src/features/query/components/QuestionForm.tsx` (+ test) — `Textarea` + `Button` (`@/components/ui/*`), visually-hidden label, trims/ignores empty input, `disabled` while pending; axe assertion
+
+**Scope (out):** The mutation call (F3.4.7 owns submit wiring).
+
+**Skills:** `frontend-query-mode`, `frontend-testing`  **Decisions:** D-052  **Dependencies:** F3.4-SETUP
+
+---
+
+#### F3.4.5 — AnswerDisplay + CitationList components
+
+**Goal:** Render the answer text and its citations as navigable links.
+
+**Scope (in):**
+- `apps/web/src/features/query/components/AnswerDisplay.tsx` (+ test) — answer in `whitespace-pre-wrap`; **never** `dangerouslySetInnerHTML`; omits the citation section when `citations` is empty
+- `apps/web/src/features/query/components/CitationList.tsx` (+ test) — each citation a `<Link to={`/campaigns/${campaignId}/sessions/${sessionId}`}>` (target page in F3.4.6, route in F3.4.8); descriptive `aria-label`; axe assertions
+
+**Scope (out):** Container/state (F3.4.7).
+
+**Skills:** `frontend-query-mode`, `frontend-testing`  **Decisions:** D-003  **Dependencies:** F3.4.1
+
+---
+
+#### F3.4.6 — Minimal SessionDetailPage + getSessionDetail hook
+
+**Goal:** A read-only session-detail view so citation links resolve to a real page (citations target `/campaigns/{id}/sessions/{sid}`). The backend `GET …/sessions/{sid}` endpoint already exists (TR-1).
+
+**Scope (in):**
+- `apps/web/src/types/session.ts` (edit) — add `SessionDetailResponse` (`{ sessionId; campaignId; status; sequenceNumber; failureReason; committedAt; createdAt; updatedAt; narrativeBlockId }`)
+- `apps/web/src/api/sessions.ts` (edit) — add `getSessionDetail(campaignId, sessionId)` + `useSessionDetail` hook + a `detail` query key
+- `apps/web/src/features/input/SessionDetailPage.tsx` (+ test) — reads `:sessionId`; renders status / sequence / timestamps; skeleton while loading; axe assertion
+
+**Scope (out):** Route registration (F3.4.8); annotations / version history (Phase 4).
+
+**Skills:** `frontend-api-resource`, `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-055, D-003  **Dependencies:** F3.4-SETUP
+
+---
+
+#### F3.4.7 — QueryPage container
+
+**Goal:** Compose the form, loading skeleton, feedback banner, and answer; stateless local state (D-058).
+
+**Scope (in):**
+- `apps/web/src/features/query/QueryPage.tsx` (+ test) — `useCampaignStore((s) => s.activeCampaignId)`; `QuestionForm`; `useSubmitQuery`; `QueryAnswerSkeleton` while pending; `InlineBanner` for `504 QUERY_TIMEOUT` (rephrase suggestion) and generic errors; `AnswerDisplay` on success; `useState` for the answer (no cache); resets prior state on each submit; axe assertion
+
+**Scope (out):** Route wiring + nav (F3.4.8).
+
+**Skills:** `frontend-query-mode`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-052, D-058, D-083  **Dependencies:** F3.4.2, F3.4.3, F3.4.4, F3.4.5
+
+---
+
+#### F3.4.8 — Query route wiring + Sidebar Query nav activation
+
+**Goal:** Register the routes and turn the inert Query nav item into a live link.
+
+**Scope (in):**
+- `apps/web/src/main.tsx` (edit) — under `AppShell`, add `<Route path="query" element={<QueryPage />} />` and `<Route path="sessions/:sessionId" element={<SessionDetailPage />} />`
+- `apps/web/src/components/domain/Sidebar.tsx` (+ `Sidebar.test.tsx` update) — replace the Query `ComingSoonItem` with a `NavLink` to `/campaigns/${activeCampaignId}/query` (visible to all roles, including `player`)
+
+**Scope (out):** Exploration / Settings nav (still stubbed).
+
+**Skills:** `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-052  **Dependencies:** F3.4.6, F3.4.7
 
 ---
 
