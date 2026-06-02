@@ -214,7 +214,7 @@
 
 *Adapters:*
 - `MockEmailAdapter`: logs full `EmailMessage` (to, subject, body) at INFO; activated on `local` profile (D-075)
-- Real `EmailAdapter` stub: activated on `email-real` profile; throws `UnsupportedOperationException` until provider is wired
+- `BrevoEmailAdapter`: activated on `email-real` profile; `POST https://api.brevo.com/v3/smtp/email` via `RestClient` (HTTPS, not SMTP — works from Render)
 - `UserJpaEntity` + `UserRepository` + `UserPersistenceAdapter` in `adapters.out.persistence`
 
 *API:*
