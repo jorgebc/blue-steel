@@ -17,17 +17,20 @@ import org.springframework.context.annotation.Profile;
  *   <li><b>mock</b> ({@code !llm-real & !llm-ollama}): {@code Mock*} adapters — deterministic
  *       canned responses, zero API cost. Active by default in {@code local} dev and CI.
  *   <li><b>llm-real</b>: Google Gemini via Spring AI {@code ChatClient} + {@code EmbeddingModel}.
- *       One {@code GEMINI_API_KEY} serves both chat and embeddings (D-093).
+ *       One {@code GEMINI_API_KEY} serves both chat and embeddings, supplied by two starters —
+ *       {@code spring-ai-starter-model-google-genai} (chat) and {@code
+ *       spring-ai-starter-model-google-genai-embedding} (embeddings), since 2.0.x ships them
+ *       separately (D-093).
  *   <li><b>llm-ollama</b>: Local Ollama models — {@code ChatClient} from {@code OllamaChatModel};
  *       {@code EmbeddingModel} exposed from {@code OllamaEmbeddingModel}. Zero cost, offline
  *       (D-088).
  * </ul>
  *
  * <p>Exactly one {@link ChatClient} and one {@link EmbeddingModel} bean are active per profile.
- * Each profile disables the other provider's auto-configuration to prevent bean ambiguity when both
- * starters are on the classpath: {@code llm-ollama} blanks {@code spring.ai.google.genai.api-key};
- * {@code llm-real} excludes the Ollama auto-configuration classes via {@code
- * spring.autoconfigure.exclude}.
+ * Each profile excludes the other provider's auto-configuration classes via {@code
+ * spring.autoconfigure.exclude} to prevent bean ambiguity when both providers are on the classpath:
+ * {@code llm-real} excludes the Ollama auto-configurations; {@code llm-ollama} excludes the Google
+ * GenAI chat + embedding auto-configurations.
  */
 @Configuration
 public class AiConfig {

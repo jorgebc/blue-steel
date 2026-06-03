@@ -111,10 +111,19 @@
       <artifactId>spring-boot-starter-liquibase</artifactId>
     </dependency>
 
-    <!-- ── Spring AI — Google GenAI / Gemini: chat + embeddings, one key (D-093) ── -->
+    <!-- ── Spring AI — Google GenAI / Gemini chat (D-093) ───────────────── -->
     <dependency>
       <groupId>org.springframework.ai</groupId>
       <artifactId>spring-ai-starter-model-google-genai</artifactId>
+    </dependency>
+
+    <!-- ── Spring AI — Google GenAI / Gemini embeddings (D-093) ─────────── -->
+    <!-- Separate artifact since 2.0.x: the chat starter above ships chat only, so the    -->
+    <!-- EmbeddingModel auto-configuration is gated off (@ConditionalOnClass) without this -->
+    <!-- starter. Both use the single GEMINI_API_KEY.                                      -->
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-starter-model-google-genai-embedding</artifactId>
     </dependency>
 
     <!-- ── Spring AI — Ollama: local chat + embeddings, offline (D-088) ── -->

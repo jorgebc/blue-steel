@@ -9,3 +9,5 @@ spring:
     google:
       genai:
         api-key: test-placeholder
+        embedding:
+          api-key: test-placeholder
