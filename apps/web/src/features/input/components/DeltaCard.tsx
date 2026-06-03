@@ -13,12 +13,16 @@ interface Props {
 
 /** Existing world-state entity that changed this session — shows the delta only (D-006). */
 export function DeltaCard({ card, decision, onSetDecision, onEdit }: Props) {
-  const fields = Object.entries(card.changedFields)
+  const edited = decision.action === 'edit'
+  const fields = Object.entries(edited ? decision.editedFields : card.changedFields)
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <header className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-base font-medium text-slate-900">{card.name}</h3>
-        <Badge variant="outline">Updated</Badge>
+        <div className="flex items-center gap-2">
+          {edited && <Badge variant="outline">Edited</Badge>}
+          <Badge variant="outline">Updated</Badge>
+        </div>
       </header>
       <dl className="mb-4 space-y-1 text-sm">
         {fields.length === 0 ? (

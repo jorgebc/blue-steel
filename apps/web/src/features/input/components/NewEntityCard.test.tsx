@@ -35,6 +35,22 @@ describe('NewEntityCard', () => {
     expect(screen.getByText('fortress')).toBeInTheDocument()
   })
 
+  it('shows the edited profile and an Edited badge when the decision is edit', () => {
+    render(
+      <NewEntityCard
+        card={card}
+        decision={{ action: 'edit', editedFields: { region: 'The Mists', kind: 'ruin' } }}
+        onSetDecision={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('The Mists')).toBeInTheDocument()
+    expect(screen.getByText('ruin')).toBeInTheDocument()
+    expect(screen.queryByText('Barovia')).not.toBeInTheDocument()
+    expect(screen.getByText('Edited')).toBeInTheDocument()
+  })
+
   it('emits an edit click through onEdit', async () => {
     const onEdit = vi.fn()
     render(

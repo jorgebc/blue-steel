@@ -35,6 +35,22 @@ describe('DeltaCard', () => {
     expect(screen.getByText('allegiance')).toBeInTheDocument()
   })
 
+  it('shows the edited values and an Edited badge when the decision is edit', () => {
+    render(
+      <DeltaCard
+        card={card}
+        decision={{ action: 'edit', editedFields: { title: 'Lord', allegiance: 'The Mists' } }}
+        onSetDecision={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Lord')).toBeInTheDocument()
+    expect(screen.getByText('The Mists')).toBeInTheDocument()
+    expect(screen.queryByText('Count')).not.toBeInTheDocument()
+    expect(screen.getByText('Edited')).toBeInTheDocument()
+  })
+
   it('emits an accept decision when Accept is clicked', async () => {
     const onSetDecision = vi.fn()
     render(

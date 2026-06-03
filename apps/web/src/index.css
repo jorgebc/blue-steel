@@ -17,6 +17,27 @@
   --color-accent-pressed: #1d4ed8;
   --color-accent-subtle: #eff6ff;
 
+  /* shadcn semantic tokens — mapped to the Blue Steel palette */
+  --color-foreground: #0f172a;            /* slate-900 — primary text */
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+
+  --color-primary: #3b82f6;               /* blue-500 (matches accent) */
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1f5f9;             /* slate-100 */
+  --color-secondary-foreground: #0f172a;
+  --color-muted: #f1f5f9;                 /* slate-100 */
+  --color-muted-foreground: #64748b;      /* slate-500 */
+  --color-accent-foreground: #ffffff;     /* --color-accent already = #3b82f6 */
+
+  --color-destructive: #ef4444;           /* red-500 */
+  --color-destructive-foreground: #ffffff;
+
+  --color-input: #cbd5e1;                 /* slate-300 (matches border-strong) */
+  --color-ring: #3b82f6;                  /* blue-500 focus ring */
+
   /* Border Radius — MD3 style */
   --radius-card: 1rem;        /* rounded-2xl = 16px */
   --radius-button: 0.5rem;    /* rounded-lg = 8px */

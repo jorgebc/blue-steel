@@ -4,8 +4,9 @@ import { FocusedOverlay } from '@/components/domain/FocusedOverlay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import type { ExistingDiffCard, NewDiffCard } from '@/types/session'
-import { decodeFieldValue, encodeFieldValue } from './fieldFormat'
+import { decodeFieldValue, encodeFieldValue, fieldControl } from './fieldFormat'
 
 interface Props {
   card: ExistingDiffCard | NewDiffCard
@@ -52,12 +53,22 @@ export function EditCardOverlay({ card, open, onClose, onSave }: Props) {
       <div className="w-[28rem] max-w-[90vw] bg-white p-6">
         <h3 className="mb-4 text-base font-medium text-slate-900">Edit {card.name}</h3>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          {keys.map((key) => (
-            <div key={key} className="space-y-1">
-              <Label htmlFor={`edit-${key}`}>{key}</Label>
-              <Input id={`edit-${key}`} {...register(key)} />
-            </div>
-          ))}
+          {keys.map((key) => {
+            const control = fieldControl(key, fields[key])
+            return (
+              <div key={key} className="space-y-1">
+                <Label htmlFor={`edit-${key}`}>{key}</Label>
+                {control === 'textarea' ? (
+                  <Textarea id={`edit-${key}`} rows={4} {...register(key)} />
+                ) : (
+                  <Input id={`edit-${key}`} {...register(key)} />
+                )}
+                {control === 'array' && (
+                  <p className="text-xs text-slate-500">Separate values with commas</p>
+                )}
+              </div>
+            )
+          })}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
