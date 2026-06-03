@@ -55,6 +55,14 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Player')).not.toBeInTheDocument()
   })
 
+  it('shows the Home link pointing at the campaign home route for all roles', () => {
+    for (const role of ['gm', 'editor', 'player'] as const) {
+      const { unmount } = setup(role)
+      expect(screen.getByRole('link', { name: /home/i })).toHaveAttribute('href', '/campaigns/c1')
+      unmount()
+    }
+  })
+
   it('shows the Input mode link pointing at the new-session route for gm', () => {
     setup('gm')
     expect(screen.getByRole('link', { name: /input/i })).toHaveAttribute(
@@ -102,6 +110,7 @@ describe('Sidebar', () => {
     setup('gm', false)
     expect(screen.queryByText('Curse of Strahd')).not.toBeInTheDocument()
     expect(screen.queryByText('Input')).not.toBeInTheDocument()
+    expect(screen.queryByText('Home')).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
