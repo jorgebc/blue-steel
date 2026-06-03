@@ -2,6 +2,7 @@ import { Link, NavLink } from 'react-router-dom'
 import {
   ChevronLeft,
   Compass,
+  Home,
   Library,
   Search,
   Settings,
@@ -94,6 +95,18 @@ export function Sidebar() {
 
       {/* Mode nav */}
       <div className="flex-1 py-2">
+        {activeCampaignId && (
+          <NavLink
+            end
+            to={`/campaigns/${activeCampaignId}`}
+            className={({ isActive }) =>
+              `${itemBaseClass} ${isActive ? activeLinkClass : inactiveLinkClass}`
+            }
+          >
+            <Home className="h-5 w-5 shrink-0" aria-hidden />
+            {expanded && <span>Home</span>}
+          </NavLink>
+        )}
         {activeRole !== 'player' && activeCampaignId && (
           <NavLink
             to={`/campaigns/${activeCampaignId}/sessions/new`}

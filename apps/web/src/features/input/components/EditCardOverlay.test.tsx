@@ -81,6 +81,41 @@ describe('EditCardOverlay', () => {
     expect(onSave).toHaveBeenCalledWith({ coords: { x: 1, y: 2 } })
   })
 
+  it('shows an array field as a comma-separated list and round-trips it to a string[]', async () => {
+    const aliasCard: ExistingDiffCard = {
+      cardId: 'e3',
+      cardType: 'EXISTING',
+      entityId: 'ent-3',
+      entityType: 'actor',
+      name: 'Strahd',
+      changedFields: { aliases: ['The Ancient', 'The Devil'] },
+    }
+    const onSave = vi.fn()
+    render(<EditCardOverlay card={aliasCard} open onClose={vi.fn()} onSave={onSave} />)
+
+    const input = screen.getByLabelText('aliases')
+    expect(input).toHaveValue('The Ancient, The Devil')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'The Ancient, Lord of Barovia')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onSave).toHaveBeenCalledWith({ aliases: ['The Ancient', 'Lord of Barovia'] })
+  })
+
+  it('renders a long-text field (description) as a textarea', () => {
+    const descCard: ExistingDiffCard = {
+      cardId: 'e4',
+      cardType: 'EXISTING',
+      entityId: 'ent-4',
+      entityType: 'actor',
+      name: 'Strahd',
+      changedFields: { description: 'A brooding vampire lord.' },
+    }
+    render(<EditCardOverlay card={descCard} open onClose={vi.fn()} onSave={vi.fn()} />)
+
+    expect(screen.getByLabelText('description').tagName).toBe('TEXTAREA')
+  })
+
   it('closes without saving on Cancel', async () => {
     const onClose = vi.fn()
     const onSave = vi.fn()

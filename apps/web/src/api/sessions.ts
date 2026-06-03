@@ -12,8 +12,9 @@ import type {
 /** Query-key factory for session queries, scoped per campaign. */
 export const sessionKeys = {
   all: (campaignId: string) => ['sessions', campaignId] as const,
+  lists: (campaignId: string) => [...sessionKeys.all(campaignId), 'list'] as const,
   list: (campaignId: string, page: number) =>
-    [...sessionKeys.all(campaignId), 'list', page] as const,
+    [...sessionKeys.lists(campaignId), page] as const,
   status: (campaignId: string, sessionId: string) =>
     [...sessionKeys.all(campaignId), sessionId, 'status'] as const,
   diff: (campaignId: string, sessionId: string) =>
@@ -102,21 +103,25 @@ export function useSessionDiff(campaignId: string, sessionId: string, enabled = 
   })
 }
 
-/** Commits a draft and refreshes the campaign's session cache on success. */
+/** Commits a draft and refreshes the campaign's session list on success. */
 export function useCommitSession(campaignId: string, sessionId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (payload: CommitPayload) => commitSession(campaignId, sessionId, payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all(campaignId) }),
+    // Invalidate only the list, not the whole `sessions` prefix — the latter also
+    // matches this session's still-mounted `diff` query and would refetch a now
+    // COMMITTED session, yielding a spurious 404 before the page navigates away.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.lists(campaignId) }),
   })
 }
 
-/** Discards a draft and refreshes the campaign's session cache on success. */
+/** Discards a draft and refreshes the campaign's session list on success. */
 export function useDiscardSession(campaignId: string, sessionId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => discardSession(campaignId, sessionId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all(campaignId) }),
+    // Same reasoning as commit: avoid refetching the discarded session's diff (404).
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.lists(campaignId) }),
   })
 }
 

@@ -81,6 +81,7 @@ const diffPayload: DiffPayload = {
 describe('sessionKeys', () => {
   it('scopes the status and diff keys under the campaign session list key', () => {
     expect(sessionKeys.all('c1')).toEqual(['sessions', 'c1'])
+    expect(sessionKeys.lists('c1')).toEqual(['sessions', 'c1', 'list'])
     expect(sessionKeys.list('c1', 0)).toEqual(['sessions', 'c1', 'list', 0])
     expect(sessionKeys.status('c1', 's1')).toEqual(['sessions', 'c1', 's1', 'status'])
     expect(sessionKeys.diff('c1', 's1')).toEqual(['sessions', 'c1', 's1', 'diff'])
@@ -225,7 +226,7 @@ describe('discardSession', () => {
 })
 
 describe('useCommitSession', () => {
-  it('invalidates the campaign session cache on success', async () => {
+  it('invalidates only the session list on success (not the diff query, which would 404)', async () => {
     vi.mocked(apiClient.post).mockResolvedValue(envelope(null))
     const queryClient = createTestQueryClient()
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
@@ -236,12 +237,12 @@ describe('useCommitSession', () => {
     result.current.mutate(commitPayload)
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sessionKeys.all('c1') })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sessionKeys.lists('c1') })
   })
 })
 
 describe('useDiscardSession', () => {
-  it('invalidates the campaign session cache on success', async () => {
+  it('invalidates only the session list on success', async () => {
     vi.mocked(apiClient.delete).mockResolvedValue(envelope(null))
     const queryClient = createTestQueryClient()
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
@@ -252,7 +253,7 @@ describe('useDiscardSession', () => {
     result.current.mutate()
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sessionKeys.all('c1') })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sessionKeys.lists('c1') })
   })
 })
 
