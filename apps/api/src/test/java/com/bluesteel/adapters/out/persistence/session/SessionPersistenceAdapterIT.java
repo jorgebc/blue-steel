@@ -181,13 +181,13 @@ class SessionPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
   }
 
   @Test
-  @DisplayName("should order sessions by sequence number with nulls last")
-  void findByCampaignId_ordersBySequenceNumberNullsLast() {
-    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
-    committedSession(1, now);
-    committedSession(2, now);
-    // an active draft has no sequence number yet — it must sort after committed sessions
-    Session draft = Session.create(UUID.randomUUID(), campaignId, ownerId, now);
+  @DisplayName("should order sessions newest-first by creation time")
+  void findByCampaignId_ordersNewestFirst() {
+    Instant base = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    committedSession(1, base.minusSeconds(30));
+    committedSession(2, base.minusSeconds(20));
+    // the most recently created session — an active draft with no sequence number yet
+    Session draft = Session.create(UUID.randomUUID(), campaignId, ownerId, base.minusSeconds(10));
     draft.startProcessing();
     draft.toDraft("{}");
     adapter.save(draft);
@@ -195,9 +195,9 @@ class SessionPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
     List<Session> page = adapter.findByCampaignId(campaignId, 0, 10);
 
     assertThat(page).hasSize(3);
-    assertThat(page.get(0).sequenceNumber()).isEqualTo(1);
+    assertThat(page.get(0).sequenceNumber()).isNull(); // newest (draft)
     assertThat(page.get(1).sequenceNumber()).isEqualTo(2);
-    assertThat(page.get(2).sequenceNumber()).isNull();
+    assertThat(page.get(2).sequenceNumber()).isEqualTo(1); // oldest
   }
 
   @Test

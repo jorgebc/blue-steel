@@ -38,7 +38,8 @@ public class SessionPersistenceAdapter implements SessionRepository {
 
   @Override
   public List<Session> findByCampaignId(UUID campaignId, int page, int size) {
-    Sort sort = Sort.by(Sort.Order.asc("sequenceNumber").nullsLast(), Sort.Order.asc("createdAt"));
+    Sort sort =
+        Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("sequenceNumber").nullsLast());
     return jpaRepository.findByCampaignId(campaignId, PageRequest.of(page, size, sort)).stream()
         .map(this::toDomain)
         .toList();
