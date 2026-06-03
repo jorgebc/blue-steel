@@ -24,9 +24,10 @@ import org.springframework.context.annotation.Profile;
  * </ul>
  *
  * <p>Exactly one {@link ChatClient} and one {@link EmbeddingModel} bean are active per profile.
- * Gemini auto-configuration is disabled in the {@code llm-ollama} profile by setting {@code
- * spring.ai.google.genai.api-key} to empty in {@code application-llm-ollama.properties}, which
- * prevents bean ambiguity when both starters are on the classpath.
+ * Each profile disables the other provider's auto-configuration to prevent bean ambiguity when both
+ * starters are on the classpath: {@code llm-ollama} blanks {@code spring.ai.google.genai.api-key};
+ * {@code llm-real} excludes the Ollama auto-configuration classes via {@code
+ * spring.autoconfigure.exclude}.
  */
 @Configuration
 public class AiConfig {
