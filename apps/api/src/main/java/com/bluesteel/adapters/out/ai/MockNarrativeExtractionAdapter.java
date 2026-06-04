@@ -1,6 +1,7 @@
 package com.bluesteel.adapters.out.ai;
 
 import com.bluesteel.application.model.ingestion.ExtractedMention;
+import com.bluesteel.application.model.ingestion.ExtractedRelation;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.application.port.out.ingestion.NarrativeExtractionPort;
 import java.util.List;
@@ -29,7 +30,11 @@ public class MockNarrativeExtractionAdapter implements NarrativeExtractionPort {
             new ExtractedMention(
                 "The Arrival", "The party arrives at Thornwick at dusk", rawSummaryText)),
         List.of(
-            new ExtractedMention(
-                "Mira guides the party", "Mira leads the group to shelter", rawSummaryText)));
+            new ExtractedRelation(
+                "Mira guides the party",
+                "Mira leads the group to shelter",
+                "Mira",
+                "Thornwick",
+                rawSummaryText)));
   }
 }

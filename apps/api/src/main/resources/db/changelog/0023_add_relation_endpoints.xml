@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    F4.3.1: structured relation graph endpoints (D-095, D-030, D-021, D-035).
+    Relations gain a source and a target endpoint so the Relations graph can draw
+    reliable edges. Columns are nullable: endpoints are best-effort name-matched at
+    commit and left null when unresolved. Endpoint type is restricted to the node
+    entity types the graph renders (actor / space). Append-only (DB-02).
+  -->
+  <changeSet id="0023-add-relation-endpoints" author="jorge">
+
+    <addColumn tableName="relations">
+      <column name="source_entity_id" type="UUID"/>
+      <column name="source_entity_type" type="TEXT"/>
+      <column name="target_entity_id" type="UUID"/>
+      <column name="target_entity_type" type="TEXT"/>
+    </addColumn>
+
+    <!-- Fast lookup of relations touching a given entity (graph + actor filter) -->
+    <sql>
+      CREATE INDEX idx_relations_source_entity_id ON relations (source_entity_id);
+      CREATE INDEX idx_relations_target_entity_id ON relations (target_entity_id);
+    </sql>
+
+    <!-- Endpoint types may only be the graph node types, or NULL when unresolved -->
+    <sql>
+      ALTER TABLE relations ADD CONSTRAINT chk_relations_source_entity_type
+        CHECK (source_entity_type IS NULL OR source_entity_type IN ('actor', 'space'));
+      ALTER TABLE relations ADD CONSTRAINT chk_relations_target_entity_type
+        CHECK (target_entity_type IS NULL OR target_entity_type IN ('actor', 'space'));
+    </sql>
+
+    <rollback>
+      <sql>
+        ALTER TABLE relations DROP CONSTRAINT chk_relations_source_entity_type;
+        ALTER TABLE relations DROP CONSTRAINT chk_relations_target_entity_type;
+      </sql>
+      <dropIndex tableName="relations" indexName="idx_relations_source_entity_id"/>
+      <dropIndex tableName="relations" indexName="idx_relations_target_entity_id"/>
+      <dropColumn tableName="relations" columnName="source_entity_id"/>
+      <dropColumn tableName="relations" columnName="source_entity_type"/>
+      <dropColumn tableName="relations" columnName="target_entity_id"/>
+      <dropColumn tableName="relations" columnName="target_entity_type"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

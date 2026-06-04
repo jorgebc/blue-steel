@@ -21,6 +21,7 @@ import { SpacesPage } from '@/features/exploration/spaces/SpacesPage'
 import { SpaceProfilePage } from '@/features/exploration/spaces/SpaceProfilePage'
 import { TimelinePage } from '@/features/exploration/timeline/TimelinePage'
 import { EventDetailPage } from '@/features/exploration/timeline/EventDetailPage'
+import { RelationsPage } from '@/features/exploration/relations/RelationsPage'
 import { CampaignContextGuard } from '@/components/domain/CampaignContextGuard'
 import { AppShell } from '@/components/domain/AppShell'
 import { AuthenticatedLayout } from '@/components/domain/AuthenticatedLayout'
@@ -76,6 +77,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <Route path="entities/:entityId" element={<EntityProfilePage />} />
                     <Route path="spaces" element={<SpacesPage />} />
                     <Route path="spaces/:spaceId" element={<SpaceProfilePage />} />
+                    <Route path="relations" element={<RelationsPage />} />
                   </Route>
                 </Route>
               </Route>

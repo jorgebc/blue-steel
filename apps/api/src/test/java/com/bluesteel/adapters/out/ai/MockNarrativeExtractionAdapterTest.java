@@ -42,6 +42,16 @@ class MockNarrativeExtractionAdapterTest {
   }
 
   @Test
+  @DisplayName("should emit relation source/target endpoint mentions referencing the mock entities")
+  void extract_relationCarriesEndpoints() {
+    var result = adapter.extract("raw text");
+
+    var relation = result.relations().get(0);
+    assertThat(relation.sourceMention()).isEqualTo("Mira");
+    assertThat(relation.targetMention()).isEqualTo("Thornwick");
+  }
+
+  @Test
   @DisplayName("should return a non-blank narrativeSummaryHeader")
   void extract_returnsNonBlankHeader() {
     var result = adapter.extract("raw text");

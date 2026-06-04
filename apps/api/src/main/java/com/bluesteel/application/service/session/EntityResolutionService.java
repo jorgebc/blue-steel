@@ -2,6 +2,7 @@ package com.bluesteel.application.service.session;
 
 import com.bluesteel.application.model.ingestion.EntityContext;
 import com.bluesteel.application.model.ingestion.ExtractedMention;
+import com.bluesteel.application.model.ingestion.ExtractedRelation;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.application.model.ingestion.ResolutionOutcome;
 import com.bluesteel.application.model.ingestion.ResolvedEntity;
@@ -67,7 +68,11 @@ public class EntityResolutionService {
     results.addAll(resolveAll(extraction.actors(), "actor", campaignId));
     results.addAll(resolveAll(extraction.spaces(), "space", campaignId));
     results.addAll(resolveAll(extraction.events(), "event", campaignId));
-    results.addAll(resolveAll(extraction.relations(), "relation", campaignId));
+    results.addAll(
+        resolveAll(
+            extraction.relations().stream().map(ExtractedRelation::toMention).toList(),
+            "relation",
+            campaignId));
 
     log.info("Resolution complete campaignId={} resolved={}", campaignId, results.size());
     return results;
