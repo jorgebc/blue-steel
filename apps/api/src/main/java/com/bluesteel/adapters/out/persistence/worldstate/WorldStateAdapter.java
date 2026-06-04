@@ -2,6 +2,7 @@ package com.bluesteel.adapters.out.persistence.worldstate;
 
 import com.bluesteel.application.model.worldstate.CommittedEntityVersion;
 import com.bluesteel.application.model.worldstate.EntityWriteCommand;
+import com.bluesteel.application.model.worldstate.ResolvedEndpoint;
 import com.bluesteel.application.port.out.worldstate.WorldStatePort;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -62,16 +65,33 @@ public class WorldStateAdapter implements WorldStatePort {
       entityId = UUID.randomUUID();
       versionNumber = 1;
 
-      jdbcTemplate.update(
-          "INSERT INTO "
-              + tables.headTable()
-              + " (id, campaign_id, owner_id, name, created_at, created_in_session_id)"
-              + " VALUES (?, ?, ?, ?, now(), ?)",
-          entityId,
-          cmd.campaignId(),
-          cmd.ownerId(),
-          cmd.name(),
-          cmd.sessionId());
+      if ("relation".equals(cmd.entityType())) {
+        jdbcTemplate.update(
+            "INSERT INTO relations (id, campaign_id, owner_id, name, created_at,"
+                + " created_in_session_id, source_entity_id, source_entity_type,"
+                + " target_entity_id, target_entity_type)"
+                + " VALUES (?, ?, ?, ?, now(), ?, ?, ?, ?, ?)",
+            entityId,
+            cmd.campaignId(),
+            cmd.ownerId(),
+            cmd.name(),
+            cmd.sessionId(),
+            cmd.sourceEntityId(),
+            cmd.sourceEntityType(),
+            cmd.targetEntityId(),
+            cmd.targetEntityType());
+      } else {
+        jdbcTemplate.update(
+            "INSERT INTO "
+                + tables.headTable()
+                + " (id, campaign_id, owner_id, name, created_at, created_in_session_id)"
+                + " VALUES (?, ?, ?, ?, now(), ?)",
+            entityId,
+            cmd.campaignId(),
+            cmd.ownerId(),
+            cmd.name(),
+            cmd.sessionId());
+      }
     } else {
       entityId = cmd.existingEntityId();
       versionNumber =
@@ -101,6 +121,32 @@ public class WorldStateAdapter implements WorldStatePort {
 
     return new CommittedEntityVersion(
         cmd.entityType(), entityId, entityVersionId, versionNumber, contentToEmbed, contentHash);
+  }
+
+  @Override
+  public Optional<ResolvedEndpoint> findEndpointByName(UUID campaignId, String name) {
+    if (name == null || name.isBlank()) {
+      return Optional.empty();
+    }
+    // Actors take precedence over spaces; the first case-insensitive match wins (D-095).
+    return findEndpoint("actors", "actor", campaignId, name)
+        .or(() -> findEndpoint("spaces", "space", campaignId, name));
+  }
+
+  private Optional<ResolvedEndpoint> findEndpoint(
+      String headTable, String entityType, UUID campaignId, String name) {
+    List<UUID> ids =
+        jdbcTemplate.query(
+            "SELECT id FROM "
+                + headTable
+                + " WHERE campaign_id = ? AND lower(name) = lower(?) ORDER BY created_at ASC"
+                + " LIMIT 1",
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
+            campaignId,
+            name);
+    return ids.isEmpty()
+        ? Optional.empty()
+        : Optional.of(new ResolvedEndpoint(ids.get(0), entityType));
   }
 
   @Override

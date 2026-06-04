@@ -12,6 +12,7 @@ import com.bluesteel.application.model.session.NewEntityCard;
 import com.bluesteel.application.model.session.UncertainEntityCard;
 import com.bluesteel.application.model.worldstate.CommittedEntityVersion;
 import com.bluesteel.application.model.worldstate.EntityWriteCommand;
+import com.bluesteel.application.model.worldstate.ResolvedEndpoint;
 import com.bluesteel.application.port.in.session.CommitSessionUseCase;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
 import com.bluesteel.application.port.out.session.SessionRepository;
@@ -101,16 +102,12 @@ public class CommitService implements CommitSessionUseCase {
     List<CommittedEntityVersion> versions = new ArrayList<>();
     Map<UUID, DiffCard> cardMap = buildCardMap(storedDiff);
 
+    // Non-relation cards first, then UNCERTAIN resolutions, then relations. Relations are written
+    // last so their source/target name-matches resolve against every actor/space committed in this
+    // same session — regardless of the order the client listed the decisions in (F4.3.4, D-095).
     for (CardDecision decision : command.payload().cardDecisions()) {
-      DiffCard card = cardMap.get(decision.cardId());
-      switch (decision.action()) {
-        case ACCEPT, EDIT -> {
-          EntityWriteCommand cmd = buildWriteCommand(card, decision, session);
-          versions.add(worldStatePort.writeEntity(cmd));
-        }
-        case DELETE -> {
-          /* skip — entity is intentionally omitted */
-        }
+      if (!isRelationCard(cardMap.get(decision.cardId()))) {
+        writeDecision(decision, cardMap, session, versions);
       }
     }
 
@@ -118,6 +115,12 @@ public class CommitService implements CommitSessionUseCase {
       UncertainEntityCard uncertainCard = (UncertainEntityCard) cardMap.get(resolution.cardId());
       EntityWriteCommand cmd = buildUncertainWriteCommand(uncertainCard, resolution, session);
       versions.add(worldStatePort.writeEntity(cmd));
+    }
+
+    for (CardDecision decision : command.payload().cardDecisions()) {
+      if (isRelationCard(cardMap.get(decision.cardId()))) {
+        writeDecision(decision, cardMap, session, versions);
+      }
     }
 
     int seq = sessionRepository.nextSequenceNumber(command.campaignId());
@@ -154,6 +157,33 @@ public class CommitService implements CommitSessionUseCase {
     };
   }
 
+  private void writeDecision(
+      CardDecision decision,
+      Map<UUID, DiffCard> cardMap,
+      Session session,
+      List<CommittedEntityVersion> versions) {
+    DiffCard card = cardMap.get(decision.cardId());
+    switch (decision.action()) {
+      case ACCEPT, EDIT ->
+          versions.add(worldStatePort.writeEntity(buildWriteCommand(card, decision, session)));
+      case DELETE -> {
+        /* skip — entity is intentionally omitted */
+      }
+    }
+  }
+
+  private static boolean isRelationCard(DiffCard card) {
+    return "relation".equals(entityTypeOf(card));
+  }
+
+  private static String entityTypeOf(DiffCard card) {
+    return switch (card) {
+      case ExistingEntityCard c -> c.entityType();
+      case NewEntityCard c -> c.entityType();
+      case UncertainEntityCard c -> c.entityType();
+    };
+  }
+
   private EntityWriteCommand buildWriteCommand(
       DiffCard card, CardDecision decision, Session session) {
     return switch (card) {
@@ -162,35 +192,65 @@ public class CommitService implements CommitSessionUseCase {
         if (decision.editedFields() != null) {
           changedFields.putAll(decision.editedFields());
         }
-        yield new EntityWriteCommand(
-            c.entityType(),
-            c.entityId(),
-            session.campaignId(),
-            session.ownerId(),
-            c.name(),
-            changedFields,
-            changedFields,
-            session.id());
+        EntityWriteCommand cmd =
+            new EntityWriteCommand(
+                c.entityType(),
+                c.entityId(),
+                session.campaignId(),
+                session.ownerId(),
+                c.name(),
+                changedFields,
+                changedFields,
+                session.id());
+        yield applyRelationEndpoints(cmd, changedFields, session.campaignId());
       }
       case NewEntityCard c -> {
         Map<String, Object> fullSnapshot = new HashMap<>(c.fullProfile());
         if (decision.editedFields() != null) {
           fullSnapshot.putAll(decision.editedFields());
         }
-        yield new EntityWriteCommand(
-            c.entityType(),
-            null,
-            session.campaignId(),
-            session.ownerId(),
-            c.name(),
-            null,
-            fullSnapshot,
-            session.id());
+        EntityWriteCommand cmd =
+            new EntityWriteCommand(
+                c.entityType(),
+                null,
+                session.campaignId(),
+                session.ownerId(),
+                c.name(),
+                null,
+                fullSnapshot,
+                session.id());
+        yield applyRelationEndpoints(cmd, fullSnapshot, session.campaignId());
       }
       case UncertainEntityCard c ->
           throw new IllegalStateException(
               "UNCERTAIN card should be handled via uncertainResolutions, not cardDecisions");
     };
+  }
+
+  /**
+   * For relation cards, best-effort resolves the {@code sourceMention}/{@code targetMention} names
+   * stashed in the card snapshot to committed actor/space ids and sets them on the command;
+   * unresolved endpoints stay null (F4.3.4, D-095). Non-relation commands are returned unchanged.
+   */
+  private EntityWriteCommand applyRelationEndpoints(
+      EntityWriteCommand cmd, Map<String, Object> snapshot, UUID campaignId) {
+    if (!"relation".equals(cmd.entityType())) {
+      return cmd;
+    }
+    ResolvedEndpoint source = resolveEndpoint(snapshot.get("sourceMention"), campaignId);
+    ResolvedEndpoint target = resolveEndpoint(snapshot.get("targetMention"), campaignId);
+    return cmd.withEndpoints(
+        source == null ? null : source.entityId(),
+        source == null ? null : source.entityType(),
+        target == null ? null : target.entityId(),
+        target == null ? null : target.entityType());
+  }
+
+  private ResolvedEndpoint resolveEndpoint(Object mentionName, UUID campaignId) {
+    if (!(mentionName instanceof String name) || name.isBlank()) {
+      return null;
+    }
+    return worldStatePort.findEndpointByName(campaignId, name).orElse(null);
   }
 
   private EntityWriteCommand buildUncertainWriteCommand(

@@ -19,6 +19,7 @@ import com.bluesteel.application.model.session.ExistingEntityCard;
 import com.bluesteel.application.model.session.NewEntityCard;
 import com.bluesteel.application.model.worldstate.CommittedEntityVersion;
 import com.bluesteel.application.model.worldstate.EntityWriteCommand;
+import com.bluesteel.application.model.worldstate.ResolvedEndpoint;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
 import com.bluesteel.application.port.out.session.SessionRepository;
 import com.bluesteel.application.port.out.worldstate.WorldStatePort;
@@ -225,5 +226,155 @@ class CommitServiceTest {
         .isInstanceOf(InvalidSessionStateTransitionException.class);
 
     verify(worldStatePort, never()).writeEntity(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  @DisplayName("should resolve relation source/target mentions to entity ids on the write command")
+  void commit_relationCard_resolvesEndpoints() throws Exception {
+    UUID relationCardId = UUID.randomUUID();
+    UUID sourceId = UUID.randomUUID();
+    UUID targetId = UUID.randomUUID();
+    CommittedEntityVersion relationVersion =
+        new CommittedEntityVersion(
+            "relation", UUID.randomUUID(), UUID.randomUUID(), 1, "rel\n{}", "hash");
+    when(worldStatePort.writeEntity(org.mockito.ArgumentMatchers.any(EntityWriteCommand.class)))
+        .thenReturn(relationVersion);
+    when(worldStatePort.findEndpointByName(campaignId, "Mira"))
+        .thenReturn(Optional.of(new ResolvedEndpoint(sourceId, "actor")));
+    when(worldStatePort.findEndpointByName(campaignId, "Thornwick"))
+        .thenReturn(Optional.of(new ResolvedEndpoint(targetId, "space")));
+
+    CommitService relationService = commitServiceFor(relationDiffWithEndpoints(relationCardId));
+
+    relationService.commit(
+        new CommitSessionCommand(
+            callerId,
+            campaignId,
+            sessionId,
+            new CommitPayload(
+                List.of(new CardDecision(relationCardId, CardAction.ACCEPT, null)),
+                List.of(),
+                List.of())));
+
+    ArgumentCaptor<EntityWriteCommand> captor = forClass(EntityWriteCommand.class);
+    verify(worldStatePort).writeEntity(captor.capture());
+    EntityWriteCommand cmd = captor.getValue();
+    assertThat(cmd.sourceEntityId()).isEqualTo(sourceId);
+    assertThat(cmd.sourceEntityType()).isEqualTo("actor");
+    assertThat(cmd.targetEntityId()).isEqualTo(targetId);
+    assertThat(cmd.targetEntityType()).isEqualTo("space");
+  }
+
+  @Test
+  @DisplayName("should leave relation endpoints null when a mention does not name-match any entity")
+  void commit_relationCard_unresolvedEndpointsStayNull() throws Exception {
+    UUID relationCardId = UUID.randomUUID();
+    CommittedEntityVersion relationVersion =
+        new CommittedEntityVersion(
+            "relation", UUID.randomUUID(), UUID.randomUUID(), 1, "rel\n{}", "hash");
+    when(worldStatePort.writeEntity(org.mockito.ArgumentMatchers.any(EntityWriteCommand.class)))
+        .thenReturn(relationVersion);
+    when(worldStatePort.findEndpointByName(campaignId, "Mira")).thenReturn(Optional.empty());
+    when(worldStatePort.findEndpointByName(campaignId, "Thornwick")).thenReturn(Optional.empty());
+
+    CommitService relationService = commitServiceFor(relationDiffWithEndpoints(relationCardId));
+
+    relationService.commit(
+        new CommitSessionCommand(
+            callerId,
+            campaignId,
+            sessionId,
+            new CommitPayload(
+                List.of(new CardDecision(relationCardId, CardAction.ACCEPT, null)),
+                List.of(),
+                List.of())));
+
+    ArgumentCaptor<EntityWriteCommand> captor = forClass(EntityWriteCommand.class);
+    verify(worldStatePort).writeEntity(captor.capture());
+    EntityWriteCommand cmd = captor.getValue();
+    assertThat(cmd.sourceEntityId()).isNull();
+    assertThat(cmd.sourceEntityType()).isNull();
+    assertThat(cmd.targetEntityId()).isNull();
+    assertThat(cmd.targetEntityType()).isNull();
+  }
+
+  @Test
+  @DisplayName("should write relation cards after non-relation cards regardless of decision order")
+  void commit_writesRelationsLastRegardlessOfOrder() throws Exception {
+    UUID actorCardId = UUID.randomUUID();
+    UUID relationCardId = UUID.randomUUID();
+    DiffPayload diffPayload =
+        new DiffPayload(
+            "header",
+            List.of(new NewEntityCard(actorCardId, "actor", "Mira", Map.of("name", "Mira"))),
+            List.of(),
+            List.of(),
+            List.of(
+                new NewEntityCard(
+                    relationCardId,
+                    "relation",
+                    "Mira guides the party",
+                    Map.of("name", "Mira guides the party", "sourceMention", "Mira"))),
+            List.of());
+    CommitService relationService = commitServiceFor(diffPayload);
+    when(worldStatePort.findEndpointByName(campaignId, "Mira")).thenReturn(Optional.empty());
+
+    // The relation decision is listed BEFORE the actor decision — the service must still write the
+    // actor first so the relation's endpoint name-match can see it.
+    relationService.commit(
+        new CommitSessionCommand(
+            callerId,
+            campaignId,
+            sessionId,
+            new CommitPayload(
+                List.of(
+                    new CardDecision(relationCardId, CardAction.ACCEPT, null),
+                    new CardDecision(actorCardId, CardAction.ACCEPT, null)),
+                List.of(),
+                List.of())));
+
+    ArgumentCaptor<EntityWriteCommand> captor = forClass(EntityWriteCommand.class);
+    verify(worldStatePort, org.mockito.Mockito.times(2)).writeEntity(captor.capture());
+    assertThat(captor.getAllValues().get(0).entityType()).isEqualTo("actor");
+    assertThat(captor.getAllValues().get(1).entityType()).isEqualTo("relation");
+  }
+
+  private DiffPayload relationDiffWithEndpoints(UUID relationCardId) {
+    return new DiffPayload(
+        "header",
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(
+            new NewEntityCard(
+                relationCardId,
+                "relation",
+                "Mira guides the party",
+                Map.of(
+                    "name",
+                    "Mira guides the party",
+                    "sourceMention",
+                    "Mira",
+                    "targetMention",
+                    "Thornwick"))),
+        List.of());
+  }
+
+  private CommitService commitServiceFor(DiffPayload relationDiff) throws Exception {
+    String diffJson = objectMapper.writeValueAsString(relationDiff);
+    Session relationSession =
+        Session.reconstitute(
+            sessionId,
+            campaignId,
+            callerId,
+            com.bluesteel.domain.session.SessionStatus.DRAFT,
+            null,
+            null,
+            diffJson,
+            null,
+            Instant.now(),
+            Instant.now());
+    when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(relationSession));
+    return service;
   }
 }

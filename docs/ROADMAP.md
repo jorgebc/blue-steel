@@ -3336,21 +3336,21 @@ no modals (D-082), no Q&A history (D-058).
 | F4.2.9 | Frontend: TimelinePage (infinite feed + Load more + filters) | ✅ |
 | F4.2.10 | Frontend: EventDetailPage (timeline click-through) | ✅ |
 | F4.2.11 | Frontend: timeline + event routes (index → timeline) | ✅ |
-| F4.3 | Relations graph — structured endpoints + React Flow (D-030, D-009) | 🔲 |
-| F4.3.1 | Backend: migration 0023 — relation source/target endpoint columns | 🔲 |
-| F4.3.2 | Backend: ExtractedRelation model + ExtractionResult signature change | 🔲 |
-| F4.3.3 | Backend: mock + real extraction adapters emit relation endpoints | 🔲 |
-| F4.3.4 | Backend: resolve + persist relation endpoints at commit (EntityWriteCommand + WorldStateAdapter) | 🔲 |
-| F4.3.5 | Backend: relation read model + port + adapter (endpoints + history) + IT | 🔲 |
-| F4.3.6 | Backend: GetRelations use cases + service + RelationsController + DTOs | 🔲 |
+| F4.3 | Relations graph — structured endpoints + React Flow (D-030, D-009) | ✅ |
+| F4.3.1 | Backend: migration 0023 — relation source/target endpoint columns | ✅ |
+| F4.3.2 | Backend: ExtractedRelation model + ExtractionResult signature change | ✅ |
+| F4.3.3 | Backend: mock + real extraction adapters emit relation endpoints | ✅ |
+| F4.3.4 | Backend: resolve + persist relation endpoints at commit (EntityWriteCommand + WorldStateAdapter) | ✅ |
+| F4.3.5 | Backend: relation read model + port + adapter (endpoints + history) + IT | ✅ |
+| F4.3.6 | Backend: GetRelations use cases + service + RelationsController + DTOs | ✅ |
 | F4.3-SETUP | Frontend scaffolding — relations contract + React Flow notes (human step) | 👤 |
-| F4.3.7 | Frontend: relation TypeScript types | 🔲 |
-| F4.3.8 | Frontend: relations API client + hooks | 🔲 |
-| F4.3.9 | Frontend: graphTransform util (actors/spaces/relations → nodes/edges) | 🔲 |
-| F4.3.10 | Frontend: RelationNode + RelationEdge custom components | 🔲 |
-| F4.3.11 | Frontend: RelationsGraphSkeleton + accessible relations list | 🔲 |
-| F4.3.12 | Frontend: RelationsPage (React Flow container, read-only) | 🔲 |
-| F4.3.13 | Frontend: relations route | 🔲 |
+| F4.3.7 | Frontend: relation TypeScript types | ✅ |
+| F4.3.8 | Frontend: relations API client + hooks | ✅ |
+| F4.3.9 | Frontend: graphTransform util (actors/spaces/relations → nodes/edges) | ✅ |
+| F4.3.10 | Frontend: RelationNode + RelationEdge custom components | ✅ |
+| F4.3.11 | Frontend: RelationsGraphSkeleton + accessible relations list | ✅ |
+| F4.3.12 | Frontend: RelationsPage (React Flow container, read-only) | ✅ |
+| F4.3.13 | Frontend: relations route | ✅ |
 | F4.4 | Annotations — create, list, delete; non-canonical (D-011) | 🔲 |
 | F4.4.1 | Backend: Annotation domain + use-case ports + repository port + models | 🔲 |
 | F4.4.2 | Backend: annotation persistence adapter (JPA) + IT | 🔲 |
@@ -3775,6 +3775,24 @@ accessible relations-list alternative.
 **Scope (out):** v2 proposal pipeline; world-state edits from the graph (D-010).
 
 **Skills:** `database-migration`, `session-ingestion-pipeline`, `spring-ai-llm-adapter`, `backend-endpoint`, `frontend-exploration`  **Decisions:** D-009, D-030, D-010, D-021, D-035, D-089, D-095  **Dependencies:** F4.1, F2.8
+
+> **Post-implementation review follow-ups (2026-06-05).** F4.3 shipped; the deep review found one
+> bug (now fixed) and these deferred items — track for a future hardening pass:
+> - **F4.3-FU1 ✅ fixed in F4.3.4:** commit-time endpoint resolution was order-dependent (a relation
+>   written before its endpoint's actor/space card, or pointing at an UNCERTAIN-resolved entity, got
+>   null endpoints). `CommitService` now writes relations in a final pass after all actors/spaces.
+> - **F4.3-FU2:** `kind` is plumbed end-to-end (column → read model → DTO → graph/list label) but the
+>   extraction pipeline never emits a `kind` snapshot field, so it is always null today and the edge
+>   label always falls back to `name`. Emit `kind` from extraction (or drop the field) when relation
+>   typing is specced.
+> - **F4.3-FU3:** `RelationsPage` loads only page 0 (size 20) of actors/spaces via `useEntityList`;
+>   in campaigns with >20 of either, off-page entities have no node and their relations render as
+>   "Unknown"/edgeless. Add an all-entities fetch for the graph.
+> - **F4.3-FU4:** relation endpoints are written only at head creation; a relation re-committed in a
+>   later session (MATCH → new version) does not refresh its endpoints. Add an endpoint UPDATE on
+>   relation re-commit if endpoints need to track later sessions.
+> - **F4.3-FU5 (nit):** `buildRelationCards`/`buildCards` use `Map.of("description", …)`, which NPEs
+>   if the LLM omits a description. Pre-existing across all entity types; harden with a null-guard.
 
 ---
 

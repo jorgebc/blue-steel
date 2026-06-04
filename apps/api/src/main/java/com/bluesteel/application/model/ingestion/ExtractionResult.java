@@ -6,13 +6,15 @@ import java.util.Objects;
 /**
  * The structured output of {@code NarrativeExtractionPort}: a narrative summary header plus four
  * entity-candidate lists (actors, spaces, events, relations) extracted from one session's raw text.
+ * Relations are {@link ExtractedRelation}s carrying structured source/target endpoint mentions
+ * (D-095).
  */
 public record ExtractionResult(
     String narrativeSummaryHeader,
     List<ExtractedMention> actors,
     List<ExtractedMention> spaces,
     List<ExtractedMention> events,
-    List<ExtractedMention> relations) {
+    List<ExtractedRelation> relations) {
 
   public ExtractionResult {
     Objects.requireNonNull(narrativeSummaryHeader, "narrativeSummaryHeader must not be null");

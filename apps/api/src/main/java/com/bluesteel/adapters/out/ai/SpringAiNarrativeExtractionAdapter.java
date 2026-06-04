@@ -30,6 +30,9 @@ public class SpringAiNarrativeExtractionAdapter implements NarrativeExtractionPo
       You are a knowledge extraction assistant for tabletop RPG session summaries.
       Extract all actors (named characters), spaces (locations/settings), events (plot occurrences),
       and relations (connections between entities) explicitly mentioned in the session text.
+      For each relation, set sourceMention and targetMention to the names of the two entities it
+      connects (an actor or space), exactly as they appear among the extracted actors/spaces; leave
+      a mention null only if the endpoint cannot be identified.
       Also produce a concise 1–3 sentence narrative summary header capturing the session's key events (D-005).
       Return a single valid JSON object matching the schema provided. No extra text.
       """;
