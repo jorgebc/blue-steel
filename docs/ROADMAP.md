@@ -3323,19 +3323,19 @@ no modals (D-082), no Q&A history (D-058).
 | F4.1.11 | Frontend: EntityProfilePage (actor: snapshot + history + slots) | ✅ |
 | F4.1.12 | Frontend: SpacesPage + SpaceProfilePage | ✅ |
 | F4.1.13 | Frontend: exploration route wiring + Sidebar Exploration activation | ✅ |
-| F4.2 | Timeline endpoint + view (keyset pagination, D-055, D-009) | 🔲 |
-| F4.2.1 | Backend: timeline read model + TimelineReadPort (keyset) | 🔲 |
-| F4.2.2 | Backend: TimelineReadAdapter (native SQL keyset + JSONB filters) + IT | 🔲 |
-| F4.2.3 | Backend: GetTimelineUseCase + service | 🔲 |
-| F4.2.4 | Backend: TimelineController (cursor + filters) + DTOs | 🔲 |
+| F4.2 | Timeline endpoint + view (keyset pagination, D-055, D-009) | ✅ |
+| F4.2.1 | Backend: timeline read model + TimelineReadPort (keyset) | ✅ |
+| F4.2.2 | Backend: TimelineReadAdapter (native SQL keyset + JSONB filters) + IT | ✅ |
+| F4.2.3 | Backend: GetTimelineUseCase + service | ✅ |
+| F4.2.4 | Backend: TimelineController (cursor + filters) + DTOs | ✅ |
 | F4.2-SETUP | Frontend scaffolding — verified timeline (keyset) contract (human step) | 👤 |
-| F4.2.5 | Frontend: timeline TypeScript types | 🔲 |
-| F4.2.6 | Frontend: timeline API client (useInfiniteQuery, keyset) | 🔲 |
-| F4.2.7 | Frontend: TimelineSkeleton | 🔲 |
-| F4.2.8 | Frontend: EventCard component | 🔲 |
-| F4.2.9 | Frontend: TimelinePage (infinite feed + Load more + filters) | 🔲 |
-| F4.2.10 | Frontend: EventDetailPage (timeline click-through) | 🔲 |
-| F4.2.11 | Frontend: timeline + event routes (index → timeline) | 🔲 |
+| F4.2.5 | Frontend: timeline TypeScript types | ✅ |
+| F4.2.6 | Frontend: timeline API client (useInfiniteQuery, keyset) | ✅ |
+| F4.2.7 | Frontend: TimelineSkeleton | ✅ |
+| F4.2.8 | Frontend: EventCard component | ✅ |
+| F4.2.9 | Frontend: TimelinePage (infinite feed + Load more + filters) | ✅ |
+| F4.2.10 | Frontend: EventDetailPage (timeline click-through) | ✅ |
+| F4.2.11 | Frontend: timeline + event routes (index → timeline) | ✅ |
 | F4.3 | Relations graph — structured endpoints + React Flow (D-030, D-009) | 🔲 |
 | F4.3.1 | Backend: migration 0023 — relation source/target endpoint columns | 🔲 |
 | F4.3.2 | Backend: ExtractedRelation model + ExtractionResult signature change | 🔲 |
@@ -3371,6 +3371,8 @@ no modals (D-082), no Q&A history (D-058).
 | F4.6.2 | Backend: ExtractedEvent model (space + involved actors) + ExtractionResult change | 🔲 |
 | F4.6.3 | Backend: mock + real extraction adapters emit event links | 🔲 |
 | F4.6.4 | Backend: resolve + persist event links at commit | 🔲 |
+| F4.6.5 | Backend: re-point Timeline adapter (F4.2.2) at the relational event links | 🔲 |
+| F4.6.6 | Decide + implement the `eventType` source (or drop the Timeline type badge/filter) | 🔲 |
 | F4.7 | Profile cross-links — "living record" relational sections + navigation (D-009) | 🔲 |
 | F4.7.1 | Backend: EntityLinksReadPort + adapter (relations/events/appearances) + IT | 🔲 |
 | F4.7.2 | Backend: GetEntityLinks use case + service + endpoint | 🔲 |
@@ -4159,6 +4161,13 @@ npx shadcn@latest add tooltip --yes      # writes src/components/ui/tooltip.tsx
 
 **Scope (out):** Read/UI of these links (F4.7, F4.2); relation endpoints (F4.3).
 
+> **Timeline integration note (F4.2 gap):** F4.2 shipped reading event type / involved actors /
+> space from the `event_versions.full_snapshot` JSONB (per the F4.2 spec), but F4.6 persists space
+> and actors **relationally** (`events.space_id` + `event_involved_actors`), not into the snapshot.
+> So finishing F4.6.1–4 does **not** automatically populate the Timeline's actor/space columns or
+> filters — F4.6.5 re-points the Timeline adapter at the relational links. Separately, **no feature
+> produces `eventType`** (it appears only in F4.2); F4.6.6 resolves that.
+
 **Skills:** `database-migration`, `session-ingestion-pipeline`, `spring-ai-llm-adapter`, `backend-testing`  **Decisions:** D-095, D-021, D-035, D-089, D-009  **Dependencies:** F2.8, F4.3
 
 ---
@@ -4218,6 +4227,40 @@ npx shadcn@latest add tooltip --yes      # writes src/components/ui/tooltip.tsx
 **Scope (out):** Read side (F4.7).
 
 **Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-095, D-089  **Dependencies:** F4.6.1, F4.6.2, F4.3.4
+
+---
+
+#### F4.6.5 — Re-point Timeline adapter at the relational event links
+
+**Goal:** Make the Timeline's involved-actors and space columns/filters (F4.2) work on real
+committed data. F4.2.2 currently reads `involvedActors`/`space` from `event_versions.full_snapshot`,
+which the pipeline never populates; F4.6 stores them relationally instead. Re-point the read so the
+Timeline reflects the structured links.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/worldstate/TimelineReadAdapter.java` — read `spaceName` via `JOIN spaces ON spaces.id = events.space_id` and `involvedActorNames` via `event_involved_actors → actors.name`; change the actor/space filters to query those tables (drop the JSONB `->>'space'` / `jsonb_array_elements_text('involvedActors')` reads)
+- `apps/api/src/test/java/com/bluesteel/adapters/out/persistence/worldstate/TimelineReadAdapterIT.java` — seed the relational links (not snapshot keys); assert ordering/cursor unchanged, and that actor/space projection + filters resolve through the join tables
+- revert the timeline `eventType`/`involvedActors`/`space` JSONB enrichment in `scripts/seed-local.sql` to seed `events.space_id` + `event_involved_actors` rows instead
+
+**Scope (out):** `eventType` (F4.6.6); UI (unchanged — same response contract).
+
+**Skills:** `database-migration`, `backend-testing`  **Decisions:** D-095, D-055, D-089  **Dependencies:** F4.6.4
+
+---
+
+#### F4.6.6 — Decide + implement the `eventType` source
+
+**Goal:** `eventType` exists only in the F4.2 read model and DTO — nothing extracts, stores, or
+populates it, so the Timeline's type badge and `eventType` filter are permanently empty on real
+data. Resolve the dangling field one way or the other.
+
+**Scope (in):**
+- Decide (record as a D-NNN): either (a) extract an event type during ingestion — add `eventType` to `ExtractedEvent`/extraction prompt and persist it (snapshot or a column), or (b) drop the type badge + `eventType` filter from F4.2 (`TimelineEntryView`, `TimelineEventResponse`, `TimelineController` param, `TimelineReadAdapter` filter, frontend `TimelineEvent` type, `EventCard` badge, `TimelinePage` filter input)
+- Implement the chosen option end-to-end with tests
+
+**Scope (out):** Actor/space links (F4.6.5).
+
+**Skills:** `session-ingestion-pipeline`, `spring-ai-llm-adapter`, `frontend-exploration`, `backend-testing`  **Decisions:** D-095, D-009  **Dependencies:** F4.6.4
 
 ---
 
