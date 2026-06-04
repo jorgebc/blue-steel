@@ -72,13 +72,17 @@ class TimelineReadAdapterIT extends TestcontainersPostgresBaseIT {
 
     assertThat(page.events()).hasSize(3);
 
-    // Session 1 events come first (sequence 1), ordered by ascending event id; session 2 last.
+    // Cross-session ordering is the deterministic contract: both session-1 events (sequence 1)
+    // come before the session-2 event. The within-session tiebreaker is Postgres's own `e.id ASC`
+    // (unsigned-byte UUID order), which does not match Java's signed UUID.compareTo — so we assert
+    // the two session-1 events are present in either order rather than predicting their order here.
+    // The keyset-continuation test verifies the tiebreaker is consistent and gap-free.
     TimelineEntryView first = page.events().get(0);
     TimelineEntryView middle = page.events().get(1);
     assertThat(first.sessionSequenceNumber()).isEqualTo(1);
     assertThat(middle.sessionSequenceNumber()).isEqualTo(1);
-    assertThat(List.of(ambushId, coronationId)).contains(first.eventId(), middle.eventId());
-    assertThat(first.eventId().compareTo(middle.eventId())).isLessThan(0);
+    assertThat(List.of(first.eventId(), middle.eventId()))
+        .containsExactlyInAnyOrder(ambushId, coronationId);
 
     TimelineEntryView last = page.events().get(2);
     assertThat(last.eventId()).isEqualTo(duelId);
