@@ -3323,19 +3323,19 @@ no modals (D-082), no Q&A history (D-058).
 | F4.1.11 | Frontend: EntityProfilePage (actor: snapshot + history + slots) | ✅ |
 | F4.1.12 | Frontend: SpacesPage + SpaceProfilePage | ✅ |
 | F4.1.13 | Frontend: exploration route wiring + Sidebar Exploration activation | ✅ |
-| F4.2 | Timeline endpoint + view (keyset pagination, D-055, D-009) | 🔲 |
-| F4.2.1 | Backend: timeline read model + TimelineReadPort (keyset) | 🔲 |
-| F4.2.2 | Backend: TimelineReadAdapter (native SQL keyset + JSONB filters) + IT | 🔲 |
-| F4.2.3 | Backend: GetTimelineUseCase + service | 🔲 |
-| F4.2.4 | Backend: TimelineController (cursor + filters) + DTOs | 🔲 |
+| F4.2 | Timeline endpoint + view (keyset pagination, D-055, D-009) | ✅ |
+| F4.2.1 | Backend: timeline read model + TimelineReadPort (keyset) | ✅ |
+| F4.2.2 | Backend: TimelineReadAdapter (native SQL keyset + JSONB filters) + IT | ✅ |
+| F4.2.3 | Backend: GetTimelineUseCase + service | ✅ |
+| F4.2.4 | Backend: TimelineController (cursor + filters) + DTOs | ✅ |
 | F4.2-SETUP | Frontend scaffolding — verified timeline (keyset) contract (human step) | 👤 |
-| F4.2.5 | Frontend: timeline TypeScript types | 🔲 |
-| F4.2.6 | Frontend: timeline API client (useInfiniteQuery, keyset) | 🔲 |
-| F4.2.7 | Frontend: TimelineSkeleton | 🔲 |
-| F4.2.8 | Frontend: EventCard component | 🔲 |
-| F4.2.9 | Frontend: TimelinePage (infinite feed + Load more + filters) | 🔲 |
-| F4.2.10 | Frontend: EventDetailPage (timeline click-through) | 🔲 |
-| F4.2.11 | Frontend: timeline + event routes (index → timeline) | 🔲 |
+| F4.2.5 | Frontend: timeline TypeScript types | ✅ |
+| F4.2.6 | Frontend: timeline API client (useInfiniteQuery, keyset) | ✅ |
+| F4.2.7 | Frontend: TimelineSkeleton | ✅ |
+| F4.2.8 | Frontend: EventCard component | ✅ |
+| F4.2.9 | Frontend: TimelinePage (infinite feed + Load more + filters) | ✅ |
+| F4.2.10 | Frontend: EventDetailPage (timeline click-through) | ✅ |
+| F4.2.11 | Frontend: timeline + event routes (index → timeline) | ✅ |
 | F4.3 | Relations graph — structured endpoints + React Flow (D-030, D-009) | 🔲 |
 | F4.3.1 | Backend: migration 0023 — relation source/target endpoint columns | 🔲 |
 | F4.3.2 | Backend: ExtractedRelation model + ExtractionResult signature change | 🔲 |

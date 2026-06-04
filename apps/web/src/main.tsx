@@ -19,6 +19,8 @@ import { EntitiesPage } from '@/features/exploration/entities/EntitiesPage'
 import { EntityProfilePage } from '@/features/exploration/entities/EntityProfilePage'
 import { SpacesPage } from '@/features/exploration/spaces/SpacesPage'
 import { SpaceProfilePage } from '@/features/exploration/spaces/SpaceProfilePage'
+import { TimelinePage } from '@/features/exploration/timeline/TimelinePage'
+import { EventDetailPage } from '@/features/exploration/timeline/EventDetailPage'
 import { CampaignContextGuard } from '@/components/domain/CampaignContextGuard'
 import { AppShell } from '@/components/domain/AppShell'
 import { AuthenticatedLayout } from '@/components/domain/AuthenticatedLayout'
@@ -67,7 +69,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                   <Route path="sessions/new" element={<SubmitSessionPage />} />
                   <Route path="sessions/:sessionId/diff" element={<DiffReviewPage />} />
                   <Route path="explore" element={<ExplorationLayout />}>
-                    <Route index element={<Navigate to="entities" replace />} />
+                    <Route index element={<Navigate to="timeline" replace />} />
+                    <Route path="timeline" element={<TimelinePage />} />
+                    <Route path="events/:eventId" element={<EventDetailPage />} />
                     <Route path="entities" element={<EntitiesPage />} />
                     <Route path="entities/:entityId" element={<EntityProfilePage />} />
                     <Route path="spaces" element={<SpacesPage />} />
