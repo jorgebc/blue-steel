@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    F4.6.1: structured event links (D-095, D-097, D-021, D-035).
+    Events gain the space they occurred in (space_id), an extracted event_type, and a
+    many-to-many link to the actors they involved (event_involved_actors). Like the
+    relation endpoints, space_id is nullable and best-effort name-matched at commit;
+    event_type is nullable and extracted during ingestion (D-097). Append-only (DB-02).
+  -->
+  <changeSet id="0024-add-event-links" author="jorge">
+
+    <addColumn tableName="events">
+      <column name="space_id" type="UUID">
+        <constraints nullable="true"
+                     foreignKeyName="fk_events_space"
+                     references="spaces(id)"/>
+      </column>
+      <column name="event_type" type="TEXT"/>
+    </addColumn>
+
+    <!-- Fast lookup of events occurring in a given space (timeline space filter + cross-links) -->
+    <sql>
+      CREATE INDEX idx_events_space_id ON events (space_id);
+    </sql>
+
+    <!-- Many-to-many: actors involved in an event (timeline actor filter + cross-links) -->
+    <createTable tableName="event_involved_actors">
+      <column name="event_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_event_involved_actors_event"
+                     references="events(id)"/>
+      </column>
+      <column name="actor_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_event_involved_actors_actor"
+                     references="actors(id)"/>
+      </column>
+    </createTable>
+
+    <addPrimaryKey tableName="event_involved_actors"
+                   columnNames="event_id, actor_id"
+                   constraintName="pk_event_involved_actors"/>
+
+    <!-- PK covers event_id-first lookups; this index serves actor-first lookups -->
+    <sql>
+      CREATE INDEX idx_event_involved_actors_actor_id ON event_involved_actors (actor_id);
+    </sql>
+
+    <rollback>
+      <dropIndex tableName="event_involved_actors" indexName="idx_event_involved_actors_actor_id"/>
+      <dropTable tableName="event_involved_actors"/>
+      <dropIndex tableName="events" indexName="idx_events_space_id"/>
+      <dropColumn tableName="events" columnName="event_type"/>
+      <dropColumn tableName="events" columnName="space_id"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

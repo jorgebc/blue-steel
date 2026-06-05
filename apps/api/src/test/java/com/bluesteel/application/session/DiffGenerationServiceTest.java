@@ -8,6 +8,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import com.bluesteel.application.model.ingestion.ConflictWarning;
+import com.bluesteel.application.model.ingestion.ExtractedEvent;
 import com.bluesteel.application.model.ingestion.ExtractedMention;
 import com.bluesteel.application.model.ingestion.ExtractedRelation;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
@@ -122,12 +123,14 @@ class DiffGenerationServiceTest {
   @DisplayName(
       "should build UncertainEntityCard with null candidateEntityId for an UNCERTAIN event")
   void run_withUncertainEvent_buildsUncertainEntityCard() throws Exception {
-    ExtractedMention mention =
-        new ExtractedMention("The Battle", "A clash of forces", "The battle raged.");
+    ExtractedEvent event =
+        new ExtractedEvent(
+            "The Battle", "A clash of forces", null, null, List.of(), "The battle raged.");
     ExtractionResult extraction =
         new ExtractionResult(
-            "The battle was fierce.", List.of(), List.of(), List.of(mention), List.of());
-    ResolvedEntity resolved = new ResolvedEntity(mention, ResolutionOutcome.UNCERTAIN, null);
+            "The battle was fierce.", List.of(), List.of(), List.of(event), List.of());
+    ResolvedEntity resolved =
+        new ResolvedEntity(event.toMention(), ResolutionOutcome.UNCERTAIN, null);
     Session session = processingSession();
 
     sut.run(session, extraction, List.of(resolved), List.of());
@@ -242,6 +245,35 @@ class DiffGenerationServiceTest {
         objectMapper.readValue(captor.getValue().diffPayload(), DiffPayload.class);
     NewEntityCard card = (NewEntityCard) payload.relations().get(0);
     assertThat(card.fullProfile()).doesNotContainKey("kind");
+  }
+
+  @Test
+  @DisplayName("should stash event space/actor mentions and event type in the snapshot (F4.6.4)")
+  void run_withEventLinks_stashesMentionsAndTypeInSnapshot() throws Exception {
+    ExtractedEvent event =
+        new ExtractedEvent(
+            "The Arrival",
+            "The party reaches the village",
+            "arrival",
+            "Thornwick",
+            List.of("Mira", "Aldric"),
+            "They arrived.");
+    ExtractionResult extraction =
+        new ExtractionResult("Summary.", List.of(), List.of(), List.of(event), List.of());
+    ResolvedEntity resolved = new ResolvedEntity(event.toMention(), ResolutionOutcome.NEW, null);
+    Session session = processingSession();
+
+    sut.run(session, extraction, List.of(resolved), List.of());
+
+    ArgumentCaptor<Session> captor = ArgumentCaptor.forClass(Session.class);
+    verify(sessionRepository).save(captor.capture());
+    DiffPayload payload =
+        objectMapper.readValue(captor.getValue().diffPayload(), DiffPayload.class);
+    NewEntityCard card = (NewEntityCard) payload.events().get(0);
+    assertThat(card.fullProfile()).containsEntry("spaceMention", "Thornwick");
+    assertThat(card.fullProfile()).containsEntry("eventType", "arrival");
+    assertThat(card.fullProfile())
+        .containsEntry("involvedActorMentions", List.of("Mira", "Aldric"));
   }
 
   @Test

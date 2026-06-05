@@ -1,5 +1,6 @@
 package com.bluesteel.adapters.out.ai;
 
+import com.bluesteel.application.model.ingestion.ExtractedEvent;
 import com.bluesteel.application.model.ingestion.ExtractedMention;
 import com.bluesteel.application.model.ingestion.ExtractedRelation;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
@@ -27,8 +28,13 @@ public class MockNarrativeExtractionAdapter implements NarrativeExtractionPort {
             new ExtractedMention(
                 "Thornwick", "A ruined village in the eastern marshes", rawSummaryText)),
         List.of(
-            new ExtractedMention(
-                "The Arrival", "The party arrives at Thornwick at dusk", rawSummaryText)),
+            new ExtractedEvent(
+                "The Arrival",
+                "The party arrives at Thornwick at dusk",
+                "arrival",
+                "Thornwick",
+                List.of("Mira", "Aldric"),
+                rawSummaryText)),
         List.of(
             new ExtractedRelation(
                 "Mira guides the party",

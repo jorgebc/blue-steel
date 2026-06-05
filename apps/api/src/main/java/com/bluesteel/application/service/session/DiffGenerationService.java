@@ -1,6 +1,7 @@
 package com.bluesteel.application.service.session;
 
 import com.bluesteel.application.model.ingestion.ConflictWarning;
+import com.bluesteel.application.model.ingestion.ExtractedEvent;
 import com.bluesteel.application.model.ingestion.ExtractedMention;
 import com.bluesteel.application.model.ingestion.ExtractedRelation;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
@@ -64,7 +65,7 @@ public class DiffGenerationService {
               extraction.narrativeSummaryHeader(),
               buildCards(extraction.actors(), "actor", byMention),
               buildCards(extraction.spaces(), "space", byMention),
-              buildCards(extraction.events(), "event", byMention),
+              buildEventCards(extraction.events(), byMention),
               buildRelationCards(extraction.relations(), byMention),
               buildConflictCards(conflicts, extraction, resolved));
 
@@ -168,6 +169,62 @@ public class DiffGenerationService {
     return snapshot;
   }
 
+  /**
+   * Builds event diff cards, mirroring {@link #buildCards} but stashing the event's space mention,
+   * involved-actor mentions, and event type into the card snapshot so they survive serialize →
+   * commit, where the mentions are resolved to entity ids and the links persisted (F4.6.4, D-095,
+   * D-097).
+   */
+  private List<DiffCard> buildEventCards(
+      List<ExtractedEvent> events, Map<ExtractedMention, ResolvedEntity> byMention) {
+    List<DiffCard> cards = new ArrayList<>(events.size());
+    for (ExtractedEvent event : events) {
+      ResolvedEntity resolved = byMention.get(event.toMention());
+      if (resolved == null) {
+        continue;
+      }
+      UUID cardId = UUID.randomUUID();
+      DiffCard card =
+          switch (resolved.outcome()) {
+            case MATCH ->
+                new ExistingEntityCard(
+                    cardId,
+                    resolved.matchedEntityId(),
+                    "event",
+                    event.name(),
+                    withEventExtras(snapshotOf(event.description()), event));
+            case NEW ->
+                new NewEntityCard(
+                    cardId,
+                    "event",
+                    event.name(),
+                    withEventExtras(snapshotOf(event.name(), event.description()), event));
+            case UNCERTAIN -> new UncertainEntityCard(cardId, "event", event.name(), null);
+          };
+      cards.add(card);
+    }
+    return cards;
+  }
+
+  /**
+   * Returns a copy of {@code base} with a non-null space mention, non-empty involved-actor
+   * mentions, and a non-null event type added (F4.6.4, D-097).
+   */
+  private static Map<String, Object> withEventExtras(
+      Map<String, Object> base, ExtractedEvent event) {
+    Map<String, Object> snapshot = new LinkedHashMap<>(base);
+    if (event.spaceMention() != null) {
+      snapshot.put("spaceMention", event.spaceMention());
+    }
+    if (!event.involvedActorMentions().isEmpty()) {
+      snapshot.put("involvedActorMentions", event.involvedActorMentions());
+    }
+    if (event.eventType() != null) {
+      snapshot.put("eventType", event.eventType());
+    }
+    return snapshot;
+  }
+
   /** Builds a snapshot delta containing only a non-null description (FU5). */
   private static Map<String, Object> snapshotOf(String description) {
     Map<String, Object> m = new LinkedHashMap<>();
@@ -222,7 +279,7 @@ public class DiffGenerationService {
   private String findEntityType(String entityName, ExtractionResult extraction) {
     if (containsName(extraction.actors(), entityName)) return "actor";
     if (containsName(extraction.spaces(), entityName)) return "space";
-    if (containsName(extraction.events(), entityName)) return "event";
+    if (extraction.events().stream().anyMatch(e -> e.name().equals(entityName))) return "event";
     if (extraction.relations().stream().anyMatch(r -> r.name().equals(entityName)))
       return "relation";
     return null;

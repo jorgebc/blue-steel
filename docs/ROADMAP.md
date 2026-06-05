@@ -3366,13 +3366,13 @@ no modals (D-082), no Q&A history (D-058).
 | F4.5-SETUP | Frontend scaffolding — npx shadcn@latest add tooltip (human step) | 👤 |
 | F4.5.1 | Frontend: ProposeChangeButton domain component (disabled + tooltip) | ✅ |
 | F4.5.2 | Frontend: mount ProposeChangeButton in entity/space/relation profiles | ✅ |
-| F4.6 | Event relational links — structured event↔space / event↔actor (Phase-2 pipeline extension, D-095) | 🔲 |
-| F4.6.1 | Backend: migration 0024 — events.space_id + event_involved_actors join | 🔲 |
-| F4.6.2 | Backend: ExtractedEvent model (space + involved actors) + ExtractionResult change | 🔲 |
-| F4.6.3 | Backend: mock + real extraction adapters emit event links | 🔲 |
-| F4.6.4 | Backend: resolve + persist event links at commit | 🔲 |
-| F4.6.5 | Backend: re-point Timeline adapter (F4.2.2) at the relational event links | 🔲 |
-| F4.6.6 | Decide + implement the `eventType` source (or drop the Timeline type badge/filter) | 🔲 |
+| F4.6 | Event relational links — structured event↔space / event↔actor (Phase-2 pipeline extension, D-095) | ✅ |
+| F4.6.1 | Backend: migration 0024 — events.space_id + event_involved_actors join | ✅ |
+| F4.6.2 | Backend: ExtractedEvent model (space + involved actors) + ExtractionResult change | ✅ |
+| F4.6.3 | Backend: mock + real extraction adapters emit event links | ✅ |
+| F4.6.4 | Backend: resolve + persist event links at commit | ✅ |
+| F4.6.5 | Backend: re-point Timeline adapter (F4.2.2) at the relational event links | ✅ |
+| F4.6.6 | Decide + implement the `eventType` source (extract + persist as events.event_type, D-097) | ✅ |
 | F4.7 | Profile cross-links — "living record" relational sections + navigation (D-009) | 🔲 |
 | F4.7.1 | Backend: EntityLinksReadPort + adapter (relations/events/appearances) + IT | 🔲 |
 | F4.7.2 | Backend: GetEntityLinks use case + service + endpoint | 🔲 |

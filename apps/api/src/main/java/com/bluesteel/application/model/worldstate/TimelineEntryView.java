@@ -8,8 +8,9 @@ import java.util.UUID;
 /**
  * Read-side projection of one event for the Timeline feed (F4.2): the event's latest committed
  * version plus the session it belongs to. {@code eventType}, {@code involvedActorNames}, and {@code
- * spaceName} are read from {@code full_snapshot} and may be absent (null / empty) until the
- * extraction pipeline enriches event snapshots.
+ * spaceName} are read from the event's structured relational links (the {@code events.event_type} /
+ * {@code events.space_id} columns and the {@code event_involved_actors} join table) populated at
+ * commit (F4.6, D-097); they may be null/empty when the extractor could not identify them.
  */
 public record TimelineEntryView(
     UUID eventId,

@@ -6,14 +6,15 @@ import java.util.Objects;
 /**
  * The structured output of {@code NarrativeExtractionPort}: a narrative summary header plus four
  * entity-candidate lists (actors, spaces, events, relations) extracted from one session's raw text.
- * Relations are {@link ExtractedRelation}s carrying structured source/target endpoint mentions
- * (D-095).
+ * Relations are {@link ExtractedRelation}s carrying structured source/target endpoint mentions, and
+ * events are {@link ExtractedEvent}s carrying structured space/involved-actor mentions and an event
+ * type (D-095, D-097).
  */
 public record ExtractionResult(
     String narrativeSummaryHeader,
     List<ExtractedMention> actors,
     List<ExtractedMention> spaces,
-    List<ExtractedMention> events,
+    List<ExtractedEvent> events,
     List<ExtractedRelation> relations) {
 
   public ExtractionResult {

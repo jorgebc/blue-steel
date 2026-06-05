@@ -1,5 +1,6 @@
 package com.bluesteel.application.model.worldstate;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -10,7 +11,9 @@ import java.util.UUID;
  *
  * <p>The four {@code source*}/{@code target*} fields carry a relation's resolved graph endpoints
  * (F4.3.4, D-095); they are null for non-relation entities and for relations whose endpoints could
- * not be name-matched.
+ * not be name-matched. The {@code spaceId}, {@code involvedActorIds}, and {@code eventType} fields
+ * carry an event's resolved structured links (F4.6.4, D-095, D-097); they are null/empty for
+ * non-event entities and for events whose mentions could not be resolved.
  */
 public record EntityWriteCommand(
     String entityType,
@@ -24,9 +27,14 @@ public record EntityWriteCommand(
     UUID sourceEntityId,
     String sourceEntityType,
     UUID targetEntityId,
-    String targetEntityType) {
+    String targetEntityType,
+    UUID spaceId,
+    List<UUID> involvedActorIds,
+    String eventType) {
 
-  /** Convenience constructor for non-relation writes, leaving all graph endpoints null. */
+  /**
+   * Convenience constructor for plain writes, leaving all graph endpoints and event links unset.
+   */
   public EntityWriteCommand(
       String entityType,
       UUID existingEntityId,
@@ -48,6 +56,9 @@ public record EntityWriteCommand(
         null,
         null,
         null,
+        null,
+        null,
+        List.of(),
         null);
   }
 
@@ -66,6 +77,30 @@ public record EntityWriteCommand(
         sourceEntityId,
         sourceEntityType,
         targetEntityId,
-        targetEntityType);
+        targetEntityType,
+        spaceId,
+        involvedActorIds,
+        eventType);
+  }
+
+  /** Returns a copy of this command with the given resolved event links set (F4.6.4). */
+  public EntityWriteCommand withEventLinks(
+      UUID spaceId, List<UUID> involvedActorIds, String eventType) {
+    return new EntityWriteCommand(
+        entityType,
+        existingEntityId,
+        campaignId,
+        ownerId,
+        name,
+        changedFields,
+        fullSnapshot,
+        sessionId,
+        sourceEntityId,
+        sourceEntityType,
+        targetEntityId,
+        targetEntityType,
+        spaceId,
+        involvedActorIds == null ? List.of() : List.copyOf(involvedActorIds),
+        eventType);
   }
 }

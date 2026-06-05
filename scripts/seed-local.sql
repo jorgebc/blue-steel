@@ -27,12 +27,13 @@
 --   Events  — Arrival, Zombie horde (s1); Werewolf ambush (s2); Festival (s3)
 --   Relations — Strahd→Ireena obsession, Ireena→Ismark sibling bond (s1)
 --
--- TIMELINE (F4.2): event snapshots carry eventType / involvedActors / space so
--- the feed's EventCard fields and the actor/space/eventType filters can be
--- exercised. The feed orders by (session sequence, event id) across committed
--- sessions, so Curse of Strahd shows: Arrival + Zombie horde (seq 1), Werewolf
--- ambush (seq 2), Festival (seq 3). Try filters: eventType "battle" → 2 events;
--- actor "Ismark" → 2 events; space "Vallaki" → 1 event.
+-- TIMELINE (F4.2 / F4.6): events carry structured links — events.event_type,
+-- events.space_id, and event_involved_actors rows — so the feed's EventCard
+-- fields and the actor/space/eventType filters can be exercised. The feed orders
+-- by (session sequence, event id) across committed sessions, so Curse of Strahd
+-- shows: Arrival + Zombie horde (seq 1), Werewolf ambush (seq 2), Festival
+-- (seq 3). Try filters: eventType "battle" → 2 events; actor "Ismark" → 2 events;
+-- space "Vallaki" → 1 event.
 --
 -- DRAFT diff_payload (Curse of Strahd session 5):
 --   Actors  — NEW: Madame Eva; EXISTING update: Strahd; UNCERTAIN: dark figure
@@ -454,15 +455,26 @@ VALUES
 -- WORLD STATE — Events
 -- =============================================================================
 
-INSERT INTO events (id, campaign_id, owner_id, name, created_at, created_in_session_id) VALUES
+-- F4.6: events carry structured links — space_id + event_type columns, and
+-- event_involved_actors rows below. The Svalich Road has no seeded space head, so the
+-- werewolf ambush's space_id is left NULL (best-effort, like a commit that did not resolve).
+INSERT INTO events (id, campaign_id, owner_id, name, created_at, created_in_session_id, space_id, event_type) VALUES
   ('a4000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001',
-   'Party crosses into Barovia',           '2026-01-11 19:00:00+00', 'e0000000-0000-4000-8000-000000000001'),
+   'Party crosses into Barovia',           '2026-01-11 19:00:00+00', 'e0000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'travel'),
   ('a4000000-0000-4000-8000-000000000002', 'c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001',
-   'Zombie horde in the village square',   '2026-01-11 19:00:00+00', 'e0000000-0000-4000-8000-000000000001'),
+   'Zombie horde in the village square',   '2026-01-11 19:00:00+00', 'e0000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'battle'),
   ('a4000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001',
-   'Werewolf ambush on the Svalich Road',  '2026-01-18 20:00:00+00', 'e0000000-0000-4000-8000-000000000002'),
+   'Werewolf ambush on the Svalich Road',  '2026-01-18 20:00:00+00', 'e0000000-0000-4000-8000-000000000002', NULL, 'battle'),
   ('a4000000-0000-4000-8000-000000000004', 'c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001',
-   'Festival of the Blazing Sun — Vallaki','2026-01-25 21:00:00+00', 'e0000000-0000-4000-8000-000000000003');
+   'Festival of the Blazing Sun — Vallaki','2026-01-25 21:00:00+00', 'e0000000-0000-4000-8000-000000000003', 'a2000000-0000-4000-8000-000000000003', 'social');
+
+-- F4.6: event ↔ involved-actor links (Strahd campaign)
+INSERT INTO event_involved_actors (event_id, actor_id) VALUES
+  ('a4000000-0000-4000-8000-000000000002', 'ac000000-0000-4000-8000-000000000003'),  -- Zombie horde ← Ismark
+  ('a4000000-0000-4000-8000-000000000003', 'ac000000-0000-4000-8000-000000000002'),  -- Werewolf ambush ← Ireena
+  ('a4000000-0000-4000-8000-000000000003', 'ac000000-0000-4000-8000-000000000003'),  -- Werewolf ambush ← Ismark
+  ('a4000000-0000-4000-8000-000000000004', 'ac000000-0000-4000-8000-000000000005'),  -- Festival ← Baron Vallakovich
+  ('a4000000-0000-4000-8000-000000000004', 'ac000000-0000-4000-8000-000000000004');  -- Festival ← Lady Wachter
 
 INSERT INTO event_versions
   (id, event_id, session_id, version_number, changed_fields, full_snapshot, created_at)
@@ -471,28 +483,28 @@ VALUES
    'a4000000-0000-4000-8000-000000000001',
    'e0000000-0000-4000-8000-000000000001',
    1, NULL,
-   '{"name":"Party crosses into Barovia","eventType":"travel","involvedActors":[],"space":"Village of Barovia","description":"The adventuring party passed through the mist at the border of Barovia and found themselves trapped in the cursed land. The mist closed behind them; there was no return until Strahd is dealt with.","outcome":"Party is now trapped in Barovia"}',
+   '{"name":"Party crosses into Barovia","description":"The adventuring party passed through the mist at the border of Barovia and found themselves trapped in the cursed land. The mist closed behind them; there was no return until Strahd is dealt with.","outcome":"Party is now trapped in Barovia"}',
    '2026-01-11 19:00:00+00'),
 
   ('ee000000-0000-4000-8000-000000000002',
    'a4000000-0000-4000-8000-000000000002',
    'e0000000-0000-4000-8000-000000000001',
    1, NULL,
-   '{"name":"Zombie horde in the village square","eventType":"battle","involvedActors":["Ismark Kolyanovich"],"space":"Village of Barovia","description":"A shambling horde of zombies appeared in the village square. The townsfolk seemed grimly accustomed to this. The party fought off several zombies before the horde dispersed at dawn.","outcome":"Party survived; zombies dispersed at daylight"}',
+   '{"name":"Zombie horde in the village square","description":"A shambling horde of zombies appeared in the village square. The townsfolk seemed grimly accustomed to this. The party fought off several zombies before the horde dispersed at dawn.","outcome":"Party survived; zombies dispersed at daylight"}',
    '2026-01-11 19:00:00+00'),
 
   ('ee000000-0000-4000-8000-000000000003',
    'a4000000-0000-4000-8000-000000000003',
    'e0000000-0000-4000-8000-000000000002',
    1, NULL,
-   '{"name":"Werewolf ambush on the Svalich Road","eventType":"battle","involvedActors":["Ireena Kolyana","Ismark Kolyanovich"],"space":"Svalich Road","description":"A werewolf leapt from the fog on the Svalich Road and mauled the fighter before the rogue drove it off with silvered arrows. The creature fled into the dark forest.","outcome":"Fighter wounded; werewolf fled; party cautious about the full moon"}',
+   '{"name":"Werewolf ambush on the Svalich Road","description":"A werewolf leapt from the fog on the Svalich Road and mauled the fighter before the rogue drove it off with silvered arrows. The creature fled into the dark forest.","outcome":"Fighter wounded; werewolf fled; party cautious about the full moon"}',
    '2026-01-18 20:00:00+00'),
 
   ('ee000000-0000-4000-8000-000000000004',
    'a4000000-0000-4000-8000-000000000004',
    'e0000000-0000-4000-8000-000000000003',
    1, NULL,
-   '{"name":"Festival of the Blazing Sun — Vallaki","eventType":"social","involvedActors":["Baron Vargas Vallakovich","Lady Fiona Wachter"],"space":"Vallaki","description":"Baron Vallakovich''s latest mandatory festival was in full preparation. Citizens displayed forced smiles. The party observed the political tension and noted the Baron''s guards harassing residents who seemed unhappy.","outcome":"Party understands Vallaki''s political situation; Lady Wachter made contact"}',
+   '{"name":"Festival of the Blazing Sun — Vallaki","description":"Baron Vallakovich''s latest mandatory festival was in full preparation. Citizens displayed forced smiles. The party observed the political tension and noted the Baron''s guards harassing residents who seemed unhappy.","outcome":"Party understands Vallaki''s political situation; Lady Wachter made contact"}',
    '2026-01-25 21:00:00+00');
 
 -- =============================================================================
@@ -563,9 +575,14 @@ VALUES
    '{"name":"Cragmaw Hideout","description":"A goblin-infested cave complex on the Triboar Trail used as a base by King Grol''s Cragmaw tribe. Sildar Hallwinter was imprisoned here. The party cleared the hideout and rescued Sildar.","type":"Cave/Dungeon","status":"Cleared by party"}',
    '2026-01-15 20:00:00+00');
 
-INSERT INTO events (id, campaign_id, owner_id, name, created_at, created_in_session_id) VALUES
+INSERT INTO events (id, campaign_id, owner_id, name, created_at, created_in_session_id, space_id, event_type) VALUES
   ('a4000000-0000-4000-8000-000000000010', 'c0000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000001',
-   'Goblin ambush on the Triboar Trail', '2026-01-15 20:00:00+00', 'e0000000-0000-4000-8000-000000000010');
+   'Goblin ambush on the Triboar Trail', '2026-01-15 20:00:00+00', 'e0000000-0000-4000-8000-000000000010', 'a2000000-0000-4000-8000-000000000010', 'battle');
+
+-- F4.6: event ↔ involved-actor links (Phandelver campaign)
+INSERT INTO event_involved_actors (event_id, actor_id) VALUES
+  ('a4000000-0000-4000-8000-000000000010', 'ac000000-0000-4000-8000-000000000011'),  -- Goblin ambush ← Sildar
+  ('a4000000-0000-4000-8000-000000000010', 'ac000000-0000-4000-8000-000000000010');  -- Goblin ambush ← Gundren
 
 INSERT INTO event_versions
   (id, event_id, session_id, version_number, changed_fields, full_snapshot, created_at)
@@ -574,7 +591,7 @@ VALUES
    'a4000000-0000-4000-8000-000000000010',
    'e0000000-0000-4000-8000-000000000010',
    1, NULL,
-   '{"name":"Goblin ambush on the Triboar Trail","eventType":"battle","involvedActors":["Sildar Hallwinter","Gundren Rockseeker"],"space":"Cragmaw Hideout","description":"The party discovered two dead horses and was ambushed by goblins on the Triboar Trail. They tracked the goblins back to Cragmaw Hideout, defeated the occupants, and rescued Sildar Hallwinter. Gundren Rockseeker and his map were taken to Cragmaw Castle.","outcome":"Sildar rescued; Gundren''s location identified; map is missing"}',
+   '{"name":"Goblin ambush on the Triboar Trail","description":"The party discovered two dead horses and was ambushed by goblins on the Triboar Trail. They tracked the goblins back to Cragmaw Hideout, defeated the occupants, and rescued Sildar Hallwinter. Gundren Rockseeker and his map were taken to Cragmaw Castle.","outcome":"Sildar rescued; Gundren''s location identified; map is missing"}',
    '2026-01-15 20:00:00+00');
 
 COMMIT;

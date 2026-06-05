@@ -24,8 +24,10 @@ import org.springframework.stereotype.Component;
 /**
  * Native-SQL implementation of {@link TimelineReadPort} (D-062, D-089). Builds the event feed from
  * each event's latest committed version, ordered by {@code (session.sequence_number, event.id)} so
- * the keyset cursor is total and gap-free. Snapshots are read as {@code ::text} then parsed to
- * maps; event type / involved actors / space are projected out of {@code full_snapshot}.
+ * the keyset cursor is total and gap-free. Event type, space, and involved actors are read from the
+ * event's structured relational links (the {@code events.event_type} / {@code events.space_id}
+ * columns and the {@code event_involved_actors} join table) populated at commit (F4.6, D-097); the
+ * latest version's {@code full_snapshot} is still surfaced as the raw snapshot map.
  */
 @Component
 public class TimelineReadAdapter implements TimelineReadPort {
@@ -50,13 +52,20 @@ public class TimelineReadAdapter implements TimelineReadPort {
             """
             SELECT e.id AS event_id,
                    e.name,
+                   e.event_type,
                    e.created_at,
+                   sp.name AS space_name,
                    ev.full_snapshot::text AS full_snapshot,
                    ev.session_id,
-                   s.sequence_number AS session_seq
+                   s.sequence_number AS session_seq,
+                   (SELECT array_agg(a.name ORDER BY a.name)
+                      FROM event_involved_actors ea
+                      JOIN actors a ON a.id = ea.actor_id
+                     WHERE ea.event_id = e.id) AS involved_actors
             FROM events e
             JOIN event_versions ev ON ev.event_id = e.id
             JOIN sessions s ON s.id = ev.session_id
+            LEFT JOIN spaces sp ON sp.id = e.space_id
             WHERE e.campaign_id = ?
               AND s.status = 'committed'
               AND ev.version_number = (
@@ -72,17 +81,17 @@ public class TimelineReadAdapter implements TimelineReadPort {
       args.add(decoded.eventId());
     }
     if (safeFilter.eventType() != null) {
-      sql.append(" AND ev.full_snapshot->>'eventType' = ?\n");
+      sql.append(" AND e.event_type = ?\n");
       args.add(safeFilter.eventType());
     }
     if (safeFilter.space() != null) {
-      sql.append(" AND ev.full_snapshot->>'space' ILIKE ?\n");
+      sql.append(" AND sp.name ILIKE ?\n");
       args.add("%" + safeFilter.space() + "%");
     }
     if (safeFilter.actor() != null) {
       sql.append(
-          " AND EXISTS (SELECT 1 FROM jsonb_array_elements_text("
-              + "COALESCE(ev.full_snapshot->'involvedActors', '[]'::jsonb)) a WHERE a ILIKE ?)\n");
+          " AND EXISTS (SELECT 1 FROM event_involved_actors ea JOIN actors a ON a.id = ea.actor_id"
+              + " WHERE ea.event_id = e.id AND a.name ILIKE ?)\n");
       args.add("%" + safeFilter.actor() + "%");
     }
 
@@ -103,25 +112,24 @@ public class TimelineReadAdapter implements TimelineReadPort {
 
   private TimelineEntryView mapEntry(ResultSet rs) throws SQLException {
     Map<String, Object> snapshot = parseJson(rs.getString("full_snapshot"));
-    Object eventTypeValue = snapshot.get("eventType");
-    Object spaceValue = snapshot.get("space");
     return new TimelineEntryView(
         rs.getObject("event_id", UUID.class),
         rs.getString("name"),
-        eventTypeValue == null ? null : String.valueOf(eventTypeValue),
-        involvedActorNames(snapshot.get("involvedActors")),
-        spaceValue == null ? null : String.valueOf(spaceValue),
+        rs.getString("event_type"),
+        involvedActorNames(rs.getArray("involved_actors")),
+        rs.getString("space_name"),
         rs.getObject("session_id", UUID.class),
         rs.getObject("session_seq", Integer.class),
         snapshot,
         instant(rs, "created_at"));
   }
 
-  private static List<String> involvedActorNames(Object value) {
-    if (value instanceof List<?> list) {
-      return list.stream().filter(java.util.Objects::nonNull).map(String::valueOf).toList();
+  private static List<String> involvedActorNames(java.sql.Array array) throws SQLException {
+    if (array == null) {
+      return List.of();
     }
-    return List.of();
+    String[] names = (String[]) array.getArray();
+    return java.util.Arrays.stream(names).filter(java.util.Objects::nonNull).toList();
   }
 
   private static Instant instant(ResultSet rs, String column) throws SQLException {

@@ -15,6 +15,7 @@ import com.bluesteel.domain.session.Session;
 import com.bluesteel.domain.user.User;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -190,18 +191,15 @@ class WorldStateAdapterIT extends TestcontainersPostgresBaseIT {
     UUID targetId = UUID.randomUUID();
     EntityWriteCommand cmd =
         new EntityWriteCommand(
-            "relation",
-            null,
-            campaignId,
-            ownerId,
-            "Mira guides the party",
-            null,
-            Map.of("name", "Mira guides the party"),
-            sessionId,
-            sourceId,
-            "actor",
-            targetId,
-            "space");
+                "relation",
+                null,
+                campaignId,
+                ownerId,
+                "Mira guides the party",
+                null,
+                Map.of("name", "Mira guides the party"),
+                sessionId)
+            .withEndpoints(sourceId, "actor", targetId, "space");
 
     CommittedEntityVersion result = adapter.writeEntity(cmd);
 
@@ -248,36 +246,30 @@ class WorldStateAdapterIT extends TestcontainersPostgresBaseIT {
     UUID originalTargetId = UUID.randomUUID();
     EntityWriteCommand createCmd =
         new EntityWriteCommand(
-            "relation",
-            null,
-            campaignId,
-            ownerId,
-            "Mira guides the party",
-            null,
-            Map.of("name", "Mira guides the party"),
-            sessionId,
-            originalSourceId,
-            "actor",
-            originalTargetId,
-            "space");
+                "relation",
+                null,
+                campaignId,
+                ownerId,
+                "Mira guides the party",
+                null,
+                Map.of("name", "Mira guides the party"),
+                sessionId)
+            .withEndpoints(originalSourceId, "actor", originalTargetId, "space");
     CommittedEntityVersion v1 = adapter.writeEntity(createCmd);
 
     UUID newSourceId = UUID.randomUUID();
     UUID newTargetId = UUID.randomUUID();
     EntityWriteCommand reCommitCmd =
         new EntityWriteCommand(
-            "relation",
-            v1.entityId(),
-            campaignId,
-            ownerId,
-            "Mira guides the party",
-            Map.of("description", "Updated bond"),
-            Map.of("name", "Mira guides the party", "description", "Updated bond"),
-            sessionId,
-            newSourceId,
-            "actor",
-            newTargetId,
-            "space");
+                "relation",
+                v1.entityId(),
+                campaignId,
+                ownerId,
+                "Mira guides the party",
+                Map.of("description", "Updated bond"),
+                Map.of("name", "Mira guides the party", "description", "Updated bond"),
+                sessionId)
+            .withEndpoints(newSourceId, "actor", newTargetId, "space");
     adapter.writeEntity(reCommitCmd);
 
     Map<String, Object> row =
@@ -339,5 +331,135 @@ class WorldStateAdapterIT extends TestcontainersPostgresBaseIT {
   @DisplayName("should return empty when no actor or space matches the endpoint name")
   void findEndpointByName_noMatch_returnsEmpty() {
     assertThat(adapter.findEndpointByName(campaignId, "Nobody")).isEmpty();
+  }
+
+  @Test
+  @DisplayName("should persist event space_id, event_type, and involved-actor join rows (F4.6.4)")
+  void writeEntity_eventWithLinks_persistsColumnsAndJoinRows() {
+    UUID spaceId = writeEntity("space", "Thornwick").entityId();
+    UUID actorId = writeEntity("actor", "Mira").entityId();
+
+    EntityWriteCommand eventCmd =
+        new EntityWriteCommand(
+                "event",
+                null,
+                campaignId,
+                ownerId,
+                "The Arrival",
+                null,
+                Map.of("name", "The Arrival"),
+                sessionId)
+            .withEventLinks(spaceId, List.of(actorId), "arrival");
+
+    CommittedEntityVersion result = adapter.writeEntity(eventCmd);
+
+    Map<String, Object> row =
+        jdbcTemplate.queryForMap(
+            "SELECT space_id, event_type FROM events WHERE id = ?", result.entityId());
+    assertThat(row.get("space_id")).isEqualTo(spaceId);
+    assertThat(row.get("event_type")).isEqualTo("arrival");
+
+    Integer joinCount =
+        jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM event_involved_actors WHERE event_id = ? AND actor_id = ?",
+            Integer.class,
+            result.entityId(),
+            actorId);
+    assertThat(joinCount).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("should leave event space_id/event_type null and no join rows when unset (F4.6.4)")
+  void writeEntity_eventWithoutLinks_persistsNullColumnsAndNoJoinRows() {
+    EntityWriteCommand cmd =
+        new EntityWriteCommand(
+            "event",
+            null,
+            campaignId,
+            ownerId,
+            "An untethered event",
+            null,
+            Map.of("name", "An untethered event"),
+            sessionId);
+
+    CommittedEntityVersion result = adapter.writeEntity(cmd);
+
+    Map<String, Object> row =
+        jdbcTemplate.queryForMap(
+            "SELECT space_id, event_type FROM events WHERE id = ?", result.entityId());
+    assertThat(row.get("space_id")).isNull();
+    assertThat(row.get("event_type")).isNull();
+
+    Integer joinCount =
+        jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM event_involved_actors WHERE event_id = ?",
+            Integer.class,
+            result.entityId());
+    assertThat(joinCount).isZero();
+  }
+
+  @Test
+  @DisplayName("should refresh event links and re-sync involved actors on re-commit (F4.6.4)")
+  void writeEntity_eventReCommit_refreshesLinksAndJoinRows() {
+    UUID space1 = writeEntity("space", "Thornwick").entityId();
+    UUID space2 = writeEntity("space", "Daggerford").entityId();
+    UUID actor1 = writeEntity("actor", "Mira").entityId();
+    UUID actor2 = writeEntity("actor", "Aldric").entityId();
+
+    EntityWriteCommand createCmd =
+        new EntityWriteCommand(
+                "event",
+                null,
+                campaignId,
+                ownerId,
+                "The Arrival",
+                null,
+                Map.of("name", "The Arrival"),
+                sessionId)
+            .withEventLinks(space1, List.of(actor1), "battle");
+    CommittedEntityVersion v1 = adapter.writeEntity(createCmd);
+
+    EntityWriteCommand reCommitCmd =
+        new EntityWriteCommand(
+                "event",
+                v1.entityId(),
+                campaignId,
+                ownerId,
+                "The Arrival",
+                Map.of("description", "Updated"),
+                Map.of("name", "The Arrival", "description", "Updated"),
+                sessionId)
+            .withEventLinks(space2, List.of(actor2), "social");
+    adapter.writeEntity(reCommitCmd);
+
+    Map<String, Object> row =
+        jdbcTemplate.queryForMap(
+            "SELECT space_id, event_type FROM events WHERE id = ?", v1.entityId());
+    assertThat(row.get("space_id")).isEqualTo(space2);
+    assertThat(row.get("event_type")).isEqualTo("social");
+
+    List<UUID> actorIds =
+        jdbcTemplate.query(
+            "SELECT actor_id FROM event_involved_actors WHERE event_id = ?",
+            (rs, n) -> rs.getObject("actor_id", UUID.class),
+            v1.entityId());
+    assertThat(actorIds).containsExactly(actor2);
+  }
+
+  @Test
+  @DisplayName(
+      "should resolve a name to a specific entity type without cross-type fallback (F4.6.4)")
+  void findEntityIdByName_typeScoped_doesNotCrossMatch() {
+    UUID actorId = writeEntity("actor", "Mira").entityId();
+
+    assertThat(adapter.findEntityIdByName(campaignId, "mira", "actor")).contains(actorId);
+    // "Mira" is an actor, not a space — a space-scoped lookup must not return it.
+    assertThat(adapter.findEntityIdByName(campaignId, "Mira", "space")).isEmpty();
+  }
+
+  private CommittedEntityVersion writeEntity(String entityType, String name) {
+    return adapter.writeEntity(
+        new EntityWriteCommand(
+            entityType, null, campaignId, ownerId, name, null, Map.of("name", name), sessionId));
   }
 }
