@@ -65,6 +65,11 @@ describe('SpaceProfilePage', () => {
     expect(screen.getByText('Bree')).toBeInTheDocument()
   })
 
+  it('renders the propose-change affordance as a disabled stub (D-012)', () => {
+    renderPage()
+    expect(screen.getByRole('button', { name: /propose a change/i })).toBeDisabled()
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = renderPage()
     expect(await axe(container)).toHaveNoViolations()

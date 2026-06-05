@@ -116,6 +116,14 @@ describe('RelationsPage', () => {
     expect(screen.getByText(/no annotations yet/i)).toBeInTheDocument()
   })
 
+  it('shows the disabled propose-change button in the relation detail panel', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: /show annotations/i }))
+
+    expect(screen.getByRole('button', { name: /propose a change/i })).toBeDisabled()
+  })
+
   it('shows the skeleton while any query is loading', () => {
     mockUseRelations.mockReturnValue(relationsResult({ isLoading: true }))
     renderPage()

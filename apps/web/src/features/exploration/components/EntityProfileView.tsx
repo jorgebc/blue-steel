@@ -4,7 +4,7 @@ import { useEntityDetail } from '@/api/worldstate'
 import { AnnotationThread } from '@/components/domain/AnnotationThread'
 import { EntityVersionHistory } from '@/components/domain/EntityVersionHistory'
 import { InlineBanner } from '@/components/domain/InlineBanner'
-import { Button } from '@/components/ui/button'
+import { ProposeChangeButton } from '@/components/domain/ProposeChangeButton'
 import { EntityProfileSkeleton } from './EntityProfileSkeleton'
 import type { EntityType, EntityVersion } from '@/types/worldstate'
 
@@ -62,15 +62,7 @@ export function EntityProfileView({ entityType, entityId, backTo, backLabel }: P
               <h1 className="text-2xl font-semibold text-slate-900">{data.name}</h1>
               <p className="text-sm capitalize text-slate-500">{data.entityType}</p>
             </div>
-            {/* Propose-change affordance — disabled stub in v1 (D-012). */}
-            <Button
-              type="button"
-              variant="outline"
-              disabled
-              title="Proposing changes is coming soon"
-            >
-              Propose a change
-            </Button>
+            <ProposeChangeButton />
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
