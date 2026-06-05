@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.bluesteel.application.model.ingestion.ExtractedEvent;
 import com.bluesteel.application.model.ingestion.ExtractedMention;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.config.LlmCostLogger;
@@ -64,7 +65,9 @@ class SpringAiNarrativeExtractionAdapterTest {
             "The party explored a dungeon.",
             List.of(new ExtractedMention("Aragorn", "A ranger", "the ranger")),
             List.of(new ExtractedMention("Dungeon", "Underground", "the dungeon")),
-            List.of(new ExtractedMention("Battle", "Combat", "fought goblins")),
+            List.of(
+                new ExtractedEvent(
+                    "Battle", "Combat", "battle", "Dungeon", List.of("Aragorn"), "fought goblins")),
             List.of());
 
     // Mock the fluent ChatClient chain using RETURNS_SELF for the request spec

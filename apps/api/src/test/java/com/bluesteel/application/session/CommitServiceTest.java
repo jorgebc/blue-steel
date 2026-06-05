@@ -339,6 +339,107 @@ class CommitServiceTest {
     assertThat(captor.getAllValues().get(1).entityType()).isEqualTo("relation");
   }
 
+  @Test
+  @DisplayName(
+      "should resolve event space/actor mentions to entity ids on the write command (F4.6.4)")
+  void commit_eventCard_resolvesLinks() throws Exception {
+    UUID eventCardId = UUID.randomUUID();
+    UUID spaceId = UUID.randomUUID();
+    UUID actorId = UUID.randomUUID();
+    CommittedEntityVersion eventVersion =
+        new CommittedEntityVersion(
+            "event", UUID.randomUUID(), UUID.randomUUID(), 1, "ev\n{}", "hash");
+    when(worldStatePort.writeEntity(org.mockito.ArgumentMatchers.any(EntityWriteCommand.class)))
+        .thenReturn(eventVersion);
+    when(worldStatePort.findEntityIdByName(campaignId, "Thornwick", "space"))
+        .thenReturn(Optional.of(spaceId));
+    when(worldStatePort.findEntityIdByName(campaignId, "Mira", "actor"))
+        .thenReturn(Optional.of(actorId));
+
+    DiffPayload eventDiff =
+        new DiffPayload(
+            "header",
+            List.of(),
+            List.of(),
+            List.of(
+                new NewEntityCard(
+                    eventCardId,
+                    "event",
+                    "The Arrival",
+                    Map.of(
+                        "name",
+                        "The Arrival",
+                        "spaceMention",
+                        "Thornwick",
+                        "involvedActorMentions",
+                        List.of("Mira"),
+                        "eventType",
+                        "arrival"))),
+            List.of(),
+            List.of());
+    CommitService eventService = commitServiceFor(eventDiff);
+
+    eventService.commit(
+        new CommitSessionCommand(
+            callerId,
+            campaignId,
+            sessionId,
+            new CommitPayload(
+                List.of(new CardDecision(eventCardId, CardAction.ACCEPT, null)),
+                List.of(),
+                List.of())));
+
+    ArgumentCaptor<EntityWriteCommand> captor = forClass(EntityWriteCommand.class);
+    verify(worldStatePort).writeEntity(captor.capture());
+    EntityWriteCommand cmd = captor.getValue();
+    assertThat(cmd.spaceId()).isEqualTo(spaceId);
+    assertThat(cmd.involvedActorIds()).containsExactly(actorId);
+    assertThat(cmd.eventType()).isEqualTo("arrival");
+  }
+
+  @Test
+  @DisplayName(
+      "should write event cards after actor/space cards regardless of decision order (F4.6.4)")
+  void commit_writesEventsAfterActorsRegardlessOfOrder() throws Exception {
+    UUID actorCardId = UUID.randomUUID();
+    UUID eventCardId = UUID.randomUUID();
+    DiffPayload diffPayload =
+        new DiffPayload(
+            "header",
+            List.of(new NewEntityCard(actorCardId, "actor", "Mira", Map.of("name", "Mira"))),
+            List.of(),
+            List.of(
+                new NewEntityCard(
+                    eventCardId,
+                    "event",
+                    "The Arrival",
+                    Map.of("name", "The Arrival", "involvedActorMentions", List.of("Mira")))),
+            List.of(),
+            List.of());
+    CommitService eventService = commitServiceFor(diffPayload);
+    when(worldStatePort.findEntityIdByName(campaignId, "Mira", "actor"))
+        .thenReturn(Optional.empty());
+
+    // The event decision is listed BEFORE the actor decision — the service must still write the
+    // actor first so the event's involved-actor name-match can see it.
+    eventService.commit(
+        new CommitSessionCommand(
+            callerId,
+            campaignId,
+            sessionId,
+            new CommitPayload(
+                List.of(
+                    new CardDecision(eventCardId, CardAction.ACCEPT, null),
+                    new CardDecision(actorCardId, CardAction.ACCEPT, null)),
+                List.of(),
+                List.of())));
+
+    ArgumentCaptor<EntityWriteCommand> captor = forClass(EntityWriteCommand.class);
+    verify(worldStatePort, org.mockito.Mockito.times(2)).writeEntity(captor.capture());
+    assertThat(captor.getAllValues().get(0).entityType()).isEqualTo("actor");
+    assertThat(captor.getAllValues().get(1).entityType()).isEqualTo("event");
+  }
+
   private DiffPayload relationDiffWithEndpoints(UUID relationCardId) {
     return new DiffPayload(
         "header",

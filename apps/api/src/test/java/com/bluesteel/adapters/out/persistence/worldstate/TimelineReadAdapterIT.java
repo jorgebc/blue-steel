@@ -15,9 +15,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Testcontainers integration test for {@link TimelineReadAdapter} (F4.2.2) — verifies feed ordering
- * by session sequence and event id, keyset cursor continuation without overlap or gap, the
- * end-of-feed null cursor, JSONB event-type filtering, and campaign scoping against real Postgres.
+ * Testcontainers integration test for {@link TimelineReadAdapter} (F4.2.2, F4.6.5) — verifies feed
+ * ordering by session sequence and event id, keyset cursor continuation without overlap or gap, the
+ * end-of-feed null cursor, and event-type / space / involved-actor filtering resolved through the
+ * relational links ({@code events.event_type}, {@code events.space_id}, {@code
+ * event_involved_actors}), plus campaign scoping against real Postgres.
  */
 @DisplayName("TimelineReadAdapter (F4.2.2)")
 class TimelineReadAdapterIT extends TestcontainersPostgresBaseIT {
@@ -40,33 +42,32 @@ class TimelineReadAdapterIT extends TestcontainersPostgresBaseIT {
     session1Id = insertSession(campaignId, userId, 1);
     session2Id = insertSession(campaignId, userId, 2);
 
+    // Structured links live relationally now (F4.6): actor/space heads + the join table.
+    UUID aldric = insertActor(campaignId, userId, "Aldric");
+    UUID seraphine = insertActor(campaignId, userId, "Seraphine");
+    UUID mountainPass = insertSpace(campaignId, userId, "Mountain Pass");
+
     // Two events in session 1 (same sequence number -> ordered by event id), one in session 2.
     ambushId = insertEvent(campaignId, userId, session1Id, "Ambush at the Pass");
-    insertEventVersion(
-        ambushId,
-        session1Id,
-        1,
-        "{\"name\":\"Ambush at the Pass\",\"eventType\":\"battle\","
-            + "\"space\":\"Mountain Pass\",\"involvedActors\":[\"Aldric\",\"Seraphine\"]}");
+    setEventLinks(ambushId, mountainPass, "battle");
+    addInvolvedActor(ambushId, aldric);
+    addInvolvedActor(ambushId, seraphine);
+    insertEventVersion(ambushId, session1Id, 1, "{\"name\":\"Ambush at the Pass\"}");
 
     coronationId = insertEvent(campaignId, userId, session1Id, "Coronation");
-    insertEventVersion(
-        coronationId,
-        session1Id,
-        1,
-        "{\"name\":\"Coronation\",\"eventType\":\"ceremony\",\"involvedActors\":[\"Aldric\"]}");
+    setEventLinks(coronationId, null, "ceremony");
+    addInvolvedActor(coronationId, aldric);
+    insertEventVersion(coronationId, session1Id, 1, "{\"name\":\"Coronation\"}");
 
     duelId = insertEvent(campaignId, userId, session2Id, "Duel at Dawn");
-    insertEventVersion(
-        duelId,
-        session2Id,
-        1,
-        "{\"name\":\"Duel at Dawn\",\"eventType\":\"battle\",\"involvedActors\":[\"Seraphine\"]}");
+    setEventLinks(duelId, null, "battle");
+    addInvolvedActor(duelId, seraphine);
+    insertEventVersion(duelId, session2Id, 1, "{\"name\":\"Duel at Dawn\"}");
   }
 
   @Test
   @DisplayName(
-      "should return events ordered by session sequence then event id with snapshot fields")
+      "should return events ordered by session sequence then event id with relational link fields")
   void page_returnsOrderedFeedWithProjectedFields() {
     TimelinePage page = sut.page(campaignId, null, 20, TimelineFilter.none());
 
@@ -122,7 +123,7 @@ class TimelineReadAdapterIT extends TestcontainersPostgresBaseIT {
   }
 
   @Test
-  @DisplayName("should filter the feed by event type from the snapshot")
+  @DisplayName("should filter the feed by event type from the event_type column")
   void page_filtersByEventType() {
     TimelinePage battles = sut.page(campaignId, null, 20, new TimelineFilter(null, null, "battle"));
 
@@ -133,7 +134,7 @@ class TimelineReadAdapterIT extends TestcontainersPostgresBaseIT {
   }
 
   @Test
-  @DisplayName("should filter the feed by an involved actor substring")
+  @DisplayName("should filter the feed by an involved actor substring via the join table")
   void page_filtersByActor() {
     TimelinePage seraphineEvents =
         sut.page(campaignId, null, 20, new TimelineFilter("seraph", null, null));
@@ -141,6 +142,16 @@ class TimelineReadAdapterIT extends TestcontainersPostgresBaseIT {
     assertThat(seraphineEvents.events())
         .extracting(TimelineEntryView::eventId)
         .containsExactlyInAnyOrder(ambushId, duelId);
+  }
+
+  @Test
+  @DisplayName("should filter the feed by space name via events.space_id")
+  void page_filtersBySpace() {
+    TimelinePage atThePass =
+        sut.page(campaignId, null, 20, new TimelineFilter(null, "mountain", null));
+
+    assertThat(atThePass.events()).extracting(TimelineEntryView::eventId).containsExactly(ambushId);
+    assertThat(atThePass.events().get(0).spaceName()).isEqualTo("Mountain Pass");
   }
 
   @Test
@@ -227,6 +238,38 @@ class TimelineReadAdapterIT extends TestcontainersPostgresBaseIT {
         name,
         sessionId);
     return id;
+  }
+
+  private UUID insertActor(UUID campaignId, UUID ownerId, String name) {
+    UUID id = UUID.randomUUID();
+    jdbcTemplate.update(
+        "INSERT INTO actors (id, campaign_id, owner_id, name, created_at) VALUES (?, ?, ?, ?, now())",
+        id,
+        campaignId,
+        ownerId,
+        name);
+    return id;
+  }
+
+  private UUID insertSpace(UUID campaignId, UUID ownerId, String name) {
+    UUID id = UUID.randomUUID();
+    jdbcTemplate.update(
+        "INSERT INTO spaces (id, campaign_id, owner_id, name, created_at) VALUES (?, ?, ?, ?, now())",
+        id,
+        campaignId,
+        ownerId,
+        name);
+    return id;
+  }
+
+  private void setEventLinks(UUID eventId, UUID spaceId, String eventType) {
+    jdbcTemplate.update(
+        "UPDATE events SET space_id = ?, event_type = ? WHERE id = ?", spaceId, eventType, eventId);
+  }
+
+  private void addInvolvedActor(UUID eventId, UUID actorId) {
+    jdbcTemplate.update(
+        "INSERT INTO event_involved_actors (event_id, actor_id) VALUES (?, ?)", eventId, actorId);
   }
 
   private void insertEventVersion(

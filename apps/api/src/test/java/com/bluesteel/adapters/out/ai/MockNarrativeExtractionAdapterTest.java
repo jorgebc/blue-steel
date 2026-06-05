@@ -52,6 +52,17 @@ class MockNarrativeExtractionAdapterTest {
   }
 
   @Test
+  @DisplayName("should emit event space/actor mentions and type referencing the mock entities")
+  void extract_eventCarriesLinks() {
+    var result = adapter.extract("raw text");
+
+    var event = result.events().get(0);
+    assertThat(event.spaceMention()).isEqualTo("Thornwick");
+    assertThat(event.involvedActorMentions()).containsExactly("Mira", "Aldric");
+    assertThat(event.eventType()).isEqualTo("arrival");
+  }
+
+  @Test
   @DisplayName("should return a non-blank narrativeSummaryHeader")
   void extract_returnsNonBlankHeader() {
     var result = adapter.extract("raw text");

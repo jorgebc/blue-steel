@@ -80,6 +80,18 @@ public class WorldStateAdapter implements WorldStatePort {
             cmd.sourceEntityType(),
             cmd.targetEntityId(),
             cmd.targetEntityType());
+      } else if ("event".equals(cmd.entityType())) {
+        jdbcTemplate.update(
+            "INSERT INTO events (id, campaign_id, owner_id, name, created_at,"
+                + " created_in_session_id, space_id, event_type)"
+                + " VALUES (?, ?, ?, ?, now(), ?, ?, ?)",
+            entityId,
+            cmd.campaignId(),
+            cmd.ownerId(),
+            cmd.name(),
+            cmd.sessionId(),
+            cmd.spaceId(),
+            cmd.eventType());
       } else {
         jdbcTemplate.update(
             "INSERT INTO "
@@ -114,6 +126,26 @@ public class WorldStateAdapter implements WorldStatePort {
             cmd.targetEntityId(),
             cmd.targetEntityType(),
             entityId);
+      } else if ("event".equals(cmd.entityType())) {
+        // Refresh the event head's structured links so they reflect the latest commit (F4.6.4).
+        jdbcTemplate.update(
+            "UPDATE events SET space_id = ?, event_type = ? WHERE id = ?",
+            cmd.spaceId(),
+            cmd.eventType(),
+            entityId);
+      }
+    }
+
+    // Re-sync the event's involved-actor links to the latest resolved set (F4.6.4). The DELETE is a
+    // harmless no-op on a brand-new event; ON CONFLICT guards a mention list with duplicate ids.
+    if ("event".equals(cmd.entityType())) {
+      jdbcTemplate.update("DELETE FROM event_involved_actors WHERE event_id = ?", entityId);
+      for (UUID actorId : cmd.involvedActorIds()) {
+        jdbcTemplate.update(
+            "INSERT INTO event_involved_actors (event_id, actor_id) VALUES (?, ?)"
+                + " ON CONFLICT DO NOTHING",
+            entityId,
+            actorId);
       }
     }
 
@@ -159,6 +191,22 @@ public class WorldStateAdapter implements WorldStatePort {
     return ids.isEmpty()
         ? Optional.empty()
         : Optional.of(new ResolvedEndpoint(ids.get(0), entityType));
+  }
+
+  @Override
+  public Optional<UUID> findEntityIdByName(UUID campaignId, String name, String entityType) {
+    if (name == null || name.isBlank()) {
+      return Optional.empty();
+    }
+    // Only actors/spaces are name-matchable event links; reuse the head-table resolver.
+    String headTable =
+        switch (entityType) {
+          case "actor" -> "actors";
+          case "space" -> "spaces";
+          default ->
+              throw new IllegalArgumentException("Unsupported link entity type: " + entityType);
+        };
+    return findEndpoint(headTable, entityType, campaignId, name).map(ResolvedEndpoint::entityId);
   }
 
   @Override

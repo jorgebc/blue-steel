@@ -10,7 +10,9 @@ import com.bluesteel.application.model.ingestion.ExtractionResult;
  * narrativeBlock.rawSummaryText()} when wiring the real pipeline.
  *
  * <p>Relations are returned as {@code ExtractedRelation}s carrying the names of their source and
- * target entities; those endpoint names are resolved to entity ids at commit (D-095).
+ * target entities, and events as {@code ExtractedEvent}s carrying the name of their space, the
+ * names of their involved actors, and an event type; those mentions are resolved to entity ids at
+ * commit (D-095, D-097).
  */
 public interface NarrativeExtractionPort {
 

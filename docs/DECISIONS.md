@@ -107,6 +107,7 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-094 | Exploration Mode (Phase 4) built before Query Mode (Phase 3) | ✅ Active | Phase 4 |
 | D-095 | Relations and events carry structured entity links | ✅ Active | Phase 4 |
 | D-096 | Query Mode app-level rate limit + daily cost cap | ✅ Active | Phase 3 |
+| D-097 | Event type is extracted during ingestion and persisted as `events.event_type` | ✅ Active | Phase 4 |
 
 ---
 
@@ -1977,6 +1978,25 @@ The Relations graph (D-030) and the PRD §6.3 "living record" profile cross-link
 Every Query is a live, billable LLM call. Provider-level spend governance (D-034) caps the total bill but does not stop a single user from exhausting the budget or degrading service for others; an app-level per-principal limit and a daily cap give early, attributable backpressure and protect both cost and availability for a free-tier hobby deployment.
 
 **Cross-refs:** D-052 (synchronous query), D-034 (provider cost governance), LOG-01 (LLM cost logging).
+
+---
+
+### D-097 — Event type is extracted during ingestion and persisted as `events.event_type`
+
+**Date:** 2026-06-06
+**Status:** Active
+
+**Decision:**
+The Timeline's `eventType` (F4.2) is sourced by extracting an event type during ingestion and persisting it as a new nullable `events.event_type` column (migration 0024). Extraction emits `ExtractedEvent.eventType` (a one-or-two-word label, mock + real adapters); at commit it is carried through `EntityWriteCommand` and written to the column; the Timeline read adapter projects and filters on `events.event_type` (not JSONB). The existing F4.2 frontend type badge + `eventType` filter are kept unchanged. Implemented as F4.6.6.
+
+**Reason:**
+`eventType` shipped in the F4.2 read model, DTO, controller filter, and frontend (badge + filter), but nothing in the pipeline produced it — so on real committed data the badge and filter were permanently empty (a dangling field). F4.6.6 required resolving it one way or the other. Extracting + persisting it completes the already-shipped UI rather than tearing it out, and a dedicated column is consistent with F4.6's move of event data from `full_snapshot` JSONB to relational storage (so the Timeline reads no JSONB). The type is a best-effort LLM label and is nullable when the extractor cannot determine it.
+
+**Alternatives considered:**
+- Drop the `eventType` field, badge, and filter end-to-end — rejected; removes a useful, already-built Timeline affordance.
+- Keep `eventType` in `full_snapshot` JSONB — rejected; inconsistent with F4.6.5 re-pointing the Timeline off the snapshot, and leaves a JSONB read on the hot path.
+
+**Cross-refs:** D-095 (relations/events carry structured links), D-009 (four views), D-055 (Timeline keyset pagination).
 
 ---
 

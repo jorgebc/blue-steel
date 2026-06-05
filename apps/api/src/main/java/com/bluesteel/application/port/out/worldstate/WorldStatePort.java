@@ -27,4 +27,12 @@ public interface WorldStatePort {
    * match wins. Returns empty when no actor or space matches.
    */
   Optional<ResolvedEndpoint> findEndpointByName(UUID campaignId, String name);
+
+  /**
+   * Best-effort resolution of a name to a committed entity id of one specific type ({@code "actor"}
+   * or {@code "space"}) within the campaign (F4.6.4, D-095). The first case-insensitive name match
+   * wins. Returns empty when no entity of that type matches. Used for event space/actor links,
+   * where the target type is known and must not fall back to the other type.
+   */
+  Optional<UUID> findEntityIdByName(UUID campaignId, String name, String entityType);
 }
