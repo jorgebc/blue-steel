@@ -8,6 +8,11 @@ import { useEntityDetail } from '@/api/worldstate'
 import type { EntityDetail } from '@/types/worldstate'
 
 vi.mock('@/api/worldstate', () => ({ useEntityDetail: vi.fn() }))
+vi.mock('@/api/annotations', () => ({
+  useAnnotations: () => ({ data: [], isLoading: false, isError: false }),
+  usePostAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
+}))
 const mockUseEntityDetail = vi.mocked(useEntityDetail)
 
 const detail: EntityDetail = {

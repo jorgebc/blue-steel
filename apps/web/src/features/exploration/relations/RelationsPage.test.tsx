@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { axe } from 'vitest-axe'
 import { RelationsPage } from './RelationsPage'
@@ -23,6 +24,11 @@ vi.mock('@xyflow/react', () => ({
 }))
 vi.mock('@/api/worldstate', () => ({ useAllEntities: vi.fn() }))
 vi.mock('@/api/relations', () => ({ useRelations: vi.fn() }))
+vi.mock('@/api/annotations', () => ({
+  useAnnotations: () => ({ data: [], isLoading: false, isError: false }),
+  usePostAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
+}))
 
 const mockUseAllEntities = vi.mocked(useAllEntities)
 const mockUseRelations = vi.mocked(useRelations)
@@ -93,6 +99,21 @@ describe('RelationsPage', () => {
     expect(item).toHaveTextContent('Mira')
     expect(item).toHaveTextContent('alliance')
     expect(item).toHaveTextContent('Aldric')
+  })
+
+  it('does not show the annotation panel until a relation is selected', () => {
+    renderPage()
+    expect(screen.queryByRole('region', { name: /annotations/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/no annotations yet/i)).not.toBeInTheDocument()
+  })
+
+  it('opens the annotation thread for the selected relation', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: /show annotations/i }))
+
+    expect(screen.getByRole('region', { name: 'Annotations' })).toBeInTheDocument()
+    expect(screen.getByText(/no annotations yet/i)).toBeInTheDocument()
   })
 
   it('shows the skeleton while any query is loading', () => {

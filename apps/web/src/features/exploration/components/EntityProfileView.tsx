@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useEntityDetail } from '@/api/worldstate'
+import { AnnotationThread } from '@/components/domain/AnnotationThread'
 import { EntityVersionHistory } from '@/components/domain/EntityVersionHistory'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Button } from '@/components/ui/button'
@@ -93,7 +94,7 @@ export function EntityProfileView({ entityType, entityId, backTo, backLabel }: P
             <EntityVersionHistory versions={data.versions} />
           </div>
 
-          {/* AnnotationThread slot (F4.4) — rendered here once annotations ship. */}
+          <AnnotationThread entityType={entityType} entityId={entityId} />
         </div>
       )}
     </section>
