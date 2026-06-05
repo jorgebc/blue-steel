@@ -3351,17 +3351,17 @@ no modals (D-082), no Q&A history (D-058).
 | F4.3.11 | Frontend: RelationsGraphSkeleton + accessible relations list | ✅ |
 | F4.3.12 | Frontend: RelationsPage (React Flow container, read-only) | ✅ |
 | F4.3.13 | Frontend: relations route | ✅ |
-| F4.4 | Annotations — create, list, delete; non-canonical (D-011) | 🔲 |
-| F4.4.1 | Backend: Annotation domain + use-case ports + repository port + models | 🔲 |
-| F4.4.2 | Backend: annotation persistence adapter (JPA) + IT | 🔲 |
-| F4.4.3 | Backend: AnnotationService (create/list/delete + role rules) | 🔲 |
-| F4.4.4 | Backend: AnnotationController + DTOs + handler mappings | 🔲 |
+| F4.4 | Annotations — create, list, delete; non-canonical (D-011) | ✅ |
+| F4.4.1 | Backend: Annotation domain + use-case ports + repository port + models | ✅ |
+| F4.4.2 | Backend: annotation persistence adapter (JPA) + IT | ✅ |
+| F4.4.3 | Backend: AnnotationService (create/list/delete + role rules) | ✅ |
+| F4.4.4 | Backend: AnnotationController + DTOs + handler mappings | ✅ |
 | F4.4-SETUP | Frontend scaffolding — verified annotation contracts; no new shadcn (human step) | 👤 |
-| F4.4.5 | Frontend: annotation TypeScript types | 🔲 |
-| F4.4.6 | Frontend: annotations API client + hooks (post/list/delete) | 🔲 |
-| F4.4.7 | Frontend: AnnotationCard + AnnotationInput components | 🔲 |
-| F4.4.8 | Frontend: AnnotationThread domain component (delete confirm via FocusedOverlay) | 🔲 |
-| F4.4.9 | Frontend: mount AnnotationThread in entity/space/event/relation profiles | 🔲 |
+| F4.4.5 | Frontend: annotation TypeScript types | ✅ |
+| F4.4.6 | Frontend: annotations API client + hooks (post/list/delete) | ✅ |
+| F4.4.7 | Frontend: AnnotationCard + AnnotationInput components | ✅ |
+| F4.4.8 | Frontend: AnnotationThread domain component (delete confirm via FocusedOverlay) | ✅ |
+| F4.4.9 | Frontend: mount AnnotationThread in entity/space/event/relation profiles | ✅ |
 | F4.5 | "Propose a change" affordance — visible, inactive in v1 (D-012) | 🔲 |
 | F4.5-SETUP | Frontend scaffolding — npx shadcn@latest add tooltip (human step) | 👤 |
 | F4.5.1 | Frontend: ProposeChangeButton domain component (disabled + tooltip) | 🔲 |

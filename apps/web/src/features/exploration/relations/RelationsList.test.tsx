@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import { RelationsList } from './RelationsList'
 import type { Relation } from '@/types/relation'
@@ -30,9 +31,7 @@ describe('RelationsList', () => {
   it('describes a resolved relation as source → kind → target', () => {
     render(
       <RelationsList
-        relations={[
-          relation({ kind: 'alliance', sourceEntityId: 'a1', targetEntityId: 's1' }),
-        ]}
+        relations={[relation({ kind: 'alliance', sourceEntityId: 'a1', targetEntityId: 's1' })]}
         nameById={nameById}
       />
     )
@@ -63,6 +62,49 @@ describe('RelationsList', () => {
     )
 
     expect(screen.getByRole('listitem')).toHaveTextContent('Unknown')
+  })
+
+  it('calls onSelect with the relation id when an item is clicked', async () => {
+    const onSelect = vi.fn()
+    render(
+      <RelationsList
+        relations={[
+          relation({
+            relationId: 'r1',
+            kind: 'alliance',
+            sourceEntityId: 'a1',
+            targetEntityId: 's1',
+          }),
+        ]}
+        nameById={nameById}
+        onSelect={onSelect}
+      />
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: /show annotations/i }))
+    expect(onSelect).toHaveBeenCalledWith('r1')
+  })
+
+  it('marks the selected relation as pressed', () => {
+    render(
+      <RelationsList
+        relations={[
+          relation({
+            relationId: 'r1',
+            kind: 'alliance',
+            sourceEntityId: 'a1',
+            targetEntityId: 's1',
+          }),
+        ]}
+        nameById={nameById}
+        selectedId="r1"
+      />
+    )
+
+    expect(screen.getByRole('button', { name: /show annotations/i })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
   })
 
   it('has no accessibility violations', async () => {

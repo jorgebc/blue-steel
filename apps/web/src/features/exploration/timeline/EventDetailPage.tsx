@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useEntityDetail } from '@/api/worldstate'
+import { AnnotationThread } from '@/components/domain/AnnotationThread'
 import { EntityVersionHistory } from '@/components/domain/EntityVersionHistory'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Button } from '@/components/ui/button'
@@ -55,7 +56,12 @@ export function EventDetailPage() {
               <p className="text-sm capitalize text-slate-500">{data.entityType}</p>
             </div>
             {/* Propose-change affordance — disabled stub in v1 (D-012). */}
-            <Button type="button" variant="outline" disabled title="Proposing changes is coming soon">
+            <Button
+              type="button"
+              variant="outline"
+              disabled
+              title="Proposing changes is coming soon"
+            >
               Propose a change
             </Button>
           </div>
@@ -81,7 +87,7 @@ export function EventDetailPage() {
             <EntityVersionHistory versions={data.versions} />
           </div>
 
-          {/* AnnotationThread slot (F4.4) — rendered here once annotations ship. */}
+          <AnnotationThread entityType="event" entityId={eventId ?? ''} />
         </div>
       )}
     </section>

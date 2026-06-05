@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Background, Controls, ReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useAllEntities } from '@/api/worldstate'
 import { useRelations } from '@/api/relations'
+import { AnnotationThread } from '@/components/domain/AnnotationThread'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { graphTransform } from './graphTransform'
 import { RelationNode } from './RelationNode'
@@ -25,6 +26,7 @@ export function RelationsPage() {
   const actorsQuery = useAllEntities('actor')
   const spacesQuery = useAllEntities('space')
   const relationsQuery = useRelations()
+  const [selectedRelationId, setSelectedRelationId] = useState<string | null>(null)
 
   const actors = useMemo(() => actorsQuery.data ?? [], [actorsQuery.data])
   const spaces = useMemo(() => spacesQuery.data ?? [], [spacesQuery.data])
@@ -42,6 +44,18 @@ export function RelationsPage() {
     }
     return map
   }, [actors, spaces])
+
+  const selectedRelationLabel = useMemo(() => {
+    const relation = relations.find((r) => r.relationId === selectedRelationId)
+    if (!relation) return ''
+    const source = relation.sourceEntityId
+      ? (nameById[relation.sourceEntityId] ?? 'Unknown')
+      : 'Unknown'
+    const target = relation.targetEntityId
+      ? (nameById[relation.targetEntityId] ?? 'Unknown')
+      : 'Unknown'
+    return `${source} → ${relation.kind ?? relation.name} → ${target}`
+  }, [relations, selectedRelationId, nameById])
 
   const isLoading = actorsQuery.isLoading || spacesQuery.isLoading || relationsQuery.isLoading
   const isError = actorsQuery.isError || spacesQuery.isError || relationsQuery.isError
@@ -93,8 +107,20 @@ export function RelationsPage() {
 
           <div>
             <h2 className="mb-2 text-sm font-medium text-slate-700">All relations</h2>
-            <RelationsList relations={relations} nameById={nameById} />
+            <RelationsList
+              relations={relations}
+              nameById={nameById}
+              selectedId={selectedRelationId}
+              onSelect={setSelectedRelationId}
+            />
           </div>
+        </div>
+      )}
+
+      {!isLoading && !isError && selectedRelationId !== null && (
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-700">{selectedRelationLabel}</h2>
+          <AnnotationThread entityType="relation" entityId={selectedRelationId} />
         </div>
       )}
     </section>
