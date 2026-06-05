@@ -3352,10 +3352,10 @@ no modals (D-082), no Q&A history (D-058).
 | F4.3.12 | Frontend: RelationsPage (React Flow container, read-only) | ✅ |
 | F4.3.13 | Frontend: relations route | ✅ |
 | F4.4 | Annotations — create, list, delete; non-canonical (D-011) | 🔲 |
-| F4.4.1 | Backend: Annotation domain + use-case ports + repository port + models | 🔲 |
-| F4.4.2 | Backend: annotation persistence adapter (JPA) + IT | 🔲 |
-| F4.4.3 | Backend: AnnotationService (create/list/delete + role rules) | 🔲 |
-| F4.4.4 | Backend: AnnotationController + DTOs + handler mappings | 🔲 |
+| F4.4.1 | Backend: Annotation domain + use-case ports + repository port + models | ✅ |
+| F4.4.2 | Backend: annotation persistence adapter (JPA) + IT | ✅ |
+| F4.4.3 | Backend: AnnotationService (create/list/delete + role rules) | ✅ |
+| F4.4.4 | Backend: AnnotationController + DTOs + handler mappings | ✅ |
 | F4.4-SETUP | Frontend scaffolding — verified annotation contracts; no new shadcn (human step) | 👤 |
 | F4.4.5 | Frontend: annotation TypeScript types | 🔲 |
 | F4.4.6 | Frontend: annotations API client + hooks (post/list/delete) | 🔲 |

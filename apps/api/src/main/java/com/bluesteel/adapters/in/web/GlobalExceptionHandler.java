@@ -2,6 +2,7 @@ package com.bluesteel.adapters.in.web;
 
 import com.bluesteel.domain.exception.ActiveSessionExistsException;
 import com.bluesteel.domain.exception.AlreadyCampaignMemberException;
+import com.bluesteel.domain.exception.AnnotationNotFoundException;
 import com.bluesteel.domain.exception.CampaignNotFoundException;
 import com.bluesteel.domain.exception.CannotRemoveGmException;
 import com.bluesteel.domain.exception.CommitValidationException;
@@ -165,6 +166,12 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ApiResponse<Void> handleEntityNotFound(EntityNotFoundException ex) {
     return ApiResponse.error(ApiError.of("ENTITY_NOT_FOUND", ex.getMessage()));
+  }
+
+  @ExceptionHandler(AnnotationNotFoundException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public ApiResponse<Void> handleAnnotationNotFound(AnnotationNotFoundException ex) {
+    return ApiResponse.error(ApiError.of("ANNOTATION_NOT_FOUND", ex.getMessage()));
   }
 
   /**
