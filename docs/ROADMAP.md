@@ -3781,17 +3781,17 @@ accessible relations-list alternative.
 > - **F4.3-FU1 ✅ fixed in F4.3.4:** commit-time endpoint resolution was order-dependent (a relation
 >   written before its endpoint's actor/space card, or pointing at an UNCERTAIN-resolved entity, got
 >   null endpoints). `CommitService` now writes relations in a final pass after all actors/spaces.
-> - **F4.3-FU2:** `kind` is plumbed end-to-end (column → read model → DTO → graph/list label) but the
+> - **F4.3-FU2 ✅:** `kind` is plumbed end-to-end (column → read model → DTO → graph/list label) but the
 >   extraction pipeline never emits a `kind` snapshot field, so it is always null today and the edge
 >   label always falls back to `name`. Emit `kind` from extraction (or drop the field) when relation
 >   typing is specced.
-> - **F4.3-FU3:** `RelationsPage` loads only page 0 (size 20) of actors/spaces via `useEntityList`;
+> - **F4.3-FU3 ✅:** `RelationsPage` loads only page 0 (size 20) of actors/spaces via `useEntityList`;
 >   in campaigns with >20 of either, off-page entities have no node and their relations render as
 >   "Unknown"/edgeless. Add an all-entities fetch for the graph.
-> - **F4.3-FU4:** relation endpoints are written only at head creation; a relation re-committed in a
+> - **F4.3-FU4 ✅:** relation endpoints are written only at head creation; a relation re-committed in a
 >   later session (MATCH → new version) does not refresh its endpoints. Add an endpoint UPDATE on
 >   relation re-commit if endpoints need to track later sessions.
-> - **F4.3-FU5 (nit):** `buildRelationCards`/`buildCards` use `Map.of("description", …)`, which NPEs
+> - **F4.3-FU5 ✅ (nit):** `buildRelationCards`/`buildCards` use `Map.of("description", …)`, which NPEs
 >   if the LLM omits a description. Pre-existing across all entity types; harden with a null-guard.
 
 ---

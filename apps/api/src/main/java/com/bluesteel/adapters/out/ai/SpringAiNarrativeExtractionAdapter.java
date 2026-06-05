@@ -33,6 +33,8 @@ public class SpringAiNarrativeExtractionAdapter implements NarrativeExtractionPo
       For each relation, set sourceMention and targetMention to the names of the two entities it
       connects (an actor or space), exactly as they appear among the extracted actors/spaces; leave
       a mention null only if the endpoint cannot be identified.
+      For each relation also provide a kind (one or two words describing the relationship type,
+      e.g. "alliance", "rivalry", "mentorship"); omit (leave null) if the type is unclear.
       Also produce a concise 1–3 sentence narrative summary header capturing the session's key events (D-005).
       Return a single valid JSON object matching the schema provided. No extra text.
       """;

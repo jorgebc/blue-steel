@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import com.bluesteel.application.model.ingestion.ConflictWarning;
 import com.bluesteel.application.model.ingestion.ExtractedMention;
+import com.bluesteel.application.model.ingestion.ExtractedRelation;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.application.model.ingestion.ResolutionOutcome;
 import com.bluesteel.application.model.ingestion.ResolvedEntity;
@@ -174,6 +175,73 @@ class DiffGenerationServiceTest {
         .isEqualTo("Mira is described as dead but world state says alive.");
     assertThat(conflict.existingFact())
         .isEqualTo("Mira is described as dead but world state says alive.");
+  }
+
+  @Test
+  @DisplayName("should omit description key from snapshot when LLM returns null description (FU5)")
+  void run_withNullDescription_buildsSnapshotWithoutDescriptionKey() throws Exception {
+    ExtractedMention mention = new ExtractedMention("Mira", null, "Mira appeared.");
+    ExtractionResult extraction =
+        new ExtractionResult("Summary.", List.of(mention), List.of(), List.of(), List.of());
+    ResolvedEntity resolved = new ResolvedEntity(mention, ResolutionOutcome.NEW, null);
+    Session session = processingSession();
+
+    sut.run(session, extraction, List.of(resolved), List.of());
+
+    ArgumentCaptor<Session> captor = ArgumentCaptor.forClass(Session.class);
+    verify(sessionRepository).save(captor.capture());
+    DiffPayload payload =
+        objectMapper.readValue(captor.getValue().diffPayload(), DiffPayload.class);
+    NewEntityCard card = (NewEntityCard) payload.actors().get(0);
+    assertThat(card.fullProfile()).doesNotContainKey("description");
+    assertThat(card.fullProfile()).containsKey("name");
+  }
+
+  @Test
+  @DisplayName("should include kind in relation snapshot when LLM provides it (FU2)")
+  void run_withRelationKind_stashesKindInSnapshot() throws Exception {
+    ExtractedRelation relation =
+        new ExtractedRelation(
+            "Mira guides the party",
+            "A bond of trust",
+            "alliance",
+            "Mira",
+            "Thornwick",
+            "Mira led them.");
+    ExtractionResult extraction =
+        new ExtractionResult("Summary.", List.of(), List.of(), List.of(), List.of(relation));
+    ResolvedEntity resolved = new ResolvedEntity(relation.toMention(), ResolutionOutcome.NEW, null);
+    Session session = processingSession();
+
+    sut.run(session, extraction, List.of(resolved), List.of());
+
+    ArgumentCaptor<Session> captor = ArgumentCaptor.forClass(Session.class);
+    verify(sessionRepository).save(captor.capture());
+    DiffPayload payload =
+        objectMapper.readValue(captor.getValue().diffPayload(), DiffPayload.class);
+    NewEntityCard card = (NewEntityCard) payload.relations().get(0);
+    assertThat(card.fullProfile()).containsEntry("kind", "alliance");
+  }
+
+  @Test
+  @DisplayName("should omit kind from relation snapshot when LLM does not provide it (FU2)")
+  void run_withNullRelationKind_omitsKindFromSnapshot() throws Exception {
+    ExtractedRelation relation =
+        new ExtractedRelation(
+            "Mira guides the party", "A bond of trust", null, "Mira", "Thornwick", "Mira led.");
+    ExtractionResult extraction =
+        new ExtractionResult("Summary.", List.of(), List.of(), List.of(), List.of(relation));
+    ResolvedEntity resolved = new ResolvedEntity(relation.toMention(), ResolutionOutcome.NEW, null);
+    Session session = processingSession();
+
+    sut.run(session, extraction, List.of(resolved), List.of());
+
+    ArgumentCaptor<Session> captor = ArgumentCaptor.forClass(Session.class);
+    verify(sessionRepository).save(captor.capture());
+    DiffPayload payload =
+        objectMapper.readValue(captor.getValue().diffPayload(), DiffPayload.class);
+    NewEntityCard card = (NewEntityCard) payload.relations().get(0);
+    assertThat(card.fullProfile()).doesNotContainKey("kind");
   }
 
   @Test

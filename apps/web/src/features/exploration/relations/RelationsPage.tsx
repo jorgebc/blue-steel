@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Background, Controls, ReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useEntityList } from '@/api/worldstate'
+import { useAllEntities } from '@/api/worldstate'
 import { useRelations } from '@/api/relations'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { graphTransform } from './graphTransform'
@@ -22,12 +22,12 @@ const edgeTypes = { relationEdge: RelationEdge }
  */
 export function RelationsPage() {
   const navigate = useNavigate()
-  const actorsQuery = useEntityList('actor', 0)
-  const spacesQuery = useEntityList('space', 0)
+  const actorsQuery = useAllEntities('actor')
+  const spacesQuery = useAllEntities('space')
   const relationsQuery = useRelations()
 
-  const actors = useMemo(() => actorsQuery.data?.items ?? [], [actorsQuery.data])
-  const spaces = useMemo(() => spacesQuery.data?.items ?? [], [spacesQuery.data])
+  const actors = useMemo(() => actorsQuery.data ?? [], [actorsQuery.data])
+  const spaces = useMemo(() => spacesQuery.data ?? [], [spacesQuery.data])
   const relations = useMemo(() => relationsQuery.data ?? [], [relationsQuery.data])
 
   const { nodes, edges } = useMemo(

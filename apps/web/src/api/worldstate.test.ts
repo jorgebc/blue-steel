@@ -6,6 +6,7 @@ import { apiClient } from './client'
 import {
   getEntities,
   getEntityDetail,
+  useAllEntities,
   useEntityDetail,
   useEntityList,
   worldstateKeys,
@@ -93,6 +94,14 @@ describe('getEntities', () => {
 
     expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/spaces?page=2&size=20')
   })
+
+  it('passes a custom size when provided', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope([summary], { page: 0, size: 100, totalCount: 1 }))
+
+    await getEntities('c1', 'actor', 0, 100)
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/actors?page=0&size=100')
+  })
 })
 
 describe('getEntityDetail', () => {
@@ -122,6 +131,27 @@ describe('useEntityList', () => {
 
   it('does not fetch while there is no active campaign', () => {
     renderHook(() => useEntityList('actor', 0), { wrapper })
+
+    expect(apiClient.get).not.toHaveBeenCalled()
+  })
+})
+
+describe('useAllEntities', () => {
+  it('fetches page 0 with size 100 and returns the items array directly (FU3)', async () => {
+    useCampaignStore.getState().setCampaign('c1', 'gm')
+    vi.mocked(apiClient.get).mockResolvedValue(
+      envelope([summary], { page: 0, size: 100, totalCount: 1 })
+    )
+
+    const { result } = renderHook(() => useAllEntities('actor'), { wrapper })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual([summary])
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/actors?page=0&size=100')
+  })
+
+  it('does not fetch while there is no active campaign', () => {
+    renderHook(() => useAllEntities('actor'), { wrapper })
 
     expect(apiClient.get).not.toHaveBeenCalled()
   })

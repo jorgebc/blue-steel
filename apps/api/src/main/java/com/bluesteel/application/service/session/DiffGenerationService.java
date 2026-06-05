@@ -98,13 +98,13 @@ public class DiffGenerationService {
                     resolved.matchedEntityId(),
                     entityType,
                     mention.name(),
-                    Map.of("description", mention.description()));
+                    snapshotOf(mention.description()));
             case NEW ->
                 new NewEntityCard(
                     cardId,
                     entityType,
                     mention.name(),
-                    Map.of("name", mention.name(), "description", mention.description()));
+                    snapshotOf(mention.name(), mention.description()));
             case UNCERTAIN -> new UncertainEntityCard(cardId, entityType, mention.name(), null);
           };
       cards.add(card);
@@ -134,15 +134,14 @@ public class DiffGenerationService {
                     resolved.matchedEntityId(),
                     "relation",
                     relation.name(),
-                    withEndpoints(Map.of("description", relation.description()), relation));
+                    withRelationExtras(snapshotOf(relation.description()), relation));
             case NEW ->
                 new NewEntityCard(
                     cardId,
                     "relation",
                     relation.name(),
-                    withEndpoints(
-                        Map.of("name", relation.name(), "description", relation.description()),
-                        relation));
+                    withRelationExtras(
+                        snapshotOf(relation.name(), relation.description()), relation));
             case UNCERTAIN -> new UncertainEntityCard(cardId, "relation", relation.name(), null);
           };
       cards.add(card);
@@ -150,8 +149,11 @@ public class DiffGenerationService {
     return cards;
   }
 
-  /** Returns a copy of {@code base} with non-null relation endpoint mentions added (F4.3.4). */
-  private static Map<String, Object> withEndpoints(
+  /**
+   * Returns a copy of {@code base} with non-null relation endpoint mentions and {@code kind} added
+   * (F4.3.4, FU2).
+   */
+  private static Map<String, Object> withRelationExtras(
       Map<String, Object> base, ExtractedRelation relation) {
     Map<String, Object> snapshot = new LinkedHashMap<>(base);
     if (relation.sourceMention() != null) {
@@ -160,7 +162,31 @@ public class DiffGenerationService {
     if (relation.targetMention() != null) {
       snapshot.put("targetMention", relation.targetMention());
     }
+    if (relation.kind() != null) {
+      snapshot.put("kind", relation.kind());
+    }
     return snapshot;
+  }
+
+  /** Builds a snapshot delta containing only a non-null description (FU5). */
+  private static Map<String, Object> snapshotOf(String description) {
+    Map<String, Object> m = new LinkedHashMap<>();
+    if (description != null) {
+      m.put("description", description);
+    }
+    return m;
+  }
+
+  /**
+   * Builds a full-profile snapshot with {@code name} and, when non-null, {@code description} (FU5).
+   */
+  private static Map<String, Object> snapshotOf(String name, String description) {
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("name", name);
+    if (description != null) {
+      m.put("description", description);
+    }
+    return m;
   }
 
   private List<ConflictCard> buildConflictCards(

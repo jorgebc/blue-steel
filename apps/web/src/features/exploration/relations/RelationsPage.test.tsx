@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { axe } from 'vitest-axe'
 import { RelationsPage } from './RelationsPage'
-import { useEntityList } from '@/api/worldstate'
+import { useAllEntities } from '@/api/worldstate'
 import { useRelations } from '@/api/relations'
 import type { EntitySummary } from '@/types/worldstate'
 import type { Relation } from '@/types/relation'
@@ -21,10 +21,10 @@ vi.mock('@xyflow/react', () => ({
   Background: () => null,
   Controls: () => null,
 }))
-vi.mock('@/api/worldstate', () => ({ useEntityList: vi.fn() }))
+vi.mock('@/api/worldstate', () => ({ useAllEntities: vi.fn() }))
 vi.mock('@/api/relations', () => ({ useRelations: vi.fn() }))
 
-const mockUseEntityList = vi.mocked(useEntityList)
+const mockUseAllEntities = vi.mocked(useAllEntities)
 const mockUseRelations = vi.mocked(useRelations)
 
 function actor(id: string, name: string): EntitySummary {
@@ -50,16 +50,16 @@ const relation: Relation = {
   sessionId: 's1',
 }
 
-type ListResult = ReturnType<typeof useEntityList>
+type AllEntitiesResult = ReturnType<typeof useAllEntities>
 type RelationsResult = ReturnType<typeof useRelations>
 
-function listResult(over: Partial<ListResult>): ListResult {
+function allEntitiesResult(over: Partial<AllEntitiesResult>): AllEntitiesResult {
   return {
-    data: { items: [], page: 0, size: 20, totalCount: 0 },
+    data: [],
     isLoading: false,
     isError: false,
     ...over,
-  } as unknown as ListResult
+  } as unknown as AllEntitiesResult
 }
 
 function relationsResult(over: Partial<RelationsResult>): RelationsResult {
@@ -76,14 +76,9 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockUseEntityList.mockImplementation((entityType) =>
-    listResult({
-      data: {
-        items: entityType === 'actor' ? [actor('a1', 'Mira'), actor('a2', 'Aldric')] : [],
-        page: 0,
-        size: 20,
-        totalCount: 2,
-      },
+  mockUseAllEntities.mockImplementation((entityType) =>
+    allEntitiesResult({
+      data: entityType === 'actor' ? [actor('a1', 'Mira'), actor('a2', 'Aldric')] : [],
     })
   )
   mockUseRelations.mockReturnValue(relationsResult({ data: [relation] }))

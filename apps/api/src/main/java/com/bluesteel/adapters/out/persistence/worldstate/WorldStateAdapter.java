@@ -103,6 +103,18 @@ public class WorldStateAdapter implements WorldStatePort {
                   + " = ?",
               Integer.class,
               entityId);
+      // Refresh the relation head's endpoint columns so they always reflect the latest commit
+      // (a re-committed relation may have resolved new endpoints). Nulls are valid (FU4).
+      if ("relation".equals(cmd.entityType())) {
+        jdbcTemplate.update(
+            "UPDATE relations SET source_entity_id = ?, source_entity_type = ?,"
+                + " target_entity_id = ?, target_entity_type = ? WHERE id = ?",
+            cmd.sourceEntityId(),
+            cmd.sourceEntityType(),
+            cmd.targetEntityId(),
+            cmd.targetEntityType(),
+            entityId);
+      }
     }
 
     jdbcTemplate.update(

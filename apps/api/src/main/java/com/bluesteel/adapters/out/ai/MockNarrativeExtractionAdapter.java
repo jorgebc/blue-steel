@@ -33,6 +33,7 @@ public class MockNarrativeExtractionAdapter implements NarrativeExtractionPort {
             new ExtractedRelation(
                 "Mira guides the party",
                 "Mira leads the group to shelter",
+                "alliance",
                 "Mira",
                 "Thornwick",
                 rawSummaryText)));

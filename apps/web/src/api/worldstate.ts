@@ -21,10 +21,11 @@ export const worldstateKeys = {
 export async function getEntities(
   campaignId: string,
   entityType: EntityType,
-  page: number
+  page: number,
+  size: number = PAGE_SIZE
 ): Promise<EntityListPage> {
   const res = await apiClient.get<EntitySummary[]>(
-    `/api/v1/campaigns/${campaignId}/${entityType}s?page=${page}&size=${PAGE_SIZE}`
+    `/api/v1/campaigns/${campaignId}/${entityType}s?page=${page}&size=${size}`
   )
   const meta = (res.meta ?? {}) as { page?: number; size?: number; totalCount?: number }
   return {
@@ -53,6 +54,23 @@ export function useEntityList(entityType: EntityType, page: number) {
   return useQuery({
     queryKey: worldstateKeys.list(campaignId ?? '', entityType, page),
     queryFn: () => getEntities(campaignId ?? '', entityType, page),
+    enabled: campaignId !== null,
+  })
+}
+
+/**
+ * Fetches all entity summaries for the active campaign in a single request (size=100, matching
+ * backend MAX_PAGE_SIZE). Use this for graph views that need every node — not for paginated lists.
+ * (FU3)
+ */
+export function useAllEntities(entityType: EntityType) {
+  const campaignId = useCampaignStore((s) => s.activeCampaignId)
+  return useQuery({
+    queryKey: [...worldstateKeys.all(campaignId ?? ''), entityType, 'all-items'] as const,
+    queryFn: async () => {
+      const page = await getEntities(campaignId ?? '', entityType, 0, 100)
+      return page.items
+    },
     enabled: campaignId !== null,
   })
 }

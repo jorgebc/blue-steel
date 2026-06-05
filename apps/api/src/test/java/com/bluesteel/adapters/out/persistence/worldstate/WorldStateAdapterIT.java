@@ -241,6 +241,57 @@ class WorldStateAdapterIT extends TestcontainersPostgresBaseIT {
   }
 
   @Test
+  @DisplayName(
+      "should update relation head endpoint columns when the relation is re-committed (FU4)")
+  void writeEntity_relationReCommit_updatesEndpointColumns() {
+    UUID originalSourceId = UUID.randomUUID();
+    UUID originalTargetId = UUID.randomUUID();
+    EntityWriteCommand createCmd =
+        new EntityWriteCommand(
+            "relation",
+            null,
+            campaignId,
+            ownerId,
+            "Mira guides the party",
+            null,
+            Map.of("name", "Mira guides the party"),
+            sessionId,
+            originalSourceId,
+            "actor",
+            originalTargetId,
+            "space");
+    CommittedEntityVersion v1 = adapter.writeEntity(createCmd);
+
+    UUID newSourceId = UUID.randomUUID();
+    UUID newTargetId = UUID.randomUUID();
+    EntityWriteCommand reCommitCmd =
+        new EntityWriteCommand(
+            "relation",
+            v1.entityId(),
+            campaignId,
+            ownerId,
+            "Mira guides the party",
+            Map.of("description", "Updated bond"),
+            Map.of("name", "Mira guides the party", "description", "Updated bond"),
+            sessionId,
+            newSourceId,
+            "actor",
+            newTargetId,
+            "space");
+    adapter.writeEntity(reCommitCmd);
+
+    Map<String, Object> row =
+        jdbcTemplate.queryForMap(
+            "SELECT source_entity_id, source_entity_type, target_entity_id, target_entity_type"
+                + " FROM relations WHERE id = ?",
+            v1.entityId());
+    assertThat(row.get("source_entity_id")).isEqualTo(newSourceId);
+    assertThat(row.get("source_entity_type")).isEqualTo("actor");
+    assertThat(row.get("target_entity_id")).isEqualTo(newTargetId);
+    assertThat(row.get("target_entity_type")).isEqualTo("space");
+  }
+
+  @Test
   @DisplayName("should resolve an endpoint name to an actor, case-insensitively")
   void findEndpointByName_matchingActor_returnsActorEndpoint() {
     CommittedEntityVersion actor =
