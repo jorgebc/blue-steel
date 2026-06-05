@@ -3362,10 +3362,10 @@ no modals (D-082), no Q&A history (D-058).
 | F4.4.7 | Frontend: AnnotationCard + AnnotationInput components | ✅ |
 | F4.4.8 | Frontend: AnnotationThread domain component (delete confirm via FocusedOverlay) | ✅ |
 | F4.4.9 | Frontend: mount AnnotationThread in entity/space/event/relation profiles | ✅ |
-| F4.5 | "Propose a change" affordance — visible, inactive in v1 (D-012) | 🔲 |
+| F4.5 | "Propose a change" affordance — visible, inactive in v1 (D-012) | ✅ |
 | F4.5-SETUP | Frontend scaffolding — npx shadcn@latest add tooltip (human step) | 👤 |
-| F4.5.1 | Frontend: ProposeChangeButton domain component (disabled + tooltip) | 🔲 |
-| F4.5.2 | Frontend: mount ProposeChangeButton in entity/space/relation profiles | 🔲 |
+| F4.5.1 | Frontend: ProposeChangeButton domain component (disabled + tooltip) | ✅ |
+| F4.5.2 | Frontend: mount ProposeChangeButton in entity/space/relation profiles | ✅ |
 | F4.6 | Event relational links — structured event↔space / event↔actor (Phase-2 pipeline extension, D-095) | 🔲 |
 | F4.6.1 | Backend: migration 0024 — events.space_id + event_involved_actors join | 🔲 |
 | F4.6.2 | Backend: ExtractedEvent model (space + involved actors) + ExtractionResult change | 🔲 |
