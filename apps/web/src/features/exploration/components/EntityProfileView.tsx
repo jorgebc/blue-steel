@@ -5,6 +5,7 @@ import { AnnotationThread } from '@/components/domain/AnnotationThread'
 import { EntityVersionHistory } from '@/components/domain/EntityVersionHistory'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { ProposeChangeButton } from '@/components/domain/ProposeChangeButton'
+import { EntityLinks } from './EntityLinks'
 import { EntityProfileSkeleton } from './EntityProfileSkeleton'
 import type { EntityType, EntityVersion } from '@/types/worldstate'
 
@@ -85,6 +86,8 @@ export function EntityProfileView({ entityType, entityId, backTo, backLabel }: P
             <h2 className="mb-3 text-sm font-semibold text-slate-700">Version history</h2>
             <EntityVersionHistory versions={data.versions} />
           </div>
+
+          <EntityLinks entityType={entityType} entityId={entityId} />
 
           <AnnotationThread entityType={entityType} entityId={entityId} />
         </div>

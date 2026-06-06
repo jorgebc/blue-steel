@@ -4,16 +4,19 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 import { apiClient } from './client'
 import {
+  entityLinksKeys,
   getEntities,
   getEntityDetail,
+  getEntityLinks,
   useAllEntities,
   useEntityDetail,
+  useEntityLinks,
   useEntityList,
   worldstateKeys,
 } from './worldstate'
 import { createTestQueryClient } from '@/test/createTestQueryClient'
 import { useCampaignStore } from '@/store/campaignStore'
-import type { EntityDetail, EntitySummary } from '@/types/worldstate'
+import type { EntityDetail, EntityLinks, EntitySummary } from '@/types/worldstate'
 
 vi.mock('./client', () => ({
   apiClient: { get: vi.fn() },
@@ -172,6 +175,96 @@ describe('useEntityDetail', () => {
     useCampaignStore.getState().setCampaign('c1', 'player')
 
     renderHook(() => useEntityDetail('actor', ''), { wrapper })
+
+    expect(apiClient.get).not.toHaveBeenCalled()
+  })
+})
+
+const links: EntityLinks = {
+  relations: [
+    {
+      relationId: 'r1',
+      name: 'Aldric guards the Tavern',
+      kind: 'guardianship',
+      sourceEntityId: 'a1',
+      sourceEntityType: 'actor',
+      targetEntityId: 'x1',
+      targetEntityType: 'space',
+      sessionId: 's1',
+    },
+  ],
+  relatedEntities: [
+    {
+      entityId: 'x1',
+      entityType: 'space',
+      name: 'The Tavern',
+      latestVersionNumber: 1,
+      currentSnapshot: {},
+      lastUpdatedSessionId: 's1',
+      createdAt: '2026-01-01T09:00:00Z',
+    },
+  ],
+  events: [
+    {
+      eventId: 'e1',
+      name: 'The Brawl',
+      eventType: 'conflict',
+      involvedActorNames: ['Aldric'],
+      spaceName: 'The Tavern',
+      sessionId: 's1',
+      sessionSequenceNumber: 1,
+      createdAt: '2026-01-01T09:00:00Z',
+    },
+  ],
+  appearanceSessionIds: ['s1', 's2'],
+}
+
+describe('entityLinksKeys', () => {
+  it('nests the links key under the entity detail key', () => {
+    expect(entityLinksKeys.links('c1', 'actor', 'a1')).toEqual([
+      'worldstate',
+      'c1',
+      'actor',
+      'detail',
+      'a1',
+      'links',
+    ])
+  })
+})
+
+describe('getEntityLinks', () => {
+  it('GETs the pluralised links endpoint and unwraps the envelope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(links))
+
+    const result = await getEntityLinks('c1', 'space', 'x1')
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/spaces/x1/links')
+    expect(result).toEqual(links)
+  })
+})
+
+describe('useEntityLinks', () => {
+  it('returns the cross-link bundle once a campaign is active', async () => {
+    useCampaignStore.getState().setCampaign('c1', 'player')
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(links))
+
+    const { result } = renderHook(() => useEntityLinks('actor', 'a1'), { wrapper })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual(links)
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/actors/a1/links')
+  })
+
+  it('does not fetch while there is no active campaign', () => {
+    renderHook(() => useEntityLinks('actor', 'a1'), { wrapper })
+
+    expect(apiClient.get).not.toHaveBeenCalled()
+  })
+
+  it('does not fetch when the entity id is empty', () => {
+    useCampaignStore.getState().setCampaign('c1', 'player')
+
+    renderHook(() => useEntityLinks('actor', ''), { wrapper })
 
     expect(apiClient.get).not.toHaveBeenCalled()
   })
