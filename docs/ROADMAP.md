@@ -3374,8 +3374,8 @@ no modals (D-082), no Q&A history (D-058).
 | F4.6.5 | Backend: re-point Timeline adapter (F4.2.2) at the relational event links | ✅ |
 | F4.6.6 | Decide + implement the `eventType` source (extract + persist as events.event_type, D-097) | ✅ |
 | F4.7 | Profile cross-links — "living record" relational sections + navigation (D-009) | 🔲 |
-| F4.7.1 | Backend: EntityLinksReadPort + adapter (relations/events/appearances) + IT | 🔲 |
-| F4.7.2 | Backend: GetEntityLinks use case + service + endpoint | 🔲 |
+| F4.7.1 | Backend: EntityLinksReadPort + adapter (relations/events/appearances) + IT | ✅ |
+| F4.7.2 | Backend: GetEntityLinks use case + service + endpoint | ✅ |
 | F4.7-SETUP | Frontend scaffolding — verified entity-links contract; no new shadcn (human step) | 👤 |
 | F4.7.3 | Frontend: entity-links types + API hook | 🔲 |
 | F4.7.4 | Frontend: EntityLinks sections wired into entity/space profiles | 🔲 |

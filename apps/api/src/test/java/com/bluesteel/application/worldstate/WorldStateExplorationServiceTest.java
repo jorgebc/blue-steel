@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.bluesteel.application.model.worldstate.EntityDetailView;
+import com.bluesteel.application.model.worldstate.EntityLinks;
 import com.bluesteel.application.model.worldstate.EntityListFilter;
 import com.bluesteel.application.model.worldstate.EntityListPage;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
+import com.bluesteel.application.port.out.worldstate.EntityLinksReadPort;
 import com.bluesteel.application.port.out.worldstate.WorldStateReadPort;
 import com.bluesteel.application.service.worldstate.WorldStateExplorationService;
 import com.bluesteel.domain.campaign.CampaignRole;
@@ -29,6 +31,7 @@ class WorldStateExplorationServiceTest {
 
   @Mock private CampaignMembershipPort membershipPort;
   @Mock private WorldStateReadPort readPort;
+  @Mock private EntityLinksReadPort linksReadPort;
 
   private WorldStateExplorationService sut;
 
@@ -38,7 +41,7 @@ class WorldStateExplorationServiceTest {
 
   @org.junit.jupiter.api.BeforeEach
   void setUp() {
-    sut = new WorldStateExplorationService(membershipPort, readPort);
+    sut = new WorldStateExplorationService(membershipPort, readPort, linksReadPort);
   }
 
   @Test
@@ -108,5 +111,27 @@ class WorldStateExplorationServiceTest {
     EntityDetailView result = sut.getDetail("actor", CAMPAIGN_ID, ENTITY_ID, CALLER_ID);
 
     assertThat(result).isSameAs(detail);
+  }
+
+  @Test
+  @DisplayName("should throw UnauthorizedException when reading links as a non-member")
+  void getLinks_nonMember_throwsUnauthorized() {
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> sut.getLinks("actor", CAMPAIGN_ID, ENTITY_ID, CALLER_ID))
+        .isInstanceOf(UnauthorizedException.class);
+  }
+
+  @Test
+  @DisplayName("should delegate to the links read port and return its bundle for a member")
+  void getLinks_member_delegatesToLinksReadPort() {
+    EntityLinks links = new EntityLinks(List.of(), List.of(), List.of(), List.of());
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(linksReadPort.getLinks("space", CAMPAIGN_ID, ENTITY_ID)).thenReturn(links);
+
+    EntityLinks result = sut.getLinks("space", CAMPAIGN_ID, ENTITY_ID, CALLER_ID);
+
+    assertThat(result).isSameAs(links);
   }
 }

@@ -1,11 +1,14 @@
 package com.bluesteel.application.service.worldstate;
 
 import com.bluesteel.application.model.worldstate.EntityDetailView;
+import com.bluesteel.application.model.worldstate.EntityLinks;
 import com.bluesteel.application.model.worldstate.EntityListFilter;
 import com.bluesteel.application.model.worldstate.EntityListPage;
 import com.bluesteel.application.port.in.worldstate.GetEntityDetailUseCase;
+import com.bluesteel.application.port.in.worldstate.GetEntityLinksUseCase;
 import com.bluesteel.application.port.in.worldstate.ListEntitiesUseCase;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
+import com.bluesteel.application.port.out.worldstate.EntityLinksReadPort;
 import com.bluesteel.application.port.out.worldstate.WorldStateReadPort;
 import com.bluesteel.domain.exception.EntityNotFoundException;
 import com.bluesteel.domain.exception.UnauthorizedException;
@@ -20,7 +23,8 @@ import org.springframework.stereotype.Service;
  * {@link EntityNotFoundException}.
  */
 @Service
-public class WorldStateExplorationService implements ListEntitiesUseCase, GetEntityDetailUseCase {
+public class WorldStateExplorationService
+    implements ListEntitiesUseCase, GetEntityDetailUseCase, GetEntityLinksUseCase {
 
   private static final Logger log = LoggerFactory.getLogger(WorldStateExplorationService.class);
   private static final int DEFAULT_PAGE_SIZE = 20;
@@ -28,11 +32,15 @@ public class WorldStateExplorationService implements ListEntitiesUseCase, GetEnt
 
   private final CampaignMembershipPort membershipPort;
   private final WorldStateReadPort readPort;
+  private final EntityLinksReadPort linksReadPort;
 
   public WorldStateExplorationService(
-      CampaignMembershipPort membershipPort, WorldStateReadPort readPort) {
+      CampaignMembershipPort membershipPort,
+      WorldStateReadPort readPort,
+      EntityLinksReadPort linksReadPort) {
     this.membershipPort = membershipPort;
     this.readPort = readPort;
+    this.linksReadPort = linksReadPort;
   }
 
   @Override
@@ -63,6 +71,19 @@ public class WorldStateExplorationService implements ListEntitiesUseCase, GetEnt
       throw new EntityNotFoundException("%s not found: %s".formatted(entityType, entityId));
     }
     return detail;
+  }
+
+  @Override
+  public EntityLinks getLinks(String entityType, UUID campaignId, UUID entityId, UUID callerId) {
+    log.info(
+        "Reading {} links entityId={} campaignId={} callerId={}",
+        entityType,
+        entityId,
+        campaignId,
+        callerId);
+    requireMember(campaignId, callerId);
+
+    return linksReadPort.getLinks(entityType, campaignId, entityId);
   }
 
   private void requireMember(UUID campaignId, UUID callerId) {
