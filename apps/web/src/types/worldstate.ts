@@ -3,6 +3,9 @@
  * entity-type-specific JSON objects and are typed as `Record<string, unknown>` — render generically.
  */
 
+import type { Relation } from './relation'
+import type { TimelineEvent } from './timeline'
+
 export type EntityType = 'actor' | 'space' | 'event' | 'relation'
 
 export interface EntitySummary {
@@ -40,4 +43,16 @@ export interface EntityListPage {
   page: number
   size: number
   totalCount: number
+}
+
+/**
+ * Cross-link bundle for an actor's or space's profile (F4.7): the relations it participates in, the
+ * entities at the other end of those relations, the events linked to it, and the sessions it appears
+ * in. Mirrors the backend `EntityLinksResponse`.
+ */
+export interface EntityLinks {
+  relations: Relation[]
+  relatedEntities: EntitySummary[]
+  events: TimelineEvent[]
+  appearanceSessionIds: string[]
 }

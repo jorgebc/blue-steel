@@ -3373,12 +3373,17 @@ no modals (D-082), no Q&A history (D-058).
 | F4.6.4 | Backend: resolve + persist event links at commit | ✅ |
 | F4.6.5 | Backend: re-point Timeline adapter (F4.2.2) at the relational event links | ✅ |
 | F4.6.6 | Decide + implement the `eventType` source (extract + persist as events.event_type, D-097) | ✅ |
-| F4.7 | Profile cross-links — "living record" relational sections + navigation (D-009) | 🔲 |
-| F4.7.1 | Backend: EntityLinksReadPort + adapter (relations/events/appearances) + IT | 🔲 |
-| F4.7.2 | Backend: GetEntityLinks use case + service + endpoint | 🔲 |
+| F4.7 | Profile cross-links — "living record" relational sections + navigation (D-009) | ✅ |
+| F4.7.1 | Backend: EntityLinksReadPort + adapter (relations/events/appearances) + IT | ✅ |
+| F4.7.2 | Backend: GetEntityLinks use case + service + endpoint | ✅ |
 | F4.7-SETUP | Frontend scaffolding — verified entity-links contract; no new shadcn (human step) | 👤 |
-| F4.7.3 | Frontend: entity-links types + API hook | 🔲 |
-| F4.7.4 | Frontend: EntityLinks sections wired into entity/space profiles | 🔲 |
+| F4.7.3 | Frontend: entity-links types + API hook | ✅ |
+| F4.7.4 | Frontend: EntityLinks sections wired into entity/space profiles | ✅ |
+| F4.8 | Profile cross-link deep-link targets — relation & session detail pages + wiring (D-009) | 🔲 |
+| F4.8.1 | Backend+FE: enrich EntityLinks appearances → session summaries (id + sequenceNumber) | 🔲 |
+| F4.8.2 | Frontend: RelationDetailPage + route (consumes existing useRelationDetail) | 🔲 |
+| F4.8.3 | Frontend: read-only SessionDetailPage + route | 🔲 |
+| F4.8.4 | Frontend: make EntityLinks relations + appearances navigable to the new pages | 🔲 |
 
 ---
 
@@ -4355,7 +4360,76 @@ data. Resolve the dangling field one way or the other.
 
 **Scope (out):** Annotations/propose (F4.4/F4.5).
 
+> **Shipped note:** EntityLinks is rendered via the shared `EntityProfileView` (the real reserved slot host) rather than the two thin page wrappers, so both actor and space profiles get it from one edit. Related entities link to their profile and events to event detail. **Relations** and **Appears in sessions** shipped as non-navigable rows: no relation-detail or read-only session-detail page exists yet — deep-linking is deferred to F4.8.
+
 **Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-009, D-001  **Dependencies:** F4.7.3, F4.1.11, F4.1.12
+
+---
+
+#### F4.8 — Profile cross-link deep-link targets
+
+> **Umbrella task — run the F4.8.N sub-tasks below, not this.**
+
+**Goal:** Build the destination pages the F4.7 cross-links point at but which do not exist yet, then make every EntityLinks item navigable. Discovered during F4.7.4: of the four cross-link sections, only "Related entities" (entity profiles) and "Events" (event detail) had routes/pages; "Relations" and "Appears in sessions" had no detail page, so F4.7.4 shipped them as non-navigable rows.
+
+**Scope (out):** v2 proposal/annotation work; changing the EntityLinks four-section shape beyond the appearance enrichment in F4.8.1.
+
+**Decisions:** D-009, D-010, D-055  **Dependencies:** F4.7
+
+---
+
+#### F4.8.1 — Enrich EntityLinks appearances with session summaries
+
+**Goal:** Return session label data (sequence number) for appearances, not bare UUIDs, so the UI can render "Session #N" and deep-link.
+
+**Scope (in):**
+- Backend: replace `appearanceSessionIds: List<UUID>` with `appearances: List<SessionSummaryView>` (id, sequenceNumber) across `EntityLinks`, `EntityLinksReadPort`/`EntityLinksReadAdapter` (join `sessions`), `EntityLinksResponse`, controller; update IT + `@WebMvcTest`.
+- Frontend: update the `EntityLinks` type + `useEntityLinks` and tests.
+
+**Scope (out):** UI wiring (F4.8.4).
+
+**Skills:** `backend-endpoint`, `backend-testing`, `frontend-api-resource`  **Decisions:** D-009  **Dependencies:** F4.7.2, F4.7.3
+
+---
+
+#### F4.8.2 — RelationDetailPage + route
+
+**Goal:** A read-only single-relation view so Relations cross-links (and the graph) can deep-link.
+
+**Scope (in):**
+- `apps/web/src/features/exploration/relations/RelationDetailPage.tsx` (+ test) — consumes the existing `useRelationDetail` (`api/relations.ts`); renders name, kind, endpoints (linking to entity profiles), and version history; loading/error/empty + axe.
+- route `explore/relations/:relationId` in `main.tsx`.
+
+**Scope (out):** EntityLinks wiring (F4.8.4).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-009, D-010  **Dependencies:** F4.3.6
+
+---
+
+#### F4.8.3 — Read-only SessionDetailPage + route
+
+**Goal:** A read-only committed-session view so "Appears in sessions" can deep-link.
+
+**Scope (in):**
+- Backend: confirm/extend a committed-session read endpoint (sequence number, status, committed date, narrative summary) — reuse `GetSessionDetailUseCase` if it already serves this.
+- `apps/web/src/features/.../SessionDetailPage.tsx` (+ test) + route `sessions/:sessionId` (read-only; distinct from the existing `sessions/:sessionId/diff` review route); axe.
+
+**Scope (out):** EntityLinks wiring (F4.8.4).
+
+**Skills:** `frontend-exploration`, `backend-endpoint`, `frontend-testing`  **Decisions:** D-009  **Dependencies:** F4.8.1
+
+---
+
+#### F4.8.4 — Make EntityLinks items navigable
+
+**Goal:** Replace F4.7.4's non-navigable Relations and Appears-in-sessions rows with links to the new pages.
+
+**Scope (in):**
+- edit `apps/web/src/features/exploration/components/EntityLinks.tsx` (+ test) — Relations items → `explore/relations/:relationId`; appearances → `sessions/:sessionId`, rendered as "Session #N"; axe.
+
+**Scope (out):** New pages (F4.8.2/F4.8.3).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-009  **Dependencies:** F4.8.1, F4.8.2, F4.8.3
 
 ---
 

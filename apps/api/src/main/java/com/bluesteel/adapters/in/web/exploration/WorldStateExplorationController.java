@@ -2,8 +2,10 @@ package com.bluesteel.adapters.in.web.exploration;
 
 import com.bluesteel.adapters.in.web.ApiResponse;
 import com.bluesteel.application.model.worldstate.EntityDetailView;
+import com.bluesteel.application.model.worldstate.EntityLinks;
 import com.bluesteel.application.model.worldstate.EntityListPage;
 import com.bluesteel.application.port.in.worldstate.GetEntityDetailUseCase;
+import com.bluesteel.application.port.in.worldstate.GetEntityLinksUseCase;
 import com.bluesteel.application.port.in.worldstate.ListEntitiesUseCase;
 import java.util.List;
 import java.util.Map;
@@ -29,11 +31,15 @@ public class WorldStateExplorationController {
 
   private final ListEntitiesUseCase listEntitiesUseCase;
   private final GetEntityDetailUseCase getEntityDetailUseCase;
+  private final GetEntityLinksUseCase getEntityLinksUseCase;
 
   public WorldStateExplorationController(
-      ListEntitiesUseCase listEntitiesUseCase, GetEntityDetailUseCase getEntityDetailUseCase) {
+      ListEntitiesUseCase listEntitiesUseCase,
+      GetEntityDetailUseCase getEntityDetailUseCase,
+      GetEntityLinksUseCase getEntityLinksUseCase) {
     this.listEntitiesUseCase = listEntitiesUseCase;
     this.getEntityDetailUseCase = getEntityDetailUseCase;
+    this.getEntityLinksUseCase = getEntityLinksUseCase;
   }
 
   @GetMapping("/actors")
@@ -50,6 +56,12 @@ public class WorldStateExplorationController {
     return detailResponse("actor", id, aid);
   }
 
+  @GetMapping("/actors/{aid}/links")
+  public ResponseEntity<ApiResponse<EntityLinksResponse>> getActorLinks(
+      @PathVariable UUID id, @PathVariable UUID aid) {
+    return linksResponse("actor", id, aid);
+  }
+
   @GetMapping("/spaces")
   public ResponseEntity<ApiResponse<List<EntitySummaryResponse>>> listSpaces(
       @PathVariable UUID id,
@@ -62,6 +74,12 @@ public class WorldStateExplorationController {
   public ResponseEntity<ApiResponse<EntityDetailResponse>> getSpace(
       @PathVariable UUID id, @PathVariable UUID sid) {
     return detailResponse("space", id, sid);
+  }
+
+  @GetMapping("/spaces/{sid}/links")
+  public ResponseEntity<ApiResponse<EntityLinksResponse>> getSpaceLinks(
+      @PathVariable UUID id, @PathVariable UUID sid) {
+    return linksResponse("space", id, sid);
   }
 
   @GetMapping("/events")
@@ -95,6 +113,13 @@ public class WorldStateExplorationController {
     EntityDetailView view =
         getEntityDetailUseCase.getDetail(entityType, campaignId, entityId, callerId);
     return ResponseEntity.ok(ApiResponse.success(EntityDetailResponse.from(view)));
+  }
+
+  private ResponseEntity<ApiResponse<EntityLinksResponse>> linksResponse(
+      String entityType, UUID campaignId, UUID entityId) {
+    UUID callerId = resolveCallerId();
+    EntityLinks view = getEntityLinksUseCase.getLinks(entityType, campaignId, entityId, callerId);
+    return ResponseEntity.ok(ApiResponse.success(EntityLinksResponse.from(view)));
   }
 
   private UUID resolveCallerId() {

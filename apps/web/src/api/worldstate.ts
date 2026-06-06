@@ -1,7 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from './client'
 import { useCampaignStore } from '@/store/campaignStore'
-import type { EntityDetail, EntityListPage, EntitySummary, EntityType } from '@/types/worldstate'
+import type {
+  EntityDetail,
+  EntityLinks,
+  EntityListPage,
+  EntitySummary,
+  EntityType,
+} from '@/types/worldstate'
 
 const PAGE_SIZE = 20
 
@@ -12,6 +18,12 @@ export const worldstateKeys = {
     [...worldstateKeys.all(campaignId), entityType, 'list', page] as const,
   detail: (campaignId: string, entityType: EntityType, entityId: string) =>
     [...worldstateKeys.all(campaignId), entityType, 'detail', entityId] as const,
+}
+
+/** Query-key factory for an entity's profile cross-links (F4.7), nested under its detail key. */
+export const entityLinksKeys = {
+  links: (campaignId: string, entityType: EntityType, entityId: string) =>
+    [...worldstateKeys.detail(campaignId, entityType, entityId), 'links'] as const,
 }
 
 /**
@@ -81,6 +93,28 @@ export function useEntityDetail(entityType: EntityType, entityId: string) {
   return useQuery({
     queryKey: worldstateKeys.detail(campaignId ?? '', entityType, entityId),
     queryFn: () => getEntityDetail(campaignId ?? '', entityType, entityId),
+    enabled: campaignId !== null && entityId !== '',
+  })
+}
+
+/** Fetches an entity's profile cross-links. Only actor and space expose a `/links` endpoint (F4.7). */
+export async function getEntityLinks(
+  campaignId: string,
+  entityType: EntityType,
+  entityId: string
+): Promise<EntityLinks> {
+  const res = await apiClient.get<EntityLinks>(
+    `/api/v1/campaigns/${campaignId}/${entityType}s/${entityId}/links`
+  )
+  return res.data
+}
+
+/** Cross-link bundle (relations, related entities, events, sessions) for the active campaign. */
+export function useEntityLinks(entityType: EntityType, entityId: string) {
+  const campaignId = useCampaignStore((s) => s.activeCampaignId)
+  return useQuery({
+    queryKey: entityLinksKeys.links(campaignId ?? '', entityType, entityId),
+    queryFn: () => getEntityLinks(campaignId ?? '', entityType, entityId),
     enabled: campaignId !== null && entityId !== '',
   })
 }

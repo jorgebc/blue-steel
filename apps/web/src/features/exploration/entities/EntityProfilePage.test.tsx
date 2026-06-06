@@ -7,7 +7,14 @@ import { EntityProfilePage } from './EntityProfilePage'
 import { useEntityDetail } from '@/api/worldstate'
 import type { EntityDetail } from '@/types/worldstate'
 
-vi.mock('@/api/worldstate', () => ({ useEntityDetail: vi.fn() }))
+vi.mock('@/api/worldstate', () => ({
+  useEntityDetail: vi.fn(),
+  useEntityLinks: () => ({
+    data: { relations: [], relatedEntities: [], events: [], appearanceSessionIds: [] },
+    isLoading: false,
+    isError: false,
+  }),
+}))
 vi.mock('@/api/annotations', () => ({
   useAnnotations: () => ({ data: [], isLoading: false, isError: false }),
   usePostAnnotation: () => ({ mutate: vi.fn(), isPending: false }),

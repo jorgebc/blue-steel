@@ -8,9 +8,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.worldstate.EntityDetailView;
+import com.bluesteel.application.model.worldstate.EntityLinks;
 import com.bluesteel.application.model.worldstate.EntityListPage;
 import com.bluesteel.application.model.worldstate.EntitySummaryView;
 import com.bluesteel.application.model.worldstate.EntityVersionView;
+import com.bluesteel.application.model.worldstate.RelationSummaryView;
+import com.bluesteel.application.model.worldstate.TimelineEntryView;
 import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.health.CheckHealthUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
@@ -18,6 +21,7 @@ import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
 import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
 import com.bluesteel.application.port.in.user.InvitePlatformUserUseCase;
 import com.bluesteel.application.port.in.worldstate.GetEntityDetailUseCase;
+import com.bluesteel.application.port.in.worldstate.GetEntityLinksUseCase;
 import com.bluesteel.application.port.in.worldstate.ListEntitiesUseCase;
 import com.bluesteel.domain.exception.EntityNotFoundException;
 import java.time.Instant;
@@ -53,6 +57,7 @@ class WorldStateExplorationControllerTest {
 
   @MockitoBean private ListEntitiesUseCase listEntitiesUseCase;
   @MockitoBean private GetEntityDetailUseCase getEntityDetailUseCase;
+  @MockitoBean private GetEntityLinksUseCase getEntityLinksUseCase;
 
   // Persistence-touching services whose JPA repositories are excluded from this sliced context —
   // mocked so the full application context loads (mirrors HealthControllerTest).
@@ -153,10 +158,85 @@ class WorldStateExplorationControllerTest {
   }
 
   @Test
+  @DisplayName(
+      "should return 200 with the actor's relations, related entities, events and sessions")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void getActorLinks_returns200WithAllSections() throws Exception {
+    UUID relationId = UUID.fromString("44444444-4444-4444-4444-444444444444");
+    UUID spaceId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    UUID eventId = UUID.fromString("66666666-6666-6666-6666-666666666666");
+    RelationSummaryView relation =
+        new RelationSummaryView(
+            relationId,
+            "Aldric guards the Tavern",
+            "guardianship",
+            ACTOR_ID,
+            "actor",
+            spaceId,
+            "space",
+            SESSION_ID,
+            Instant.now());
+    EntitySummaryView related =
+        new EntitySummaryView(
+            spaceId, "space", "The Tavern", 1, Map.of(), SESSION_ID, Instant.now());
+    TimelineEntryView event =
+        new TimelineEntryView(
+            eventId,
+            "The Brawl",
+            "conflict",
+            List.of("Aldric"),
+            "The Tavern",
+            SESSION_ID,
+            1,
+            Map.of(),
+            Instant.now());
+    EntityLinks links =
+        new EntityLinks(List.of(relation), List.of(related), List.of(event), List.of(SESSION_ID));
+    when(getEntityLinksUseCase.getLinks("actor", CAMPAIGN_ID, ACTOR_ID, CALLER_ID))
+        .thenReturn(links);
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/actors/{aid}/links", CAMPAIGN_ID, ACTOR_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.relations[0].relationId").value(relationId.toString()))
+        .andExpect(jsonPath("$.data.relations[0].kind").value("guardianship"))
+        .andExpect(jsonPath("$.data.relatedEntities[0].entityId").value(spaceId.toString()))
+        .andExpect(jsonPath("$.data.relatedEntities[0].name").value("The Tavern"))
+        .andExpect(jsonPath("$.data.events[0].eventId").value(eventId.toString()))
+        .andExpect(jsonPath("$.data.events[0].eventType").value("conflict"))
+        .andExpect(jsonPath("$.data.appearanceSessionIds[0]").value(SESSION_ID.toString()));
+  }
+
+  @Test
+  @DisplayName("should return 200 with empty link sections for a space with no cross-links")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void getSpaceLinks_returns200WithEmptySections() throws Exception {
+    UUID spaceId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    when(getEntityLinksUseCase.getLinks("space", CAMPAIGN_ID, spaceId, CALLER_ID))
+        .thenReturn(new EntityLinks(List.of(), List.of(), List.of(), List.of()));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/spaces/{sid}/links", CAMPAIGN_ID, spaceId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.relations").isEmpty())
+        .andExpect(jsonPath("$.data.relatedEntities").isEmpty())
+        .andExpect(jsonPath("$.data.events").isEmpty())
+        .andExpect(jsonPath("$.data.appearanceSessionIds").isEmpty());
+  }
+
+  @Test
   @DisplayName("should return 401 when listing actors while unauthenticated")
   void listActors_unauthenticated_returns401() throws Exception {
     mockMvc
         .perform(get("/api/v1/campaigns/{id}/actors", CAMPAIGN_ID))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("should return 401 when reading actor links while unauthenticated")
+  void getActorLinks_unauthenticated_returns401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/actors/{aid}/links", CAMPAIGN_ID, ACTOR_ID))
         .andExpect(status().isUnauthorized());
   }
 }
