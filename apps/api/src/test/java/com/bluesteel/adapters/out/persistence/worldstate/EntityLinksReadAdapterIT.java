@@ -3,9 +3,11 @@ package com.bluesteel.adapters.out.persistence.worldstate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bluesteel.TestcontainersPostgresBaseIT;
+import com.bluesteel.application.model.session.SessionSummaryView;
 import com.bluesteel.application.model.worldstate.EntityLinks;
 import com.bluesteel.application.model.worldstate.EntitySummaryView;
 import com.bluesteel.application.model.worldstate.TimelineEntryView;
+import com.bluesteel.domain.session.SessionStatus;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -128,11 +130,19 @@ class EntityLinksReadAdapterIT extends TestcontainersPostgresBaseIT {
   }
 
   @Test
-  @DisplayName("should return distinct appearance session ids ordered by first appearance")
+  @DisplayName("should return distinct appearance session summaries ordered by first appearance")
   void getLinks_actor_returnsDistinctAppearanceSessions() {
     EntityLinks links = sut.getLinks("actor", campaignId, aldricId);
 
-    assertThat(links.appearanceSessionIds()).containsExactly(session1Id, session2Id);
+    assertThat(links.appearances())
+        .extracting(SessionSummaryView::sessionId)
+        .containsExactly(session1Id, session2Id);
+    assertThat(links.appearances())
+        .extracting(SessionSummaryView::sequenceNumber)
+        .containsExactly(1, 2);
+    assertThat(links.appearances())
+        .extracting(SessionSummaryView::status)
+        .containsExactly(SessionStatus.COMMITTED, SessionStatus.COMMITTED);
     assertThat(links.events()).hasSize(1);
     assertThat(links.events().get(0).eventId()).isEqualTo(duelEventId);
   }

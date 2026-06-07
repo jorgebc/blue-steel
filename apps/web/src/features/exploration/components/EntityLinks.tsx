@@ -18,9 +18,9 @@ interface Props {
 
 /**
  * Profile cross-links (F4.7): the entity's relations, the entities at the other end, the events it
- * is linked to, and the sessions it appears in. Related entities link to their profile and events to
- * their detail page; relations and session appearances render as non-navigable rows until their
- * detail pages exist (F4.8).
+ * is linked to, and the sessions it appears in. Every item deep-links: relations to the relation
+ * detail page, related entities to their profile, events to event detail, and appearances to the
+ * read-only session detail page, labelled "Session #N" (F4.8).
  */
 export function EntityLinks({ entityType, entityId }: Props) {
   const { campaignId } = useParams<{ campaignId: string }>()
@@ -55,7 +55,7 @@ export function EntityLinks({ entityType, entityId }: Props) {
     )
   }
 
-  const sessionCount = data.appearanceSessionIds.length
+  const sessionCount = data.appearances.length
 
   return (
     <section aria-label="Connections" className="space-y-6">
@@ -66,19 +66,23 @@ export function EntityLinks({ entityType, entityId }: Props) {
         ) : (
           <ul className="space-y-2">
             {data.relations.map((relation) => (
-              <li
-                key={relation.relationId}
-                className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-              >
-                <span className="flex-1 truncate font-medium text-slate-900">{relation.name}</span>
-                {relation.kind && (
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 bg-slate-100 capitalize text-slate-600"
-                  >
-                    {relation.kind}
-                  </Badge>
-                )}
+              <li key={relation.relationId}>
+                <Link
+                  to={`/campaigns/${campaignId}/explore/relations/${relation.relationId}`}
+                  className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
+                >
+                  <span className="flex-1 truncate font-medium text-slate-900">
+                    {relation.name}
+                  </span>
+                  {relation.kind && (
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 bg-slate-100 capitalize text-slate-600"
+                    >
+                      {relation.kind}
+                    </Badge>
+                  )}
+                </Link>
               </li>
             ))}
           </ul>
@@ -136,11 +140,14 @@ export function EntityLinks({ entityType, entityId }: Props) {
           <p className="text-sm text-slate-500">Does not appear in any sessions.</p>
         ) : (
           <ul className="flex flex-wrap gap-2">
-            {data.appearanceSessionIds.map((sessionId) => (
-              <li key={sessionId}>
-                <Badge variant="outline" className="bg-slate-100 font-mono text-slate-600">
-                  {sessionId.slice(0, 8)}
-                </Badge>
+            {data.appearances.map((appearance) => (
+              <li key={appearance.sessionId}>
+                <Link
+                  to={`/campaigns/${campaignId}/sessions/${appearance.sessionId}`}
+                  className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm transition-shadow duration-200 hover:shadow-md"
+                >
+                  Session #{appearance.sequenceNumber}
+                </Link>
               </li>
             ))}
           </ul>

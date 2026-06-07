@@ -3379,11 +3379,11 @@ no modals (D-082), no Q&A history (D-058).
 | F4.7-SETUP | Frontend scaffolding — verified entity-links contract; no new shadcn (human step) | 👤 |
 | F4.7.3 | Frontend: entity-links types + API hook | ✅ |
 | F4.7.4 | Frontend: EntityLinks sections wired into entity/space profiles | ✅ |
-| F4.8 | Profile cross-link deep-link targets — relation & session detail pages + wiring (D-009) | 🔲 |
-| F4.8.1 | Backend+FE: enrich EntityLinks appearances → session summaries (id + sequenceNumber) | 🔲 |
-| F4.8.2 | Frontend: RelationDetailPage + route (consumes existing useRelationDetail) | 🔲 |
-| F4.8.3 | Frontend: read-only SessionDetailPage + route | 🔲 |
-| F4.8.4 | Frontend: make EntityLinks relations + appearances navigable to the new pages | 🔲 |
+| F4.8 | Profile cross-link deep-link targets — relation & session detail pages + wiring (D-009) | ✅ |
+| F4.8.1 | Backend+FE: enrich EntityLinks appearances → session summaries (id + sequenceNumber) | ✅ |
+| F4.8.2 | Frontend: RelationDetailPage + route (consumes existing useRelationDetail) | ✅ |
+| F4.8.3 | Frontend: read-only SessionDetailPage + route | ✅ |
+| F4.8.4 | Frontend: make EntityLinks relations + appearances navigable to the new pages | ✅ |
 
 ---
 

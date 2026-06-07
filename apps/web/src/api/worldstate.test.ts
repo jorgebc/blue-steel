@@ -216,7 +216,22 @@ const links: EntityLinks = {
       createdAt: '2026-01-01T09:00:00Z',
     },
   ],
-  appearanceSessionIds: ['s1', 's2'],
+  appearances: [
+    {
+      sessionId: 's1',
+      status: 'COMMITTED',
+      sequenceNumber: 1,
+      committedAt: '2026-01-02T09:00:00Z',
+      createdAt: '2026-01-01T09:00:00Z',
+    },
+    {
+      sessionId: 's2',
+      status: 'COMMITTED',
+      sequenceNumber: 2,
+      committedAt: '2026-01-04T09:00:00Z',
+      createdAt: '2026-01-03T09:00:00Z',
+    },
+  ],
 }
 
 describe('entityLinksKeys', () => {

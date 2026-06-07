@@ -10,7 +10,7 @@ import type { EntityDetail } from '@/types/worldstate'
 vi.mock('@/api/worldstate', () => ({
   useEntityDetail: vi.fn(),
   useEntityLinks: () => ({
-    data: { relations: [], relatedEntities: [], events: [], appearanceSessionIds: [] },
+    data: { relations: [], relatedEntities: [], events: [], appearances: [] },
     isLoading: false,
     isError: false,
   }),

@@ -4,6 +4,7 @@ import type {
   CommitPayload,
   DiffPayload,
   SessionAcceptedResponse,
+  SessionDetail,
   SessionStatusResponse,
   SessionSummary,
   SubmitSessionRequest,
@@ -19,6 +20,8 @@ export const sessionKeys = {
     [...sessionKeys.all(campaignId), sessionId, 'status'] as const,
   diff: (campaignId: string, sessionId: string) =>
     [...sessionKeys.all(campaignId), sessionId, 'diff'] as const,
+  detail: (campaignId: string, sessionId: string) =>
+    [...sessionKeys.all(campaignId), sessionId, 'detail'] as const,
 }
 
 /** Submits a raw session summary, kicking off the async extraction pipeline. */
@@ -40,6 +43,17 @@ export async function getSessionStatus(
 ): Promise<SessionStatusResponse> {
   const res = await apiClient.get<SessionStatusResponse>(
     `/api/v1/campaigns/${campaignId}/sessions/${sessionId}/status`
+  )
+  return res.data
+}
+
+/** Fetches a single session's read-only detail (any campaign member; F4.8.3). */
+export async function getSessionDetail(
+  campaignId: string,
+  sessionId: string
+): Promise<SessionDetail> {
+  const res = await apiClient.get<SessionDetail>(
+    `/api/v1/campaigns/${campaignId}/sessions/${sessionId}`
   )
   return res.data
 }
@@ -88,6 +102,15 @@ export function useSessionStatus(campaignId: string, sessionId: string, enabled:
     queryFn: () => getSessionStatus(campaignId, sessionId),
     enabled,
     refetchInterval: (query) => (query.state.data?.status === 'PROCESSING' ? 2000 : false),
+  })
+}
+
+/** Fetches a session's read-only detail once. Disabled until both ids are present. */
+export function useSessionDetail(campaignId: string, sessionId: string) {
+  return useQuery({
+    queryKey: sessionKeys.detail(campaignId, sessionId),
+    queryFn: () => getSessionDetail(campaignId, sessionId),
+    enabled: campaignId !== '' && sessionId !== '',
   })
 }
 

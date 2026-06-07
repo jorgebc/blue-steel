@@ -14,6 +14,7 @@ import { InvitePlatformUserPage } from '@/features/admin/InvitePlatformUserPage'
 import { SubmitSessionPage } from '@/features/input/SubmitSessionPage'
 import { DiffReviewPage } from '@/features/input/DiffReviewPage'
 import { SessionsListPage } from '@/features/input/SessionsListPage'
+import { SessionDetailPage } from '@/features/input/SessionDetailPage'
 import { ExplorationLayout } from '@/features/exploration/ExplorationLayout'
 import { EntitiesPage } from '@/features/exploration/entities/EntitiesPage'
 import { EntityProfilePage } from '@/features/exploration/entities/EntityProfilePage'
@@ -22,6 +23,7 @@ import { SpaceProfilePage } from '@/features/exploration/spaces/SpaceProfilePage
 import { TimelinePage } from '@/features/exploration/timeline/TimelinePage'
 import { EventDetailPage } from '@/features/exploration/timeline/EventDetailPage'
 import { RelationsPage } from '@/features/exploration/relations/RelationsPage'
+import { RelationDetailPage } from '@/features/exploration/relations/RelationDetailPage'
 import { CampaignContextGuard } from '@/components/domain/CampaignContextGuard'
 import { AppShell } from '@/components/domain/AppShell'
 import { AuthenticatedLayout } from '@/components/domain/AuthenticatedLayout'
@@ -68,6 +70,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                   <Route index element={<CampaignHomePage />} />
                   <Route path="sessions" element={<SessionsListPage />} />
                   <Route path="sessions/new" element={<SubmitSessionPage />} />
+                  <Route path="sessions/:sessionId" element={<SessionDetailPage />} />
                   <Route path="sessions/:sessionId/diff" element={<DiffReviewPage />} />
                   <Route path="explore" element={<ExplorationLayout />}>
                     <Route index element={<Navigate to="timeline" replace />} />
@@ -78,6 +81,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <Route path="spaces" element={<SpacesPage />} />
                     <Route path="spaces/:spaceId" element={<SpaceProfilePage />} />
                     <Route path="relations" element={<RelationsPage />} />
+                    <Route path="relations/:relationId" element={<RelationDetailPage />} />
                   </Route>
                 </Route>
               </Route>

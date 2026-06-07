@@ -1,10 +1,12 @@
 package com.bluesteel.adapters.out.persistence.worldstate;
 
+import com.bluesteel.application.model.session.SessionSummaryView;
 import com.bluesteel.application.model.worldstate.EntityLinks;
 import com.bluesteel.application.model.worldstate.EntitySummaryView;
 import com.bluesteel.application.model.worldstate.RelationSummaryView;
 import com.bluesteel.application.model.worldstate.TimelineEntryView;
 import com.bluesteel.application.port.out.worldstate.EntityLinksReadPort;
+import com.bluesteel.domain.session.SessionStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +17,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -62,9 +65,9 @@ public class EntityLinksReadAdapter implements EntityLinksReadPort {
     List<RelationSummaryView> relations = relations(campaignId, entityId);
     List<EntitySummaryView> relatedEntities = relatedEntities(campaignId, entityId, relations);
     List<TimelineEntryView> events = events(entityType, campaignId, entityId);
-    List<UUID> appearanceSessionIds = appearanceSessionIds(tables, entityId);
+    List<SessionSummaryView> appearances = appearances(tables, entityId);
 
-    return new EntityLinks(relations, relatedEntities, events, appearanceSessionIds);
+    return new EntityLinks(relations, relatedEntities, events, appearances);
   }
 
   // -------------------------------------------------------------------------
@@ -211,21 +214,36 @@ public class EntityLinksReadAdapter implements EntityLinksReadPort {
   }
 
   // -------------------------------------------------------------------------
-  // Distinct sessions the entity appears in, ordered by first appearance
+  // Distinct sessions the entity appears in, ordered by first appearance, with
+  // their summary (sequence number, status) so the UI can label and deep-link.
   // -------------------------------------------------------------------------
 
-  private List<UUID> appearanceSessionIds(TablePair tables, UUID entityId) {
+  private List<SessionSummaryView> appearances(TablePair tables, UUID entityId) {
     String sql =
         """
-        SELECT v.session_id
+        SELECT s.id AS session_id,
+               s.status,
+               s.sequence_number,
+               s.committed_at,
+               s.created_at
         FROM %s v
+        JOIN sessions s ON s.id = v.session_id
         WHERE v.%s = ?
-        GROUP BY v.session_id
+        GROUP BY s.id, s.status, s.sequence_number, s.committed_at, s.created_at
         ORDER BY MIN(v.version_number) ASC
         """
             .formatted(tables.versionTable(), tables.fkColumn());
-    return jdbcTemplate.query(
-        sql, (rs, rowNum) -> rs.getObject("session_id", UUID.class), entityId);
+    return jdbcTemplate.query(sql, (rs, rowNum) -> mapSessionSummary(rs), entityId);
+  }
+
+  private SessionSummaryView mapSessionSummary(ResultSet rs) throws SQLException {
+    String status = rs.getString("status");
+    return new SessionSummaryView(
+        rs.getObject("session_id", UUID.class),
+        status == null ? null : SessionStatus.valueOf(status.toUpperCase(Locale.ROOT)),
+        rs.getObject("sequence_number", Integer.class),
+        instant(rs, "committed_at"),
+        instant(rs, "created_at"));
   }
 
   // -------------------------------------------------------------------------

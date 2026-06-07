@@ -4,6 +4,7 @@
  */
 
 import type { Relation } from './relation'
+import type { SessionSummary } from './session'
 import type { TimelineEvent } from './timeline'
 
 export type EntityType = 'actor' | 'space' | 'event' | 'relation'
@@ -48,11 +49,12 @@ export interface EntityListPage {
 /**
  * Cross-link bundle for an actor's or space's profile (F4.7): the relations it participates in, the
  * entities at the other end of those relations, the events linked to it, and the sessions it appears
- * in. Mirrors the backend `EntityLinksResponse`.
+ * in. Appearances carry the session summary (sequence number, status) so the UI can label and
+ * deep-link them (F4.8.1). Mirrors the backend `EntityLinksResponse`.
  */
 export interface EntityLinks {
   relations: Relation[]
   relatedEntities: EntitySummary[]
   events: TimelineEvent[]
-  appearanceSessionIds: string[]
+  appearances: SessionSummary[]
 }

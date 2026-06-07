@@ -452,7 +452,8 @@ class SessionControllerTest {
             Instant.now(),
             Instant.now(),
             Instant.now(),
-            blockId);
+            blockId,
+            "The party stormed the keep.");
     when(getSessionDetailUseCase.getDetail(SESSION_ID, CALLER_ID, CAMPAIGN_ID)).thenReturn(detail);
 
     mockMvc
@@ -460,7 +461,8 @@ class SessionControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.sessionId").value(SESSION_ID.toString()))
         .andExpect(jsonPath("$.data.sequenceNumber").value(2))
-        .andExpect(jsonPath("$.data.narrativeBlockId").value(blockId.toString()));
+        .andExpect(jsonPath("$.data.narrativeBlockId").value(blockId.toString()))
+        .andExpect(jsonPath("$.data.narrativeSummary").value("The party stormed the keep."));
   }
 
   @Test

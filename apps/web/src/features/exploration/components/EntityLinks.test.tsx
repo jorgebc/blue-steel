@@ -46,7 +46,22 @@ const links: EntityLinksData = {
       createdAt: '2026-01-01T09:00:00Z',
     },
   ],
-  appearanceSessionIds: ['11111111-aaaa', '22222222-bbbb'],
+  appearances: [
+    {
+      sessionId: '11111111-aaaa',
+      status: 'COMMITTED',
+      sequenceNumber: 3,
+      committedAt: '2026-01-02T09:00:00Z',
+      createdAt: '2026-01-01T09:00:00Z',
+    },
+    {
+      sessionId: '22222222-bbbb',
+      status: 'COMMITTED',
+      sequenceNumber: 5,
+      committedAt: '2026-01-04T09:00:00Z',
+      createdAt: '2026-01-03T09:00:00Z',
+    },
+  ],
 }
 
 function renderLinks() {
@@ -84,6 +99,13 @@ describe('EntityLinks', () => {
     expect(screen.getByText('guardianship')).toBeInTheDocument()
   })
 
+  it('links each relation to its detail page', () => {
+    renderLinks()
+
+    const link = screen.getByRole('link', { name: /Aldric guards the Tavern/i })
+    expect(link).toHaveAttribute('href', '/campaigns/c1/explore/relations/r1')
+  })
+
   it('links each related entity to its profile by type', () => {
     renderLinks()
 
@@ -106,6 +128,17 @@ describe('EntityLinks', () => {
     expect(screen.getByText('Appears in 2 sessions')).toBeInTheDocument()
   })
 
+  it('links each appearance to its session detail page, labelled "Session #N"', () => {
+    renderLinks()
+
+    const link = screen.getByRole('link', { name: 'Session #3' })
+    expect(link).toHaveAttribute('href', '/campaigns/c1/sessions/11111111-aaaa')
+    expect(screen.getByRole('link', { name: 'Session #5' })).toHaveAttribute(
+      'href',
+      '/campaigns/c1/sessions/22222222-bbbb'
+    )
+  })
+
   it('shows the loading skeleton while fetching', () => {
     mockResult({ isLoading: true })
     renderLinks()
@@ -122,7 +155,7 @@ describe('EntityLinks', () => {
 
   it('shows per-section empty states when there are no links', () => {
     mockResult({
-      data: { relations: [], relatedEntities: [], events: [], appearanceSessionIds: [] },
+      data: { relations: [], relatedEntities: [], events: [], appearances: [] },
     })
     renderLinks()
 

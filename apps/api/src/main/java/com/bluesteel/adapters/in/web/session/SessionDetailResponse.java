@@ -14,4 +14,5 @@ public record SessionDetailResponse(
     Instant committedAt,
     Instant createdAt,
     Instant updatedAt,
-    UUID narrativeBlockId) {}
+    UUID narrativeBlockId,
+    String narrativeSummary) {}
