@@ -2901,11 +2901,11 @@ context.
 
 | # | Feature | Status |
 |---|---|---|
-| F3.1 | Query endpoint skeleton — synchronous pipeline, 504 on timeout (D-052) | 🔲 |
-| F3.1.1 | Backend: AnswerQueryUseCase driving port + QueryTimeoutException | 🔲 |
-| F3.1.2 | Backend: QueryService (member auth + synchronous timeout enforcement) | 🔲 |
-| F3.1.3 | Backend: GlobalExceptionHandler 504 QUERY_TIMEOUT mapping | 🔲 |
-| F3.1.4 | Backend: QueryController + request/response DTOs (POST /queries) | 🔲 |
+| F3.1 | Query endpoint skeleton — synchronous pipeline, 504 on timeout (D-052) | ✅ |
+| F3.1.1 | Backend: AnswerQueryUseCase driving port + QueryTimeoutException | ✅ |
+| F3.1.2 | Backend: QueryService (member auth + synchronous timeout enforcement) | ✅ |
+| F3.1.3 | Backend: GlobalExceptionHandler 504 QUERY_TIMEOUT mapping | ✅ |
+| F3.1.4 | Backend: QueryController + request/response DTOs (POST /queries) | ✅ |
 | F3.2 | pgvector similarity retrieval — embed question → top-N entity versions | 🔲 |
 | F3.2.1 | Backend: QueryContextRetrievalPort driven port | 🔲 |
 | F3.2.2 | Backend: EntityQueryRetrievalAdapter (native cross-type pgvector search) + IT | 🔲 |

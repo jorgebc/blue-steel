@@ -12,6 +12,7 @@ import com.bluesteel.domain.exception.EntityNotFoundException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
 import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
+import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.RefreshTokenException;
 import com.bluesteel.domain.exception.SessionNotFoundException;
 import com.bluesteel.domain.exception.SummaryTooLargeException;
@@ -160,6 +161,15 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ApiResponse<Void> handleSessionNotFound(SessionNotFoundException ex) {
     return ApiResponse.error(ApiError.of("SESSION_NOT_FOUND", ex.getMessage()));
+  }
+
+  /** Synchronous Query Mode request exceeded its deadline (D-052). */
+  @ExceptionHandler(QueryTimeoutException.class)
+  @ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)
+  public ApiResponse<Void> handleQueryTimeout(QueryTimeoutException ex) {
+    return ApiResponse.error(
+        ApiError.of(
+            "QUERY_TIMEOUT", "The query timed out. Try rephrasing or narrowing your question."));
   }
 
   @ExceptionHandler(EntityNotFoundException.class)
