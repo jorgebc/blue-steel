@@ -58,6 +58,23 @@ Summarise: files created/modified (full paths), which acceptance criteria are me
 results, and any assumptions or deviations. Do not commit, push, or merge unless asked; if directed
 to close out, mark the task ✅ in `docs/ROADMAP.md`.
 
+## Step 6 — Version bump (only when a ROADMAP phase milestone completes)
+Per-task work does **not** bump the version. When the task you finished completes a whole ROADMAP
+**phase** (e.g. the last epic of Phase N), bump the single repo-wide SemVer version (**D-090**):
+- Set **both** `apps/web/package.json` `version` and `apps/api/pom.xml` `<version>` to the **same**
+  plain `MAJOR.MINOR.PATCH` (no `-SNAPSHOT`); they must always be equal and match the latest `v*`
+  tag on `main`.
+- Pre-1.0: `0.x` minors track phase milestones in **completion order** (build order D-094) —
+  `0.1.0` Phase 1 · `0.2.0` Phase 2 · `0.3.0` Phase 4 (Exploration) · `0.4.0` Phase 3 (Query);
+  `1.0.0` = v1 (Input + Query + Exploration) complete.
+- Commit the bump on a branch as a `chore:` commit. Do **not** create or push the annotated
+  `vX.Y.Z` tag yourself — tagging is a release action on `main` after merge; flag it for the human.
+- If unsure whether the task closes a phase, ask — don't bump speculatively.
+
+> **Committing multi-line messages:** in the Bash tool, write the message to a temp file and
+> `git commit -F <file>` — never `git commit -m` with a multi-line string, and never the PowerShell
+> `@'…'@` here-string (it leaves a stray `@` in the subject).
+
 ## Guardrails (never violate)
 - Never edit `apps/web/src/components/ui/` (shadcn auto-generated) — wrap in `components/domain/`.
 - Liquibase changelogs are append-only — new files only.

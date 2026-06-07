@@ -164,6 +164,8 @@ Never put business logic in controllers. Never put format validation in services
 
 **DB (DB-01/02):** JPA for standard CRUD; native SQL for all pgvector queries. Liquibase changelogs are **append-only**.
 
+**Versioning (VERSION-01, D-090):** `pom.xml` `<version>` is the single repo-wide SemVer string — plain `MAJOR.MINOR.PATCH`, **no `-SNAPSHOT`** — and must stay **equal to `apps/web/package.json`** and the latest `v*` tag on `main`. Bump both files together in one `chore:` commit; never bump the backend version alone. (The `4.0.x` near the top is the Spring Boot parent, not our version.)
+
 **Logging (LOG-01):** Every LLM call logged at INFO with `tokens_in`, `tokens_out`, `cost_usd`, `session_id`, `user_id`, `stage`. No raw LLM response content at INFO (may contain narrative data). JSON appender in prod via `logstash-logback-encoder`.
 
 **Logging (LOG-02):** One static `Logger` per class (`LoggerFactory.getLogger`). Domain layer: no logging — domain must not depend on infrastructure. Application services: INFO on use-case entry/exit with minimum business IDs; ERROR on unhandled exceptions. Adapters out: ERROR on infrastructure failures with full exception; never silently swallow a caught exception. Never log at INFO on high-throughput paths (e.g. health check polling). Never log passwords, tokens, or PII. Local profile: `com.bluesteel` packages at DEBUG; third-party at WARN. Prod profile: project at INFO; third-party at WARN; DEBUG disabled.
