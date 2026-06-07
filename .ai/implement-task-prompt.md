@@ -3,7 +3,7 @@
 > Reusable prompt. **Edit only the TASK line**, then run. Everything below is standing
 > context that works for any Phase task, backend or frontend.
 
-**TASK:** F2.12 and all subtasks
+**TASK:** F3.2 and all subtasks
 
 ---
 
@@ -37,6 +37,25 @@ mergeable standard. Work from the project's own docs — never from memory or as
 Restate Scope (in) as a short checklist of verifiable outcomes (files, behaviours, tests). Scope
 (out) is explicitly NOT yours — don't build it. Where the task is ambiguous or names something that
 doesn't exist yet, pick the simplest reasonable interpretation and record the assumption.
+
+## Step 2.5 — Respect the deployment resource budget (Render free tier)
+
+Production runs on a **Render free-tier web service (~512 MB RAM, sleeps after 15 min idle)** with a
+**Neon serverless PostgreSQL** database (limited connections). Memory is the binding constraint.
+Design every feature so capacity is a *parameter*, never a rewrite:
+
+- **Push heavy work to the database, not the JVM.** Vector search, aggregation, filtering, sorting
+  belong in native SQL on Neon (ARCH-04, D-062) — the JVM should receive only bounded result sets.
+- **Bound anything that scales with data.** Any in-memory collection whose size grows with rows,
+  tokens, batch size, context window, top-N, or fetch size must have an explicit limit.
+- **Make every such limit an env-overridable property**, conservatively defaulted, following the
+  existing convention in `application.properties`: `some.knob=${SOME_KNOB:default}` read via
+  `@Value` (or `@ConfigurationProperties`). Precedents: `query.retrieval.top-n`,
+  `blue-steel.resolution.top-n`, `blue-steel.conflict.context-top-n`, `blue-steel.llm.*-max-tokens`,
+  HikariCP `maximum-pool-size=3` ("sized for Render free tier").
+- **The goal:** when more memory becomes available, capacity rises by changing an env var in the
+  Render dashboard (restart only) — **never** by re-implementing the feature. State the property +
+  env var name and its default in your Step 5 report.
 
 ## Step 3 — Implement (TDD, surgical)
 - Read every existing file you'll touch or depend on; confirm real symbol names/exports before
@@ -80,3 +99,5 @@ Per-task work does **not** bump the version. When the task you finished complete
 - Liquibase changelogs are append-only — new files only.
 - No secrets in any file (D-050).
 - Stay inside the task's scope and layer; a file in the other app is out of scope.
+- Memory budget: data-scaled in-memory collections must be bounded by an env-overridable property
+  (Render free tier ~512 MB) — see Step 2.5.
