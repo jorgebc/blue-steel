@@ -1,0 +1,50 @@
+package com.bluesteel.adapters.in.web.query;
+
+import com.bluesteel.adapters.in.web.ApiResponse;
+import com.bluesteel.application.model.query.QueryResponse;
+import com.bluesteel.application.port.in.query.AnswerQueryUseCase;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/** Answers free-text questions against a campaign's world state for any campaign member (D-052). */
+@RestController
+@RequestMapping("/api/v1/campaigns/{id}/queries")
+public class QueryController {
+
+  private final AnswerQueryUseCase answerQueryUseCase;
+
+  public QueryController(AnswerQueryUseCase answerQueryUseCase) {
+    this.answerQueryUseCase = answerQueryUseCase;
+  }
+
+  /** Submits a question and returns the grounded answer with its citations; 200 on success. */
+  @PostMapping
+  public ResponseEntity<ApiResponse<QueryAnswerResponse>> ask(
+      @PathVariable UUID id, @Valid @RequestBody QueryRequest request) {
+    UUID callerId = resolveCallerId();
+    QueryResponse result = answerQueryUseCase.answer(id, callerId, request.question());
+    return ResponseEntity.ok(ApiResponse.success(toResponse(result)));
+  }
+
+  private static QueryAnswerResponse toResponse(QueryResponse result) {
+    List<CitationResponse> citations =
+        result.citations().stream()
+            .map(c -> new CitationResponse(c.sessionId(), c.sequenceNumber(), c.snippet()))
+            .toList();
+    return new QueryAnswerResponse(result.answer(), citations);
+  }
+
+  private UUID resolveCallerId() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    return UUID.fromString(auth.getName());
+  }
+}
