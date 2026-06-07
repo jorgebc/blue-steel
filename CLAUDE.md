@@ -110,6 +110,8 @@ Secrets are **never committed**. `.env` and `.env.local` are always gitignored (
 
 **Branch naming:** `type/short-description` kebab-case
 
+**Versioning (SemVer, D-090):** One repo-wide [SemVer](https://semver.org) version — **`apps/web/package.json` and `apps/api/pom.xml` `<version>` must always be equal** (plain `MAJOR.MINOR.PATCH`, no `-SNAPSHOT`) and match the latest `vMAJOR.MINOR.PATCH` annotated tag on `main`. Bump both files together in one `chore:` commit on a branch (never tag a branch). Pre-1.0: `0.x` minors track ROADMAP phase milestones in completion order (`0.1.0` Phase 1 · `0.2.0` Phase 2 · `0.3.0` Phase 4 Exploration · `0.4.0` Phase 3 Query); `1.0.0` = v1 (Input + Query + Exploration) complete. Tag (annotated, `git tag -a`) only on `main` after merge — a release action; don't create/push tags unless asked.
+
 **API error shape:** `{ "errors": [{ "code": "MACHINE_READABLE", "message": "...", "field": null }] }`
 
 **HTTP status conventions:** 400 validation, 401 unauth, 403 unauthorized, 404 not found, 409 conflict, 422 business rule, 500 internal

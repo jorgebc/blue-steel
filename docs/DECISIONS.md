@@ -1847,16 +1847,17 @@ Cross-refs: D-001/D-003 (append-only versioning), D-062 (native pgvector), D-069
 
 ### D-090 — Versioning: Semantic Versioning via annotated Git tags on `main` (repo-wide, pre-1.0)
 
-**Date:** 2026-05-29
+**Date:** 2026-05-29 (refined 2026-06-07)
 **Status:** Active
 
 **Decision:**
 Releases follow [Semantic Versioning](https://semver.org) (`MAJOR.MINOR.PATCH`) and are marked by **annotated** Git tags named `vMAJOR.MINOR.PATCH` (e.g. `v0.1.0`).
 
-- **Repo-wide, single version line.** The monorepo (D-022) is versioned as one product: a tag marks a milestone for the whole repository, not per-package. `apps/web/package.json` (+ its lockfile) carries the human-facing version number; the backend `pom.xml` stays at `-SNAPSHOT` during development and is not independently tagged. There is intentionally **no** `web-v*` / `api-v*` split.
-- **Tags live on `main` only.** A version is tagged on the `main` commit *after* the work has merged (tag the merge/merge-base commit on `main`). Feature branches may carry the `package.json` version bump, but are **never** tagged — a tag must be permanently reachable from `main`.
+- **Repo-wide, single version line.** The monorepo (D-022) is versioned as one product: a tag marks a milestone for the whole repository, not per-package. Both `apps/web/package.json` (+ its lockfile) and the backend `apps/api/pom.xml` `<version>` carry the **same** version string, equal to the latest `vMAJOR.MINOR.PATCH` tag, and are bumped **together** in one version-bump commit. There is intentionally **no** `web-v*` / `api-v*` split. *(2026-06-07: supersedes the earlier rule that `pom.xml` stayed at `-SNAPSHOT` and only `package.json` carried the number — that split caused the two files to drift out of sync.)*
+- **No `-SNAPSHOT` suffix.** The backend version is a plain SemVer string, not `X.Y.Z-SNAPSHOT`. The repo never publishes its own artifact to a Maven repository (D-044: local + prod only; the JAR is built by `spring-boot:repackage`), so SNAPSHOT semantics add nothing and would only break the single-string lockstep with `package.json`.
+- **Tags live on `main` only.** A version is tagged on the `main` commit *after* the work has merged (tag the merge/merge-base commit on `main`). Feature branches may carry the version bump, but are **never** tagged — a tag must be permanently reachable from `main`.
 - **Annotated, not lightweight.** Tags are created with `git tag -a` and a message summarizing the milestone (what shipped), so the tag carries author, date, and notes.
-- **Pre-1.0 semantics.** While `0.x`, the product is pre-release: the public surface is unstable and a `MINOR` bump may include breaking changes. `0.x` minors track ROADMAP phase milestones (e.g. `0.1.0` = the Phase-1 frontend foundation: auth, campaigns, app-shell, branding). `1.0.0` is reserved for when the v1 feature set — Input (ingestion), Query, and Exploration modes — is functionally complete.
+- **Pre-1.0 semantics.** While `0.x`, the product is pre-release: the public surface is unstable and a `MINOR` bump may include breaking changes. `0.x` minors track ROADMAP phase milestones in **completion order** (build order per D-094, *not* phase number): `0.1.0` = Phase 1 (frontend foundation: auth, campaigns, app-shell, branding), `0.2.0` = Phase 2 (Session Ingestion + 2.5 hardening), `0.3.0` = Phase 4 (Exploration Mode), `0.4.0` = Phase 3 (Query Mode, built last). `1.0.0` is reserved for when the v1 feature set — Input (ingestion), Query, and Exploration modes — is functionally complete.
 - **Commits** continue to follow Conventional Commits (D-065); a version bump is a `chore` commit. SemVer governs the release tag, Conventional Commits govern individual commits — they are complementary, not the same scheme.
 
 **Reason:**

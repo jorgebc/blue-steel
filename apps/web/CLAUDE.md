@@ -139,6 +139,7 @@ npx shadcn@latest add <component> --yes
 | All IDs are UUIDs (`string`) | Don't convert; parse timestamps at render boundary only |
 | Forms use React Hook Form + shadcn Form primitives | Map API `400` `field` errors via `setError` |
 | Accessibility is not optional | axe-core assertion on every component in `components/domain/` and every feature-level page |
+| Versioning (D-090) | `package.json` `version` is the single repo-wide SemVer string — keep it **equal to `apps/api/pom.xml`** and the latest `v*` tag; bump both together in one `chore:` commit (see root `CLAUDE.md` §5) |
 
 ---
 
