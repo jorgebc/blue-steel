@@ -130,3 +130,23 @@ export interface SessionSummary {
   committedAt: string | null
   createdAt: string
 }
+
+// ─── Session detail (F4.8.3) ─────────────────────────────────────────────────
+
+/**
+ * Read-only detail returned by GET /campaigns/{id}/sessions/{sid}. Mirrors the backend
+ * `SessionDetailResponse`. `narrativeBlockId` / `narrativeSummary` are null only if no narrative
+ * block was ever stored for the session.
+ */
+export interface SessionDetail {
+  sessionId: string
+  campaignId: string
+  status: SessionStatus
+  sequenceNumber: number | null
+  failureReason: string | null
+  committedAt: string | null
+  createdAt: string
+  updatedAt: string
+  narrativeBlockId: string | null
+  narrativeSummary: string | null
+}

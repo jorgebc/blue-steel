@@ -93,6 +93,7 @@ class GetSessionDetailServiceTest {
     assertThat(view.sessionId()).isEqualTo(SESSION_ID);
     assertThat(view.campaignId()).isEqualTo(CAMPAIGN_ID);
     assertThat(view.narrativeBlockId()).isEqualTo(blockId);
+    assertThat(view.narrativeSummary()).isEqualTo("Raw summary text.");
   }
 
   @Test
@@ -107,5 +108,6 @@ class GetSessionDetailServiceTest {
     SessionDetailView view = sut.getDetail(SESSION_ID, CALLER_ID, CAMPAIGN_ID);
 
     assertThat(view.narrativeBlockId()).isNull();
+    assertThat(view.narrativeSummary()).isNull();
   }
 }

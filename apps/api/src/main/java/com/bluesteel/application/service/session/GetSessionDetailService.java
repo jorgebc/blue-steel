@@ -49,8 +49,10 @@ public class GetSessionDetailService implements GetSessionDetailUseCase {
             .filter(s -> s.campaignId().equals(campaignId))
             .orElseThrow(() -> new SessionNotFoundException("Session not found: " + sessionId));
 
-    UUID narrativeBlockId =
-        narrativeBlockRepository.findBySessionId(sessionId).map(NarrativeBlock::id).orElse(null);
+    NarrativeBlock narrativeBlock =
+        narrativeBlockRepository.findBySessionId(sessionId).orElse(null);
+    UUID narrativeBlockId = narrativeBlock == null ? null : narrativeBlock.id();
+    String narrativeSummary = narrativeBlock == null ? null : narrativeBlock.rawSummaryText();
 
     return new SessionDetailView(
         session.id(),
@@ -61,6 +63,7 @@ public class GetSessionDetailService implements GetSessionDetailUseCase {
         session.committedAt(),
         session.createdAt(),
         session.updatedAt(),
-        narrativeBlockId);
+        narrativeBlockId,
+        narrativeSummary);
   }
 }

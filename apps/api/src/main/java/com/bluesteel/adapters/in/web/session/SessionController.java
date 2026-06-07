@@ -123,7 +123,8 @@ public class SessionController {
                 view.committedAt(),
                 view.createdAt(),
                 view.updatedAt(),
-                view.narrativeBlockId())));
+                view.narrativeBlockId(),
+                view.narrativeSummary())));
   }
 
   /** Returns the current status of a session, accessible to any campaign member. */

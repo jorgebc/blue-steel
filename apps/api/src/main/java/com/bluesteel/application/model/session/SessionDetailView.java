@@ -6,8 +6,8 @@ import java.util.UUID;
 
 /**
  * Read model for a single session's detail (ARCHITECTURE.md §7.6), including the reference to its
- * narrative block. {@code narrativeBlockId} is null only if no block was ever stored for the
- * session.
+ * narrative block and that block's raw summary text. Both {@code narrativeBlockId} and {@code
+ * narrativeSummary} are null only if no block was ever stored for the session.
  */
 public record SessionDetailView(
     UUID sessionId,
@@ -18,4 +18,5 @@ public record SessionDetailView(
     Instant committedAt,
     Instant createdAt,
     Instant updatedAt,
-    UUID narrativeBlockId) {}
+    UUID narrativeBlockId,
+    String narrativeSummary) {}

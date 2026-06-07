@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bluesteel.BlueSteelApplication;
+import com.bluesteel.application.model.session.SessionSummaryView;
 import com.bluesteel.application.model.worldstate.EntityDetailView;
 import com.bluesteel.application.model.worldstate.EntityLinks;
 import com.bluesteel.application.model.worldstate.EntityListPage;
@@ -24,6 +25,7 @@ import com.bluesteel.application.port.in.worldstate.GetEntityDetailUseCase;
 import com.bluesteel.application.port.in.worldstate.GetEntityLinksUseCase;
 import com.bluesteel.application.port.in.worldstate.ListEntitiesUseCase;
 import com.bluesteel.domain.exception.EntityNotFoundException;
+import com.bluesteel.domain.session.SessionStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -190,8 +192,11 @@ class WorldStateExplorationControllerTest {
             1,
             Map.of(),
             Instant.now());
+    SessionSummaryView appearance =
+        new SessionSummaryView(
+            SESSION_ID, SessionStatus.COMMITTED, 7, Instant.now(), Instant.now());
     EntityLinks links =
-        new EntityLinks(List.of(relation), List.of(related), List.of(event), List.of(SESSION_ID));
+        new EntityLinks(List.of(relation), List.of(related), List.of(event), List.of(appearance));
     when(getEntityLinksUseCase.getLinks("actor", CAMPAIGN_ID, ACTOR_ID, CALLER_ID))
         .thenReturn(links);
 
@@ -204,7 +209,9 @@ class WorldStateExplorationControllerTest {
         .andExpect(jsonPath("$.data.relatedEntities[0].name").value("The Tavern"))
         .andExpect(jsonPath("$.data.events[0].eventId").value(eventId.toString()))
         .andExpect(jsonPath("$.data.events[0].eventType").value("conflict"))
-        .andExpect(jsonPath("$.data.appearanceSessionIds[0]").value(SESSION_ID.toString()));
+        .andExpect(jsonPath("$.data.appearances[0].sessionId").value(SESSION_ID.toString()))
+        .andExpect(jsonPath("$.data.appearances[0].sequenceNumber").value(7))
+        .andExpect(jsonPath("$.data.appearances[0].status").value("COMMITTED"));
   }
 
   @Test
@@ -221,7 +228,7 @@ class WorldStateExplorationControllerTest {
         .andExpect(jsonPath("$.data.relations").isEmpty())
         .andExpect(jsonPath("$.data.relatedEntities").isEmpty())
         .andExpect(jsonPath("$.data.events").isEmpty())
-        .andExpect(jsonPath("$.data.appearanceSessionIds").isEmpty());
+        .andExpect(jsonPath("$.data.appearances").isEmpty());
   }
 
   @Test
