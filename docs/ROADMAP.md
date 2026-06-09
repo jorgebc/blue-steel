@@ -2910,9 +2910,9 @@ context.
 | F3.2.1 | Backend: QueryContextRetrievalPort driven port | ✅ |
 | F3.2.2 | Backend: EntityQueryRetrievalAdapter (native cross-type pgvector search) + IT | ✅ |
 | F3.2.3 | Backend: wire embed + retrieval into QueryService | ✅ |
-| F3.3 | QueryAnsweringPort + LLM call + citation grounding | 🔲 |
-| F3.3.1 | Backend: QueryPromptAssembler + QueryResponseParser (context format + JSON parse) | 🔲 |
-| F3.3.2 | Backend: real SpringAiQueryAnsweringAdapter (LLM call + cost log, replaces stub) | 🔲 |
+| F3.3 | QueryAnsweringPort + LLM call + citation grounding | ✅ |
+| F3.3.1 | Backend: QueryPromptAssembler + QueryResponseParser (context format + JSON parse) | ✅ |
+| F3.3.2 | Backend: real SpringAiQueryAnsweringAdapter (LLM call + cost log, replaces stub) | ✅ |
 | F3.4 | Query Mode UI — question input, answer, citation links (frontend) | 🔲 |
 | F3.4-SETUP | Frontend scaffolding — verified contract + notes; no new shadcn components (human step) | 👤 |
 | F3.4.1 | Frontend: Query TypeScript types (query.ts) | 🔲 |
