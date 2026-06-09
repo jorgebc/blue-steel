@@ -3,16 +3,20 @@ package com.bluesteel.application.service.query;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bluesteel.application.model.ingestion.EntityContext;
 import com.bluesteel.application.model.query.Citation;
 import com.bluesteel.application.model.query.QueryResponse;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
+import com.bluesteel.application.port.out.cost.LlmCostAccountingPort;
 import com.bluesteel.application.port.out.embedding.EmbeddingPort;
 import com.bluesteel.application.port.out.query.QueryAnsweringPort;
 import com.bluesteel.application.port.out.query.QueryContextRetrievalPort;
 import com.bluesteel.domain.campaign.CampaignRole;
+import com.bluesteel.domain.exception.CostCapExceededException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import java.util.List;
@@ -34,6 +38,7 @@ class QueryServiceTest {
   @Mock private EmbeddingPort embeddingPort;
   @Mock private QueryContextRetrievalPort retrievalPort;
   @Mock private QueryAnsweringPort queryAnsweringPort;
+  @Mock private LlmCostAccountingPort costAccountingPort;
 
   private QueryService sut;
 
@@ -41,6 +46,7 @@ class QueryServiceTest {
   private static final UUID CAMPAIGN_ID = UUID.randomUUID();
   private static final String QUESTION = "Who is Mira?";
   private static final int TOP_N = 8;
+  private static final double DAILY_CAP_USD = 1.00;
   private static final float[] EMBEDDING = {0.1f, 0.2f, 0.3f};
   private static final List<EntityContext> CONTEXT =
       List.of(
@@ -51,7 +57,14 @@ class QueryServiceTest {
   void setUp() {
     sut =
         new QueryService(
-            membershipPort, embeddingPort, retrievalPort, queryAnsweringPort, 1, TOP_N);
+            membershipPort,
+            embeddingPort,
+            retrievalPort,
+            queryAnsweringPort,
+            costAccountingPort,
+            1,
+            TOP_N,
+            DAILY_CAP_USD);
   }
 
   @Test
@@ -78,6 +91,20 @@ class QueryServiceTest {
     QueryResponse actual = sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
 
     assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("should throw CostCapExceededException when the daily cost cap is reached")
+  void answer_capReached_throwsCostCapExceeded() {
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(costAccountingPort.currentDailyCostUsd()).thenReturn(DAILY_CAP_USD);
+
+    assertThatThrownBy(() -> sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION))
+        .isInstanceOf(CostCapExceededException.class);
+
+    verify(embeddingPort, never()).embed(QUESTION);
+    verify(queryAnsweringPort, never()).answer(QUESTION, CONTEXT);
   }
 
   @Test

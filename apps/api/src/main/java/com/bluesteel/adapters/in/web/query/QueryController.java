@@ -21,9 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class QueryController {
 
   private final AnswerQueryUseCase answerQueryUseCase;
+  private final QueryRateLimiter rateLimiter;
 
-  public QueryController(AnswerQueryUseCase answerQueryUseCase) {
+  public QueryController(AnswerQueryUseCase answerQueryUseCase, QueryRateLimiter rateLimiter) {
     this.answerQueryUseCase = answerQueryUseCase;
+    this.rateLimiter = rateLimiter;
   }
 
   /** Submits a question and returns the grounded answer with its citations; 200 on success. */
@@ -31,6 +33,7 @@ public class QueryController {
   public ResponseEntity<ApiResponse<QueryAnswerResponse>> ask(
       @PathVariable UUID id, @Valid @RequestBody QueryRequest request) {
     UUID callerId = resolveCallerId();
+    rateLimiter.check(callerId, id);
     QueryResponse result = answerQueryUseCase.answer(id, callerId, request.question());
     return ResponseEntity.ok(ApiResponse.success(toResponse(result)));
   }

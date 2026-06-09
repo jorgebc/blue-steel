@@ -6,6 +6,7 @@ import com.bluesteel.domain.exception.AnnotationNotFoundException;
 import com.bluesteel.domain.exception.CampaignNotFoundException;
 import com.bluesteel.domain.exception.CannotRemoveGmException;
 import com.bluesteel.domain.exception.CommitValidationException;
+import com.bluesteel.domain.exception.CostCapExceededException;
 import com.bluesteel.domain.exception.DomainException;
 import com.bluesteel.domain.exception.EmailDeliveryException;
 import com.bluesteel.domain.exception.EntityNotFoundException;
@@ -13,6 +14,7 @@ import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
 import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
+import com.bluesteel.domain.exception.RateLimitExceededException;
 import com.bluesteel.domain.exception.RefreshTokenException;
 import com.bluesteel.domain.exception.SessionNotFoundException;
 import com.bluesteel.domain.exception.SummaryTooLargeException;
@@ -170,6 +172,20 @@ public class GlobalExceptionHandler {
     return ApiResponse.error(
         ApiError.of(
             "QUERY_TIMEOUT", "The query timed out. Try rephrasing or narrowing your question."));
+  }
+
+  /** Caller exceeded the per-user/per-campaign Query Mode request rate limit (D-096). */
+  @ExceptionHandler(RateLimitExceededException.class)
+  @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+  public ApiResponse<Void> handleRateLimitExceeded(RateLimitExceededException ex) {
+    return ApiResponse.error(ApiError.of("QUERY_RATE_LIMITED", ex.getMessage()));
+  }
+
+  /** Daily LLM cost cap reached — Query Mode is temporarily unavailable (D-096). */
+  @ExceptionHandler(CostCapExceededException.class)
+  @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+  public ApiResponse<Void> handleCostCapExceeded(CostCapExceededException ex) {
+    return ApiResponse.error(ApiError.of("QUERY_COST_CAP", ex.getMessage()));
   }
 
   @ExceptionHandler(EntityNotFoundException.class)

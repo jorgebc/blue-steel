@@ -2923,9 +2923,9 @@ context.
 | F3.4.6 | Frontend: minimal SessionDetailPage + getSessionDetail hook (citation target) — already shipped under F4.8.3 (page, hook, route all pre-existed) | ✅ |
 | F3.4.7 | Frontend: QueryPage container (form + skeleton + InlineBanner + answer) | ✅ |
 | F3.4.8 | Frontend: query route wiring + Sidebar Query nav activation | ✅ |
-| F3.5 | Backend: Query rate-limit + daily cost cap (D-096) | 🔲 |
-| F3.5.1 | Backend: per-user/per-campaign query rate limit + 429 mapping | 🔲 |
-| F3.5.2 | Backend: daily LLM cost cap guard (reuses cost logging) | 🔲 |
+| F3.5 | Backend: Query rate-limit + daily cost cap (D-096) | ✅ |
+| F3.5.1 | Backend: per-user/per-campaign query rate limit + 429 mapping | ✅ |
+| F3.5.2 | Backend: daily LLM cost cap guard (reuses cost logging) | ✅ |
 
 ---
 
