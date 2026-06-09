@@ -2913,16 +2913,16 @@ context.
 | F3.3 | QueryAnsweringPort + LLM call + citation grounding | ✅ |
 | F3.3.1 | Backend: QueryPromptAssembler + QueryResponseParser (context format + JSON parse) | ✅ |
 | F3.3.2 | Backend: real SpringAiQueryAnsweringAdapter (LLM call + cost log, replaces stub) | ✅ |
-| F3.4 | Query Mode UI — question input, answer, citation links (frontend) | 🔲 |
+| F3.4 | Query Mode UI — question input, answer, citation links (frontend) | ✅ |
 | F3.4-SETUP | Frontend scaffolding — verified contract + notes; no new shadcn components (human step) | 👤 |
-| F3.4.1 | Frontend: Query TypeScript types (query.ts) | 🔲 |
-| F3.4.2 | Frontend: queries API client + useSubmitQuery mutation hook | 🔲 |
-| F3.4.3 | Frontend: QueryAnswerSkeleton loading component | 🔲 |
-| F3.4.4 | Frontend: QuestionForm component | 🔲 |
-| F3.4.5 | Frontend: AnswerDisplay + CitationList components | 🔲 |
-| F3.4.6 | Frontend: minimal SessionDetailPage + getSessionDetail hook (citation target) | 🔲 |
-| F3.4.7 | Frontend: QueryPage container (form + skeleton + InlineBanner + answer) | 🔲 |
-| F3.4.8 | Frontend: query route wiring + Sidebar Query nav activation | 🔲 |
+| F3.4.1 | Frontend: Query TypeScript types (query.ts) | ✅ |
+| F3.4.2 | Frontend: queries API client + useSubmitQuery mutation hook | ✅ |
+| F3.4.3 | Frontend: QueryAnswerSkeleton loading component | ✅ |
+| F3.4.4 | Frontend: QuestionForm component | ✅ |
+| F3.4.5 | Frontend: AnswerDisplay + CitationList components | ✅ |
+| F3.4.6 | Frontend: minimal SessionDetailPage + getSessionDetail hook (citation target) — already shipped under F4.8.3 (page, hook, route all pre-existed) | ✅ |
+| F3.4.7 | Frontend: QueryPage container (form + skeleton + InlineBanner + answer) | ✅ |
+| F3.4.8 | Frontend: query route wiring + Sidebar Query nav activation | ✅ |
 | F3.5 | Backend: Query rate-limit + daily cost cap (D-096) | 🔲 |
 | F3.5.1 | Backend: per-user/per-campaign query rate limit + 429 mapping | 🔲 |
 | F3.5.2 | Backend: daily LLM cost cap guard (reuses cost logging) | 🔲 |

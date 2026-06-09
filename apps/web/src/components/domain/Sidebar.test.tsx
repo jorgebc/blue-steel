@@ -81,12 +81,21 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: /input/i })).not.toBeInTheDocument()
   })
 
-  it('renders Query and Settings as disabled coming-soon items', () => {
-    setup('gm')
-    for (const label of ['Query', 'Settings']) {
-      const item = screen.getByText(label).closest('[aria-disabled]')
-      expect(item).toHaveAttribute('aria-disabled', 'true')
+  it('shows the Query link pointing at the query route for all roles', () => {
+    for (const role of ['gm', 'editor', 'player'] as const) {
+      const { unmount } = setup(role)
+      expect(screen.getByRole('link', { name: /query/i })).toHaveAttribute(
+        'href',
+        '/campaigns/c1/query'
+      )
+      unmount()
     }
+  })
+
+  it('renders Settings as a disabled coming-soon item', () => {
+    setup('gm')
+    const item = screen.getByText('Settings').closest('[aria-disabled]')
+    expect(item).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('shows the Exploration link pointing at the explore route for all roles', () => {
