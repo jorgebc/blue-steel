@@ -48,10 +48,11 @@ class QueryServiceTest {
   private static final int TOP_N = 8;
   private static final double DAILY_CAP_USD = 1.00;
   private static final float[] EMBEDDING = {0.1f, 0.2f, 0.3f};
+  private static final UUID CONTEXT_SESSION = UUID.randomUUID();
   private static final List<EntityContext> CONTEXT =
       List.of(
           new EntityContext(
-              UUID.randomUUID(), "actor", "Mira", "{\"name\":\"Mira\"}", UUID.randomUUID(), 1));
+              UUID.randomUUID(), "actor", "Mira", "{\"name\":\"Mira\"}", CONTEXT_SESSION, 1));
 
   @BeforeEach
   void setUp() {
@@ -81,7 +82,7 @@ class QueryServiceTest {
   void answer_playerMember_returnsAnswer() {
     QueryResponse expected =
         new QueryResponse(
-            "Mira is a rogue.", List.of(new Citation(UUID.randomUUID(), 1, "Mira appears.")));
+            "Mira is a rogue.", List.of(new Citation(CONTEXT_SESSION, 1, "Mira appears.")));
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.PLAYER));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
@@ -91,6 +92,23 @@ class QueryServiceTest {
     QueryResponse actual = sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
 
     assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("should drop citations whose session is not among the retrieved context")
+  void answer_ungroundedCitation_isDropped() {
+    Citation grounded = new Citation(CONTEXT_SESSION, 1, "Mira appears.");
+    Citation hallucinated = new Citation(UUID.randomUUID(), 2, "Invented.");
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
+    when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+        .thenReturn(new QueryResponse("Answer.", List.of(grounded, hallucinated)));
+
+    QueryResponse actual = sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
+
+    assertThat(actual.citations()).containsExactly(grounded);
   }
 
   @Test
