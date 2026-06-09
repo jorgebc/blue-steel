@@ -118,7 +118,17 @@ export function Sidebar() {
             {expanded && <span>Input</span>}
           </NavLink>
         )}
-        <ComingSoonItem label="Query" icon={Search} expanded={expanded} />
+        {activeCampaignId && (
+          <NavLink
+            to={`/campaigns/${activeCampaignId}/query`}
+            className={({ isActive }) =>
+              `${itemBaseClass} ${isActive ? activeLinkClass : inactiveLinkClass}`
+            }
+          >
+            <Search className="h-5 w-5 shrink-0" aria-hidden />
+            {expanded && <span>Query</span>}
+          </NavLink>
+        )}
         {activeCampaignId && (
           <NavLink
             to={`/campaigns/${activeCampaignId}/explore`}
