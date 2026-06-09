@@ -2,6 +2,7 @@ package com.bluesteel.adapters.out.ai;
 
 import com.bluesteel.application.model.query.Citation;
 import com.bluesteel.application.model.query.QueryResponse;
+import com.bluesteel.domain.exception.QueryResponseParseException;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

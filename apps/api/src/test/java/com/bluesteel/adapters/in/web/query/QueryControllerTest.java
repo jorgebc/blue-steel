@@ -17,8 +17,10 @@ import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
 import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
 import com.bluesteel.application.port.in.user.InvitePlatformUserUseCase;
+import com.bluesteel.domain.exception.QueryResponseParseException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.RateLimitExceededException;
+import com.bluesteel.domain.exception.TokenBudgetExceededException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -135,6 +137,46 @@ class QueryControllerTest {
                     """))
         .andExpect(status().isTooManyRequests())
         .andExpect(jsonPath("$.errors[0].code").value("QUERY_RATE_LIMITED"));
+  }
+
+  @Test
+  @DisplayName("should return 422 QUERY_TOKEN_BUDGET_EXCEEDED when the prompt exceeds the budget")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void ask_tokenBudgetExceeded_returns422() throws Exception {
+    when(answerQueryUseCase.answer(CAMPAIGN_ID, CALLER_ID, QUESTION))
+        .thenThrow(new TokenBudgetExceededException(9000, 6000));
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/queries", CAMPAIGN_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "question": "Who is Mira?" }
+                    """))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.errors[0].code").value("QUERY_TOKEN_BUDGET_EXCEEDED"));
+  }
+
+  @Test
+  @DisplayName("should return 502 QUERY_ANSWER_UNPARSEABLE when the LLM response cannot be parsed")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void ask_unparseableAnswer_returns502() throws Exception {
+    when(answerQueryUseCase.answer(CAMPAIGN_ID, CALLER_ID, QUESTION))
+        .thenThrow(
+            new QueryResponseParseException(
+                "Unparseable LLM query response", new RuntimeException()));
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/queries", CAMPAIGN_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "question": "Who is Mira?" }
+                    """))
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.errors[0].code").value("QUERY_ANSWER_UNPARSEABLE"));
   }
 
   @Test

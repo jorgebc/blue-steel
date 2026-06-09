@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bluesteel.application.model.query.Citation;
 import com.bluesteel.application.model.query.QueryResponse;
+import com.bluesteel.domain.exception.QueryResponseParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;

@@ -5,6 +5,7 @@ import com.bluesteel.application.model.ingestion.EntityContext;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.application.port.out.ingestion.ConflictDetectionPort;
 import com.bluesteel.config.LlmCostLogger;
+import com.bluesteel.domain.exception.TokenBudgetExceededException;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.ai.chat.client.ChatClient;

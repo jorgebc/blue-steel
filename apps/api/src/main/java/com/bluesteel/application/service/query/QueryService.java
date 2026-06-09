@@ -1,6 +1,7 @@
 package com.bluesteel.application.service.query;
 
 import com.bluesteel.application.model.ingestion.EntityContext;
+import com.bluesteel.application.model.query.Citation;
 import com.bluesteel.application.model.query.QueryResponse;
 import com.bluesteel.application.port.in.query.AnswerQueryUseCase;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
@@ -12,11 +13,13 @@ import com.bluesteel.domain.exception.CostCapExceededException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -81,7 +84,7 @@ public class QueryService implements AnswerQueryUseCase {
     try {
       QueryResponse response = future.get(timeoutSeconds, TimeUnit.SECONDS);
       log.info("Answered query campaignId={} callerId={}", campaignId, callerId);
-      return response;
+      return withGroundedCitations(response, context, campaignId);
     } catch (TimeoutException e) {
       future.cancel(true);
       throw new QueryTimeoutException();
@@ -95,5 +98,28 @@ public class QueryService implements AnswerQueryUseCase {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("Query answering was interrupted", e);
     }
+  }
+
+  /**
+   * Drops any citation whose session is not among the retrieved context: the LLM may only cite
+   * sessions it was given, so an unknown session id is a hallucination that would otherwise resolve
+   * to a broken citation link (D-003).
+   */
+  private QueryResponse withGroundedCitations(
+      QueryResponse response, List<EntityContext> context, UUID campaignId) {
+    Set<UUID> retrievedSessions =
+        context.stream().map(EntityContext::sessionId).collect(Collectors.toSet());
+    List<Citation> grounded =
+        response.citations().stream()
+            .filter(citation -> retrievedSessions.contains(citation.sessionId()))
+            .toList();
+    if (grounded.size() != response.citations().size()) {
+      log.warn(
+          "Dropped {} ungrounded citation(s) from query answer campaignId={}",
+          response.citations().size() - grounded.size(),
+          campaignId);
+      return new QueryResponse(response.answer(), grounded);
+    }
+    return response;
   }
 }

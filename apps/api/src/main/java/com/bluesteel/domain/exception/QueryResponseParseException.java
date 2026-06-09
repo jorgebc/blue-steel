@@ -1,4 +1,4 @@
-package com.bluesteel.adapters.out.ai;
+package com.bluesteel.domain.exception;
 
 /**
  * Thrown when the LLM query-answering response cannot be parsed into a {@code QueryResponse}. A

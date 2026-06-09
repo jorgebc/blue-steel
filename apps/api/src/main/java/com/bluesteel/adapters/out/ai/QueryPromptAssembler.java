@@ -1,6 +1,7 @@
 package com.bluesteel.adapters.out.ai;
 
 import com.bluesteel.application.model.ingestion.EntityContext;
+import com.bluesteel.domain.exception.TokenBudgetExceededException;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;

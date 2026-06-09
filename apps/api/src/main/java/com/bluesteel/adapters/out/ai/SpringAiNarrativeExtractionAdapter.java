@@ -3,6 +3,7 @@ package com.bluesteel.adapters.out.ai;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.application.port.out.ingestion.NarrativeExtractionPort;
 import com.bluesteel.config.LlmCostLogger;
+import com.bluesteel.domain.exception.TokenBudgetExceededException;
 import java.time.Instant;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClient.CallResponseSpec;

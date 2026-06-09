@@ -13,11 +13,13 @@ import com.bluesteel.domain.exception.EntityNotFoundException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
 import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
+import com.bluesteel.domain.exception.QueryResponseParseException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.RateLimitExceededException;
 import com.bluesteel.domain.exception.RefreshTokenException;
 import com.bluesteel.domain.exception.SessionNotFoundException;
 import com.bluesteel.domain.exception.SummaryTooLargeException;
+import com.bluesteel.domain.exception.TokenBudgetExceededException;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.exception.UserNotFoundException;
 import java.util.List;
@@ -186,6 +188,29 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
   public ApiResponse<Void> handleCostCapExceeded(CostCapExceededException ex) {
     return ApiResponse.error(ApiError.of("QUERY_COST_CAP", ex.getMessage()));
+  }
+
+  /**
+   * Estimated LLM input tokens exceeded the configured budget on the synchronous query path (D-034)
+   * — a request the caller can fix by narrowing the question, not a server fault.
+   */
+  @ExceptionHandler(TokenBudgetExceededException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
+  public ApiResponse<Void> handleTokenBudgetExceeded(TokenBudgetExceededException ex) {
+    return ApiResponse.error(
+        ApiError.of(
+            "QUERY_TOKEN_BUDGET_EXCEEDED",
+            "Your question pulled in too much context to answer. Narrow it and try again."));
+  }
+
+  /** The LLM returned a query answer that could not be parsed — an upstream fault (D-003). */
+  @ExceptionHandler(QueryResponseParseException.class)
+  @ResponseStatus(HttpStatus.BAD_GATEWAY)
+  public ApiResponse<Void> handleQueryResponseParse(QueryResponseParseException ex) {
+    return ApiResponse.error(
+        ApiError.of(
+            "QUERY_ANSWER_UNPARSEABLE",
+            "The answer service returned an unreadable response. Please try again."));
   }
 
   @ExceptionHandler(EntityNotFoundException.class)

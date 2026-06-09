@@ -95,6 +95,46 @@ describe('QueryPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/something went wrong/i)
   })
 
+  it('shows a rate-limit message when the caller is throttled (429)', async () => {
+    stubMutation({
+      rejectWith: new ApiClientError('rate limited', 429, [
+        { code: 'QUERY_RATE_LIMITED', message: 'Too many queries.', field: null },
+      ]),
+    })
+    renderPage()
+    await ask()
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/too quickly/i)
+  })
+
+  it('shows a cost-cap message when the daily budget is exhausted (503)', async () => {
+    stubMutation({
+      rejectWith: new ApiClientError('cost cap', 503, [
+        { code: 'QUERY_COST_CAP', message: 'Budget reached.', field: null },
+      ]),
+    })
+    renderPage()
+    await ask()
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/daily question limit/i)
+  })
+
+  it('surfaces the backend message for other coded failures', async () => {
+    stubMutation({
+      rejectWith: new ApiClientError('unparseable', 502, [
+        {
+          code: 'QUERY_ANSWER_UNPARSEABLE',
+          message: 'The answer service returned an unreadable response.',
+          field: null,
+        },
+      ]),
+    })
+    renderPage()
+    await ask()
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/unreadable response/i)
+  })
+
   it('renders the loading skeleton while a query is pending', () => {
     stubMutation({ isPending: true })
     renderPage()

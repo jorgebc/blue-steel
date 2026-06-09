@@ -15,7 +15,27 @@ interface Banner {
 
 const TIMEOUT_MESSAGE =
   'That query took too long to answer. Try rephrasing it or narrowing the scope, then ask again.'
+const RATE_LIMIT_MESSAGE =
+  "You're sending questions too quickly. Wait a few seconds, then ask again."
+const COST_CAP_MESSAGE =
+  'The daily question limit for this service has been reached. Please try again tomorrow.'
 const GENERIC_MESSAGE = 'Something went wrong answering that question. Please try again.'
+
+/**
+ * Maps a failed query to a banner. The synchronous-deadline (504), rate-limit (429), and daily
+ * cost-cap (503) guards (D-052, D-096) get tailored, retry-oriented copy; any other coded backend
+ * error surfaces its own envelope message; anything else falls back to a generic message.
+ */
+function toBanner(err: unknown): Banner {
+  if (err instanceof ApiClientError) {
+    if (err.status === 504) return { variant: 'warning', message: TIMEOUT_MESSAGE }
+    if (err.status === 429) return { variant: 'warning', message: RATE_LIMIT_MESSAGE }
+    if (err.status === 503) return { variant: 'warning', message: COST_CAP_MESSAGE }
+    const backendMessage = err.errors[0]?.message
+    if (backendMessage) return { variant: 'error', message: backendMessage }
+  }
+  return { variant: 'error', message: GENERIC_MESSAGE }
+}
 
 /**
  * Query Mode screen: ask a question, wait synchronously, render the grounded answer (D-052).
@@ -35,13 +55,7 @@ export function QueryPage() {
     setBanner(null)
     mutate(question, {
       onSuccess: (data) => setAnswer(data),
-      onError: (err) => {
-        const isTimeout = err instanceof ApiClientError && err.status === 504
-        setBanner({
-          variant: isTimeout ? 'warning' : 'error',
-          message: isTimeout ? TIMEOUT_MESSAGE : GENERIC_MESSAGE,
-        })
-      },
+      onError: (err) => setBanner(toBanner(err)),
     })
   }
 

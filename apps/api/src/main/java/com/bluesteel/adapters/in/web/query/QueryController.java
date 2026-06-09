@@ -3,6 +3,7 @@ package com.bluesteel.adapters.in.web.query;
 import com.bluesteel.adapters.in.web.ApiResponse;
 import com.bluesteel.application.model.query.QueryResponse;
 import com.bluesteel.application.port.in.query.AnswerQueryUseCase;
+import com.bluesteel.domain.exception.UnauthorizedException;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -48,6 +49,9 @@ public class QueryController {
 
   private UUID resolveCallerId() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || auth.getName() == null || auth.getName().isBlank()) {
+      throw new UnauthorizedException("Authentication is required to query a campaign");
+    }
     return UUID.fromString(auth.getName());
   }
 }
