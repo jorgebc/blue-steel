@@ -13,6 +13,7 @@ import com.bluesteel.application.model.ingestion.ExtractedMention;
 import com.bluesteel.application.model.ingestion.ResolutionOutcome;
 import com.bluesteel.application.model.ingestion.ResolvedEntity;
 import com.bluesteel.config.LlmCostLogger;
+import com.bluesteel.domain.exception.TokenBudgetExceededException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

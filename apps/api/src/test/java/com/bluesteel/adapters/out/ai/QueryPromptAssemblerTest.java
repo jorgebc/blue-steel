@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bluesteel.application.model.ingestion.EntityContext;
+import com.bluesteel.domain.exception.TokenBudgetExceededException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;

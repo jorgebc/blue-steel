@@ -6,6 +6,7 @@ import com.bluesteel.application.model.ingestion.ResolutionOutcome;
 import com.bluesteel.application.model.ingestion.ResolvedEntity;
 import com.bluesteel.application.port.out.ingestion.EntityResolutionPort;
 import com.bluesteel.config.LlmCostLogger;
+import com.bluesteel.domain.exception.TokenBudgetExceededException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;

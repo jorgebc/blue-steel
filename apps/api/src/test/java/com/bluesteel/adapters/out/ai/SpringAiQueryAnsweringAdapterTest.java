@@ -11,6 +11,7 @@ import com.bluesteel.application.model.ingestion.EntityContext;
 import com.bluesteel.application.model.query.Citation;
 import com.bluesteel.application.model.query.QueryResponse;
 import com.bluesteel.config.LlmCostLogger;
+import com.bluesteel.domain.exception.TokenBudgetExceededException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
