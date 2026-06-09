@@ -14,7 +14,7 @@
 
   <groupId>com.bluesteel</groupId>
   <artifactId>blue-steel-api</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
   <packaging>jar</packaging>
   <name>blue-steel-api</name>
   <description>AI-assisted narrative memory system for tabletop RPG campaigns</description>

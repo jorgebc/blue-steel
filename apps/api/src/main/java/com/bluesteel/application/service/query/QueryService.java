@@ -4,9 +4,11 @@ import com.bluesteel.application.model.ingestion.EntityContext;
 import com.bluesteel.application.model.query.QueryResponse;
 import com.bluesteel.application.port.in.query.AnswerQueryUseCase;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
+import com.bluesteel.application.port.out.cost.LlmCostAccountingPort;
 import com.bluesteel.application.port.out.embedding.EmbeddingPort;
 import com.bluesteel.application.port.out.query.QueryAnsweringPort;
 import com.bluesteel.application.port.out.query.QueryContextRetrievalPort;
+import com.bluesteel.domain.exception.CostCapExceededException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import java.util.List;
@@ -34,22 +36,28 @@ public class QueryService implements AnswerQueryUseCase {
   private final EmbeddingPort embeddingPort;
   private final QueryContextRetrievalPort retrievalPort;
   private final QueryAnsweringPort queryAnsweringPort;
+  private final LlmCostAccountingPort costAccountingPort;
   private final int timeoutSeconds;
   private final int topN;
+  private final double dailyCapUsd;
 
   public QueryService(
       CampaignMembershipPort membershipPort,
       EmbeddingPort embeddingPort,
       QueryContextRetrievalPort retrievalPort,
       QueryAnsweringPort queryAnsweringPort,
+      LlmCostAccountingPort costAccountingPort,
       @Value("${query.timeout-seconds:20}") int timeoutSeconds,
-      @Value("${query.retrieval.top-n:8}") int topN) {
+      @Value("${query.retrieval.top-n:8}") int topN,
+      @Value("${query.cost-cap.daily-usd:1.00}") double dailyCapUsd) {
     this.membershipPort = membershipPort;
     this.embeddingPort = embeddingPort;
     this.retrievalPort = retrievalPort;
     this.queryAnsweringPort = queryAnsweringPort;
+    this.costAccountingPort = costAccountingPort;
     this.timeoutSeconds = timeoutSeconds;
     this.topN = topN;
+    this.dailyCapUsd = dailyCapUsd;
   }
 
   @Override
@@ -59,6 +67,10 @@ public class QueryService implements AnswerQueryUseCase {
     membershipPort
         .resolveRole(campaignId, callerId)
         .orElseThrow(() -> new UnauthorizedException("Caller is not a member of this campaign"));
+
+    if (costAccountingPort.currentDailyCostUsd() >= dailyCapUsd) {
+      throw new CostCapExceededException();
+    }
 
     float[] questionEmbedding = embeddingPort.embed(question);
     List<EntityContext> context =

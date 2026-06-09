@@ -1,5 +1,6 @@
 package com.bluesteel.adapters.in.web.query;
 
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -17,6 +18,7 @@ import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
 import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
 import com.bluesteel.application.port.in.user.InvitePlatformUserUseCase;
 import com.bluesteel.domain.exception.QueryTimeoutException;
+import com.bluesteel.domain.exception.RateLimitExceededException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +51,7 @@ import org.springframework.web.context.WebApplicationContext;
 class QueryControllerTest {
 
   @MockitoBean private AnswerQueryUseCase answerQueryUseCase;
+  @MockitoBean private QueryRateLimiter rateLimiter;
 
   // Mocked so the full application context loads without database/infra-backed beans.
   @MockitoBean private CheckHealthUseCase checkHealthUseCase;
@@ -114,6 +117,24 @@ class QueryControllerTest {
                     """))
         .andExpect(status().isGatewayTimeout())
         .andExpect(jsonPath("$.errors[0].code").value("QUERY_TIMEOUT"));
+  }
+
+  @Test
+  @DisplayName("should return 429 QUERY_RATE_LIMITED when the caller exceeds the rate limit")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void ask_rateLimited_returns429() throws Exception {
+    doThrow(new RateLimitExceededException()).when(rateLimiter).check(CALLER_ID, CAMPAIGN_ID);
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/queries", CAMPAIGN_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "question": "Who is Mira?" }
+                    """))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.errors[0].code").value("QUERY_RATE_LIMITED"));
   }
 
   @Test
