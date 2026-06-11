@@ -13,22 +13,34 @@ import com.bluesteel.domain.exception.CostCapExceededException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
  * Answers a free-text question against a campaign's world state for any campaign member, enforcing
  * a hard synchronous deadline (D-052). Embeds the question, retrieves the top-N most similar
- * committed entity-version snapshots (D-062, D-034), then delegates to the answering port.
+ * committed entity-version snapshots (D-062, D-034), then delegates to the answering port on the
+ * dedicated bounded query executor.
+ *
+ * <p>Known cost-cap limits, accepted for the single-instance free-tier deployment (D-096): the
+ * daily cap check is read-then-act, so concurrent queries may overshoot the cap by the calls
+ * admitted before their cost is recorded — bounded by the query executor's pool plus queue and by
+ * the per-user rate limit. On timeout the future is cancelled, but the blocking LLM call is not
+ * interrupted: it completes on its pool thread and still records its cost (the spend was genuinely
+ * incurred).
  */
 @Service
 public class QueryService implements AnswerQueryUseCase {
@@ -40,6 +52,7 @@ public class QueryService implements AnswerQueryUseCase {
   private final QueryContextRetrievalPort retrievalPort;
   private final QueryAnsweringPort queryAnsweringPort;
   private final LlmCostAccountingPort costAccountingPort;
+  private final Executor queryExecutor;
   private final int timeoutSeconds;
   private final int topN;
   private final double dailyCapUsd;
@@ -50,6 +63,7 @@ public class QueryService implements AnswerQueryUseCase {
       QueryContextRetrievalPort retrievalPort,
       QueryAnsweringPort queryAnsweringPort,
       LlmCostAccountingPort costAccountingPort,
+      @Qualifier("queryTaskExecutor") Executor queryExecutor,
       @Value("${query.timeout-seconds:20}") int timeoutSeconds,
       @Value("${query.retrieval.top-n:8}") int topN,
       @Value("${query.cost-cap.daily-usd:1.00}") double dailyCapUsd) {
@@ -58,6 +72,7 @@ public class QueryService implements AnswerQueryUseCase {
     this.retrievalPort = retrievalPort;
     this.queryAnsweringPort = queryAnsweringPort;
     this.costAccountingPort = costAccountingPort;
+    this.queryExecutor = queryExecutor;
     this.timeoutSeconds = timeoutSeconds;
     this.topN = topN;
     this.dailyCapUsd = dailyCapUsd;
@@ -71,32 +86,60 @@ public class QueryService implements AnswerQueryUseCase {
         .resolveRole(campaignId, callerId)
         .orElseThrow(() -> new UnauthorizedException("Caller is not a member of this campaign"));
 
-    if (costAccountingPort.currentDailyCostUsd() >= dailyCapUsd) {
-      throw new CostCapExceededException();
-    }
-
-    float[] questionEmbedding = embeddingPort.embed(question);
-    List<EntityContext> context =
-        retrievalPort.retrieveRelevantContext(campaignId, questionEmbedding, topN);
-
-    CompletableFuture<QueryResponse> future =
-        CompletableFuture.supplyAsync(() -> queryAnsweringPort.answer(question, context));
+    MDC.put("user_id", callerId.toString());
+    MDC.put("campaign_id", campaignId.toString());
     try {
-      QueryResponse response = future.get(timeoutSeconds, TimeUnit.SECONDS);
-      log.info("Answered query campaignId={} callerId={}", campaignId, callerId);
-      return withGroundedCitations(response, context, campaignId);
-    } catch (TimeoutException e) {
-      future.cancel(true);
-      throw new QueryTimeoutException();
-    } catch (ExecutionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof RuntimeException re) {
-        throw re;
+      double currentDailyCostUsd = costAccountingPort.currentDailyCostUsd();
+      if (currentDailyCostUsd >= dailyCapUsd) {
+        log.warn(
+            "Query cost cap tripped callerId={} campaignId={} currentDailyCostUsd={} dailyCapUsd={}",
+            callerId,
+            campaignId,
+            currentDailyCostUsd,
+            dailyCapUsd);
+        throw new CostCapExceededException();
       }
-      throw new IllegalStateException("Query answering failed", cause);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Query answering was interrupted", e);
+
+      float[] questionEmbedding = embeddingPort.embed(question);
+      List<EntityContext> context =
+          retrievalPort.retrieveRelevantContext(campaignId, questionEmbedding, topN);
+
+      // MDC is thread-local: hand the caller's context map to the pool thread so the
+      // query_answering cost-log line stays attributable (LOG-01).
+      Map<String, String> mdc = MDC.getCopyOfContextMap();
+      CompletableFuture<QueryResponse> future =
+          CompletableFuture.supplyAsync(
+              () -> {
+                if (mdc != null) {
+                  MDC.setContextMap(mdc);
+                }
+                try {
+                  return queryAnsweringPort.answer(question, context);
+                } finally {
+                  MDC.clear();
+                }
+              },
+              queryExecutor);
+      try {
+        QueryResponse response = future.get(timeoutSeconds, TimeUnit.SECONDS);
+        log.info("Answered query campaignId={} callerId={}", campaignId, callerId);
+        return withGroundedCitations(response, context, campaignId);
+      } catch (TimeoutException e) {
+        future.cancel(true);
+        throw new QueryTimeoutException();
+      } catch (ExecutionException e) {
+        Throwable cause = e.getCause();
+        if (cause instanceof RuntimeException re) {
+          throw re;
+        }
+        throw new IllegalStateException("Query answering failed", cause);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("Query answering was interrupted", e);
+      }
+    } finally {
+      MDC.remove("user_id");
+      MDC.remove("campaign_id");
     }
   }
 

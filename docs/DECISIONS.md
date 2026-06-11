@@ -836,8 +836,10 @@ An unresolved entity left out of a session commit creates an orphaned, unanchore
 ### D-043 — Authentication mechanism: stateless JWT; authorization via DB
 
 **Date:** 2026-04-07
-**Amended:** 2026-04-12
+**Amended:** 2026-04-12, 2026-06-11
 **Status:** Active
+
+**Amendment note (2026-06-11):** `is_admin` does **not** bypass campaign membership for Query Mode. `QueryService` requires `resolveRole(campaignId, callerId)` to return a campaign role; an admin who is not a member of the campaign receives `403 FORBIDDEN` like any other non-member. This was always the implemented behaviour — the amendment records it explicitly, since the original text was silent on whether the `is_admin` claim grants campaign-scoped read access (it does not; `is_admin` governs platform administration only, e.g. user management).
 
 **Decision:**
 Authentication uses stateless JWTs. Tokens are issued on login, included in the `Authorization: Bearer` header on every request, and validated by Spring Security on the server without a session store. The access token carries only `user_id` and `is_admin`.

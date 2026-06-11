@@ -613,11 +613,12 @@ Query (user question, free text)
 
 ### 6.5 Cost Governance
 
-Cost is controlled at four levels:
+Cost is controlled at five levels:
 
 | Level | Mechanism |
 |---|---|
 | **Provider level** | Hard monthly spend cap configured in the Google AI Studio / Gemini console — non-negotiable before first production call |
+| **App-level guards** | Query Mode per-(user, campaign) request rate limit (`429 QUERY_RATE_LIMITED`) and daily LLM spend cap (`503 QUERY_COST_CAP`) — early, attributable backpressure before the provider cap (D-096; config in §7.10) |
 | **Pre-call estimation** | Token count estimated before every LLM call; call rejected if it exceeds configured envelope |
 | **Context bounding** | pgvector similarity search scopes LLM context to relevant chunks only — prevents context growth with campaign size |
 | **Usage logging** | Every LLM call logged: tokens in, tokens out, estimated cost, session, user, pipeline stage |
@@ -692,7 +693,13 @@ Error codes are machine-readable constants. Messages are human-readable. Field i
 | 404 | Resource not found |
 | 409 | Conflict (e.g. duplicate entity) |
 | 422 | Unprocessable — valid request, business rule violation |
+| 429 | Too many requests — app-level rate limit (D-096) |
 | 500 | Internal error |
+| 502 | Upstream dependency fault (LLM, email provider) |
+| 503 | Temporarily unavailable — daily cost cap reached (D-096) |
+| 504 | Synchronous query exceeded its deadline (D-052) |
+
+The complete machine-readable code list lives in §7.11 (Error-Code Catalog).
 
 ### 7.5 Versioning
 
@@ -927,6 +934,8 @@ All endpoints are read-only. All require campaign membership. Pagination follows
 { "question": "What does Seraphine know about the cursed artifact?" }
 ```
 
+**Validation:** `question` is required (non-blank) and limited to **2000 characters**; violations return `400 VALIDATION_ERROR` with `field: "question"`.
+
 **Response shape (outline):**
 ```json
 {
@@ -944,6 +953,77 @@ All endpoints are read-only. All require campaign membership. Pagination follows
 Queries are stateless — each call is independent. No conversation history is maintained between queries.
 
 **Q&A persistence:** Queries are stateless in v1 — no query history is stored. A campaign Q&A log with a history panel inside Query Mode is deferred to v2 (D-058).
+
+**Error responses:**
+
+| Status | Code | When |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | `question` blank or over 2000 characters |
+| 403 | `FORBIDDEN` | Caller is not a member of the campaign (`is_admin` does **not** bypass membership — D-043) |
+| 422 | `QUERY_TOKEN_BUDGET_EXCEEDED` | Assembled prompt + question exceeds the token envelope (D-034); narrow the question |
+| 429 | `QUERY_RATE_LIMITED` | Per-(user, campaign) sliding-window rate limit exceeded (D-096) |
+| 502 | `QUERY_ANSWER_UNPARSEABLE` | LLM returned an answer that could not be parsed — upstream fault, retryable |
+| 503 | `QUERY_COST_CAP` | Daily LLM spend cap reached (D-096); resets at UTC midnight |
+| 504 | `QUERY_TIMEOUT` | Pipeline exceeded `query.timeout-seconds` (D-052) |
+
+**Configuration** (all env-overridable, conservative free-tier defaults):
+
+| Property | Env var | Default | Effect |
+|---|---|---|---|
+| `query.timeout-seconds` | `QUERY_TIMEOUT_SECONDS` | `20` | Synchronous deadline before `504 QUERY_TIMEOUT` (D-052) |
+| `query.retrieval.top-n` | `QUERY_RETRIEVAL_TOP_N` | `8` | Entity snapshots retrieved per query — primary heap knob |
+| `query.rate-limit.max-requests` | `QUERY_RATE_LIMIT_MAX_REQUESTS` | `10` | Requests allowed per key within the window (D-096) |
+| `query.rate-limit.window-seconds` | `QUERY_RATE_LIMIT_WINDOW_SECONDS` | `60` | Sliding-window length (D-096) |
+| `query.rate-limit.max-tracked-keys` | `QUERY_RATE_LIMIT_MAX_TRACKED_KEYS` | `1000` | Heap bound on the limiter's (user, campaign) key map |
+| `query.cost-cap.daily-usd` | `QUERY_COST_CAP_DAILY_USD` | `1.00` | Daily LLM spend cap before `503 QUERY_COST_CAP` (D-096) |
+| `query.executor.pool-size` | `QUERY_EXECUTOR_POOL_SIZE` | `2` | Concurrent query LLM calls (dedicated bounded pool) |
+| `query.executor.queue-capacity` | `QUERY_EXECUTOR_QUEUE_CAPACITY` | `20` | Queued query tasks before rejection |
+| `blue-steel.llm.query-answering-max-tokens` | `BLUE_STEEL_LLM_QUERY_ANSWERING_MAX_TOKENS` | `6000` | Token envelope before `422 QUERY_TOKEN_BUDGET_EXCEEDED` (D-034) |
+
+---
+
+### 7.11 Error-Code Catalog
+
+Master list of machine-readable error codes emitted by the API (source of truth: `GlobalExceptionHandler` plus the coded exception classes it delegates to). All use the §7.4 envelope.
+
+| Status | Code | Meaning |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Bean Validation failure on a request field (`field` is populated) |
+| 400 | `MALFORMED_REQUEST` | Request body is unparseable or missing |
+| 400 | `INVALID_PATH_PARAMETER` | Path/query parameter cannot be coerced to its declared type (e.g. non-UUID) |
+| 400 | `SUMMARY_TOO_LARGE` | Session summary exceeds the ingestion token budget |
+| 401 | `INVALID_CREDENTIALS` | Email/password pair does not match |
+| 401 | `REFRESH_TOKEN_MISSING` | Refresh cookie absent on a refresh call |
+| 401 | `REFRESH_TOKEN_INVALID` | Presented refresh token not found |
+| 401 | `REFRESH_TOKEN_EXPIRED` | Refresh token past its TTL |
+| 401 | `REFRESH_TOKEN_REUSE_DETECTED` | Already-rotated token presented — token family revoked (D-059) |
+| 403 | `ACCESS_DENIED` | Spring Security access rule denied the request |
+| 403 | `FORBIDDEN` | Caller's campaign role (or non-membership) is insufficient (D-043) |
+| 404 | `USER_NOT_FOUND` | User does not exist |
+| 404 | `CAMPAIGN_NOT_FOUND` | Campaign does not exist |
+| 404 | `SESSION_NOT_FOUND` | Session does not exist in the campaign |
+| 404 | `ENTITY_NOT_FOUND` | World-state entity does not exist in the campaign |
+| 404 | `ANNOTATION_NOT_FOUND` | Annotation does not exist |
+| 409 | `ALREADY_CAMPAIGN_MEMBER` | Invited user is already a member |
+| 409 | `ACTIVE_SESSION_EXISTS` | Another session is `processing` or `draft` for this campaign (D-054) |
+| 409 | `INVALID_SESSION_STATE` | Requested transition is invalid for the session's current status |
+| 422 | `CANNOT_REMOVE_GM` | Attempt to remove the sole GM |
+| 422 | `INVALID_CURRENT_PASSWORD` | Current password does not match on password change |
+| 422 | `UNKNOWN_CARD_ID` | Commit decision references a card not in the stored diff |
+| 422 | `DUPLICATE_CARD_DECISION` | Same card decided twice in one commit payload |
+| 422 | `INCOMPLETE_CARD_DECISIONS` | A non-UNCERTAIN card has no decision (D-080) |
+| 422 | `UNCERTAIN_ENTITIES_PRESENT` | UNCERTAIN cards unresolved at commit (D-042) |
+| 422 | `CONFLICTS_NOT_ACKNOWLEDGED` | A detected conflict was not acknowledged |
+| 422 | `INVALID_ENTITY_REFERENCE` | `matchedEntityId` belongs to a different campaign (D-079) |
+| 422 | `UNSUPPORTED_ACTION` | Commit action outside {`accept`, `edit`, `delete`} (D-053) |
+| 422 | `QUERY_TOKEN_BUDGET_EXCEEDED` | Query prompt + question over the token envelope (D-034) |
+| 422 | `DOMAIN_ERROR` | Uncategorised domain invariant violation |
+| 429 | `QUERY_RATE_LIMITED` | Query Mode per-(user, campaign) rate limit exceeded (D-096) |
+| 502 | `QUERY_ANSWER_UNPARSEABLE` | LLM answer could not be parsed — upstream fault |
+| 502 | `EMAIL_DELIVERY_FAILED` | Email provider error; the surrounding transaction rolled back |
+| 503 | `QUERY_COST_CAP` | Daily LLM spend cap reached (D-096) |
+| 504 | `QUERY_TIMEOUT` | Query pipeline exceeded its synchronous deadline (D-052) |
+| 500 | `INTERNAL_ERROR` | Unhandled exception — a bug, logged with full stack trace |
 
 ---
 
