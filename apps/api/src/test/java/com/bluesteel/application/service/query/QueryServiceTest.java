@@ -7,6 +7,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.bluesteel.application.model.ingestion.EntityContext;
 import com.bluesteel.application.model.query.Citation;
 import com.bluesteel.application.model.query.QueryResponse;
@@ -22,6 +25,7 @@ import com.bluesteel.domain.exception.UnauthorizedException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +33,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("QueryService")
@@ -123,6 +129,62 @@ class QueryServiceTest {
 
     verify(embeddingPort, never()).embed(QUESTION);
     verify(queryAnsweringPort, never()).answer(QUESTION, CONTEXT);
+  }
+
+  @Test
+  @DisplayName("should WARN with caller, campaign, and tally vs cap when the cost cap trips")
+  void answer_capReached_logsWarn() {
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    ch.qos.logback.classic.Logger serviceLogger =
+        (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(QueryService.class);
+    serviceLogger.addAppender(appender);
+    try {
+      when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+          .thenReturn(Optional.of(CampaignRole.PLAYER));
+      when(costAccountingPort.currentDailyCostUsd()).thenReturn(DAILY_CAP_USD);
+
+      assertThatThrownBy(() -> sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION))
+          .isInstanceOf(CostCapExceededException.class);
+    } finally {
+      serviceLogger.detachAppender(appender);
+    }
+
+    assertThat(appender.list)
+        .anySatisfy(
+            event -> {
+              assertThat(event.getLevel()).isEqualTo(Level.WARN);
+              assertThat(event.getFormattedMessage())
+                  .contains(CALLER_ID.toString())
+                  .contains(CAMPAIGN_ID.toString())
+                  .contains(String.valueOf(DAILY_CAP_USD));
+            });
+  }
+
+  @Test
+  @DisplayName(
+      "should expose user_id and campaign_id in MDC to the answering call and clear both after")
+  void answer_setsMdcForAnsweringCall_andClearsAfter() {
+    AtomicReference<String> userIdInMdc = new AtomicReference<>();
+    AtomicReference<String> campaignIdInMdc = new AtomicReference<>();
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
+    when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+        .thenAnswer(
+            invocation -> {
+              userIdInMdc.set(MDC.get("user_id"));
+              campaignIdInMdc.set(MDC.get("campaign_id"));
+              return new QueryResponse("Answer.", List.of());
+            });
+
+    sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
+
+    assertThat(userIdInMdc.get()).isEqualTo(CALLER_ID.toString());
+    assertThat(campaignIdInMdc.get()).isEqualTo(CAMPAIGN_ID.toString());
+    assertThat(MDC.get("user_id")).isNull();
+    assertThat(MDC.get("campaign_id")).isNull();
   }
 
   @Test

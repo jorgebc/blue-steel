@@ -8,6 +8,8 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -21,6 +23,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class QueryRateLimiter {
+
+  private static final Logger log = LoggerFactory.getLogger(QueryRateLimiter.class);
 
   private final int maxRequests;
   private final Duration window;
@@ -57,6 +61,12 @@ public class QueryRateLimiter {
             recent.pollFirst();
           }
           if (recent.size() >= maxRequests) {
+            log.warn(
+                "Query rate limit tripped userId={} campaignId={} maxRequests={} windowSeconds={}",
+                k.userId(),
+                k.campaignId(),
+                maxRequests,
+                window.toSeconds());
             throw new RateLimitExceededException();
           }
           recent.addLast(now);
