@@ -25,6 +25,8 @@ import com.bluesteel.domain.exception.UnauthorizedException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,16 +64,20 @@ class QueryServiceTest {
 
   @BeforeEach
   void setUp() {
-    sut =
-        new QueryService(
-            membershipPort,
-            embeddingPort,
-            retrievalPort,
-            queryAnsweringPort,
-            costAccountingPort,
-            1,
-            TOP_N,
-            DAILY_CAP_USD);
+    sut = serviceWithExecutor(ForkJoinPool.commonPool());
+  }
+
+  private QueryService serviceWithExecutor(Executor executor) {
+    return new QueryService(
+        membershipPort,
+        embeddingPort,
+        retrievalPort,
+        queryAnsweringPort,
+        costAccountingPort,
+        executor,
+        1,
+        TOP_N,
+        DAILY_CAP_USD);
   }
 
   @Test
@@ -220,6 +226,28 @@ class QueryServiceTest {
     QueryResponse actual = sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
 
     assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("should run the answering call on the injected query executor")
+  void answer_runsAnsweringOnInjectedExecutor() {
+    AtomicReference<String> answeringThreadName = new AtomicReference<>();
+    Executor namedThreadExecutor = command -> new Thread(command, "query-test-executor").start();
+    sut = serviceWithExecutor(namedThreadExecutor);
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
+    when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+        .thenAnswer(
+            invocation -> {
+              answeringThreadName.set(Thread.currentThread().getName());
+              return new QueryResponse("Answer.", List.of());
+            });
+
+    sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
+
+    assertThat(answeringThreadName.get()).isEqualTo("query-test-executor");
   }
 
   @Test
