@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { CitationList } from './CitationList'
 import type { QueryResponse } from '@/types/query'
 
@@ -12,10 +13,17 @@ interface Props {
  * entirely when no evidence was found (`citations` empty).
  */
 export function AnswerDisplay({ response, campaignId }: Props) {
+  const headingRef = useRef<HTMLHeadingElement>(null)
+
+  // Move focus to the answer heading on every mount so screen readers announce the new result.
+  useEffect(() => {
+    headingRef.current?.focus()
+  }, [])
+
   return (
     <article aria-label="Query answer" className="space-y-6">
       <section aria-labelledby="answer-heading">
-        <h2 id="answer-heading" className="sr-only">
+        <h2 id="answer-heading" ref={headingRef} tabIndex={-1} className="sr-only">
           Answer
         </h2>
         <p className="whitespace-pre-wrap leading-relaxed text-slate-900">{response.answer}</p>

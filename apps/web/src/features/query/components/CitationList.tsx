@@ -19,7 +19,7 @@ export function CitationList({ citations, campaignId }: Props) {
       </h3>
       <ol className="space-y-2">
         {citations.map((c) => (
-          <li key={`${c.sessionId}-${c.snippet}`} className="text-sm text-slate-700">
+          <li key={`${c.sessionId}-${c.sequenceNumber}`} className="text-sm text-slate-700">
             <Link
               to={`/campaigns/${campaignId}/sessions/${c.sessionId}`}
               aria-label={`Session ${c.sequenceNumber}: ${c.snippet}`}

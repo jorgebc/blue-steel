@@ -3,7 +3,7 @@
 > Reusable prompt. **Edit only the TASK line**, then run. Everything below is standing
 > context that works for any Phase task, backend or frontend.
 
-**TASK:** F3.2 and all subtasks
+**TASK:** F3.6.2 
 
 ---
 
