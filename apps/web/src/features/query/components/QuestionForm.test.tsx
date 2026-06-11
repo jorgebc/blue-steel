@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import { QuestionForm } from './QuestionForm'
@@ -39,6 +39,49 @@ describe('QuestionForm', () => {
 
     expect(screen.getByRole('textbox')).toBeDisabled()
     expect(screen.getByRole('button', { name: /searching/i })).toBeDisabled()
+  })
+
+  it('shows a character counter reflecting the trimmed question length', async () => {
+    render(<QuestionForm onSubmit={vi.fn()} isPending={false} />)
+    const textarea = screen.getByRole('textbox')
+
+    await userEvent.type(textarea, '  Hello world  ')
+    expect(screen.getByText('11/2000')).toBeInTheDocument()
+  })
+
+  it('disables submission when the trimmed question exceeds 2000 characters', () => {
+    render(<QuestionForm onSubmit={vi.fn()} isPending={false} />)
+    const textarea = screen.getByRole('textbox')
+
+    fireEvent.change(textarea, { target: { value: 'a'.repeat(2001) } })
+
+    expect(screen.getByRole('button', { name: /ask/i })).toBeDisabled()
+  })
+
+  it('shows amber counter colour when the question approaches the limit', () => {
+    render(<QuestionForm onSubmit={vi.fn()} isPending={false} />)
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a'.repeat(1900) } })
+
+    expect(screen.getByText('1900/2000')).toHaveClass('text-amber-600')
+  })
+
+  it('shows red counter colour when the question is at the limit', () => {
+    render(<QuestionForm onSubmit={vi.fn()} isPending={false} />)
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a'.repeat(2000) } })
+
+    expect(screen.getByText('2000/2000')).toHaveClass('text-red-600')
+  })
+
+  it('clears the textarea after the question is submitted', async () => {
+    render(<QuestionForm onSubmit={vi.fn()} isPending={false} />)
+    const textarea = screen.getByRole('textbox')
+
+    await userEvent.type(textarea, 'Where is Aldric?')
+    await userEvent.click(screen.getByRole('button', { name: /ask/i }))
+
+    expect(textarea).toHaveValue('')
   })
 
   it('has no accessibility violations', async () => {

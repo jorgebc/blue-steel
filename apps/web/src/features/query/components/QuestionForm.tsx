@@ -16,10 +16,16 @@ export function QuestionForm({ onSubmit, isPending }: Props) {
   const [value, setValue] = useState('')
   const trimmed = value.trim()
 
+  const counterColor =
+    trimmed.length >= 2000 ? 'text-red-600' :
+    trimmed.length >= 1800 ? 'text-amber-600' :
+    'text-slate-500'
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!trimmed || isPending) return
     onSubmit(trimmed)
+    setValue('')
   }
 
   return (
@@ -27,15 +33,19 @@ export function QuestionForm({ onSubmit, isPending }: Props) {
       <label htmlFor="query-input" className="sr-only">
         Ask a question about the campaign
       </label>
-      <Textarea
-        id="query-input"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="What happened to Aldric after the Battle of Thornwall?"
-        disabled={isPending}
-        rows={3}
-      />
-      <Button type="submit" disabled={isPending || trimmed === ''}>
+      <div className="space-y-1">
+        <Textarea
+          id="query-input"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="What happened to Aldric after the Battle of Thornwall?"
+          disabled={isPending}
+          rows={3}
+          maxLength={2000}
+        />
+        <span className={`block text-right text-xs ${counterColor}`}>{trimmed.length}/2000</span>
+      </div>
+      <Button type="submit" disabled={isPending || trimmed === '' || trimmed.length > 2000}>
         {isPending ? 'Searching…' : 'Ask'}
       </Button>
     </form>

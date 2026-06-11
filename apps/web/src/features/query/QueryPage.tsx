@@ -77,6 +77,12 @@ export function QueryPage() {
 
       {isPending && <QueryAnswerSkeleton />}
 
+      {!isPending && !answer && !banner && (
+        <p className="text-sm text-slate-500">
+          Submit a question to see the answer and its sources here.
+        </p>
+      )}
+
       {!isPending && answer && <AnswerDisplay response={answer} campaignId={campaignId ?? ''} />}
     </section>
   )

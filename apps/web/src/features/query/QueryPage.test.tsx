@@ -158,6 +158,41 @@ describe('QueryPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/something went wrong/i)
   })
 
+  it('shows an empty-state prompt before the first query is submitted', () => {
+    renderPage()
+    expect(
+      screen.getByText(/submit a question to see the answer and its sources here/i)
+    ).toBeInTheDocument()
+  })
+
+  it('hides the empty-state prompt when an error banner is visible', async () => {
+    stubMutation({ rejectWith: new ApiClientError('timeout', 504, []) })
+    renderPage()
+    await ask()
+
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(
+      screen.queryByText(/submit a question to see the answer and its sources here/i)
+    ).not.toBeInTheDocument()
+  })
+
+  it('hides the empty-state prompt once an answer is displayed', async () => {
+    renderPage()
+    await ask()
+
+    expect(
+      screen.queryByText(/submit a question to see the answer and its sources here/i)
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('Aldric fled north after the battle.')).toBeInTheDocument()
+  })
+
+  it('moves focus to the answer heading when a result renders', async () => {
+    renderPage()
+    await ask()
+
+    expect(document.activeElement).toBe(document.getElementById('answer-heading'))
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = renderPage()
     expect(await axe(container)).toHaveNoViolations()
