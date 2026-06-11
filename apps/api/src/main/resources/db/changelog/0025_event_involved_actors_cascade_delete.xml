@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    Fix missing CASCADE on event_involved_actors FKs (F4.6.1 oversight).
+    Migration 0024 added the event_involved_actors join table after the cascade sweep
+    in 0022, so neither of its FKs got ON DELETE CASCADE. The result: deleting a
+    campaign (which cascades to actors and events) is blocked by orphaned rows in
+    event_involved_actors. Fix: drop both FKs and re-add them with CASCADE.
+
+    event_involved_actors.event_id → events(id)
+    event_involved_actors.actor_id → actors(id)
+  -->
+
+  <!-- event_involved_actors.event_id → events -->
+  <changeSet id="0025-event-involved-actors-cascade-event" author="jorge">
+    <dropForeignKeyConstraint baseTableName="event_involved_actors"
+                              constraintName="fk_event_involved_actors_event"/>
+    <addForeignKeyConstraint baseTableName="event_involved_actors"
+                             baseColumnNames="event_id"
+                             referencedTableName="events"
+                             referencedColumnNames="id"
+                             constraintName="fk_event_involved_actors_event"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+  <!-- event_involved_actors.actor_id → actors -->
+  <changeSet id="0025-event-involved-actors-cascade-actor" author="jorge">
+    <dropForeignKeyConstraint baseTableName="event_involved_actors"
+                              constraintName="fk_event_involved_actors_actor"/>
+    <addForeignKeyConstraint baseTableName="event_involved_actors"
+                             baseColumnNames="actor_id"
+                             referencedTableName="actors"
+                             referencedColumnNames="id"
+                             constraintName="fk_event_involved_actors_actor"
+                             onDelete="CASCADE"/>
+  </changeSet>
+
+</databaseChangeLog>
