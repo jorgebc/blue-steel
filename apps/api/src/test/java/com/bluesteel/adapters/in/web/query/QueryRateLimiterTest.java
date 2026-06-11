@@ -24,9 +24,11 @@ class QueryRateLimiterTest {
   private static final UUID CAMPAIGN = UUID.fromString("11111111-1111-1111-1111-111111111111");
   private static final int MAX_REQUESTS = 3;
   private static final long WINDOW_SECONDS = 60;
+  private static final int MAX_TRACKED_KEYS = 100;
 
   private final MutableClock clock = new MutableClock(Instant.parse("2026-06-09T12:00:00Z"));
-  private final QueryRateLimiter sut = new QueryRateLimiter(MAX_REQUESTS, WINDOW_SECONDS, clock);
+  private final QueryRateLimiter sut =
+      new QueryRateLimiter(MAX_REQUESTS, WINDOW_SECONDS, MAX_TRACKED_KEYS, clock);
 
   @Test
   @DisplayName("should allow requests up to the configured limit within the window")
@@ -101,6 +103,32 @@ class QueryRateLimiterTest {
     }
 
     assertThatCode(() -> sut.check(USER, otherCampaign)).doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("should evict a stale key once the tracked-key cap is exceeded")
+  void staleKeyIsEvictedPastTrackedKeyCap() {
+    QueryRateLimiter capped = new QueryRateLimiter(MAX_REQUESTS, WINDOW_SECONDS, 1, clock);
+    capped.check(USER, CAMPAIGN);
+
+    clock.advance(Duration.ofSeconds(WINDOW_SECONDS + 1));
+    UUID otherCampaign = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    capped.check(USER, otherCampaign);
+
+    assertThat(capped.trackedKeyCount()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("should never evict a key that is still active within the window")
+  void activeKeyIsNotEvictedPastTrackedKeyCap() {
+    QueryRateLimiter capped = new QueryRateLimiter(MAX_REQUESTS, WINDOW_SECONDS, 1, clock);
+    capped.check(USER, CAMPAIGN);
+
+    clock.advance(Duration.ofSeconds(1));
+    UUID otherCampaign = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    capped.check(USER, otherCampaign);
+
+    assertThat(capped.trackedKeyCount()).isEqualTo(2);
   }
 
   /**

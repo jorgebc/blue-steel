@@ -18,8 +18,12 @@ import org.springframework.stereotype.Component;
  * In-memory sliding-window rate limiter for Query Mode, keyed by {@code (userId, campaignId)}
  * (D-096). Each call records a timestamp; a key whose window holds {@code maxRequests} timestamps
  * rejects the next request with {@link RateLimitExceededException}. The window/limit are
- * env-overridable ({@code query.rate-limit.*}); the per-key deque is bounded by {@code maxRequests}
- * and empty keys are pruned, so the map is bounded by the number of keys active within the window.
+ * env-overridable ({@code query.rate-limit.*}); the per-key deque is bounded by {@code
+ * maxRequests}. Once the map grows past {@code query.rate-limit.max-tracked-keys}, every check also
+ * prunes keys whose newest timestamp has left the window (stale keys can never reject again, so
+ * removal is safe; active keys are never evicted — that would reset their count and bypass the
+ * limit). The map is therefore bounded by {@code max(maxTrackedKeys, keys active within one
+ * window)}.
  */
 @Component
 public class QueryRateLimiter {
@@ -28,19 +32,22 @@ public class QueryRateLimiter {
 
   private final int maxRequests;
   private final Duration window;
+  private final int maxTrackedKeys;
   private final Clock clock;
   private final ConcurrentHashMap<Key, Deque<Instant>> hits = new ConcurrentHashMap<>();
 
   @Autowired
   public QueryRateLimiter(
       @Value("${query.rate-limit.max-requests:10}") int maxRequests,
-      @Value("${query.rate-limit.window-seconds:60}") long windowSeconds) {
-    this(maxRequests, windowSeconds, Clock.systemUTC());
+      @Value("${query.rate-limit.window-seconds:60}") long windowSeconds,
+      @Value("${query.rate-limit.max-tracked-keys:1000}") int maxTrackedKeys) {
+    this(maxRequests, windowSeconds, maxTrackedKeys, Clock.systemUTC());
   }
 
-  QueryRateLimiter(int maxRequests, long windowSeconds, Clock clock) {
+  QueryRateLimiter(int maxRequests, long windowSeconds, int maxTrackedKeys, Clock clock) {
     this.maxRequests = maxRequests;
     this.window = Duration.ofSeconds(windowSeconds);
+    this.maxTrackedKeys = maxTrackedKeys;
     this.clock = clock;
   }
 
@@ -72,6 +79,29 @@ public class QueryRateLimiter {
           recent.addLast(now);
           return recent;
         });
+
+    if (hits.size() > maxTrackedKeys) {
+      pruneStaleKeys(cutoff);
+    }
+  }
+
+  /**
+   * Removes keys whose newest timestamp predates the window. Per-key removal goes through {@code
+   * computeIfPresent} so it cannot race a concurrent {@link #check} on the same key.
+   */
+  private void pruneStaleKeys(Instant cutoff) {
+    for (Key key : hits.keySet()) {
+      hits.computeIfPresent(
+          key,
+          (k, timestamps) -> {
+            Instant newest = timestamps.peekLast();
+            return newest != null && newest.isBefore(cutoff) ? null : timestamps;
+          });
+    }
+  }
+
+  int trackedKeyCount() {
+    return hits.size();
   }
 
   private record Key(UUID userId, UUID campaignId) {}
