@@ -2926,16 +2926,16 @@ context.
 | F3.5 | Backend: Query rate-limit + daily cost cap (D-096) | ✅ |
 | F3.5.1 | Backend: per-user/per-campaign query rate limit + 429 mapping | ✅ |
 | F3.5.2 | Backend: daily LLM cost cap guard (reuses cost logging) | ✅ |
-| F3.6 | Query Mode post-phase review remediation | 🔲 |
+| F3.6 | Query Mode post-phase review remediation | ✅ |
 | F3.6.1 | Frontend: handle 429/503 + surface backend error message | ✅ |
 | F3.6.2 | Frontend: Query UX polish — length parity, empty state, focus-to-answer | ✅ |
 | F3.6.3 | Backend: map LLM-answering faults to specific codes (stop 500s) | ✅ |
 | F3.6.4 | Backend: validate LLM citations against retrieved context | ✅ |
-| F3.6.5 | Backend: observability + cost-log attribution for query guards | 🔲 |
-| F3.6.6 | Backend: bound the rate-limiter key map | 🔲 |
-| F3.6.7 | Backend: cost-cap + async-timeout hardening + documented limits | 🔲 |
-| F3.6.8 | Backend: prompt-injection hardening in QueryPromptAssembler | 🔲 |
-| F3.6.9 | Docs: Query Mode error catalog + config + auth clarification | 🔲 |
+| F3.6.5 | Backend: observability + cost-log attribution for query guards | ✅ |
+| F3.6.6 | Backend: bound the rate-limiter key map | ✅ |
+| F3.6.7 | Backend: cost-cap + async-timeout hardening + documented limits | ✅ |
+| F3.6.8 | Backend: prompt-injection hardening in QueryPromptAssembler | ✅ |
+| F3.6.9 | Docs: Query Mode error catalog + config + auth clarification | ✅ |
 
 ---
 

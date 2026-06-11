@@ -178,6 +178,20 @@ Never put business logic in controllers. Never put format validation in services
 
 **LLM profiles (D-049, D-088, D-093):** three provider selections layered on `local` — mock (`@Profile("!llm-real & !llm-ollama")`, default dev), `llm-real` (Google Gemini — chat + embeddings under one `GEMINI_API_KEY`, D-093), `llm-ollama` (Ollama, offline). Adapters are provider-neutral (`SpringAi*`, `@Profile("llm-real | llm-ollama")`); `AiConfig` picks the active `ChatModel`/`EmbeddingModel` bean per profile. Models + dimension are env-overridable (`GEMINI_CHAT_MODEL`, `GEMINI_EMBEDDING_MODEL`; `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBEDDING_MODEL`; `EMBEDDING_DIMENSION`). Changing the embedding model to a different dimension → update `EMBEDDING_DIMENSION` and recreate the DB (`docker compose down -v`).
 
+**Query Mode config knobs (D-096, D-052, D-034):** all env-overridable via `application.properties`; raise capacity from the Render dashboard, never by re-implementing.
+
+| Property | Env var | Default | Effect |
+|---|---|---|---|
+| `query.timeout-seconds` | `QUERY_TIMEOUT_SECONDS` | `20` | Synchronous deadline → `504 QUERY_TIMEOUT` |
+| `query.retrieval.top-n` | `QUERY_RETRIEVAL_TOP_N` | `8` | Snapshots retrieved per query (primary heap knob) |
+| `query.rate-limit.max-requests` | `QUERY_RATE_LIMIT_MAX_REQUESTS` | `10` | Requests per key per window → `429 QUERY_RATE_LIMITED` |
+| `query.rate-limit.window-seconds` | `QUERY_RATE_LIMIT_WINDOW_SECONDS` | `60` | Sliding-window length |
+| `query.rate-limit.max-tracked-keys` | `QUERY_RATE_LIMIT_MAX_TRACKED_KEYS` | `1000` | Heap bound on the limiter key map |
+| `query.cost-cap.daily-usd` | `QUERY_COST_CAP_DAILY_USD` | `1.00` | Daily LLM spend cap → `503 QUERY_COST_CAP` |
+| `query.executor.pool-size` | `QUERY_EXECUTOR_POOL_SIZE` | `2` | Concurrent query LLM calls (dedicated pool) |
+| `query.executor.queue-capacity` | `QUERY_EXECUTOR_QUEUE_CAPACITY` | `20` | Queued query tasks before rejection |
+| `blue-steel.llm.query-answering-max-tokens` | `BLUE_STEEL_LLM_QUERY_ANSWERING_MAX_TOKENS` | `6000` | Token envelope → `422 QUERY_TOKEN_BUDGET_EXCEEDED` |
+
 **Proposals schema (D-016):** `proposals` + `proposal_votes` tables exist from day one but the approval pipeline ships in v2. Do NOT implement proposal approval logic.
 
 ---
