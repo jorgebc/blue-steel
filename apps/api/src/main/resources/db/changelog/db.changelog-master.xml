@@ -58,4 +58,7 @@
   <!-- F4.6.1: structured event links (space_id + event_type + involved-actors join) -->
   <include file="db/changelog/0024_add_event_links.xml"/>
 
+  <!-- Fix missing CASCADE on event_involved_actors FKs (0024 came after cascade sweep 0022) -->
+  <include file="db/changelog/0025_event_involved_actors_cascade_delete.xml"/>
+
 </databaseChangeLog>

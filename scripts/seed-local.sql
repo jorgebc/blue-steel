@@ -35,6 +35,33 @@
 -- (seq 3). Try filters: eventType "battle" → 2 events; actor "Ismark" → 2 events;
 -- space "Vallaki" → 1 event.
 --
+-- RELATIONS GRAPH (F4.3.1): relation endpoint columns (source_entity_id /
+-- source_entity_type / target_entity_id / target_entity_type) are populated.
+-- Curse of Strahd has 3 relations:
+--   Strahd → Ireena          (actor→actor) — fully resolved
+--   Ireena → Ismark          (actor→actor) — fully resolved
+--   Strahd → Castle Ravenloft (actor→space) — exercises space nodes in the graph
+-- Lost Mine has 1 relation:
+--   Sildar → null            (actor→unresolved) — exercises the "Unresolved" endpoint UI
+-- Test the graph: all 3 Strahd edges appear; Castle Ravenloft renders as a space node.
+-- Test RelationDetailPage: first two show clickable actor links; third shows space link;
+-- Phandelver one shows "Unresolved" for the target endpoint.
+--
+-- ANNOTATIONS (F4.x): 6 annotation rows cover all four entity_type values so
+-- AnnotationThread renders pre-populated on every Exploration profile page.
+--   actor   — 2 on Strahd (gm@ + editor@), 1 on Ireena (player@)
+--   space   — 1 on Village of Barovia (gm@)
+--   event   — 1 on "Party crosses into Barovia" (editor@)
+--   relation — 1 on "Strahd obsesses over Ireena" (gm@)
+-- Author variety lets you test: GM can delete any annotation; editor@ / player@ can
+-- delete only their own.
+--
+-- QUERY MODE (F3.x): entity_embeddings are generated async by the pipeline after
+-- a real commit — they cannot be seeded. To test Query Mode: start the app with
+-- llm-real or llm-ollama profile, submit a new session summary, commit it, then
+-- post a question. The seeded committed world state serves as LLM context once
+-- embeddings exist.
+--
 -- DRAFT diff_payload (Curse of Strahd session 5):
 --   Actors  — NEW: Madame Eva; EXISTING update: Strahd; UNCERTAIN: dark figure
 --   Spaces  — NEW: Tser Pool Vistani Camp
@@ -50,6 +77,7 @@
 --   a20...   spaces         a30...   space_versions
 --   a40...   events         ee0...   event_versions
 --   a60...   relations      a70...   relation_versions
+--   a80...   annotations
 --   d00...   diff card IDs (inside diff_payload JSON only)
 --
 -- PREREQUISITES
@@ -511,11 +539,19 @@ VALUES
 -- WORLD STATE — Relations
 -- =============================================================================
 
-INSERT INTO relations (id, campaign_id, owner_id, name, created_at, created_in_session_id) VALUES
+-- F4.3.1: endpoint columns populated so the Relations graph draws directed edges.
+-- actor→actor: both Strahd relations. actor→space: Strahd→Castle Ravenloft.
+INSERT INTO relations (id, campaign_id, owner_id, name, created_at, created_in_session_id,
+                       source_entity_id, source_entity_type, target_entity_id, target_entity_type) VALUES
   ('a6000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001',
-   'Strahd obsesses over Ireena',    '2026-01-11 19:00:00+00', 'e0000000-0000-4000-8000-000000000001'),
+   'Strahd obsesses over Ireena',             '2026-01-11 19:00:00+00', 'e0000000-0000-4000-8000-000000000001',
+   'ac000000-0000-4000-8000-000000000001', 'actor', 'ac000000-0000-4000-8000-000000000002', 'actor'),
   ('a6000000-0000-4000-8000-000000000002', 'c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001',
-   'Ireena and Ismark are siblings', '2026-01-11 19:00:00+00', 'e0000000-0000-4000-8000-000000000001');
+   'Ireena and Ismark are siblings',           '2026-01-11 19:00:00+00', 'e0000000-0000-4000-8000-000000000001',
+   'ac000000-0000-4000-8000-000000000002', 'actor', 'ac000000-0000-4000-8000-000000000003', 'actor'),
+  ('a6000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001',
+   'Strahd''s power is rooted in Castle Ravenloft', '2026-01-11 19:00:00+00', 'e0000000-0000-4000-8000-000000000001',
+   'ac000000-0000-4000-8000-000000000001', 'actor', 'a2000000-0000-4000-8000-000000000002', 'space');
 
 INSERT INTO relation_versions
   (id, relation_id, session_id, version_number, changed_fields, full_snapshot, created_at)
@@ -532,6 +568,14 @@ VALUES
    'e0000000-0000-4000-8000-000000000001',
    1, NULL,
    '{"name":"Ireena and Ismark are siblings","fromEntityId":"ac000000-0000-4000-8000-000000000002","toEntityId":"ac000000-0000-4000-8000-000000000003","type":"sibling","description":"Ireena and Ismark are adoptive siblings. Ismark is fiercely protective of Ireena and arranged for the party to escort her to safety."}',
+   '2026-01-11 19:00:00+00'),
+
+  -- Strahd → Castle Ravenloft (actor→space) v1
+  ('a7000000-0000-4000-8000-000000000003',
+   'a6000000-0000-4000-8000-000000000003',
+   'e0000000-0000-4000-8000-000000000001',
+   1, NULL,
+   '{"name":"Strahd''s power is rooted in Castle Ravenloft","fromEntityId":"ac000000-0000-4000-8000-000000000001","fromEntityType":"actor","toEntityId":"a2000000-0000-4000-8000-000000000002","toEntityType":"space","type":"dominion","description":"Strahd''s authority as lord of Barovia is physically anchored in Castle Ravenloft. His power weakens the further he strays from it, and the castle is the seat of all his dark influence over the land."}',
    '2026-01-11 19:00:00+00');
 
 -- =============================================================================
@@ -593,5 +637,80 @@ VALUES
    1, NULL,
    '{"name":"Goblin ambush on the Triboar Trail","description":"The party discovered two dead horses and was ambushed by goblins on the Triboar Trail. They tracked the goblins back to Cragmaw Hideout, defeated the occupants, and rescued Sildar Hallwinter. Gundren Rockseeker and his map were taken to Cragmaw Castle.","outcome":"Sildar rescued; Gundren''s location identified; map is missing"}',
    '2026-01-15 20:00:00+00');
+
+-- F4.3.1: Phandelver relation — source resolved (Sildar), target unresolved (Iarno Albrek
+-- is not a seeded entity). Exercises the "Unresolved" endpoint display in RelationDetailPage.
+INSERT INTO relations (id, campaign_id, owner_id, name, created_at, created_in_session_id,
+                       source_entity_id, source_entity_type, target_entity_id, target_entity_type) VALUES
+  ('a6000000-0000-4000-8000-000000000010', 'c0000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000001',
+   'Sildar seeks the missing Lord Albrek', '2026-01-15 20:00:00+00', 'e0000000-0000-4000-8000-000000000010',
+   'ac000000-0000-4000-8000-000000000011', 'actor', NULL, NULL);
+
+INSERT INTO relation_versions
+  (id, relation_id, session_id, version_number, changed_fields, full_snapshot, created_at)
+VALUES
+  ('a7000000-0000-4000-8000-000000000010',
+   'a6000000-0000-4000-8000-000000000010',
+   'e0000000-0000-4000-8000-000000000010',
+   1, NULL,
+   '{"name":"Sildar seeks the missing Lord Albrek","fromEntityId":"ac000000-0000-4000-8000-000000000011","fromEntityType":"actor","toEntityId":null,"toEntityType":null,"type":"mission","description":"Sildar Hallwinter was sent by the Lords'' Alliance to find Iarno Albrek, an agent dispatched to Phandalin months ago who has not been heard from since."}',
+   '2026-01-15 20:00:00+00');
+
+-- =============================================================================
+-- ANNOTATIONS (F4.x)
+-- AnnotationThread appears on actor, space, event, and relation profile pages.
+-- 6 rows cover all four entity_type values with varied authors so canDelete logic
+-- can be tested: GM (gm@) can delete any annotation; editor@ / player@ can delete
+-- only their own.
+-- =============================================================================
+
+INSERT INTO annotations (id, campaign_id, entity_type, entity_id, author_id, content, created_at) VALUES
+
+  -- Strahd actor — 2 annotations (tests multi-item thread; gm@ and editor@ as authors)
+  ('a8000000-0000-4000-8000-000000000001',
+   'c0000000-0000-4000-8000-000000000001', 'actor',
+   'ac000000-0000-4000-8000-000000000001',
+   'a0000000-0000-4000-8000-000000000001',
+   'Strahd appeared at the village square in Session 1. The fog thickened visibly near him. He seemed fixated on Ireena and barely acknowledged the rest of the party. Possible weakness: direct sunlight slowed his movement noticeably before he retreated.',
+   '2026-01-11 19:30:00+00'),
+
+  ('a8000000-0000-4000-8000-000000000002',
+   'c0000000-0000-4000-8000-000000000001', 'actor',
+   'ac000000-0000-4000-8000-000000000001',
+   'a0000000-0000-4000-8000-000000000002',
+   'Cross-reference: the Durst children (Rose and Thorn) mentioned a "master" in the manor. Could be a Strahd connection — the Death House may have served him directly. Worth investigating before we leave the village.',
+   '2026-01-12 10:00:00+00'),
+
+  -- Ireena actor — 1 annotation by player@
+  ('a8000000-0000-4000-8000-000000000003',
+   'c0000000-0000-4000-8000-000000000001', 'actor',
+   'ac000000-0000-4000-8000-000000000002',
+   'a0000000-0000-4000-8000-000000000003',
+   'Ireena is carrying her late father''s signet ring — she mentioned it quietly to Ismark when she thought we weren''t listening. Worth checking whether it carries weight in other settlements or proves her identity.',
+   '2026-01-12 14:00:00+00'),
+
+  -- Village of Barovia space — 1 annotation by gm@
+  ('a8000000-0000-4000-8000-000000000004',
+   'c0000000-0000-4000-8000-000000000001', 'space',
+   'a2000000-0000-4000-8000-000000000001',
+   'a0000000-0000-4000-8000-000000000001',
+   'Three locations in the village worth revisiting: (1) Church — Father Donavich is hiding something in the basement and would not let us near it. (2) Burgomaster''s house — now abandoned; any papers left behind could reveal useful contacts. (3) Blood on the Vine tavern — the Vistani contact Arik knows more than he says.',
+   '2026-01-11 20:00:00+00'),
+
+  -- "Party crosses into Barovia" event — 1 annotation by editor@
+  ('a8000000-0000-4000-8000-000000000005',
+   'c0000000-0000-4000-8000-000000000001', 'event',
+   'a4000000-0000-4000-8000-000000000001',
+   'a0000000-0000-4000-8000-000000000002',
+   'Confirmed by Ismark: the fog barrier is one-way. No known method to cross back until Strahd is defeated or a specific ritual is performed. The mist closed behind the party immediately on entry — no gap, no hesitation.',
+   '2026-01-11 19:15:00+00'),
+
+  -- "Strahd obsesses over Ireena" relation — 1 annotation by gm@
+  ('a8000000-0000-4000-8000-000000000006',
+   'c0000000-0000-4000-8000-000000000001', 'relation',
+   'a6000000-0000-4000-8000-000000000001',
+   'a0000000-0000-4000-8000-000000000001',
+   'Intensity escalated in Session 2 — Strahd appeared in a vision near the Svalich Road while Ismark was speaking. Track every encounter: bite marks on Ireena''s neck (2 so far), visit frequency, and whether her resistance to compulsion is growing.',
+   '2026-01-18 21:00:00+00');
 
 COMMIT;
