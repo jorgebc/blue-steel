@@ -1,6 +1,6 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiClient } from './client'
-import type { QueryRequest, QueryResponse } from '@/types/query'
+import type { QueryRequest, QueryResponse, QueryUsage } from '@/types/query'
 
 /**
  * Posts a natural-language question and waits synchronously for the grounded answer (D-052).
@@ -21,5 +21,26 @@ export async function submitQuery(campaignId: string, question: string): Promise
 export function useSubmitQuery(campaignId: string) {
   return useMutation({
     mutationFn: (question: string) => submitQuery(campaignId, question),
+  })
+}
+
+/** Key for the shared Query Mode usage figure; invalidate after a submission to refresh it. */
+export const queryUsageKey = (campaignId: string) => ['query-usage', campaignId] as const
+
+/** Reads the shared daily LLM budget and the caller's remaining rate-limit headroom (D-096). */
+export async function fetchQueryUsage(campaignId: string): Promise<QueryUsage> {
+  const res = await apiClient.get<QueryUsage>(`/api/v1/campaigns/${campaignId}/queries/usage`)
+  return res.data
+}
+
+/**
+ * Usage is genuine server state (unlike the stateless query mutation, D-058), so it lives in the
+ * TanStack Query cache. Enabled only once a campaign is selected.
+ */
+export function useQueryUsage(campaignId: string) {
+  return useQuery({
+    queryKey: queryUsageKey(campaignId),
+    queryFn: () => fetchQueryUsage(campaignId),
+    enabled: campaignId !== '',
   })
 }

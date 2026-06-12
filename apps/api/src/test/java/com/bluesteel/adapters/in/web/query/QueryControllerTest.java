@@ -3,6 +3,7 @@ package com.bluesteel.adapters.in.web.query;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -10,9 +11,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.query.Citation;
 import com.bluesteel.application.model.query.QueryResponse;
+import com.bluesteel.application.model.query.QueryUsage;
 import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.health.CheckHealthUseCase;
 import com.bluesteel.application.port.in.query.AnswerQueryUseCase;
+import com.bluesteel.application.port.in.query.GetQueryUsageUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
 import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
@@ -53,6 +56,7 @@ import org.springframework.web.context.WebApplicationContext;
 class QueryControllerTest {
 
   @MockitoBean private AnswerQueryUseCase answerQueryUseCase;
+  @MockitoBean private GetQueryUsageUseCase getQueryUsageUseCase;
   @MockitoBean private QueryRateLimiter rateLimiter;
 
   // Mocked so the full application context loads without database/infra-backed beans.
@@ -206,6 +210,35 @@ class QueryControllerTest {
                     """
                     { "question": "Who is Mira?" }
                     """))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName(
+      "should return 200 with the shared budget and caller's remaining rate-limit headroom")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void usage_authenticated_returns200() throws Exception {
+    when(getQueryUsageUseCase.currentUsage()).thenReturn(new QueryUsage(0.42, 1.00));
+    when(rateLimiter.remaining(CALLER_ID, CAMPAIGN_ID)).thenReturn(7);
+    when(rateLimiter.maxRequests()).thenReturn(10);
+    when(rateLimiter.windowSeconds()).thenReturn(60L);
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/queries/usage", CAMPAIGN_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.consumedUsd").value(0.42))
+        .andExpect(jsonPath("$.data.capUsd").value(1.00))
+        .andExpect(jsonPath("$.data.requestsRemaining").value(7))
+        .andExpect(jsonPath("$.data.maxRequests").value(10))
+        .andExpect(jsonPath("$.data.windowSeconds").value(60))
+        .andExpect(jsonPath("$.errors").isEmpty());
+  }
+
+  @Test
+  @DisplayName("should return 401 when usage is requested unauthenticated")
+  void usage_unauthenticated_returns401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/queries/usage", CAMPAIGN_ID))
         .andExpect(status().isUnauthorized());
   }
 }

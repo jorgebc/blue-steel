@@ -131,6 +131,57 @@ class QueryRateLimiterTest {
     assertThat(capped.trackedKeyCount()).isEqualTo(2);
   }
 
+  @Test
+  @DisplayName("should report the full limit as remaining before any request")
+  void remaining_isFullBeforeAnyRequest() {
+    assertThat(sut.remaining(USER, CAMPAIGN)).isEqualTo(MAX_REQUESTS);
+  }
+
+  @Test
+  @DisplayName("should decrease remaining as requests are recorded within the window")
+  void remaining_decreasesWithRecordedRequests() {
+    sut.check(USER, CAMPAIGN);
+    sut.check(USER, CAMPAIGN);
+
+    assertThat(sut.remaining(USER, CAMPAIGN)).isEqualTo(MAX_REQUESTS - 2);
+  }
+
+  @Test
+  @DisplayName("should not consume the limit when remaining is queried")
+  void remaining_doesNotConsumeBudget() {
+    for (int i = 0; i < 5; i++) {
+      sut.remaining(USER, CAMPAIGN);
+    }
+
+    assertThatCode(
+            () -> {
+              for (int i = 0; i < MAX_REQUESTS; i++) {
+                sut.check(USER, CAMPAIGN);
+              }
+            })
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("should report the full limit again once the window has elapsed")
+  void remaining_resetsAfterWindowElapses() {
+    for (int i = 0; i < MAX_REQUESTS; i++) {
+      sut.check(USER, CAMPAIGN);
+    }
+    assertThat(sut.remaining(USER, CAMPAIGN)).isZero();
+
+    clock.advance(Duration.ofSeconds(WINDOW_SECONDS + 1));
+
+    assertThat(sut.remaining(USER, CAMPAIGN)).isEqualTo(MAX_REQUESTS);
+  }
+
+  @Test
+  @DisplayName("should expose the configured max requests and window length")
+  void exposesConfiguration() {
+    assertThat(sut.maxRequests()).isEqualTo(MAX_REQUESTS);
+    assertThat(sut.windowSeconds()).isEqualTo(WINDOW_SECONDS);
+  }
+
   /**
    * Test clock whose instant can be advanced to exercise sliding-window expiry deterministically.
    */

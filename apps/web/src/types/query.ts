@@ -20,3 +20,16 @@ export interface QueryResponse {
   answer: string
   citations: Citation[]
 }
+
+/**
+ * Shared Query Mode usage against the free-tier guards (D-096). `consumedUsd`/`capUsd` are the
+ * instance-wide daily LLM budget; `requestsRemaining` is how many more questions the caller may ask
+ * in the current `windowSeconds` window before the per-(user,campaign) rate limit of `maxRequests`.
+ */
+export interface QueryUsage {
+  consumedUsd: number
+  capUsd: number
+  requestsRemaining: number
+  maxRequests: number
+  windowSeconds: number
+}

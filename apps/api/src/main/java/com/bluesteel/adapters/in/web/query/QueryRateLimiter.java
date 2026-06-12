@@ -86,6 +86,35 @@ public class QueryRateLimiter {
   }
 
   /**
+   * Returns how many more requests the caller may make in the current window, without recording a
+   * hit — querying remaining capacity must never consume it. Prunes the key's stale timestamps in
+   * passing (consistent with {@link #check}); never adds one.
+   */
+  public int remaining(UUID userId, UUID campaignId) {
+    Key key = new Key(userId, campaignId);
+    Instant cutoff = clock.instant().minus(window);
+    Deque<Instant> recent =
+        hits.computeIfPresent(
+            key,
+            (k, timestamps) -> {
+              while (!timestamps.isEmpty() && timestamps.peekFirst().isBefore(cutoff)) {
+                timestamps.pollFirst();
+              }
+              return timestamps;
+            });
+    int used = recent == null ? 0 : recent.size();
+    return Math.max(0, maxRequests - used);
+  }
+
+  public int maxRequests() {
+    return maxRequests;
+  }
+
+  public long windowSeconds() {
+    return window.toSeconds();
+  }
+
+  /**
    * Removes keys whose newest timestamp predates the window. Per-key removal goes through {@code
    * computeIfPresent} so it cannot race a concurrent {@link #check} on the same key.
    */
