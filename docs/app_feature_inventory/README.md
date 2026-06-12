@@ -1,6 +1,6 @@
 # Blue Steel — Functionality Inventory & Use Case Manual
 
-> Generated from a full repository audit (backend controllers/services, frontend routes/pages, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/DECISIONS.md`). Every capability listed here cites the source files that implement it so the technical team can validate the inventory against the code.
+> Generated from a full repository audit (backend controllers/services, frontend routes/pages, `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/roadmap/ROADMAP_V1.md`, `docs/DECISIONS.md`). Every capability listed here cites the source files that implement it so the technical team can validate the inventory against the code.
 
 ---
 
@@ -26,7 +26,7 @@ Roadmap status at audit time: Phases 0–4 of the v1 roadmap (infrastructure, au
 blue-steel/
 ├── apps/api/   Java 25 / Spring Boot 4 (Maven) — hexagonal architecture (ports & adapters)
 ├── apps/web/   React 19 / Vite / TypeScript — TanStack Query (server state) + Zustand (client state)
-├── docs/       PRD, ARCHITECTURE, DECISIONS, ROADMAP, UX_CONSTITUTION
+├── docs/       PRD, ARCHITECTURE, DECISIONS, UX_CONSTITUTION, roadmap/
 └── docker-compose.yml   Local PostgreSQL 16 + pgvector
 ```
 
