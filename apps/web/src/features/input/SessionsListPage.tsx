@@ -78,13 +78,18 @@ function SessionRow({ session, campaignId, activeRole, onDiscard }: RowProps) {
 
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md">
-      <span className="w-6 shrink-0 text-center text-sm font-medium text-slate-500">
-        #{session.sequenceNumber}
-      </span>
-      <div className="flex flex-1 flex-col gap-1">
-        <StatusBadge status={session.status} />
-        <span className="text-xs text-slate-500">{formatted}</span>
-      </div>
+      <Link
+        to={`/campaigns/${campaignId}/sessions/${session.sessionId}`}
+        className="flex flex-1 items-center gap-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        <span className="w-6 shrink-0 text-center text-sm font-medium text-slate-500">
+          #{session.sequenceNumber}
+        </span>
+        <div className="flex flex-1 flex-col gap-1">
+          <StatusBadge status={session.status} />
+          <span className="text-xs text-slate-500">{formatted}</span>
+        </div>
+      </Link>
       <div className="flex shrink-0 gap-2">
         {canEditDraft && (
           <Link

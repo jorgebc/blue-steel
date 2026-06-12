@@ -163,6 +163,20 @@ describe('SessionsListPage', () => {
       expect(screen.getByText('#3')).toBeInTheDocument()
     })
 
+    it('links each row content to the session detail page', () => {
+      const { container } = renderPage()
+
+      expect(
+        container.querySelector('a[href="/campaigns/c1/sessions/s1"]')
+      ).toBeInTheDocument()
+      expect(
+        container.querySelector('a[href="/campaigns/c1/sessions/s2"]')
+      ).toBeInTheDocument()
+      expect(
+        container.querySelector('a[href="/campaigns/c1/sessions/s3"]')
+      ).toBeInTheDocument()
+    })
+
     it('shows a Resume link for the draft session pointing to the diff page', () => {
       renderPage()
 
