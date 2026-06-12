@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ApiClientError } from '@/api/client'
-import { useSubmitQuery } from '@/api/queries'
+import { queryUsageKey, useQueryUsage, useSubmitQuery } from '@/api/queries'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { useCampaignStore } from '@/store/campaignStore'
 import { QuestionForm } from './components/QuestionForm'
 import { QueryAnswerSkeleton } from './components/QueryAnswerSkeleton'
+import { QueryUsageNotice } from './components/QueryUsageNotice'
 import { AnswerDisplay } from './components/AnswerDisplay'
 import type { QueryResponse } from '@/types/query'
 
@@ -47,7 +49,9 @@ export function QueryPage() {
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
   const [answer, setAnswer] = useState<QueryResponse | null>(null)
   const [banner, setBanner] = useState<Banner | null>(null)
+  const queryClient = useQueryClient()
   const { mutate, isPending } = useSubmitQuery(campaignId ?? '')
+  const { data: usage } = useQueryUsage(campaignId ?? '')
 
   function handleSubmit(question: string) {
     // Clear prior answer + feedback so stale state never bleeds into the new query.
@@ -56,6 +60,8 @@ export function QueryPage() {
     mutate(question, {
       onSuccess: (data) => setAnswer(data),
       onError: (err) => setBanner(toBanner(err)),
+      // A submission moves the shared budget and the per-minute window — refresh the figure.
+      onSettled: () => queryClient.invalidateQueries({ queryKey: queryUsageKey(campaignId ?? '') }),
     })
   }
 
@@ -64,6 +70,8 @@ export function QueryPage() {
       <h1 id="query-mode-heading" className="text-2xl font-semibold text-slate-900">
         Ask the World
       </h1>
+
+      <QueryUsageNotice usage={usage} />
 
       <QuestionForm onSubmit={handleSubmit} isPending={isPending} />
 

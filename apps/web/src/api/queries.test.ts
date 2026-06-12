@@ -3,9 +3,9 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 import { apiClient, ApiClientError } from './client'
-import { submitQuery, useSubmitQuery } from './queries'
+import { fetchQueryUsage, submitQuery, useSubmitQuery } from './queries'
 import { createTestQueryClient } from '@/test/createTestQueryClient'
-import type { QueryResponse } from '@/types/query'
+import type { QueryResponse, QueryUsage } from '@/types/query'
 
 vi.mock('./client', () => ({
   apiClient: { get: vi.fn(), post: vi.fn(), delete: vi.fn() },
@@ -62,6 +62,25 @@ describe('submitQuery', () => {
     await expect(submitQuery('c1', 'slow question')).rejects.toMatchObject({
       status: 504,
     })
+  })
+})
+
+describe('fetchQueryUsage', () => {
+  const usage: QueryUsage = {
+    consumedUsd: 0.25,
+    capUsd: 1.0,
+    requestsRemaining: 8,
+    maxRequests: 10,
+    windowSeconds: 60,
+  }
+
+  it('GETs the usage endpoint for the campaign and unwraps the envelope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(usage))
+
+    const result = await fetchQueryUsage('c1')
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/queries/usage')
+    expect(result).toEqual(usage)
   })
 })
 

@@ -2,15 +2,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
 import { QueryPage } from './QueryPage'
 import { ApiClientError } from '@/api/client'
-import { useSubmitQuery } from '@/api/queries'
+import { useSubmitQuery, useQueryUsage } from '@/api/queries'
 import { useCampaignStore } from '@/store/campaignStore'
-import type { QueryResponse } from '@/types/query'
+import { createTestQueryClient } from '@/test/createTestQueryClient'
+import type { QueryResponse, QueryUsage } from '@/types/query'
 
-vi.mock('@/api/queries', () => ({ useSubmitQuery: vi.fn() }))
+vi.mock('@/api/queries', async () => {
+  const actual = await vi.importActual<typeof import('@/api/queries')>('@/api/queries')
+  return { ...actual, useSubmitQuery: vi.fn(), useQueryUsage: vi.fn() }
+})
 const mockUseSubmitQuery = vi.mocked(useSubmitQuery)
+const mockUseQueryUsage = vi.mocked(useQueryUsage)
+
+const usage: QueryUsage = {
+  consumedUsd: 0.25,
+  capUsd: 1.0,
+  requestsRemaining: 8,
+  maxRequests: 10,
+  windowSeconds: 60,
+}
 
 const answer: QueryResponse = {
   answer: 'Aldric fled north after the battle.',
@@ -22,6 +36,7 @@ const answer: QueryResponse = {
 type MutateOpts = {
   onSuccess?: (data: QueryResponse) => void
   onError?: (err: unknown) => void
+  onSettled?: () => void
 }
 
 /** Stubs useSubmitQuery so mutate immediately invokes the configured outcome. */
@@ -33,6 +48,7 @@ function stubMutation(opts: {
   const mutate = vi.fn((_question: string, callbacks?: MutateOpts) => {
     if (opts.rejectWith !== undefined) callbacks?.onError?.(opts.rejectWith)
     else if (opts.resolveWith) callbacks?.onSuccess?.(opts.resolveWith)
+    callbacks?.onSettled?.()
   })
   mockUseSubmitQuery.mockReturnValue({
     mutate,
@@ -43,9 +59,11 @@ function stubMutation(opts: {
 
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <QueryPage />
-    </MemoryRouter>
+    <QueryClientProvider client={createTestQueryClient()}>
+      <MemoryRouter>
+        <QueryPage />
+      </MemoryRouter>
+    </QueryClientProvider>
   )
 }
 
@@ -58,6 +76,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   useCampaignStore.setState({ activeCampaignId: 'c1', activeRole: 'player' })
   stubMutation({ resolveWith: answer })
+  mockUseQueryUsage.mockReturnValue({ data: usage } as unknown as ReturnType<typeof useQueryUsage>)
 })
 
 describe('QueryPage', () => {
@@ -191,6 +210,27 @@ describe('QueryPage', () => {
     await ask()
 
     expect(document.activeElement).toBe(document.getElementById('answer-heading'))
+  })
+
+  it('shows the shared free-tier moderation notice with live budget usage', () => {
+    renderPage()
+    expect(screen.getByRole('note')).toHaveTextContent(/free ai tier/i)
+    expect(screen.getByRole('note')).toHaveTextContent(/25% used/i)
+  })
+
+  it('refreshes the usage figure after a query settles', async () => {
+    const client = createTestQueryClient()
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <QueryPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+    await ask()
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['query-usage', 'c1'] })
   })
 
   it('has no accessibility violations', async () => {
