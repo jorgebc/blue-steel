@@ -108,6 +108,7 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-095 | Relations and events carry structured entity links | ✅ Active | Phase 4 |
 | D-096 | Query Mode app-level rate limit + daily cost cap | ✅ Active | Phase 3 |
 | D-097 | Event type is extracted during ingestion and persisted as `events.event_type` | ✅ Active | Phase 4 |
+| D-098 | Roadmap tracking split into `docs/roadmap/` — per-version files + index | ✅ Active | Definition |
 
 ---
 
@@ -2000,6 +2001,26 @@ The Timeline's `eventType` (F4.2) is sourced by extracting an event type during 
 - Keep `eventType` in `full_snapshot` JSONB — rejected; inconsistent with F4.6.5 re-pointing the Timeline off the snapshot, and leaves a JSONB read on the hot path.
 
 **Cross-refs:** D-095 (relations/events carry structured links), D-009 (four views), D-055 (Timeline keyset pagination).
+
+---
+
+### D-098 — Roadmap tracking split into `docs/roadmap/` — per-version files + index
+
+**Date:** 2026-06-12
+**Status:** Active
+
+**Decision:**
+`docs/ROADMAP.md` (4,700+ lines, fully ✅ after v1 shipped) is replaced by a `docs/roadmap/` folder: `README.md` (index, canonical status legend, tracking conventions, active-roadmap pointer), `ROADMAP_V1.md` (the original file moved via `git mv` — archived historical record of Phases 0–4), and `ROADMAP_V2.md` (big-picture v2 roadmap, Phases 5–7, to be decomposed into F-tasks before implementation). Phase numbering continues across versions (0–4 = v1, 5+ = v2) so task IDs (`F<phase>.<n>`) stay globally unique across files. The `.ai/` pipeline and prompt files now point at the **active** roadmap (`docs/roadmap/ROADMAP_V2.md`); the files to update on each version rollover are listed in `docs/roadmap/README.md`.
+
+**Reason:**
+The single-file roadmap had grown past 4,700 lines with all content complete, making it slow to navigate and leaving no clean place to start v2 planning. Splitting per version keeps the v1 record immutable, gives v2 a fresh big-picture document that follows the established decompose-then-implement workflow, and centralizes tracking conventions in one index instead of a trailing legend.
+
+**Alternatives considered:**
+- Keep one ROADMAP.md and append v2 phases — rejected; the file only grows, and completed v1 content dominates every read.
+- Restart phase/task numbering per version (`F1.x` in each file) — rejected; duplicate IDs break the global uniqueness that DECISIONS cross-refs, commit messages, and the pipeline's task lookup rely on.
+- Per-phase files (one file per Phase 0–7) — rejected; over-fragments v1's historical record and multiplies the paths tooling must know about.
+
+**Cross-refs:** D-090 (SemVer milestones track roadmap phases), D-094 (build-sequence directive recorded in the roadmap). Historical entries that mention `ROADMAP.md` refer to the file now located at `docs/roadmap/ROADMAP_V1.md`.
 
 ---
 

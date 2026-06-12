@@ -362,10 +362,14 @@ def _error_node(state: PipelineState) -> dict:
     return {"blocked": True, "log": [f"Pipeline ERROR: {reason}"]}
 
 
+# Active roadmap file — on version rollover, update per docs/roadmap/README.md
+ROADMAP_PATH = "docs/roadmap/ROADMAP_V2.md"
+
+
 def _mark_task_done_in_roadmap(task_id: str) -> None:
-    """Replace 🔲 or 🔄 status with ✅ for the given task in ROADMAP.md."""
+    """Replace 🔲 or 🔄 status with ✅ for the given task in the active roadmap."""
     try:
-        roadmap = read_file("docs/ROADMAP.md")
+        roadmap = read_file(ROADMAP_PATH)
         updated_lines = []
         for line in roadmap.splitlines():
             if f"| {task_id} " in line or f"| {task_id}\t" in line:
@@ -373,7 +377,7 @@ def _mark_task_done_in_roadmap(task_id: str) -> None:
             updated_lines.append(line)
         updated = "\n".join(updated_lines)
         if updated != roadmap:
-            write_file("docs/ROADMAP.md", updated)
+            write_file(ROADMAP_PATH, updated)
     except Exception as exc:
         # Non-fatal: roadmap update failure should not block the pipeline
         get_logger(task_id).warning(

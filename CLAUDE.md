@@ -26,7 +26,7 @@ blue-steel/
 ├── apps/
 │   ├── api/               ← Java 25 / Spring Boot 4.0.3 (Maven)
 │   └── web/               ← React 19 / Vite / TypeScript
-├── docs/                  ← PRD, ARCHITECTURE, DECISIONS, ROADMAP (read-only)
+├── docs/                  ← PRD, ARCHITECTURE, DECISIONS, roadmap/ (read-only)
 ├── docker-compose.yml     ← PostgreSQL + pgvector (local infra only)
 ├── .github/workflows/     ← backend.yml + frontend.yml (path-filtered)
 ├── skills/                ← Agent skill files — see SKILLS_INDEX.md

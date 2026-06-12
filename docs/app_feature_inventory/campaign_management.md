@@ -1,0 +1,75 @@
+# Module Name: Campaign Management
+
+## 1. Overview
+
+A campaign is the top-level container of Blue Steel: all sessions, world state, queries, and exploration views are scoped to one campaign. Campaign lifecycle is split between two roles: the platform **Admin** creates and deletes campaigns (assigning exactly one GM atomically at creation — a campaign is never GM-less, D-061), while the campaign's **GM** manages the member roster (invite, change role, remove). Two invariants are enforced at the database level: exactly one GM per campaign, and one membership per (campaign, user). Authorization for every member-management action is resolved from the `campaign_members` table on each request, never from the JWT (D-043).
+
+## 2. Capabilities & Use Cases
+
+- **Use Case / Action:** Admin creates a campaign and assigns its GM — ✅ Implemented
+- **Actor:** Admin
+- **Functional Description:** Admin provides a campaign name and selects the GM via an email typeahead search. Campaign and the GM membership row are inserted in the same transaction. The GM cannot be changed after creation in v1.
+- **Technical Reference / Source Files:** `POST /api/v1/campaigns` — `apps/api/src/main/java/com/bluesteel/adapters/in/web/campaign/CampaignController.java`, `apps/api/src/main/java/com/bluesteel/application/service/campaign/CreateCampaignService.java`, `apps/web/src/features/campaigns/CreateCampaignPage.tsx`
+
+---
+
+- **Use Case / Action:** User lists and opens their campaigns — ✅ Implemented
+- **Actor:** Authenticated User (any role; Admin sees all campaigns)
+- **Functional Description:** The home page (`/`) lists every campaign the caller belongs to, with a role badge (GM/Editor/Player). Selecting a campaign loads its context (active campaign + caller's role) and lands on the campaign home page, which offers navigation into the three modes and, for GMs, member management.
+- **Technical Reference / Source Files:** `GET /api/v1/campaigns`, `GET /api/v1/campaigns/{id}` — `CampaignController.java`, `apps/api/src/main/java/com/bluesteel/application/service/campaign/ListCampaignsService.java`, `GetCampaignService.java`, `apps/web/src/features/campaigns/CampaignListPage.tsx`, `CampaignHomePage.tsx`, `apps/web/src/components/domain/CampaignContextGuard.tsx`
+
+---
+
+- **Use Case / Action:** Admin deletes a campaign — ✅ Implemented
+- **Actor:** Admin
+- **Functional Description:** Irreversible deletion of the campaign and, via database cascade rules, all of its sessions, narrative blocks, world-state entities, versions, embeddings, and annotations. The UI requires confirmation through a focused overlay in the campaign home "danger zone".
+- **Technical Reference / Source Files:** `DELETE /api/v1/campaigns/{id}` — `CampaignController.java`, `apps/api/src/main/java/com/bluesteel/application/service/campaign/DeleteCampaignService.java`, cascade migrations `apps/api/src/main/resources/db/changelog/0020_campaign_cascade_delete.xml` et seq., `apps/web/src/features/campaigns/components/DeleteCampaignConfirmOverlay.tsx`
+
+---
+
+- **Use Case / Action:** Member views the campaign roster — ✅ Implemented
+- **Actor:** Any campaign member, Admin
+- **Functional Description:** Lists all members of the campaign with their roles. Rendered in the member-management panel on the campaign home page.
+- **Technical Reference / Source Files:** `GET /api/v1/campaigns/{id}/members` — `apps/api/src/main/java/com/bluesteel/adapters/in/web/campaign/CampaignMembershipController.java`, `apps/api/src/main/java/com/bluesteel/application/service/campaign/ListCampaignMembersService.java`, `apps/web/src/features/campaigns/components/MemberManagementPanel.tsx`
+
+---
+
+- **Use Case / Action:** GM invites a member to the campaign — ✅ Implemented
+- **Actor:** GM
+- **Functional Description:** GM enters an email and picks a role (Editor or Player — GM is not assignable post-creation). If the email has no platform account yet, one is created with a temporary password and an invitation email is sent (201); an existing user is simply added (200). Inviting someone already in the campaign returns 409.
+- **Technical Reference / Source Files:** `POST /api/v1/campaigns/{id}/invitations` — `CampaignMembershipController.java`, `apps/api/src/main/java/com/bluesteel/application/service/campaign/InviteCampaignMemberService.java`, `apps/web/src/features/campaigns/components/MemberManagementPanel.tsx`
+
+---
+
+- **Use Case / Action:** GM changes a member's role — ✅ Implemented
+- **Actor:** GM
+- **Functional Description:** Switches a member between Editor and Player via a dropdown. The GM role is protected: it cannot be granted or revoked through this endpoint. Because roles are resolved from the DB per request, the change takes effect on the member's very next API call.
+- **Technical Reference / Source Files:** `PATCH /api/v1/campaigns/{id}/members/{uid}` — `CampaignMembershipController.java`, `apps/api/src/main/java/com/bluesteel/application/service/campaign/ChangeMemberRoleService.java`
+
+---
+
+- **Use Case / Action:** GM removes a member from the campaign — ✅ Implemented
+- **Actor:** GM
+- **Functional Description:** Removes an Editor or Player after a confirmation overlay. Removing the GM is rejected (422 `CANNOT_REMOVE_GM`) — a campaign must always have its GM.
+- **Technical Reference / Source Files:** `DELETE /api/v1/campaigns/{id}/members/{uid}` — `CampaignMembershipController.java`, `apps/api/src/main/java/com/bluesteel/application/service/campaign/RemoveMemberService.java`, `apps/web/src/features/campaigns/components/RemoveMemberConfirmOverlay.tsx`
+
+---
+
+- **Use Case / Action:** Role-gated navigation inside a campaign — ✅ Implemented
+- **Actor:** System (frontend)
+- **Functional Description:** The sidebar exposes the three modes (Input / Query / Exploration) according to the caller's role: Players do not see Input Mode and are redirected away from its routes; member management appears only for the GM; campaign deletion only for the Admin. A "Settings" sidebar item exists as a disabled "Coming soon" stub — 🚧 Planned.
+- **Technical Reference / Source Files:** `apps/web/src/components/domain/Sidebar.tsx`, `apps/web/src/store/campaignStore.ts`, `apps/web/src/main.tsx` (route guards)
+
+## 3. Core User Journeys (Workflows)
+
+**Journey: Standing up a new campaign**
+1. Admin opens `/campaigns/new`, names the campaign, and searches for the future GM by email (the GM must already have a platform account — invite first via `/invite` if not).
+2. Backend creates the campaign and the GM membership atomically; the campaign appears in both the Admin's and the GM's campaign lists.
+3. GM opens the campaign home and invites the rest of the table from the Members panel: editors (co-writers) and players (read-only).
+4. New invitees go through temporary-password onboarding; existing users see the campaign on their home page immediately.
+
+**Journey: GM manages the roster mid-campaign**
+1. GM opens the campaign home → Members panel shows the roster with roles.
+2. To promote a player who now helps with session notes: change their role dropdown from Player to Editor — effective on their next request.
+3. To remove a departed player: click Remove → confirm in the overlay → the member loses access to the campaign instantly.
+4. All outcomes are reported through inline banners (the app uses no toasts by design).
