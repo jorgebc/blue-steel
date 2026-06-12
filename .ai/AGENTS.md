@@ -16,8 +16,9 @@ application code in `apps/api` (Java/Spring Boot) and `apps/web` (React/TypeScri
 
 - Triggered **manually** from the command line; never runs automatically.
 - Produces **plans, code changes, and review reports** — it never commits.
-- Reads the project's own docs (`docs/PRD.md`, `ROADMAP.md`, `ARCHITECTURE.md`,
-  `DECISIONS.md`) and the task entry in `ROADMAP.md` as its source of intent.
+- Reads the project's own docs (`docs/PRD.md`, the active roadmap in `docs/roadmap/`,
+  `ARCHITECTURE.md`, `DECISIONS.md`) and the task entry in the active roadmap
+  (`docs/roadmap/ROADMAP_V2.md`) as its source of intent.
 
 The pipeline itself is implemented in Python and is independent of the application
 code it modifies.
@@ -104,8 +105,8 @@ final_review → done`, with an `error` node reachable from any phase.
    - **SecOps** — security review (SAST/audit); CRITICAL/HIGH unresolved → block.
 4. **Final review** — Lead-Architect coherence check: does the implementation match
    the plan and architecture? Returns `APPROVED` or `REQUIRES_CHANGES`.
-5. **Done** — writes `{id}_done.md`; marks the task complete in `ROADMAP.md` **only**
-   when the final review is a validated `APPROVED`.
+5. **Done** — writes `{id}_done.md`; marks the task complete in the active roadmap
+   (`docs/roadmap/ROADMAP_V2.md`) **only** when the final review is a validated `APPROVED`.
 
 **Routing rules:**
 

@@ -59,7 +59,8 @@ import architect_agent
 
 _DOCS = {
     "prd": "docs/PRD.md",
-    "roadmap": "docs/ROADMAP.md",
+    # Active roadmap file — on version rollover, update per docs/roadmap/README.md
+    "roadmap": "docs/roadmap/ROADMAP_V2.md",
     "architecture": "docs/ARCHITECTURE.md",
     "decisions": "docs/DECISIONS.md",
 }
