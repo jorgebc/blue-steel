@@ -24,9 +24,9 @@ Tabletop RPG campaigns are long-running, complex narratives. Characters evolve, 
 
 ## Project status
 
-**Current phase:** Phase 1 — active development.
+**Current version:** `1.0.0` — **v1 complete.**
 
-Definition & Analysis is complete. Architecture decisions are finalized and documented. Phase 1 development is underway.
+All three interaction modes are shipped: Input (session ingestion + diff review), Query (grounded Q&A with citations), and Exploration (Timeline, Entities, Spaces, Relations). The v1 build record lives in [`docs/roadmap/ROADMAP_V1.md`](docs/roadmap/ROADMAP_V1.md); v2 (proposal & approval pipeline, input/query enhancements, campaign export) is planned and decomposed in [`docs/roadmap/ROADMAP_V2.md`](docs/roadmap/ROADMAP_V2.md).
 
 ---
 
@@ -126,6 +126,8 @@ All project decisions and specifications live in `/docs`:
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Stack, structure, patterns, conventions |
 | [`docs/roadmap/`](docs/roadmap/README.md) | Roadmap index + per-version roadmaps (phases, functional blocks, status) |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decision log — every significant technical and product choice |
+| [`docs/UX_CONSTITUTION.md`](docs/UX_CONSTITUTION.md) | Frontend design authority — visual system and interaction rules |
+| [`docs/app_feature_inventory/`](docs/app_feature_inventory/README.md) | Functionality inventory & use case manual, per module |
 | [`CLAUDE.md`](CLAUDE.md) | Conventions and context for AI-assisted development |
 
 ---
