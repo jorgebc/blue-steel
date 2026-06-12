@@ -8,12 +8,12 @@ export function RelationsGraphSkeleton() {
     <div
       role="status"
       aria-label="Loading relations"
-      className="relative h-[480px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white"
+      className="relative h-[480px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
     >
-      <div className="absolute left-8 top-10 h-9 w-32 rounded-lg bg-slate-200 animate-pulse" />
-      <div className="absolute left-64 top-24 h-9 w-32 rounded-lg bg-slate-200 animate-pulse" />
-      <div className="absolute left-40 top-56 h-9 w-32 rounded-lg bg-slate-200 animate-pulse" />
-      <div className="absolute left-80 top-72 h-9 w-32 rounded-lg bg-slate-200 animate-pulse" />
+      <div className="absolute left-8 top-10 h-12 w-40 rounded-xl bg-slate-200 animate-pulse" />
+      <div className="absolute left-64 top-24 h-12 w-40 rounded-xl bg-slate-200 animate-pulse" />
+      <div className="absolute left-40 top-56 h-12 w-40 rounded-xl bg-slate-200 animate-pulse" />
+      <div className="absolute left-80 top-72 h-12 w-40 rounded-xl bg-slate-200 animate-pulse" />
     </div>
   )
 }

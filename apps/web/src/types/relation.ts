@@ -36,6 +36,8 @@ export interface NodeData {
   entityId: string
   entityType: 'actor' | 'space'
   name: string
+  /** True when this node is an endpoint of the currently selected relation — drives the blue ring. */
+  highlighted?: boolean
   [key: string]: unknown
 }
 
@@ -43,5 +45,7 @@ export interface NodeData {
 export interface EdgeData {
   relationId: string
   label: string
+  /** True when this edge is the currently selected relation — drives the emphasised stroke. */
+  selected?: boolean
   [key: string]: unknown
 }
