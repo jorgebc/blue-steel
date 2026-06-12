@@ -51,3 +51,48 @@
   --shadow-overlay: 0 10px 15px -3px rgb(0 0 0 / 0.1);        /* shadow-lg */
   --shadow-nav:     0 20px 25px -5px rgb(0 0 0 / 0.1);        /* shadow-xl */
 }
+
+/*
+ * React Flow (Relations graph) theming — aligns the library's chrome with the Blue Steel palette.
+ * Styling lives here (not inline) per UX Constitution rule #11. Slate tones only; blue is reserved
+ * for the selected-state emphasis applied in the node/edge components.
+ */
+.react-flow {
+  --xy-edge-stroke-default: #cbd5e1; /* slate-300 */
+  --xy-edge-stroke-width-default: 1.5;
+  --xy-attribution-background-color: transparent;
+}
+
+/* Drag-to-connect is disabled, so the connection handles are dead affordances — hide them while
+ * keeping them in the DOM as edge anchor points. */
+.react-flow__handle {
+  width: 1px;
+  height: 1px;
+  min-width: 1px;
+  min-height: 1px;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+}
+
+/* Zoom/fit controls — brushed-metal card to match the design system. */
+.react-flow__controls {
+  border: 1px solid #e2e8f0; /* slate-200 */
+  border-radius: 0.5rem; /* rounded-lg */
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* shadow-sm */
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  border-bottom: 1px solid #e2e8f0; /* slate-200 */
+  background: #ffffff;
+  color: #475569; /* slate-600 */
+}
+
+.react-flow__controls-button:hover {
+  background: #f1f5f9; /* slate-100 */
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}

@@ -1,7 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Background, Controls, ReactFlow } from '@xyflow/react'
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  ReactFlow,
+  useNodesState,
+  type Edge,
+  type EdgeMouseHandler,
+} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import type { EdgeData } from '@/types/relation'
 import { useAllEntities } from '@/api/worldstate'
 import { useRelations } from '@/api/relations'
 import { AnnotationThread } from '@/components/domain/AnnotationThread'
@@ -28,6 +38,7 @@ export function RelationsPage() {
   const spacesQuery = useAllEntities('space')
   const relationsQuery = useRelations()
   const [selectedRelationId, setSelectedRelationId] = useState<string | null>(null)
+  const [listOpen, setListOpen] = useState(false)
 
   const actors = useMemo(() => actorsQuery.data ?? [], [actorsQuery.data])
   const spaces = useMemo(() => spacesQuery.data ?? [], [spacesQuery.data])
@@ -36,6 +47,45 @@ export function RelationsPage() {
   const { nodes, edges } = useMemo(
     () => graphTransform(actors, spaces, relations),
     [actors, spaces, relations]
+  )
+
+  // Node positions live in React Flow state so the user can drag nodes around (view-only — never a
+  // world-state write, D-010). Re-seed from the deterministic layout whenever the data changes.
+  const [rfNodes, setRfNodes, onNodesChange] = useNodesState(nodes)
+  useEffect(() => setRfNodes(nodes), [nodes, setRfNodes])
+
+  // Endpoints of the selected relation, so the canvas can mirror the list's selection.
+  const highlightedNodeIds = useMemo(() => {
+    const relation = relations.find((r) => r.relationId === selectedRelationId)
+    const ids = new Set<string>()
+    if (relation?.sourceEntityId) ids.add(relation.sourceEntityId)
+    if (relation?.targetEntityId) ids.add(relation.targetEntityId)
+    return ids
+  }, [relations, selectedRelationId])
+
+  const displayNodes = useMemo(
+    () =>
+      rfNodes.map((node) =>
+        highlightedNodeIds.has(node.id)
+          ? { ...node, data: { ...node.data, highlighted: true } }
+          : node
+      ),
+    [rfNodes, highlightedNodeIds]
+  )
+
+  const displayEdges = useMemo(
+    () =>
+      edges.map((edge) =>
+        edge.id === selectedRelationId && edge.data
+          ? { ...edge, data: { ...edge.data, selected: true } }
+          : edge
+      ),
+    [edges, selectedRelationId]
+  )
+
+  const handleEdgeClick = useCallback<EdgeMouseHandler<Edge<EdgeData>>>(
+    (_, edge) => setSelectedRelationId(edge.id),
+    []
   )
 
   const nameById = useMemo(() => {
@@ -83,37 +133,62 @@ export function RelationsPage() {
       {isLoading && <RelationsGraphSkeleton />}
 
       {!isLoading && !isError && (
-        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <div className="space-y-4">
           <div
             role="group"
             aria-label="Relations graph"
-            className="h-[480px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white"
+            className="h-[70vh] min-h-[520px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
           >
             <ReactFlow
-              nodes={nodes}
-              edges={edges}
+              nodes={displayNodes}
+              edges={displayEdges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
-              nodesDraggable={false}
+              colorMode="light"
+              onNodesChange={onNodesChange}
+              nodesDraggable
               nodesConnectable={false}
               elementsSelectable={false}
               edgesReconnectable={false}
               deleteKeyCode={null}
+              onEdgeClick={handleEdgeClick}
               fitView
+              fitViewOptions={{ padding: 0.2 }}
+              minZoom={0.4}
+              maxZoom={1.75}
+              panOnScroll
             >
-              <Background />
+              <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e2e8f0" />
               <Controls showInteractive={false} />
             </ReactFlow>
           </div>
 
-          <div>
-            <h2 className="mb-2 text-sm font-medium text-slate-700">All relations</h2>
-            <RelationsList
-              relations={relations}
-              nameById={nameById}
-              selectedId={selectedRelationId}
-              onSelect={setSelectedRelationId}
-            />
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <button
+              type="button"
+              aria-expanded={listOpen}
+              aria-controls="relations-list-panel"
+              onClick={() => setListOpen((open) => !open)}
+              className="flex w-full items-center gap-2 rounded-2xl px-4 py-3 text-left text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-slate-50"
+            >
+              {listOpen ? (
+                <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+              )}
+              All relations
+              <span className="text-slate-400">({relations.length})</span>
+            </button>
+            {listOpen && (
+              <div id="relations-list-panel" className="px-4 pb-4">
+                <RelationsList
+                  relations={relations}
+                  nameById={nameById}
+                  selectedId={selectedRelationId}
+                  onSelect={setSelectedRelationId}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -10,17 +10,52 @@ import type { EntitySummary } from '@/types/worldstate'
 import type { Relation } from '@/types/relation'
 
 // React Flow needs a measured DOM (ResizeObserver) it doesn't get in jsdom; stub it so the page's
-// own logic (skeleton, error, accessible list) is what we exercise.
+// own logic (skeleton, error, accessible list, selection sync) is what we exercise. The stub renders
+// each edge as a button wired to onEdgeClick and exposes each node's highlight flag, so the graph↔list
+// selection sync is testable without a real canvas.
+type StubNode = { id: string; data?: { highlighted?: boolean } }
+type StubEdge = { id: string; data?: { selected?: boolean } }
 vi.mock('@xyflow/react', () => ({
   ReactFlow: ({
     children,
-    'aria-label': label,
+    nodes,
+    edges,
+    onEdgeClick,
   }: {
     children?: React.ReactNode
-    'aria-label'?: string
-  }) => <div aria-label={label}>{children}</div>,
+    nodes?: StubNode[]
+    edges?: StubEdge[]
+    onEdgeClick?: (e: unknown, edge: StubEdge) => void
+  }) => (
+    <div>
+      {edges?.map((edge) => (
+        <button
+          key={edge.id}
+          type="button"
+          data-testid={`edge-${edge.id}`}
+          data-selected={edge.data?.selected ? 'true' : 'false'}
+          onClick={(e) => onEdgeClick?.(e, edge)}
+        >
+          edge {edge.id}
+        </button>
+      ))}
+      {nodes?.map((node) => (
+        <div
+          key={node.id}
+          data-testid={`node-${node.id}`}
+          data-highlighted={node.data?.highlighted ? 'true' : 'false'}
+        />
+      ))}
+      {children}
+    </div>
+  ),
   Background: () => null,
+  BackgroundVariant: { Dots: 'dots', Lines: 'lines', Cross: 'cross' },
   Controls: () => null,
+  MarkerType: { Arrow: 'arrow', ArrowClosed: 'arrowclosed' },
+  // Stateless stand-in: the page seeds positions from the layout and re-seeds via effect, so the
+  // setter/onChange can be no-ops for the page logic we exercise here.
+  useNodesState: (initial: StubNode[]) => [initial, () => {}, () => {}],
 }))
 vi.mock('@/api/worldstate', () => ({ useAllEntities: vi.fn() }))
 vi.mock('@/api/relations', () => ({ useRelations: vi.fn() }))
@@ -80,6 +115,12 @@ function renderPage() {
   )
 }
 
+// The relations list lives in a collapsible panel (collapsed by default); expand it before
+// interacting with its rows.
+async function openRelationsList() {
+  await userEvent.click(screen.getByRole('button', { name: /all relations/i }))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockUseAllEntities.mockImplementation((entityType) =>
@@ -91,10 +132,15 @@ beforeEach(() => {
 })
 
 describe('RelationsPage', () => {
-  it('renders the graph canvas and the accessible relations list', () => {
+  it('renders the graph canvas and the accessible relations list once expanded', async () => {
     renderPage()
 
     expect(screen.getByLabelText('Relations graph')).toBeInTheDocument()
+    // Collapsed by default — the list rows are revealed on demand.
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument()
+
+    await openRelationsList()
+
     const item = screen.getByRole('listitem')
     expect(item).toHaveTextContent('Mira')
     expect(item).toHaveTextContent('alliance')
@@ -110,15 +156,40 @@ describe('RelationsPage', () => {
   it('opens the annotation thread for the selected relation', async () => {
     renderPage()
 
+    await openRelationsList()
     await userEvent.click(screen.getByRole('button', { name: /show annotations/i }))
 
     expect(screen.getByRole('region', { name: 'Annotations' })).toBeInTheDocument()
     expect(screen.getByText(/no annotations yet/i)).toBeInTheDocument()
   })
 
+  it('highlights both endpoint nodes and the edge when a relation is selected', async () => {
+    renderPage()
+
+    expect(screen.getByTestId('node-a1')).toHaveAttribute('data-highlighted', 'false')
+    expect(screen.getByTestId('edge-r1')).toHaveAttribute('data-selected', 'false')
+
+    await openRelationsList()
+    await userEvent.click(screen.getByRole('button', { name: /show annotations/i }))
+
+    expect(screen.getByTestId('node-a1')).toHaveAttribute('data-highlighted', 'true')
+    expect(screen.getByTestId('node-a2')).toHaveAttribute('data-highlighted', 'true')
+    expect(screen.getByTestId('edge-r1')).toHaveAttribute('data-selected', 'true')
+  })
+
+  it('selects a relation and opens its annotations when its edge is clicked on the canvas', async () => {
+    renderPage()
+
+    await userEvent.click(screen.getByTestId('edge-r1'))
+
+    expect(screen.getByRole('region', { name: 'Annotations' })).toBeInTheDocument()
+    expect(screen.getByTestId('node-a1')).toHaveAttribute('data-highlighted', 'true')
+  })
+
   it('shows the disabled propose-change button in the relation detail panel', async () => {
     renderPage()
 
+    await openRelationsList()
     await userEvent.click(screen.getByRole('button', { name: /show annotations/i }))
 
     expect(screen.getByRole('button', { name: /propose a change/i })).toBeDisabled()
