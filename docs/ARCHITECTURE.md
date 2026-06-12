@@ -27,7 +27,7 @@ blue-steel/
 ├── docs/                  ← all project documentation
 │   ├── PRD.md
 │   ├── ARCHITECTURE.md
-│   ├── ROADMAP.md
+│   ├── roadmap/           ← roadmap index (README.md) + per-version roadmaps
 │   └── DECISIONS.md
 ├── apps/
 │   ├── api/               ← Java 25 / Spring Boot 4.0.3 backend

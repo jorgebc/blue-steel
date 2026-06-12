@@ -1,4 +1,10 @@
-# ROADMAP — Blue Steel
+# ROADMAP V1 — Blue Steel (complete)
+
+> **Archived.** v1 (Phases 0–4: Input Mode, Query Mode, Exploration Mode) has shipped; every task in
+> this file is ✅. The active roadmap is [`ROADMAP_V2.md`](ROADMAP_V2.md); tracking conventions and
+> the roadmap index live in [`README.md`](README.md). This file is kept as the historical record of
+> the v1 build — task IDs `F1.x`–`F4.x` remain the canonical reference for cross-links in
+> DECISIONS.md and commit history.
 
 ---
 
@@ -4683,21 +4689,6 @@ data. Resolve the dangling field one way or the other.
 **Scope (out):** New pages (F4.8.2/F4.8.3).
 
 **Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-009  **Dependencies:** F4.8.1, F4.8.2, F4.8.3
-
----
-
-### v2 — Proposal & Approval Pipeline + Enhancements
-
-> To be designed after v1 ships. Key items:
-
-- Player proposal submission UI
-- Co-sign flow (D-017)
-- GM approval / veto (D-018)
-- Proposal expiry TTL enforcement (D-019)
-- Commit payload "add" action — manually introduce missed entities (D-053)
-- Q&A log — campaign history of queries and answers, history panel in Query Mode (D-058)
-- Query streaming / SSE if synchronous model cannot meet latency target (D-052)
-- Campaign export — download full campaign data (actors, events, spaces, relations, annotations, sessions) in an interactive/portable format before deletion
 
 ---
 

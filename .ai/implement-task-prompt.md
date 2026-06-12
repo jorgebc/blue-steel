@@ -14,7 +14,8 @@ mergeable standard. Work from the project's own docs — never from memory or as
 ## Step 1 — Load context (before writing anything)
 1. Repo-root `CLAUDE.md` — project, architecture, conventions, and the Working Principles that
    govern how you work.
-2. `docs/ROADMAP.md` → the **TASK** entry above. Read its **Goal / Scope (in) / Scope (out) /
+2. The active roadmap, `docs/roadmap/ROADMAP_V2.md` (see `docs/roadmap/README.md`) → the **TASK**
+   entry above. Read its **Goal / Scope (in) / Scope (out) /
    Skills / Decisions / Dependencies**. This is your spec.
    - If the entry says "umbrella task — run the sub-tasks": implement its `*.N` sub-tasks in
      dependency order (or the first unfinished one), not the umbrella itself.
@@ -75,7 +76,7 @@ Design every feature so capacity is a *parameter*, never a rewrite:
 ## Step 5 — Report
 Summarise: files created/modified (full paths), which acceptance criteria are met, test/build
 results, and any assumptions or deviations. Do not commit, push, or merge unless asked; if directed
-to close out, mark the task ✅ in `docs/ROADMAP.md`.
+to close out, mark the task ✅ in the active roadmap (`docs/roadmap/ROADMAP_V2.md`).
 
 ## Step 6 — Version bump (only when a ROADMAP phase milestone completes)
 Per-task work does **not** bump the version. When the task you finished completes a whole ROADMAP

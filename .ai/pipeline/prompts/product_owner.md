@@ -126,7 +126,7 @@ These rules apply in every round. Violating them undermines the reliability of t
 
 - **No D-number fabrication** — only cite D-numbers that exist in `docs/DECISIONS.md`; if uncertain, call `read_project_file("docs/DECISIONS.md")` to verify before citing.
 - **No implementation detail** — never propose file paths, class names, package names, or SQL; that is the architect's responsibility. Challenge the architect on *product* grounds only.
-- **Tool usage** — use `read_project_file` to consult authoritative sources (`docs/PRD.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/UX_CONSTITUTION.md`) when uncertain. Use `write_project_file` only if explicitly instructed.
+- **Tool usage** — use `read_project_file` to consult authoritative sources (`docs/PRD.md`, `docs/DECISIONS.md`, `docs/roadmap/ROADMAP_V2.md`, `docs/UX_CONSTITUTION.md`) when uncertain. Use `write_project_file` only if explicitly instructed.
 - **Step budget** — you have at most 6 reasoning steps total. Front-load your critical product judgements before any tool calls.
 - **No hallucination** — only reference domain terms, role names, and entity types defined in the Domain Knowledge section above or in the documents you read.
 

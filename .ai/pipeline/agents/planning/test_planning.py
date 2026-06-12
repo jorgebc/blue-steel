@@ -1,6 +1,6 @@
 """Integration test for the Blue Steel planning crew.
 
-Picks the first pending task from docs/ROADMAP.md, runs the full
+Picks the first pending task from the active roadmap (docs/roadmap/ROADMAP_V2.md), runs the full
 PO <-> Architect planning conversation, and validates that the output plan:
 
   1. Exists on disk
@@ -35,7 +35,9 @@ except ImportError:
     pass  # python-dotenv not installed; rely on environment variables
 
 from tools.filesystem import read_file, REPO_ROOT
-from planning_crew import run_planning, _PLAN_SECTIONS
+from planning_crew import run_planning, _PLAN_SECTIONS, _DOCS
+
+ROADMAP_PATH = _DOCS["roadmap"]  # active roadmap — see docs/roadmap/README.md
 
 # ── Validation constants ────────────────────────────────────────────────────
 
@@ -86,7 +88,7 @@ def _find_first_pending_task(roadmap: str) -> tuple[str, str]:
                 if re.match(r"F\d+\.\d+", task_id):
                     return task_id, description
 
-    raise RuntimeError("No pending (🔲) tasks found in docs/ROADMAP.md")
+    raise RuntimeError(f"No pending (🔲) tasks found in {ROADMAP_PATH}")
 
 
 def _validate_plan(plan_path: str, task_id: str) -> list[str]:
@@ -150,8 +152,8 @@ def main() -> None:
     print("=" * 70)
 
     # Step 1: Find first pending task
-    print("\n[Step 1] Reading docs/ROADMAP.md...")
-    roadmap = read_file("docs/ROADMAP.md")
+    print(f"\n[Step 1] Reading {ROADMAP_PATH}...")
+    roadmap = read_file(ROADMAP_PATH)
     task_id, description = _find_first_pending_task(roadmap)
     print(f"         First pending task: {task_id} — {description}")
 

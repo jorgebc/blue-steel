@@ -20,10 +20,12 @@ This file is the operator guide. Run it **one batch per Claude session** (see §
 ## The prompt (paste into a Claude session, fill in the batch)
 
 > **Task:** Decompose the following Blue Steel roadmap tasks into small, pipeline-runnable
-> sub-tasks, editing `docs/ROADMAP.md` in place: **{FILL IN — e.g. F1.7, F1.8, F1.9}**.
+> sub-tasks, editing the active roadmap (`docs/roadmap/ROADMAP_V2.md` — see
+> `docs/roadmap/README.md`) in place: **{FILL IN — e.g. F5.1, F5.2}**.
 >
 > **Read first (do not skip):**
-> 1. The target task sections and their phase summary table in `docs/ROADMAP.md`.
+> 1. The target task sections and their phase summary table in the active roadmap
+>    (`docs/roadmap/ROADMAP_V2.md`).
 > 2. Both layer guides: `apps/api/CLAUDE.md` (backend) and `apps/web/CLAUDE.md` (frontend).
 > 3. **For any frontend/UI task, `docs/UX_CONSTITUTION.md` (D-087) is mandatory** — it *changes the
 >    decomposition*: feedback is an `InlineBanner` (no toasts, D-083), loading is a skeleton (no
@@ -67,7 +69,8 @@ This file is the operator guide. Run it **one batch per Claude session** (see §
 > (and any prior roadmap task) it builds on, so each run sees already-written, real symbols.
 >
 > **Output format — MUST match the pipeline parser exactly:**
-> The pipeline reads `docs/ROADMAP.md`, finds a task by its `#### <id>` heading, and reads
+> The pipeline reads the active roadmap (`docs/roadmap/ROADMAP_V2.md`), finds a task by its
+> `#### <id>` heading, and reads
 > its one-line description from the phase summary table row `| <id> | desc | status |`. So
 > for **every** sub-task you must add **both**:
 > 1. a summary-table row: `| F1.7.1 | <one-line description> | 🔲 |`
@@ -86,7 +89,7 @@ This file is the operator guide. Run it **one batch per Claude session** (see §
 >    **Skills:** <skill names>  **Decisions:** <D-numbers>  **Dependencies:** F1.7-SETUP, <earlier ids>
 >    ```
 >
-> **Edit protocol for `docs/ROADMAP.md`:**
+> **Edit protocol for the active roadmap file:**
 > - Convert each parent `#### Fx.y — Title` into an **umbrella** heading: keep it, keep it
 >   **before** its sub-tasks, and add a line `> **Umbrella task — run the Fx.y.N sub-tasks
 >   below, not this.**`. Move its original Scope into the sub-tasks.
@@ -172,7 +175,7 @@ resolves without swallowing a sub-task:
 
 ```bash
 python -c "import sys; sys.path.insert(0,'agents/planning'); import planning_crew as p; \
-r=p.read_file('docs/ROADMAP.md'); \
+r=p.read_file(p._DOCS['roadmap']); \
 print('desc:', repr(p._get_task_description('F1.7.1', r))); \
 print('section head:', p._extract_task_from_roadmap('F1.7.1', r)[:200])"
 ```
