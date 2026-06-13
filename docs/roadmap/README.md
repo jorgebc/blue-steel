@@ -10,7 +10,7 @@
 | Version | File | Phases | Status |
 |---|---|---|---|
 | v1 | [`ROADMAP_V1.md`](ROADMAP_V1.md) | 0–4 (Input, Query, Exploration) | ✅ Complete — archived |
-| v2 | [`ROADMAP_V2.md`](ROADMAP_V2.md) | 5–7 (Proposals, Input/Query enhancements, Export) | 🔲 Big picture — pre-decomposition |
+| v2 | [`ROADMAP_V2.md`](ROADMAP_V2.md) | 5–9 (Proposals, Input/Query enhancements, Export, User Settings & i18n, Per-campaign language) | 🔲 Decomposed to feature level — not started |
 
 ## Active roadmap
 

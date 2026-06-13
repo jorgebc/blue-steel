@@ -109,6 +109,11 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-096 | Query Mode app-level rate limit + daily cost cap | ✅ Active | Phase 3 |
 | D-097 | Event type is extracted during ingestion and persisted as `events.event_type` | ✅ Active | Phase 4 |
 | D-098 | Roadmap tracking split into `docs/roadmap/` — per-version files + index | ✅ Active | Definition |
+| D-099 | Two language axes: per-user UI locale vs per-campaign content language | ✅ Active | Phase 8 |
+| D-100 | User profile & settings model: display name, initials/accent avatar, columns on `users` | ✅ Active | Phase 8 |
+| D-101 | Hybrid preference persistence (DB source of truth + localStorage mirror) | ✅ Active | Phase 8 |
+| D-102 | Global settings live in a top-right account menu; removed from campaign sidebar | ✅ Active | Phase 8 |
+| D-103 | Per-campaign content language, fixed at creation, injected into LLM prompts | ✅ Active | Phase 9 |
 
 ---
 
@@ -2021,6 +2026,105 @@ The single-file roadmap had grown past 4,700 lines with all content complete, ma
 - Per-phase files (one file per Phase 0–7) — rejected; over-fragments v1's historical record and multiplies the paths tooling must know about.
 
 **Cross-refs:** D-090 (SemVer milestones track roadmap phases), D-094 (build-sequence directive recorded in the roadmap). Historical entries that mention `ROADMAP.md` refer to the file now located at `docs/roadmap/ROADMAP_V1.md`.
+
+---
+
+### D-099 — Two language axes: per-user UI locale vs per-campaign content language
+
+**Date:** 2026-06-13
+**Status:** Active
+
+**Decision:**
+Multilanguage support is modelled as two independent axes that are never conflated. **UI locale** is a per-user preference (the language of buttons, labels, menus) handled by frontend i18n and freely switchable at any time (D-101). **Campaign content language** is a per-campaign property (the language session text is written in, world state is stored in, and the LLM answers in), chosen at campaign creation and immutable thereafter (D-103). A user may run an English-content campaign with a Spanish UI, or vice versa.
+
+**Reason:**
+The two concerns have different owners, lifecycles, and blast radius. UI locale is cosmetic and reversible; changing it re-renders strings. Content language determines what gets persisted as canonical world state and embedded for retrieval — mixing languages within one campaign produces bilingual diffs, breaks name-based entity resolution, and degrades vector retrieval (question and stored snapshots in different languages). Separating the axes lets UI be flexible while content stays consistent.
+
+**Alternatives considered:**
+- A single "language" setting spanning UI + content — rejected; forces a user's menu language onto their campaigns' canonical data and blocks the common mixed case.
+- Per-session or per-entity language — rejected; same mixed-language world-state problems as no constraint at all.
+
+**Cross-refs:** D-100/D-101 (per-user settings), D-102 (settings surface), D-103 (campaign content language).
+
+---
+
+### D-100 — User profile & settings model: display name, initials/accent avatar, columns on `users`
+
+**Date:** 2026-06-13
+**Status:** Active
+
+**Decision:**
+Users gain four persisted fields stored as **columns on the existing `users` table** (not a separate settings table — the set is small and fixed): `display_name` (cosmetic, **non-unique**; email remains the login identifier), `avatar_accent_color`, `ui_locale`, and `theme`. The **avatar is rendered from initials + a chosen accent color** — no uploaded images and therefore no object storage. Display name is shown in the UI in place of the raw email; when unset, initials/labels fall back to the email.
+
+**Reason:**
+A persistent identity (name + avatar) and personalization are table-stakes for a multi-user app, but the project has no blob storage and "simplicity first" governs. Initials+accent gives a real avatar with zero new infrastructure. Keeping display name cosmetic and non-unique avoids a uniqueness/availability flow and does not touch the invitation-only login model (email stays the credential — does not relax D-051). Four columns on the lean `users` table is simpler than a 1:1 settings table (no join, no null-row bootstrapping).
+
+**Alternatives considered:**
+- Uploaded image avatars — rejected for v2; requires object storage + upload/validation, a separate epic.
+- Unique username handle — rejected; adds availability checks for no current benefit (email is the identifier).
+- Separate `user_settings` table — rejected; over-engineered for four fixed fields.
+
+**Cross-refs:** D-099 (UI locale axis), D-101 (persistence), D-102 (account menu surfaces these), D-043 (JWT carries only `user_id`/`is_admin`), D-051 (invitation-only, no self-registration).
+
+---
+
+### D-101 — Hybrid preference persistence (DB source of truth + localStorage mirror)
+
+**Date:** 2026-06-13
+**Status:** Active
+
+**Decision:**
+`theme` and `ui_locale` are persisted **server-side as the source of truth** (so preferences follow the user across devices) and **mirrored to `localStorage`** (key `blue-steel-settings`, via a Zustand `persist` store) so the first paint applies the correct theme and language with no flash before `GET /me` resolves; the store is re-hydrated from `/me` on login. Supported UI locales are **`en` and `es`**; theme values are **`light | dark | system`**. The in-campaign sidebar open/closed state remains a purely device-local concern in the existing `uiStore` (`blue-steel-sidebar`) and is **not** moved to the server.
+
+**Reason:**
+Pure server storage causes a visible theme/language flash on every cold load; pure localStorage loses preferences when the user switches device or browser. The hybrid pattern (used by GitHub/Linear) gives cross-device durability without the flash. Sidebar state is device ergonomics, not identity, so it stays local.
+
+**Alternatives considered:**
+- Server only — rejected; flash of default theme/locale on each load.
+- localStorage only — rejected; preferences don't follow the user.
+- Move sidebar state server-side too — rejected; device-specific, no cross-device value.
+
+**Cross-refs:** D-100 (fields persisted), D-099 (UI locale axis), D-087 (UX Constitution).
+
+---
+
+### D-102 — Global settings live in a top-right account menu; removed from the campaign sidebar
+
+**Date:** 2026-06-13
+**Status:** Active
+
+**Decision:**
+User-global settings are reached through a **top-right account menu** in the header (the standard pattern). The avatar (initials + accent) is the dropdown trigger and replaces the raw email currently shown; the menu holds display name + email, a **Settings** link to a global authenticated route `/settings` (sibling to the campaign list — **not** campaign-scoped), inline **theme** and **EN/ES** quick toggles, and **Log out**. The brand stays top-left. The disabled "Settings" item is **removed from the campaign sidebar**, which keeps only campaign-scoped modes (Home / Input / Query / Exploration).
+
+**Reason:**
+The sidebar is campaign-scoped; user-global settings do not belong there and the placement reads as inconsistent. The top-right avatar menu is the convention users expect for account/identity/global actions, and it naturally absorbs the new avatar and display name. A global `/settings` route reflects that these preferences are not tied to any campaign.
+
+**Alternatives considered:**
+- Keep Settings in the campaign sidebar — rejected; mixes a global concern into campaign nav.
+- Account menu on the header left next to the brand — considered and rejected; left is reserved for brand/identity by convention.
+- Campaign-scoped `/campaigns/:id/settings` — rejected; the settings are user-global, not per-campaign.
+
+**Cross-refs:** D-100/D-101 (what the menu exposes), D-087 (UX Constitution — top bar is elevation level 4), D-008 (three campaign interaction modes stay in the sidebar).
+
+---
+
+### D-103 — Per-campaign content language, fixed at creation, injected into LLM prompts
+
+**Date:** 2026-06-13
+**Status:** Active
+
+**Decision:**
+Each campaign carries a `content_language` chosen at creation and **immutable** thereafter (`campaigns.content_language`, append-only migration, `NOT NULL DEFAULT 'en'` so existing rows default to English). The language is threaded through the ingestion and query paths and **injected into the three LLM system prompts** — narrative extraction, conflict detection, and query answering (today hardcoded English-neutral constants) — so extracted entities, stored world state, and answers are all in the campaign's language. **Embeddings are unchanged**: the configured models (`gemini-embedding-001`, `bge-m3`) are multilingual, and single-language consistency is guaranteed by the per-campaign constraint rather than by tagging versions or embeddings. The supported content-language list equals the UI locale list (`en`, `es`).
+
+**Reason:**
+A campaign's canonical record must be single-language: mixing languages produces bilingual diffs, breaks name-based entity resolution, and degrades retrieval (question vs. stored-snapshot language mismatch). Fixing language at creation is the smallest constraint that guarantees consistency, and it requires no embedding/schema-dimension change because the embedding models already handle multiple languages. Injecting the instruction into the existing prompts (rather than tagging data) keeps the change localized to the AI adapters.
+
+**Alternatives considered:**
+- Mutable/per-session language — rejected; reintroduces mixed-language world state.
+- Tag each entity version / embedding with a language and filter retrieval — rejected; unnecessary given the per-campaign constraint, and adds schema + query complexity.
+- Auto-detect language from each summary — rejected; non-deterministic and allows drift within a campaign.
+
+**Cross-refs:** D-099 (two language axes), D-093 (Gemini chat + embeddings), D-088 (Ollama + embedding dimension), D-062 (native pgvector, no Spring AI VectorStore), D-003 (grounded citations — unchanged).
 
 ---
 
