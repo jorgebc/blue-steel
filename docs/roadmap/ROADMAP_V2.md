@@ -26,139 +26,546 @@ entity versions. Activates the workflow v1 shipped as data model only (D-016): `
 
 - [ ] TTL value + semantics for proposal expiry — which statuses expire, clock source, env knob (resolves the open part of D-019)
 - [ ] Concurrent-proposal rule — what happens when two open proposals target the same entity (PRD §7 v2 scope); blocks F5.6
-- [ ] Proposal-delta shape — field-level JSONB contract for `proposed_delta` and how it maps onto entity version `changed_fields`
+- [ ] **Proposal↔session linkage (provenance) + version stamp** — the author selects a campaign `session_id` at creation as **provenance/context only** (`proposals.session_id`, FK `sessions`). On approval the resulting entity version is written through the existing `WorldStatePort.writeEntity` path but stamped with the campaign's **latest committed session id**, keeping `version_number`↔`sessions.sequence_number` co-monotonic (current state stays `MAX(version_number)`; no as-of-session reconstruction anomaly). Record as a new D-number. Shapes F5.1.1, F5.2.2, F5.4.2–F5.4.4.
+- [ ] **v2 target scope = `actor` + `space` only** — defer event/relation (structured endpoints) and new-entity proposals; D-012's "relation" affordance is explicitly deferred. Creation validation rejects other target types (422). Record as a new D-number. Shapes F5.1.2, F5.2.2, F5.4.3, F5.7.1.
+- [ ] **GM decision recorded as a vote** — approve/veto writes a `proposal_votes('approve'|'reject')` row (who/when audit) in addition to flipping `proposal.status`; co-sign writes a `cosign` row. Record as a new D-number. Shapes F5.3.2, F5.4.4.
+- [ ] **GM edit-on-approve** — the GM decision accepts an optional GM-edited delta applied in place of the author's `proposed_delta` when approving; record as a new D-number. Shapes F5.4.1, F5.4.3, F5.9.2.
+- [ ] **`proposed_delta` shape (resolve first)** — field-level JSONB contract that **mirrors entity-version `changed_fields`** (ARCHITECTURE §7.6) so the approve-time apply-mapper is trivial. Note: `target_entity_type`/`target_entity_id`/`proposed_delta` stay nullable in the DB but are enforced **non-null in the application** at creation.
 - [ ] v2 build sequence (Phase 5 → 6 → 7 or otherwise) + post-1.0 version mapping (extends D-090)
 
 #### Summary
 
 | # | Feature | Status |
 |---|---|---|
-| F5.1 | Backend: proposal domain model + ports | 🔲 |
-| F5.2 | Backend: proposal submission + listing API | 🔲 |
-| F5.3 | Backend: co-sign flow | 🔲 |
-| F5.4 | Backend: GM decision — approve applies delta, veto rejects | 🔲 |
-| F5.5 | Backend: proposal TTL expiry scheduler | 🔲 |
-| F5.6 | Backend: concurrent-proposal conflict rule | 🔲 |
-| F5.7 | Frontend: activate "Propose a change" + submission overlay | 🔲 |
-| F5.8 | Frontend: proposal list/detail on profiles + co-sign | 🔲 |
-| F5.9 | Frontend: GM review queue (approve/veto) | 🔲 |
+| F5.1 | Backend: proposal domain model + ports *(umbrella)* | 🔲 |
+| F5.1.1 | Migration 0020 — add `session_id` (FK sessions) to `proposals` | 🔲 |
+| F5.1.2 | Domain: `Proposal` aggregate + `ProposalStatus` + `ProposalTargetType` + exceptions | 🔲 |
+| F5.1.3 | Domain: `ProposalVote` + `VoteKind` | 🔲 |
+| F5.1.4 | Application: `ProposalRepository` driven port + `application/model/proposal` records | 🔲 |
+| F5.1.5 | Persistence: `ProposalJpaEntity` + `ProposalVoteJpaEntity` + JPA repositories | 🔲 |
+| F5.1.6 | Persistence: `ProposalPersistenceAdapter` (mapper, impl `ProposalRepository`) + IT | 🔲 |
+| F5.2 | Backend: proposal submission + listing API *(umbrella)* | 🔲 |
+| F5.2.1 | Driving ports `Create`/`ListProposalsUseCase` + command/result models | 🔲 |
+| F5.2.2 | `ProposalCreationService` — validate target+session in campaign, set `expires_at` | 🔲 |
+| F5.2.3 | `ListProposalsService` — filter by target/status, offset pagination | 🔲 |
+| F5.2.4 | `ProposalController` POST+GET + request/response DTOs | 🔲 |
+| F5.2.5 | Error mapping in `GlobalExceptionHandler` (404 target/session, 422 invalid delta) | 🔲 |
+| F5.3 | Backend: co-sign flow *(umbrella)* | 🔲 |
+| F5.3.1 | Driving port `CoSignProposalUseCase` + `CoSignProposalCommand` | 🔲 |
+| F5.3.2 | `ProposalCoSignService` — author-cannot-cosign, duplicate→409, `open→cosigned` | 🔲 |
+| F5.3.3 | Vote endpoint + `CastVoteRequest` DTO + error mapping (`@WebMvcTest`) | 🔲 |
+| F5.4 | Backend: GM decision — approve applies delta, veto rejects *(umbrella)* | 🔲 |
+| F5.4.1 | Driving port `DecideProposalUseCase` + command (approve/reject + optional edited delta) | 🔲 |
+| F5.4.2 | `SessionRepository.findLatestCommittedSessionId` + adapter (IT) — supplies the version stamp | 🔲 |
+| F5.4.3 | `ProposalDeltaMapper` (actor/space) — reads current snapshot, stamps latest committed session | 🔲 |
+| F5.4.4 | `ProposalDecisionService` — GM-only; approve writes version + embeds + vote row, veto rejects | 🔲 |
+| F5.4.5 | Decision endpoint + DTO + GM gating + error mapping (`@WebMvcTest`) | 🔲 |
+| F5.5 | Backend: proposal TTL expiry scheduler *(umbrella)* | 🔲 |
+| F5.5.1 | `ProposalExpiryPort` + bulk-expiry SQL adapter (IT) | 🔲 |
+| F5.5.2 | `ProposalExpiryScheduler` (@Scheduled, env-overridable TTL/interval) | 🔲 |
+| F5.6 | Backend: concurrent-proposal conflict rule *(umbrella)* | 🔲 |
+| F5.6.1 | Repository `existsOpenProposalForTarget` query (IT) | 🔲 |
+| F5.6.2 | Enforce gate rule in creation/decision + error code → handler | 🔲 |
+| F5.7 | Frontend: activate "Propose a change" + submission overlay *(umbrella)* | 🔲 |
+| F5.7-SETUP | Human: `shadcn add select` | 👤 |
+| F5.7.1 | `types/proposal.ts` — DTO mirrors (Proposal incl `sessionId`, requests, statuses) | 🔲 |
+| F5.7.2 | `api/proposals.ts` — keys + `getProposals`/`createProposal` + hooks | 🔲 |
+| F5.7.3 | `ProposalSubmitForm.tsx` — RHF+zod, session `<Select>`, field-change capture, banner | 🔲 |
+| F5.7.4 | Activate `ProposeChangeButton.tsx` → opens `FocusedOverlay` with the form | 🔲 |
+| F5.8 | Frontend: proposal list/detail on profiles + co-sign *(umbrella)* | 🔲 |
+| F5.8.1 | `ProposalStatusBadge.tsx` — five states → shadcn `Badge` | 🔲 |
+| F5.8.2 | `api/proposals.ts` — add `useCoSignProposal` hook | 🔲 |
+| F5.8.3 | `ProposalThreadSkeleton.tsx` — DTO-derived loading state | 🔲 |
+| F5.8.4 | `ProposalThread.tsx` — per-entity list + co-sign (role/author gated) | 🔲 |
+| F5.8.5 | Mount `ProposalThread` in `EntityProfileView.tsx` | 🔲 |
+| F5.9 | Frontend: GM review queue (approve/veto) *(umbrella)* | 🔲 |
+| F5.9.1 | `api/proposals.ts` — add `useDecideProposal` + cosigned-queue hook | 🔲 |
+| F5.9.2 | `ProposalReviewCard.tsx` — approve (editable overlay) / veto + result link | 🔲 |
+| F5.9.3 | `ProposalReviewQueuePage.tsx` — GM-gated queue + skeleton | 🔲 |
+| F5.9.4 | Route + Sidebar nav entry (GM-gated) | 🔲 |
 
 #### F5.1 — Backend: proposal domain model + ports
 
-**Goal:** Pure-domain `Proposal` and `ProposalVote` with the status machine the schema already
-constrains (`open → cosigned → approved | rejected`, `open|cosigned → expired`), plus driving/driven
-ports, so every later task builds on validated domain invariants.
+> **Umbrella task — run the F5.1.N sub-tasks below, not this.**
+
+Pure-domain `Proposal` and `ProposalVote` with the status machine the schema already constrains
+(`open → cosigned → approved | rejected`, `open|cosigned → expired`), the driven persistence port,
+and the JPA adapter — so every later task builds on validated domain invariants. Per the Phase 5
+Gate session-linkage decision the proposal now carries a creator-selected `session_id`, which needs
+one append-only migration (so this task is no longer strictly "no schema change").
+
+#### F5.1.1 — Migration: add `session_id` + `resulting_entity_version_id` to `proposals`
+
+**Goal:** Add the creator-selected provenance session link and the approved-version back-reference the gate decisions require, on top of the existing `proposals` table (migration 0018).
 
 **Scope (in):**
-- `domain/proposal/` entities + status transitions; invariants: polymorphic target (`actor|space|event|relation`), one vote per voter (mirrors `uidx_proposal_votes_proposal_voter`), vote kinds `cosign|approve|reject`
-- driving/driven port interfaces (`port/in/proposal/`, `port/out/proposal/`) + persistence adapter over the existing tables (no schema change)
+- `apps/api/src/main/resources/db/changelog/0020_add_proposal_session_and_result.xml` — nullable `session_id UUID` + `fk_proposals_session` FK → `sessions(id)` (provenance/context; non-null enforced in the domain at creation); nullable `resulting_entity_version_id UUID` (**no FK** — polymorphic across the four `*_versions` tables; set on approval, traceability). Register it in the master changelog include list.
 
-**Scope (out):** Any REST endpoint (F5.2+); delta application (F5.4); expiry (F5.5).
+**Scope (out):** Any domain/JPA code (F5.1.2+); any change to `*_versions` tables (the approved version is stamped with the **latest committed session id**, not a new version-table column).
 
-**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-016, D-017, D-018, D-019  **Dependencies:** Phase 5 Gate
+**Skills:** `database-migration`  **Decisions:** D-016, D-021, *gate(session-linkage)*  **Dependencies:** Phase 5 Gate
+
+#### F5.1.2 — Domain: `Proposal` aggregate + status machine
+
+**Goal:** Pure-Java `Proposal` enforcing the status machine and creation invariants, with no Spring/JPA imports (ARCH-01).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/domain/proposal/Proposal.java`, `ProposalStatus.java`, `ProposalTargetType.java` (**`ACTOR|SPACE` only — v2 scope;** event/relation deferred) + needed `domain/exception/` additions (+ domain unit test)
+- transitions `open→cosigned→approved|rejected` and `open|cosigned→expired`; carries `campaignId, targetType, targetId, ownerId (maps to the `author_id` column — document the D-021 name divergence), sessionId (provenance), proposedDelta, expiresAt, resultingEntityVersionId`; non-blank + owner invariants
+
+**Scope (out):** `ProposalVote` (F5.1.3); ports/persistence (F5.1.4+); delta application (F5.4).
+
+**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-016, D-017, D-018, D-019, D-021, D-078  **Dependencies:** F5.1.1
+
+#### F5.1.3 — Domain: `ProposalVote` + vote kinds
+
+**Goal:** Pure-domain vote value object capturing vote kind and the one-vote-per-voter invariant the DB unique index mirrors.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/domain/proposal/ProposalVote.java`, `VoteKind.java` (`cosign|approve|reject`) (+ domain unit test)
+
+**Scope (out):** Vote persistence (F5.1.5); co-sign logic (F5.3); GM approve/reject (F5.4).
+
+**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-016, D-017  **Dependencies:** F5.1.2
+
+#### F5.1.4 — Application: `ProposalRepository` driven port + models
+
+**Goal:** Driven persistence port and shared application-model records every proposal service depends on.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/proposal/ProposalRepository.java` (save, findById, findByCampaign(filter,page), findByTarget, countByCampaign, `saveVote`, `existsOpenForTarget`)
+- `apps/api/src/main/java/com/bluesteel/application/model/proposal/` read-view + filter/page records (`ProposalView` exposing provenance `sessionId` + `resultingEntityVersionId`, paging params)
+
+**Scope (out):** Driving (`port/in`) use-cases — created with their endpoints (F5.2+); the adapter (F5.1.6) which provides this port's test coverage.
+
+**Skills:** `backend-endpoint`  **Decisions:** D-016, D-055  **Dependencies:** F5.1.2, F5.1.3
+
+#### F5.1.5 — Persistence: JPA entities + repositories
+
+**Goal:** JPA entities and Spring Data repositories over the existing `proposals` / `proposal_votes` tables.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/proposal/ProposalJpaEntity.java` (`@JdbcTypeCode(JSON)` for `proposed_delta`), `ProposalVoteJpaEntity.java`, `ProposalJpaRepository.java`, `ProposalVoteJpaRepository.java` (+ repository Testcontainers IT)
+
+**Scope (out):** The domain↔JPA mapper / `ProposalRepository` impl (F5.1.6).
+
+**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-016  **Dependencies:** F5.1.1
+
+#### F5.1.6 — Persistence: `ProposalPersistenceAdapter` + IT
+
+**Goal:** Adapter implementing `ProposalRepository` by mapping domain ↔ JPA, validated end-to-end against Postgres.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/proposal/ProposalPersistenceAdapter.java` (+ Testcontainers IT covering save/find and the duplicate-vote `uidx_proposal_votes_proposal_voter` constraint)
+
+**Scope (out):** Use-case services (F5.2+).
+
+**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-016, D-017  **Dependencies:** F5.1.4, F5.1.5
 
 #### F5.2 — Backend: proposal submission + listing API
 
-**Goal:** Campaign members create proposals against an existing entity and browse them, scoped per
-entity and per campaign.
+> **Umbrella task — run the F5.2.N sub-tasks below, not this.**
+
+Campaign members create proposals against an existing entity (selecting the linked session) and
+browse them, scoped per entity and per campaign.
+
+#### F5.2.1 — Driving ports + command/result models
+
+**Goal:** Use-case interfaces and command/result records for submission and listing.
 
 **Scope (in):**
-- `POST /api/v1/campaigns/{id}/proposals` (any member; target entity must exist in the campaign; `proposed_delta` validated against the gate-decided contract; sets `expires_at` from the configured TTL)
-- `GET /api/v1/campaigns/{id}/proposals` (+ filter by target entity and status; offset pagination per D-055 conventions)
-- error mapping in `GlobalExceptionHandler` (404 unknown target, 422 invalid delta)
+- `apps/api/src/main/java/com/bluesteel/application/port/in/proposal/CreateProposalUseCase.java`, `ListProposalsUseCase.java`
+- `apps/api/src/main/java/com/bluesteel/application/model/proposal/CreateProposalCommand.java` (includes `sessionId`), `ProposalListView.java`
 
-**Scope (out):** Voting (F5.3); GM decision (F5.4); UI (F5.7+).
+**Scope (out):** Service logic (F5.2.2/F5.2.3); controller (F5.2.4); voting (F5.3).
 
-**Skills:** `backend-endpoint`, `error-handling`, `backend-testing`  **Decisions:** D-016, D-043  **Dependencies:** F5.1
+**Skills:** `backend-endpoint`  **Decisions:** D-016, D-055  **Dependencies:** F5.1.4
+
+#### F5.2.2 — `ProposalCreationService`
+
+**Goal:** Create a proposal after validating membership, target type/existence, the provenance session, and the delta; set `expires_at` from the configured TTL.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/proposal/ProposalCreationService.java` (+ unit test, mocked ports): membership via `CampaignMembershipPort`; **reject `targetType ∉ {actor, space}` → 422**; require non-null `target` and `proposed_delta`; target exists via `WorldStatePort.existsInCampaign`; provenance session belongs to the campaign via `SessionRepository`; `proposed_delta` validated against the gate `changed_fields`-shaped contract; `expires_at` from configured TTL
+
+**Scope (out):** Listing (F5.2.3); controller/DTOs (F5.2.4); concurrent-proposal rule (F5.6).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-016, D-019, D-043, *gate(session-linkage, target-scope, delta-shape, TTL)*  **Dependencies:** F5.2.1, F5.1.6
+
+#### F5.2.3 — `ListProposalsService`
+
+**Goal:** List proposals filtered by target entity and status with offset pagination.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/proposal/ListProposalsService.java` (+ unit test)
+
+**Scope (out):** Creation (F5.2.2); controller (F5.2.4).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-016, D-055  **Dependencies:** F5.2.1, F5.1.6
+
+#### F5.2.4 — `ProposalController` POST + GET + DTOs
+
+**Goal:** REST surface for submission and listing.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/proposal/ProposalController.java` (`POST`/`GET /api/v1/campaigns/{id}/proposals`), `CreateProposalRequest.java` (includes `sessionId`), `ProposalResponse.java`, `ProposalListResponse.java` (+ `@WebMvcTest`)
+
+**Scope (out):** Voting/decision endpoints (F5.3.3/F5.4.4); exception mapping (F5.2.5).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-016, D-043, D-055  **Dependencies:** F5.2.2, F5.2.3
+
+#### F5.2.5 — Error mapping for submission
+
+**Goal:** Map proposal submission domain exceptions to the standard error envelope.
+
+**Scope (in):**
+- new proposal exceptions + handlers in `apps/api/src/main/java/com/bluesteel/adapters/in/web/GlobalExceptionHandler.java` (404 unknown target/session, 422 invalid delta) (+ handler test)
+
+**Scope (out):** Vote/decision error codes (F5.3.3/F5.4.4); concurrent-rule code (F5.6.2).
+
+**Skills:** `error-handling`, `backend-testing`  **Decisions:** D-016  **Dependencies:** F5.2.2
 
 #### F5.3 — Backend: co-sign flow
 
-**Goal:** A player other than the author seconds a proposal; at ≥1 co-sign the proposal becomes
-`cosigned` and surfaces to the GM (D-017).
+> **Umbrella task — run the F5.3.N sub-tasks below, not this.**
+
+A player other than the author seconds a proposal; at ≥1 co-sign the proposal becomes `cosigned`
+and surfaces to the GM (D-017).
+
+#### F5.3.1 — Driving port + command
+
+**Goal:** Use-case interface and command for casting a co-sign vote.
 
 **Scope (in):**
-- `POST /api/v1/campaigns/{id}/proposals/{pid}/votes` with `cosign` (member auth; author cannot co-sign their own proposal; duplicate vote → 409, backed by the DB unique constraint)
-- status transition `open → cosigned` on first co-sign
+- `apps/api/src/main/java/com/bluesteel/application/port/in/proposal/CoSignProposalUseCase.java`, `apps/api/src/main/java/com/bluesteel/application/model/proposal/CoSignProposalCommand.java`
 
-**Scope (out):** `approve`/`reject` votes (F5.4 — GM only).
+**Scope (out):** Service logic (F5.3.2); endpoint (F5.3.3).
 
-**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-017  **Dependencies:** F5.2
+**Skills:** `backend-endpoint`  **Decisions:** D-017  **Dependencies:** F5.1.4
+
+#### F5.3.2 — `ProposalCoSignService`
+
+**Goal:** Apply a co-sign vote with the author and duplicate-vote rules, transitioning the proposal on the first co-sign.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/proposal/ProposalCoSignService.java` (+ unit test): writes a `proposal_votes('cosign')` row; allowed for **any non-author member** (gate rule); author cannot co-sign own proposal (422); duplicate vote → 409 (backed by `uidx_proposal_votes_proposal_voter`); first co-sign transitions `open → cosigned`
+
+**Scope (out):** `approve`/`reject` votes (F5.4 — GM only); endpoint/DTO (F5.3.3).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-017  **Dependencies:** F5.3.1, F5.1.6
+
+#### F5.3.3 — Co-sign endpoint + DTO + error mapping
+
+**Goal:** REST surface for co-signing, with conflict mapping.
+
+**Scope (in):**
+- `POST .../proposals/{pid}/votes` on `ProposalController` + `CastVoteRequest.java` + `GlobalExceptionHandler` mapping (author-cosign → 422, duplicate → 409) (+ `@WebMvcTest`)
+
+**Scope (out):** GM decision route (F5.4.5).
+
+**Skills:** `backend-endpoint`, `error-handling`, `backend-testing`  **Decisions:** D-017  **Dependencies:** F5.3.2, F5.2.4
 
 #### F5.4 — Backend: GM decision — approve applies delta, veto rejects
 
-**Goal:** The GM approves or unilaterally vetoes a `cosigned` proposal (D-018). Approval applies
-`proposed_delta` as a **new entity version** through the existing world-state write path, preserving
-append-only history and traceability.
+> **Umbrella task — run the F5.4.N sub-tasks below, not this.**
+
+The GM approves (optionally editing the delta) or unilaterally vetoes a `cosigned` proposal (D-018).
+Approval writes the effective delta as a **new entity version** through the existing world-state
+write path, stamped with the campaign's **latest committed session id** (keeping
+`version_number`↔session-sequence monotonic; the creator-selected `proposals.session_id` is
+provenance only), and **publishes `SessionCommittedEvent`** so the new version is embedded and
+visible to Query Mode. v2 scope is **actor/space targets only**.
+
+#### F5.4.1 — Driving port + decision command/result
+
+**Goal:** Use-case interface and command capturing the approve/reject decision and the optional GM-edited delta.
 
 **Scope (in):**
-- GM-only decision endpoint (`approve`/`reject` vote or a dedicated decision route — settled at sub-task decomposition); status → `approved`/`rejected`
-- on approve: map delta → entity version write reusing the commit write machinery (`WorldStatePort` / `WorldStateAdapter`, v1 F2.x); version provenance must record that it came from a proposal
+- `apps/api/src/main/java/com/bluesteel/application/port/in/proposal/DecideProposalUseCase.java`
+- `apps/api/src/main/java/com/bluesteel/application/model/proposal/DecideProposalCommand.java` (decision + optional `editedDelta`), `ProposalDecisionResult.java` (`resultingEntityVersionId`)
 
-**Scope (out):** Conflicts between competing proposals (F5.6); notifications (not in v2 scope anywhere — do not add).
+**Scope (out):** Session lookup (F5.4.2); delta mapping (F5.4.3); service (F5.4.4); endpoint (F5.4.5).
 
-**Skills:** `backend-endpoint`, `backend-domain-model`, `backend-testing`  **Decisions:** D-017, D-018, D-001  **Dependencies:** F5.3
+**Skills:** `backend-endpoint`  **Decisions:** D-018, *gate(gm-edit)*  **Dependencies:** F5.1.4
+
+#### F5.4.2 — Latest-committed-session lookup
+
+**Goal:** Supply the session the approved version is stamped with, preserving monotonic version↔session ordering.
+
+**Scope (in):**
+- extend `apps/api/src/main/java/com/bluesteel/application/port/out/session/SessionRepository.java` with `findLatestCommittedSessionId(campaignId)` + its query in `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/session/SessionPersistenceAdapter.java` (max `sequence_number` where `status='committed'`) (+ Testcontainers IT)
+
+**Scope (out):** Delta mapping (F5.4.3); decision orchestration (F5.4.4).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-001, *gate(session-linkage)*  **Dependencies:** F5.1.4
+
+#### F5.4.3 — `ProposalDeltaMapper`
+
+**Goal:** Translate the effective delta into an `EntityWriteCommand` for the existing write path (actor/space only).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/proposal/ProposalDeltaMapper.java` (+ unit test): read the target's current head (`ownerId`, `name`) + latest `full_snapshot` via `WorldStateReadPort`; merge the effective delta (GM-edited if present, else `proposed_delta`) → `EntityWriteCommand` with `changed_fields` mirroring the delta, merged `full_snapshot`, and **`sessionId =` the latest committed session id (F5.4.2)**
+
+**Scope (out):** Event/relation targets (deferred); orchestration (F5.4.4); endpoint (F5.4.5).
+
+**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-001, D-076, *gate(session-linkage, target-scope, gm-edit)*  **Dependencies:** F5.4.1, F5.4.2, F5.1.6
+
+#### F5.4.4 — `ProposalDecisionService`
+
+**Goal:** GM-only decision orchestration: approve writes a new (embedded) entity version and records the decision vote; veto rejects unilaterally.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/proposal/ProposalDecisionService.java` (+ unit test): GM-only via `CampaignMembershipPort`; `cosigned` precondition; `@Transactional`. **Approve** → `ProposalDeltaMapper` + `WorldStatePort.writeEntity` + **publish `SessionCommittedEvent(latestCommittedSessionId, campaignId, [version])`** (embeddings) + write `proposal_votes('approve')` + status `approved` + store `resulting_entity_version_id`. **Veto** → write `proposal_votes('reject')` + status `rejected`.
+
+**Scope (out):** Endpoint/DTOs (F5.4.5); concurrent-proposal rule (F5.6).
+
+**Skills:** `backend-endpoint`, `backend-domain-model`, `backend-testing`  **Decisions:** D-001, D-017, D-018, D-063, *gate(gm-decision-vote)*  **Dependencies:** F5.4.3, F5.3.2
+
+#### F5.4.5 — Decision endpoint + DTO + error mapping
+
+**Goal:** GM-gated REST surface for the decision.
+
+**Scope (in):**
+- `POST .../proposals/{pid}/decision` on `ProposalController` + `DecideProposalRequest.java` (optional `editedDelta`) + GM gating + `GlobalExceptionHandler` mapping (+ `@WebMvcTest`)
+
+**Scope (out):** Notifications (not in v2 scope anywhere — do not add).
+
+**Skills:** `backend-endpoint`, `error-handling`, `backend-testing`  **Decisions:** D-018, D-043  **Dependencies:** F5.4.4, F5.3.3
 
 #### F5.5 — Backend: proposal TTL expiry scheduler
 
-**Goal:** Proposals with no action within the configured TTL flip to `expired` automatically, keeping
-the GM queue clean (D-019).
+> **Umbrella task — run the F5.5.N sub-tasks below, not this.**
+
+Proposals with no action within the configured TTL flip to `expired` automatically, keeping the GM
+queue clean (D-019).
+
+#### F5.5.1 — Expiry port + bulk-expiry adapter
+
+**Goal:** Driven port and persistence adapter that flip stale `open`/`cosigned` proposals to `expired` in one statement.
 
 **Scope (in):**
-- scheduled sweep patterned on `SessionTimeoutRecoveryScheduler` (v1 F2.x); expires `open`/`cosigned` proposals past `expires_at`
-- TTL + sweep interval as env-overridable properties (existing `${SOME_KNOB:default}` convention)
+- `apps/api/src/main/java/com/bluesteel/application/port/out/proposal/ProposalExpiryPort.java`
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/proposal/ProposalExpiryAdapter.java` (bulk-flip `open|cosigned` past `expires_at` → `expired`) (+ Testcontainers IT)
+
+**Scope (out):** The scheduler trigger (F5.5.2).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-019  **Dependencies:** F5.1.5
+
+#### F5.5.2 — `ProposalExpiryScheduler`
+
+**Goal:** Periodic sweep invoking the expiry port, patterned on `SessionTimeoutRecoveryScheduler`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/proposal/ProposalExpiryScheduler.java` (`@Scheduled`, `@Value`-bound env-overridable TTL + sweep interval) (+ unit test, mocked port)
 
 **Scope (out):** Changing `expires_at` semantics (fixed by the gate decision).
 
-**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-019  **Dependencies:** F5.2, Phase 5 Gate (TTL decision)
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-019, *gate(TTL)*  **Dependencies:** F5.5.1, Phase 5 Gate (TTL decision)
 
 #### F5.6 — Backend: concurrent-proposal conflict rule
 
-**Goal:** Enforce the gate-decided rule for multiple open proposals targeting the same entity
-(e.g., block at submission, or flag at GM decision time) so approvals never silently clobber each
-other.
+> **Umbrella task — run the F5.6.N sub-tasks below, not this.**
 
-**Scope (in):** the decided rule at submission and/or decision time, plus its error code(s).
+Enforce the gate-decided rule for multiple open proposals targeting the same entity (e.g., block at
+submission, or flag at GM decision time) so approvals never silently clobber each other.
+
+#### F5.6.1 — Open-proposal lookup query
+
+**Goal:** Repository support to detect an existing open/cosigned proposal for a target entity.
+
+**Scope (in):**
+- `existsOpenProposalForTarget(campaignId, targetType, targetId)` on `ProposalJpaRepository` + adapter wiring (+ Testcontainers IT)
+
+**Scope (out):** Enforcement / error code (F5.6.2).
+
+**Skills:** `backend-testing`  **Decisions:** *gate(concurrent-rule)*  **Dependencies:** F5.1.5
+
+#### F5.6.2 — Enforce the conflict rule
+
+**Goal:** Apply the gate-decided rule and surface a dedicated error code.
+
+**Scope (in):**
+- enforce the decided rule (block-at-submission in `ProposalCreationService` and/or flag at `ProposalDecisionService`) + new conflict exception + `GlobalExceptionHandler` 409 mapping (+ unit + handler tests)
 
 **Scope (out):** Merge/rebase tooling for deltas (out of v2 scope entirely).
 
-**Skills:** `backend-endpoint`, `error-handling`, `backend-testing`  **Decisions:** Phase 5 Gate (new D-number)  **Dependencies:** F5.4, Phase 5 Gate
+**Skills:** `backend-endpoint`, `error-handling`, `backend-testing`  **Decisions:** *gate(concurrent-rule, new D-number)*  **Dependencies:** F5.6.1, F5.4.4
 
 #### F5.7 — Frontend: activate "Propose a change" + submission overlay
 
-**Goal:** The disabled `ProposeChangeButton` stub (D-012) becomes live on every entity/space/event/
-relation profile: a FocusedOverlay form captures the proposed field changes and submits.
+> **Umbrella task — run the F5.7-SETUP checklist then the F5.7.N sub-tasks below, not this.**
+
+The disabled `ProposeChangeButton` stub (D-012) becomes live on every **actor/space** profile
+(event/relation deferred — v2 target scope): a FocusedOverlay form captures the proposed field
+changes (and the provenance session) and submits.
+
+#### F5.7-SETUP — Human scaffolding (run once before F5.7.1)
+
+> 👤 **Human step — not a pipeline sub-task.** Deterministic CLI scaffolding only. All other infra
+> (Vite, Tailwind v4, TanStack Query, RHF, zod, `FocusedOverlay`, `InlineBanner`, `apiClient`,
+> `createTestQueryClient`, `api/sessions.ts`) already exists.
+
+```bash
+cd apps/web
+npx shadcn@latest add select --yes   # session/field picker → src/components/ui/select.tsx
+```
+
+#### F5.7.1 — `types/proposal.ts`
+
+**Goal:** Hand-mirrored TypeScript types for the proposal DTOs (D-076).
 
 **Scope (in):**
-- proposal TypeScript types mirrored from the backend DTOs (D-076) + API client/hooks
-- enable `components/domain/ProposeChangeButton.tsx`; FocusedOverlay submission form (no modals, D-082); InlineBanner feedback (no toasts, D-083)
+- `apps/web/src/types/proposal.ts`: `Proposal` (incl provenance `sessionId` + `resultingEntityVersionId`), `ProposalStatus`, `ProposalTargetType` (**`'actor' | 'space'`** — v2 scope), `VoteKind`, `CreateProposalRequest` (incl `sessionId`), `ProposalListPage` — mirrored from the F5.2.4 DTOs (verified by `npm run type-check`)
 
-**Scope (out):** Browsing proposals (F5.8); GM actions (F5.9).
+**Scope (out):** API client (F5.7.2); components (F5.7.3+).
 
-**Skills:** `frontend-api-resource`, `ux-focused-overlay`, `ux-inline-feedback`, `react-hook-form`, `frontend-testing`  **Decisions:** D-012, D-076, D-082, D-083  **Dependencies:** F5.2
+**Skills:** `frontend-api-resource`  **Decisions:** D-076  **Dependencies:** F5.2.4
+
+#### F5.7.2 — `api/proposals.ts` (create + list)
+
+**Goal:** Typed client functions and TanStack hooks for submission and listing.
+
+**Scope (in):**
+- `apps/web/src/api/proposals.ts` (+ test): query-key factory, `getProposals`/`createProposal` via `apiClient`, `useProposals`/`useCreateProposal` hooks (invalidate on success)
+
+**Scope (out):** Co-sign hook (F5.8.2); decide hook (F5.9.1).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-076  **Dependencies:** F5.7.1, F5.7-SETUP
+
+#### F5.7.3 — `ProposalSubmitForm.tsx`
+
+**Goal:** The submission form: RHF + zod with a session selector and field-change capture, with inline feedback.
+
+**Scope (in):**
+- `apps/web/src/components/domain/ProposalSubmitForm.tsx` (+ test): RHF+zod (ref `features/auth/LoginPage.tsx`), receives the entity's **current snapshot as a prop** (from `EntityProfileView` `data`) to render the editable field-delta, a provenance session `<Select>` ("which session does this relate to?") from `useSessions`, captures field changes into `proposed_delta` (mirroring `changed_fields`), submits via `useCreateProposal`, `InlineBanner` feedback (no toasts, D-083), maps `400` `field` errors
+
+**Scope (out):** The button/overlay wiring (F5.7.4).
+
+**Skills:** `react-hook-form`, `ux-inline-feedback`, `frontend-api-resource`, `frontend-testing`  **Decisions:** D-076, D-083  **Dependencies:** F5.7.2, F5.7-SETUP
+
+#### F5.7.4 — Activate `ProposeChangeButton`
+
+**Goal:** Replace the disabled stub with a live button that opens the submission form in a FocusedOverlay.
+
+**Scope (in):**
+- rewrite `apps/web/src/components/domain/ProposeChangeButton.tsx` (+ update test): live `Button` (drop the disabled stub) opening `FocusedOverlay` (no modals, D-082) hosting `ProposalSubmitForm`; accepts `targetType`/`targetId` **+ current snapshot** props; rendered only on actor/space profiles
+
+**Scope (out):** Event/relation profiles (deferred — v2 target scope); browsing proposals (F5.8); GM actions (F5.9).
+
+**Skills:** `ux-focused-overlay`, `frontend-testing`  **Decisions:** D-012, D-082  **Dependencies:** F5.7.3
 
 #### F5.8 — Frontend: proposal list/detail on profiles + co-sign
 
-**Goal:** Members see a proposal thread on each entity profile (status badges for the five states)
-and players co-sign others' proposals.
+> **Umbrella task — run the F5.8.N sub-tasks below, not this.**
 
-**Scope (in):** per-entity proposal section in exploration profiles; co-sign action with role/author
-gating mirrored from the backend rules; skeleton loading (D-086).
+Members see a proposal thread on each entity profile (status badges for the five states) and
+players co-sign others' proposals.
 
-**Scope (out):** GM approve/veto (F5.9).
+#### F5.8.1 — `ProposalStatusBadge`
 
-**Skills:** `frontend-exploration`, `frontend-api-resource`, `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-017, D-076  **Dependencies:** F5.3, F5.7
+**Goal:** A badge mapping the five proposal states to shadcn `Badge` styling.
+
+**Scope (in):**
+- `apps/web/src/components/domain/ProposalStatusBadge.tsx` (+ test, axe)
+
+**Scope (out):** The thread (F5.8.4).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-017  **Dependencies:** F5.7.1
+
+#### F5.8.2 — Co-sign hook
+
+**Goal:** Extend the proposal API resource with the co-sign mutation.
+
+**Scope (in):**
+- extend `apps/web/src/api/proposals.ts` with `coSignProposal` + `useCoSignProposal` (+ test)
+
+**Scope (out):** Decide hook (F5.9.1).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-017, D-076  **Dependencies:** F5.7.2
+
+#### F5.8.3 — `ProposalThreadSkeleton`
+
+**Goal:** DTO-derived skeleton for the proposal thread (D-086, no spinners).
+
+**Scope (in):**
+- `apps/web/src/components/domain/ProposalThreadSkeleton.tsx` (+ test): `animate-pulse`, dimensions from `types/proposal.ts`, zero layout shift
+
+**Scope (out):** The thread itself (F5.8.4).
+
+**Skills:** `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-086  **Dependencies:** F5.7.1
+
+#### F5.8.4 — `ProposalThread`
+
+**Goal:** Per-entity proposal list with status badges and a role/author-gated co-sign action.
+
+**Scope (in):**
+- `apps/web/src/components/domain/ProposalThread.tsx` (+ test): `useProposals` filtered by entity, `ProposalStatusBadge`, co-sign button gated to **any non-author member** (gate rule) via `useCoSignProposal`, `InlineBanner` feedback, `ProposalThreadSkeleton` while loading
+
+**Scope (out):** Mounting it on the profile (F5.8.5); GM approve/veto (F5.9).
+
+**Skills:** `frontend-exploration`, `ux-inline-feedback`, `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-017, D-076  **Dependencies:** F5.8.1, F5.8.2, F5.8.3
+
+#### F5.8.5 — Mount the thread on the profile
+
+**Goal:** Surface the proposal thread on the entity profile beside the annotation thread.
+
+**Scope (in):**
+- mount `<ProposalThread>` in `apps/web/src/features/exploration/components/EntityProfileView.tsx` (+ update test)
+
+**Scope (out):** GM review queue (F5.9).
+
+**Skills:** `frontend-exploration`, `frontend-testing`  **Decisions:** D-076  **Dependencies:** F5.8.4, F5.7.4
 
 #### F5.9 — Frontend: GM review queue (approve/veto)
 
-**Goal:** The GM gets a campaign-level queue of `cosigned` proposals and decides each one; approval
-feedback links to the resulting entity version.
+> **Umbrella task — run the F5.9.N sub-tasks below, not this.**
 
-**Scope (in):** review queue view (GM-gated route/section); approve/veto actions with confirmation
-overlay; InlineBanner outcomes.
+The GM gets a campaign-level queue of `cosigned` proposals and decides each one — approving (with the
+option to edit the delta first) or vetoing; approval feedback links to the resulting entity version.
+
+#### F5.9.1 — Decide + queue hooks
+
+**Goal:** Extend the proposal API resource with the decision mutation and the cosigned-queue query.
+
+**Scope (in):**
+- extend `apps/web/src/api/proposals.ts`: `decideProposal` (optional `editedDelta`) + `useDecideProposal`, plus campaign-level `useCosignedProposals` (status filter) (+ test)
+
+**Scope (out):** UI (F5.9.2+).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-018, D-076  **Dependencies:** F5.7.2
+
+#### F5.9.2 — `ProposalReviewCard`
+
+**Goal:** A single proposal with approve (editable) / veto actions and a link to the resulting version.
+
+**Scope (in):**
+- `apps/web/src/features/exploration/components/ProposalReviewCard.tsx` (+ test): approve opens a `FocusedOverlay` with an editable, pre-filled delta form (submits `editedDelta`); veto confirmation overlay; `InlineBanner` outcomes; on approve success, link to the resulting entity version via `resultingEntityVersionId`
+
+**Scope (out):** The queue page (F5.9.3); routing (F5.9.4).
+
+**Skills:** `ux-focused-overlay`, `ux-inline-feedback`, `react-hook-form`, `frontend-testing`  **Decisions:** D-018, D-076, D-082, D-083, *gate(gm-edit)*  **Dependencies:** F5.9.1, F5.7.3
+
+#### F5.9.3 — `ProposalReviewQueuePage`
+
+**Goal:** GM-gated campaign-level queue listing cosigned proposals.
+
+**Scope (in):**
+- `apps/web/src/features/exploration/components/ProposalReviewQueuePage.tsx` (+ test): GM-gated (`useCampaignStore(s => s.activeRole) === 'gm'`), `useCosignedProposals`, list of `ProposalReviewCard`, skeleton loading
+
+**Scope (out):** Route/nav wiring (F5.9.4).
+
+**Skills:** `frontend-exploration`, `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-018, D-086  **Dependencies:** F5.9.2
+
+#### F5.9.4 — Route + GM-gated nav entry
+
+**Goal:** Wire the queue into routing and the sidebar, visible to GMs only.
+
+**Scope (in):**
+- route in `apps/web/src/main.tsx` + GM-gated nav entry in `apps/web/src/components/domain/Sidebar.tsx` (+ update tests)
 
 **Scope (out):** Player-facing views (F5.8).
 
-**Skills:** `frontend-exploration`, `ux-focused-overlay`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-018, D-076  **Dependencies:** F5.4, F5.8
+**Skills:** `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-018  **Dependencies:** F5.9.3
 
 ---
 
