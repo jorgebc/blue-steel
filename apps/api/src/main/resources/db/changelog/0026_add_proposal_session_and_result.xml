@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    F5.1.1: proposal provenance + result back-reference (D-107). Append-only (DB-02).
+    session_id is the creator-selected provenance/context session the author believes prompted
+    the change (nullable FK -> sessions.id); the domain enforces it non-null at creation, but the
+    approved entity version is attributed to the latest committed session, not this one (D-107).
+    resulting_entity_version_id is set on approval and points polymorphically into one of the
+    *_versions tables (actor_versions, space_versions); it therefore has NO foreign key.
+  -->
+  <changeSet id="0026-add-proposal-session-and-result" author="jorge">
+
+    <addColumn tableName="proposals">
+      <column name="session_id" type="UUID">
+        <constraints nullable="true"
+                     foreignKeyName="fk_proposals_session"
+                     references="sessions(id)"/>
+      </column>
+      <!-- Polymorphic ref into the *_versions tables, stamped on approval — no FK -->
+      <column name="resulting_entity_version_id" type="UUID">
+        <constraints nullable="true"/>
+      </column>
+    </addColumn>
+
+    <rollback>
+      <dropColumn tableName="proposals" columnName="resulting_entity_version_id"/>
+      <dropColumn tableName="proposals" columnName="session_id"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>
