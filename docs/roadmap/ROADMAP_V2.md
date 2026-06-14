@@ -37,13 +37,13 @@ entity versions. Activates the workflow v1 shipped as data model only (D-016): `
 
 | # | Feature | Status |
 |---|---|---|
-| F5.1 | Backend: proposal domain model + ports *(umbrella)* | 🔲 |
-| F5.1.1 | Migration 0020 — add `session_id` (FK sessions) to `proposals` | 🔲 |
-| F5.1.2 | Domain: `Proposal` aggregate + `ProposalStatus` + `ProposalTargetType` + exceptions | 🔲 |
-| F5.1.3 | Domain: `ProposalVote` + `VoteKind` | 🔲 |
-| F5.1.4 | Application: `ProposalRepository` driven port + `application/model/proposal` records | 🔲 |
-| F5.1.5 | Persistence: `ProposalJpaEntity` + `ProposalVoteJpaEntity` + JPA repositories | 🔲 |
-| F5.1.6 | Persistence: `ProposalPersistenceAdapter` (mapper, impl `ProposalRepository`) + IT | 🔲 |
+| F5.1 | Backend: proposal domain model + ports *(umbrella)* | ✅ |
+| F5.1.1 | Migration 0026 — add `session_id` (FK sessions) + `resulting_entity_version_id` to `proposals` | ✅ |
+| F5.1.2 | Domain: `Proposal` aggregate + `ProposalStatus` + `ProposalTargetType` + exceptions | ✅ |
+| F5.1.3 | Domain: `ProposalVote` + `VoteKind` | ✅ |
+| F5.1.4 | Application: `ProposalRepository` driven port + `application/model/proposal` records | ✅ |
+| F5.1.5 | Persistence: `ProposalJpaEntity` + `ProposalVoteJpaEntity` + JPA repositories | ✅ |
+| F5.1.6 | Persistence: `ProposalPersistenceAdapter` (mapper, impl `ProposalRepository`) + IT | ✅ |
 | F5.2 | Backend: proposal submission + listing API *(umbrella)* | 🔲 |
 | F5.2.1 | Driving ports `Create`/`ListProposalsUseCase` + command/result models | 🔲 |
 | F5.2.2 | `ProposalCreationService` — validate target+session in campaign, set `expires_at` | 🔲 |
