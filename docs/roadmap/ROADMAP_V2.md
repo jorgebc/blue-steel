@@ -44,16 +44,16 @@ entity versions. Activates the workflow v1 shipped as data model only (D-016): `
 | F5.1.4 | Application: `ProposalRepository` driven port + `application/model/proposal` records | ✅ |
 | F5.1.5 | Persistence: `ProposalJpaEntity` + `ProposalVoteJpaEntity` + JPA repositories | ✅ |
 | F5.1.6 | Persistence: `ProposalPersistenceAdapter` (mapper, impl `ProposalRepository`) + IT | ✅ |
-| F5.2 | Backend: proposal submission + listing API *(umbrella)* | 🔲 |
-| F5.2.1 | Driving ports `Create`/`ListProposalsUseCase` + command/result models | 🔲 |
-| F5.2.2 | `ProposalCreationService` — validate target+session in campaign, set `expires_at` | 🔲 |
-| F5.2.3 | `ListProposalsService` — filter by target/status, offset pagination | 🔲 |
-| F5.2.4 | `ProposalController` POST+GET + request/response DTOs | 🔲 |
-| F5.2.5 | Error mapping in `GlobalExceptionHandler` (404 target/session, 422 invalid delta) | 🔲 |
-| F5.3 | Backend: co-sign flow *(umbrella)* | 🔲 |
-| F5.3.1 | Driving port `CoSignProposalUseCase` + `CoSignProposalCommand` | 🔲 |
-| F5.3.2 | `ProposalCoSignService` — author-cannot-cosign, duplicate→409, `open→cosigned` | 🔲 |
-| F5.3.3 | Vote endpoint + `CastVoteRequest` DTO + error mapping (`@WebMvcTest`) | 🔲 |
+| F5.2 | Backend: proposal submission + listing API *(umbrella)* | ✅ |
+| F5.2.1 | Driving ports `Create`/`ListProposalsUseCase` + command/result models | ✅ |
+| F5.2.2 | `ProposalCreationService` — validate target+session in campaign, set `expires_at` | ✅ |
+| F5.2.3 | `ListProposalsService` — filter by target/status, offset pagination | ✅ |
+| F5.2.4 | `ProposalController` POST+GET + request/response DTOs | ✅ |
+| F5.2.5 | Error mapping in `GlobalExceptionHandler` (404 target/session, 422 invalid delta) | ✅ |
+| F5.3 | Backend: co-sign flow *(umbrella)* | ✅ |
+| F5.3.1 | Driving port `CoSignProposalUseCase` + `CoSignProposalCommand` | ✅ |
+| F5.3.2 | `ProposalCoSignService` — author-cannot-cosign, duplicate→409, `open→cosigned` | ✅ |
+| F5.3.3 | Vote endpoint + error mapping (`@WebMvcTest`); co-sign returns updated proposal (no body) | ✅ |
 | F5.4 | Backend: GM decision — approve applies delta, veto rejects *(umbrella)* | 🔲 |
 | F5.4.1 | Driving port `DecideProposalUseCase` + command (approve/reject + optional edited delta) | 🔲 |
 | F5.4.2 | `SessionRepository.findLatestCommittedSessionId` + adapter (IT) — supplies the version stamp | 🔲 |

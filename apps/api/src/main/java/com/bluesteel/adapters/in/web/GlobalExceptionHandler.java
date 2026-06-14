@@ -3,16 +3,22 @@ package com.bluesteel.adapters.in.web;
 import com.bluesteel.domain.exception.ActiveSessionExistsException;
 import com.bluesteel.domain.exception.AlreadyCampaignMemberException;
 import com.bluesteel.domain.exception.AnnotationNotFoundException;
+import com.bluesteel.domain.exception.AuthorCannotCoSignException;
 import com.bluesteel.domain.exception.CampaignNotFoundException;
 import com.bluesteel.domain.exception.CannotRemoveGmException;
 import com.bluesteel.domain.exception.CommitValidationException;
+import com.bluesteel.domain.exception.ConcurrentProposalException;
 import com.bluesteel.domain.exception.CostCapExceededException;
 import com.bluesteel.domain.exception.DomainException;
+import com.bluesteel.domain.exception.DuplicateVoteException;
 import com.bluesteel.domain.exception.EmailDeliveryException;
+import com.bluesteel.domain.exception.EmptyDeltaException;
 import com.bluesteel.domain.exception.EntityNotFoundException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
 import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
+import com.bluesteel.domain.exception.ProposalNotFoundException;
+import com.bluesteel.domain.exception.ProposalTargetNotFoundException;
 import com.bluesteel.domain.exception.QueryResponseParseException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.RateLimitExceededException;
@@ -21,6 +27,7 @@ import com.bluesteel.domain.exception.SessionNotFoundException;
 import com.bluesteel.domain.exception.SummaryTooLargeException;
 import com.bluesteel.domain.exception.TokenBudgetExceededException;
 import com.bluesteel.domain.exception.UnauthorizedException;
+import com.bluesteel.domain.exception.UnsupportedTargetTypeException;
 import com.bluesteel.domain.exception.UserNotFoundException;
 import java.util.List;
 import org.slf4j.Logger;
@@ -223,6 +230,55 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ApiResponse<Void> handleAnnotationNotFound(AnnotationNotFoundException ex) {
     return ApiResponse.error(ApiError.of("ANNOTATION_NOT_FOUND", ex.getMessage()));
+  }
+
+  /** Proposal targets an entity type outside the v2 actor/space scope (D-108). */
+  @ExceptionHandler(UnsupportedTargetTypeException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
+  public ApiResponse<Void> handleUnsupportedTargetType(UnsupportedTargetTypeException ex) {
+    return ApiResponse.error(ApiError.of("UNSUPPORTED_TARGET_TYPE", ex.getMessage()));
+  }
+
+  /** Proposal submitted with a missing or empty {@code proposed_delta} (D-104). */
+  @ExceptionHandler(EmptyDeltaException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
+  public ApiResponse<Void> handleEmptyDelta(EmptyDeltaException ex) {
+    return ApiResponse.error(ApiError.of("EMPTY_DELTA", ex.getMessage()));
+  }
+
+  /** Proposal target entity does not exist in the campaign. */
+  @ExceptionHandler(ProposalTargetNotFoundException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public ApiResponse<Void> handleProposalTargetNotFound(ProposalTargetNotFoundException ex) {
+    return ApiResponse.error(ApiError.of("PROPOSAL_TARGET_NOT_FOUND", ex.getMessage()));
+  }
+
+  /** Proposal referenced by id does not exist in the campaign. */
+  @ExceptionHandler(ProposalNotFoundException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public ApiResponse<Void> handleProposalNotFound(ProposalNotFoundException ex) {
+    return ApiResponse.error(ApiError.of("PROPOSAL_NOT_FOUND", ex.getMessage()));
+  }
+
+  /** An open or cosigned proposal already targets the same entity (D-106). */
+  @ExceptionHandler(ConcurrentProposalException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ApiResponse<Void> handleConcurrentProposal(ConcurrentProposalException ex) {
+    return ApiResponse.error(ApiError.of("CONCURRENT_PROPOSAL_EXISTS", ex.getMessage()));
+  }
+
+  /** A proposal's author attempted to co-sign their own proposal. */
+  @ExceptionHandler(AuthorCannotCoSignException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
+  public ApiResponse<Void> handleAuthorCannotCoSign(AuthorCannotCoSignException ex) {
+    return ApiResponse.error(ApiError.of("AUTHOR_CANNOT_COSIGN", ex.getMessage()));
+  }
+
+  /** A member voted twice on the same proposal (D-109). */
+  @ExceptionHandler(DuplicateVoteException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ApiResponse<Void> handleDuplicateVote(DuplicateVoteException ex) {
+    return ApiResponse.error(ApiError.of("DUPLICATE_VOTE", ex.getMessage()));
   }
 
   /**
