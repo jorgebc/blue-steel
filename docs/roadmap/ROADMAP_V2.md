@@ -54,18 +54,18 @@ entity versions. Activates the workflow v1 shipped as data model only (D-016): `
 | F5.3.1 | Driving port `CoSignProposalUseCase` + `CoSignProposalCommand` | ✅ |
 | F5.3.2 | `ProposalCoSignService` — author-cannot-cosign, duplicate→409, `open→cosigned` | ✅ |
 | F5.3.3 | Vote endpoint + error mapping (`@WebMvcTest`); co-sign returns updated proposal (no body) | ✅ |
-| F5.4 | Backend: GM decision — approve applies delta, veto rejects *(umbrella)* | 🔲 |
-| F5.4.1 | Driving port `DecideProposalUseCase` + command (approve/reject + optional edited delta) | 🔲 |
-| F5.4.2 | `SessionRepository.findLatestCommittedSessionId` + adapter (IT) — supplies the version stamp | 🔲 |
-| F5.4.3 | `ProposalDeltaMapper` (actor/space) — reads current snapshot, stamps latest committed session | 🔲 |
-| F5.4.4 | `ProposalDecisionService` — GM-only; approve writes version + embeds + vote row, veto rejects | 🔲 |
-| F5.4.5 | Decision endpoint + DTO + GM gating + error mapping (`@WebMvcTest`) | 🔲 |
-| F5.5 | Backend: proposal TTL expiry scheduler *(umbrella)* | 🔲 |
-| F5.5.1 | `ProposalExpiryPort` + bulk-expiry SQL adapter (IT) | 🔲 |
-| F5.5.2 | `ProposalExpiryScheduler` (@Scheduled, env-overridable TTL/interval) | 🔲 |
-| F5.6 | Backend: concurrent-proposal conflict rule *(umbrella)* | 🔲 |
-| F5.6.1 | Repository `existsOpenProposalForTarget` query (IT) | 🔲 |
-| F5.6.2 | Enforce gate rule in creation/decision + error code → handler | 🔲 |
+| F5.4 | Backend: GM decision — approve applies delta, veto rejects *(umbrella)* | ✅ |
+| F5.4.1 | Driving port `DecideProposalUseCase` + command (approve/reject + optional edited delta) | ✅ |
+| F5.4.2 | `SessionRepository.findLatestCommittedSessionId` + adapter (IT) — supplies the version stamp | ✅ |
+| F5.4.3 | `ProposalDeltaMapper` (actor/space) — reads current snapshot, stamps latest committed session | ✅ |
+| F5.4.4 | `ProposalDecisionService` — GM-only; approve writes version + embeds + vote row, veto rejects | ✅ |
+| F5.4.5 | Decision endpoint + DTO + GM gating + error mapping (`@WebMvcTest`) | ✅ |
+| F5.5 | Backend: proposal TTL expiry scheduler *(umbrella)* | ✅ |
+| F5.5.1 | `ProposalExpiryPort` + bulk-expiry SQL adapter (IT) | ✅ |
+| F5.5.2 | `ProposalExpiryScheduler` (@Scheduled, env-overridable TTL/interval) | ✅ |
+| F5.6 | Backend: concurrent-proposal conflict rule *(umbrella)* | ✅ |
+| F5.6.1 | Repository `existsOpenProposalForTarget` query (IT) — shipped with F5.1 data layer | ✅ |
+| F5.6.2 | Enforce gate rule in creation/decision + error code → handler — shipped with F5.2 | ✅ |
 | F5.7 | Frontend: activate "Propose a change" + submission overlay *(umbrella)* | 🔲 |
 | F5.7-SETUP | Human: `shadcn add select` | 👤 |
 | F5.7.1 | `types/proposal.ts` — DTO mirrors (Proposal incl `sessionId`, requests, statuses) | 🔲 |

@@ -27,4 +27,11 @@ interface SessionJpaRepository extends JpaRepository<SessionJpaEntity, UUID> {
       "SELECT COALESCE(MAX(s.sequenceNumber), 0) + 1 FROM SessionJpaEntity s"
           + " WHERE s.campaignId = ?1 AND s.status = 'committed'")
   int nextSequenceNumber(UUID campaignId);
+
+  /** Returns the id of the committed session with the highest sequence number (D-107). */
+  @Query(
+      "SELECT s.id FROM SessionJpaEntity s WHERE s.campaignId = ?1 AND s.status = 'committed'"
+          + " AND s.sequenceNumber = (SELECT MAX(s2.sequenceNumber) FROM SessionJpaEntity s2"
+          + " WHERE s2.campaignId = ?1 AND s2.status = 'committed')")
+  Optional<UUID> findLatestCommittedSessionId(UUID campaignId);
 }
