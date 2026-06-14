@@ -61,4 +61,7 @@
   <!-- Fix missing CASCADE on event_involved_actors FKs (0024 came after cascade sweep 0022) -->
   <include file="db/changelog/0025_event_involved_actors_cascade_delete.xml"/>
 
+  <!-- F5.1.1: proposal provenance session + approved-version back-reference (D-107) -->
+  <include file="db/changelog/0026_add_proposal_session_and_result.xml"/>
+
 </databaseChangeLog>
