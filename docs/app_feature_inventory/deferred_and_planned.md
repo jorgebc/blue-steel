@@ -6,10 +6,10 @@ This register consolidates everything that exists in the repository only as sche
 
 ## 2. Capabilities & Use Cases
 
-- **Use Case / Action:** Player proposes a change to world state, co-signed by players and approved/rejected by the GM — 🚧 Planned (v2, D-016/D-017)
+- **Use Case / Action:** Player proposes a change to world state, co-signed by players and approved/rejected by the GM — ✅ Implemented (v2, Phase 5)
 - **Actor:** Player (propose/co-sign), GM (approve/reject)
-- **Functional Description:** The complete approval workflow — proposal creation, voting, expiry (D-019), and application of approved deltas — is deferred to v2. What ships in v1: the database schema (`proposals`, `proposal_votes`) and a disabled "Propose a change" button on every exploration profile with a "Coming in a future update" tooltip (D-012).
-- **Technical Reference / Source Files:** Schema: `apps/api/src/main/resources/db/changelog/0018_create_proposals.xml`, `0019_create_proposal_votes.xml`; UI stub: `apps/web/src/components/domain/ProposeChangeButton.tsx`
+- **Functional Description:** Shipped in Phase 5. The full approval workflow — proposal creation, co-sign voting, GM approve-with-edit/veto, application of approved deltas as new entity versions, the concurrent-proposal rule, and TTL expiry — is now live for **actor/space** targets (event/relation deferred, D-108). See [proposals.md](proposals.md) for the capability inventory.
+- **Technical Reference / Source Files:** [proposals.md](proposals.md); schema `apps/api/src/main/resources/db/changelog/0018_create_proposals.xml`, `0019_create_proposal_votes.xml`, `0026_add_proposal_session_and_result.xml`, `0027_proposal_indexes.xml`
 
 ---
 
@@ -69,7 +69,7 @@ This register consolidates everything that exists in the repository only as sche
 
 ## 3. Core User Journeys (Workflows)
 
-**Journey (future, v2): Player-driven canon correction**
-1. A player spots an error on an entity profile and clicks "Propose a change" (currently disabled).
-2. The proposal records a field delta; other players co-sign; the GM approves or rejects; approved deltas become a new entity version; unanswered proposals expire per TTL.
-3. v1 interim path: the player leaves an **annotation** on the entity (works today) and the GM corrects the record in the next session summary via Input Mode.
+**Journey: Player-driven canon correction** — ✅ shipped in Phase 5; see [proposals.md](proposals.md).
+1. A player spots an error on an actor/space profile and clicks "Propose a change", recording a field delta.
+2. Other players co-sign; the GM approves (optionally editing) or vetoes; approved deltas become a new entity version; unanswered proposals expire per TTL.
+3. Annotations remain available as a lightweight, non-canonical alternative to a formal proposal.

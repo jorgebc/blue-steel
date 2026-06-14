@@ -99,7 +99,7 @@ one append-only migration (so this task is no longer strictly "no schema change"
 **Goal:** Add the creator-selected provenance session link and the approved-version back-reference the gate decisions require, on top of the existing `proposals` table (migration 0018).
 
 **Scope (in):**
-- `apps/api/src/main/resources/db/changelog/0020_add_proposal_session_and_result.xml` — nullable `session_id UUID` + `fk_proposals_session` FK → `sessions(id)` (provenance/context; non-null enforced in the domain at creation); nullable `resulting_entity_version_id UUID` (**no FK** — polymorphic across the four `*_versions` tables; set on approval, traceability). Register it in the master changelog include list.
+- `apps/api/src/main/resources/db/changelog/0026_add_proposal_session_and_result.xml` — nullable `session_id UUID` + `fk_proposals_session` FK → `sessions(id)` (provenance/context; non-null enforced in the domain at creation); nullable `resulting_entity_version_id UUID` (**no FK** — polymorphic across the four `*_versions` tables; set on approval, traceability). Register it in the master changelog include list.
 
 **Scope (out):** Any domain/JPA code (F5.1.2+); any change to `*_versions` tables (the approved version is stamped with the **latest committed session id**, not a new version-table column).
 

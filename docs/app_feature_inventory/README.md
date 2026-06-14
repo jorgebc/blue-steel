@@ -16,7 +16,7 @@ The application exposes **three interaction modes**, all shipped in v1:
 | **Query Mode** | Ask free-form questions → receive grounded answers with session citations | All campaign members |
 | **Exploration Mode** | Browse world state through four visual views (Timeline, Entities, Spaces, Relations) | All campaign members |
 
-Roadmap status at audit time: Phases 0–4 of the v1 roadmap (infrastructure, auth, campaigns, session ingestion, Query Mode, Exploration Mode) are **complete**. Remaining gaps are explicitly deferred v2 features — see [Deferred & Planned Features](deferred_and_planned.md).
+Roadmap status: Phases 0–4 of the v1 roadmap (infrastructure, auth, campaigns, session ingestion, Query Mode, Exploration Mode) are **complete**, and v2 **Phase 5 — Proposals & Approval Pipeline** has shipped (see [proposals.md](proposals.md)). Remaining gaps are explicitly deferred v2 features (Phases 6–9) — see [Deferred & Planned Features](deferred_and_planned.md).
 
 ---
 
@@ -64,6 +64,7 @@ Onboarding is **invitation-only** (no self-registration): Admin creates a campai
 | Session Ingestion (Input Mode) | [session_ingestion.md](session_ingestion.md) | Summary submission, 4-stage LLM pipeline, diff review, commit, discard |
 | Query Mode | [query_mode.md](query_mode.md) | Natural-language Q&A with citations, rate limiting, cost governance |
 | Exploration Mode | [exploration_mode.md](exploration_mode.md) | Timeline, Entities, Spaces, Relations graph, annotations |
+| Proposals & Approval Pipeline | [proposals.md](proposals.md) | Member-proposed actor/space edits → co-sign → GM approve/veto → new version (Phase 5) |
 | System & Platform Services | [system_platform.md](system_platform.md) | Health, LLM/email providers, cost accounting, error contract, versioning & embeddings |
 | Deferred & Planned Features | [deferred_and_planned.md](deferred_and_planned.md) | v2 register — features that exist only as schema, stubs, or decisions |
 
@@ -79,9 +80,10 @@ Onboarding is **invitation-only** (no self-registration): Admin creates a campai
 4. **GM/Editor** reviews the diff (accept/edit/delete per card, resolve UNCERTAIN matches, acknowledge conflicts) and commits. World state is versioned; embeddings are generated asynchronously.
 5. **Any member** asks questions in Query Mode and gets answers grounded in committed sessions, with clickable citations ([query_mode.md](query_mode.md)).
 6. **Any member** browses the Timeline, entity/space profiles, and the relations graph, optionally attaching annotations ([exploration_mode.md](exploration_mode.md)).
+7. **Any member** proposes a correction to an actor/space; another member co-signs; the **GM** approves (optionally editing) or vetoes, and approved changes become a new entity version ([proposals.md](proposals.md)).
 
 ---
 
 ## 6. Out of Scope (v1)
 
-The following are intentionally **not** implemented in v1 (decision IDs from `docs/DECISIONS.md`): proposal approval UI/logic (D-016 — schema exists), `add` action in the commit payload (D-053), Q&A history log (D-058), SSE streaming for queries (D-052), self-registration (D-051), self-service password reset (D-070), E2E tests (D-056), staging environment (D-044), real-time collaboration, audio/image ingestion, and a mobile app. Details in [deferred_and_planned.md](deferred_and_planned.md).
+The following are intentionally **not** implemented in v1 (decision IDs from `docs/DECISIONS.md`): `add` action in the commit payload (D-053), Q&A history log (D-058), SSE streaming for queries (D-052), self-registration (D-051), self-service password reset (D-070), E2E tests (D-056), staging environment (D-044), real-time collaboration, audio/image ingestion, and a mobile app. The proposal approval pipeline (D-016) shipped in v2 Phase 5 — see [proposals.md](proposals.md). Details in [deferred_and_planned.md](deferred_and_planned.md).

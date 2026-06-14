@@ -292,7 +292,7 @@ class ProposalControllerTest {
   @DisplayName("should return 200 with a paginated list and meta")
   @WithMockUser(username = CALLER, roles = "USER")
   void list_member_returns200() throws Exception {
-    when(listProposalsUseCase.list(CAMPAIGN_ID, CALLER_ID, null, 0, 20))
+    when(listProposalsUseCase.list(CAMPAIGN_ID, CALLER_ID, null, null, null, 0, 20))
         .thenReturn(new ProposalListView(List.of(view(ProposalStatus.OPEN)), 1L, 0, 20));
 
     mockMvc
@@ -302,6 +302,24 @@ class ProposalControllerTest {
         .andExpect(jsonPath("$.meta.totalCount").value(1))
         .andExpect(jsonPath("$.meta.page").value(0))
         .andExpect(jsonPath("$.meta.size").value(20));
+  }
+
+  @Test
+  @DisplayName("should scope the list to a target entity when targetType and targetId are given")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void list_withTarget_passesTargetThrough() throws Exception {
+    UUID targetId = UUID.fromString("44444444-4444-4444-4444-444444444444");
+    when(listProposalsUseCase.list(
+            CAMPAIGN_ID, CALLER_ID, null, ProposalTargetType.ACTOR, targetId, 0, 20))
+        .thenReturn(new ProposalListView(List.of(view(ProposalStatus.OPEN)), 1L, 0, 1));
+
+    mockMvc
+        .perform(
+            get("/api/v1/campaigns/{id}/proposals", CAMPAIGN_ID)
+                .param("targetType", "ACTOR")
+                .param("targetId", targetId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].proposalId").value(PROPOSAL_ID.toString()));
   }
 
   @Test

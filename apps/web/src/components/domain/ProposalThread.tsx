@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useProposals, useCoSignProposal } from '@/api/proposals'
+import { useProposalsForTarget, useCoSignProposal } from '@/api/proposals'
 import { ApiClientError } from '@/api/client'
 import { useAuthStore } from '@/store/authStore'
 import { useCampaignStore } from '@/store/campaignStore'
@@ -34,22 +34,24 @@ function DeltaList({ delta }: { delta: Record<string, unknown> }) {
 
 /**
  * Per-entity proposal list shown on an actor/space profile (F5.8). Lists this target's proposals with
- * their status, and lets any non-author member co-sign an open proposal (D-109). The list endpoint has
- * no target filter, so proposals are filtered to this entity client-side. Feedback via
- * {@link InlineBanner} (no toasts); loading via {@link ProposalThreadSkeleton} (no spinners).
+ * their status, and lets any non-author member co-sign an open proposal (D-109). The list is scoped
+ * to this entity server-side (no client-side filtering, so nothing is missed beyond the first page).
+ * Feedback via {@link InlineBanner} (no toasts); loading via {@link ProposalThreadSkeleton}.
  */
 export function ProposalThread({ targetType, targetId }: Props) {
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
   const currentUserId = useAuthStore((s) => s.currentUser?.id)
 
-  const { data, isLoading, isError } = useProposals(campaignId ?? '')
+  const { data, isLoading, isError } = useProposalsForTarget(
+    campaignId ?? '',
+    targetType,
+    targetId
+  )
   const coSign = useCoSignProposal(campaignId ?? '')
 
   const [feedback, setFeedback] = useState<Feedback>(null)
 
-  const proposals = (data?.proposals ?? []).filter(
-    (p) => p.targetType === targetType && p.targetId === targetId
-  )
+  const proposals = data?.proposals ?? []
 
   function canCoSign(proposal: Proposal): boolean {
     return proposal.status === 'OPEN' && currentUserId !== proposal.ownerId

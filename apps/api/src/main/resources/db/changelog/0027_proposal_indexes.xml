@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    Phase 5 hardening. Append-only (DB-02).
+    - uidx_proposals_open_target makes the D-106 "one open/cosigned proposal per target" rule
+      race-safe at the DB level (the application pre-check in ProposalCreationService alone is a
+      TOCTOU window). Mirrors the singleton-admin partial unique index (D-025). This index also
+      backs the existsOpenForTarget lookup.
+    - idx_proposals_campaign_status_created covers the campaign listing path
+      (findByCampaign filtered by status, ordered by created_at DESC).
+  -->
+  <changeSet id="0027-proposal-indexes" author="jorge">
+
+    <sql>
+      CREATE UNIQUE INDEX uidx_proposals_open_target
+      ON proposals (campaign_id, target_entity_type, target_entity_id)
+      WHERE status IN ('open', 'cosigned');
+    </sql>
+
+    <sql>
+      CREATE INDEX idx_proposals_campaign_status_created
+      ON proposals (campaign_id, status, created_at DESC);
+    </sql>
+
+    <rollback>
+      <dropIndex tableName="proposals" indexName="idx_proposals_campaign_status_created"/>
+      <dropIndex tableName="proposals" indexName="uidx_proposals_open_target"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

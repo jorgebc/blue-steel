@@ -21,8 +21,8 @@ vi.mock('@/api/annotations', () => ({
   useDeleteAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 vi.mock('@/api/proposals', () => ({
-  useProposals: () => ({
-    data: { proposals: [], page: 0, size: 20, totalCount: 0 },
+  useProposalsForTarget: () => ({
+    data: { proposals: [], page: 0, size: 0, totalCount: 0 },
     isLoading: false,
     isError: false,
   }),
