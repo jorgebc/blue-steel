@@ -1,26 +1,43 @@
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { useState } from 'react'
+import { FocusedOverlay } from '@/components/domain/FocusedOverlay'
+import { ProposalSubmitForm } from '@/components/domain/ProposalSubmitForm'
 import { Button } from '@/components/ui/button'
+import type { ProposalTargetType } from '@/types/proposal'
 
-/** Disabled "Propose a change" affordance — cosmetic stub in v1 (D-012). */
-export function ProposeChangeButton() {
+interface Props {
+  targetType: ProposalTargetType
+  targetId: string
+  entityName: string
+  /** The entity's current snapshot (latest version's full snapshot), seeding the editable fields. */
+  currentSnapshot: Record<string, unknown>
+}
+
+/**
+ * Opens the "propose a change" submission overlay for an actor or space (F5.7). Available to any
+ * campaign member — proposals are the player-facing edit path; non-author members co-sign and the GM
+ * decides.
+ */
+export function ProposeChangeButton({ targetType, targetId, entityName, currentSnapshot }: Props) {
+  const [open, setOpen] = useState(false)
+
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          {/* span captures pointer events so the tooltip fires over the disabled button */}
-          <span>
-            <Button type="button" variant="outline" disabled aria-disabled="true">
-              Propose a change
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Proposal system coming in a future update</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <>
+      <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+        Propose a change
+      </Button>
+      <FocusedOverlay
+        open={open}
+        onClose={() => setOpen(false)}
+        ariaLabel={`Propose a change to ${entityName}`}
+      >
+        <ProposalSubmitForm
+          targetType={targetType}
+          targetId={targetId}
+          currentSnapshot={currentSnapshot}
+          onSubmitted={() => setOpen(false)}
+          onCancel={() => setOpen(false)}
+        />
+      </FocusedOverlay>
+    </>
   )
 }

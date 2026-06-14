@@ -92,6 +92,22 @@ describe('Sidebar', () => {
     }
   })
 
+  it('shows the Review queue link pointing at the proposals route for gm', () => {
+    setup('gm')
+    expect(screen.getByRole('link', { name: /review queue/i })).toHaveAttribute(
+      'href',
+      '/campaigns/c1/proposals'
+    )
+  })
+
+  it('hides the Review queue link from editor and player', () => {
+    for (const role of ['editor', 'player'] as const) {
+      const { unmount } = setup(role)
+      expect(screen.queryByRole('link', { name: /review queue/i })).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
   it('renders Settings as a disabled coming-soon item', () => {
     setup('gm')
     const item = screen.getByText('Settings').closest('[aria-disabled]')

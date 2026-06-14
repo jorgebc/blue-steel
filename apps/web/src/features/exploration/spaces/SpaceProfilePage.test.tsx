@@ -20,6 +20,16 @@ vi.mock('@/api/annotations', () => ({
   usePostAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteAnnotation: () => ({ mutate: vi.fn(), isPending: false }),
 }))
+vi.mock('@/api/proposals', () => ({
+  useProposals: () => ({
+    data: { proposals: [], page: 0, size: 20, totalCount: 0 },
+    isLoading: false,
+    isError: false,
+  }),
+  useCoSignProposal: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateProposal: () => ({ mutate: vi.fn(), isPending: false }),
+}))
+vi.mock('@/api/sessions', () => ({ useSessions: () => ({ data: [] }) }))
 const mockUseEntityDetail = vi.mocked(useEntityDetail)
 
 const detail: EntityDetail = {
@@ -72,9 +82,9 @@ describe('SpaceProfilePage', () => {
     expect(screen.getByText('Bree')).toBeInTheDocument()
   })
 
-  it('renders the propose-change affordance as a disabled stub (D-012)', () => {
+  it('renders an active propose-change affordance (F5.7)', () => {
     renderPage()
-    expect(screen.getByRole('button', { name: /propose a change/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /propose a change/i })).toBeEnabled()
   })
 
   it('has no accessibility violations', async () => {

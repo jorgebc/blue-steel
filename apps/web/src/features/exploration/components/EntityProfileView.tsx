@@ -5,8 +5,10 @@ import { AnnotationThread } from '@/components/domain/AnnotationThread'
 import { EntityVersionHistory } from '@/components/domain/EntityVersionHistory'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { ProposeChangeButton } from '@/components/domain/ProposeChangeButton'
+import { ProposalThread } from '@/components/domain/ProposalThread'
 import { EntityLinks } from './EntityLinks'
 import { EntityProfileSkeleton } from './EntityProfileSkeleton'
+import type { ProposalTargetType } from '@/types/proposal'
 import type { EntityType, EntityVersion } from '@/types/worldstate'
 
 interface Props {
@@ -33,6 +35,8 @@ export function EntityProfileView({ entityType, entityId, backTo, backLabel }: P
   const navigate = useNavigate()
   const { data, isLoading, isError } = useEntityDetail(entityType, entityId)
   const latest = data ? latestVersion(data.versions) : null
+  // EntityProfileView is mounted only for actor/space, so this is always a valid proposal target (D-108).
+  const targetType = entityType.toUpperCase() as ProposalTargetType
 
   return (
     <section>
@@ -63,7 +67,12 @@ export function EntityProfileView({ entityType, entityId, backTo, backLabel }: P
               <h1 className="text-2xl font-semibold text-slate-900">{data.name}</h1>
               <p className="text-sm capitalize text-slate-500">{data.entityType}</p>
             </div>
-            <ProposeChangeButton />
+            <ProposeChangeButton
+              targetType={targetType}
+              targetId={entityId}
+              entityName={data.name}
+              currentSnapshot={latest?.fullSnapshot ?? {}}
+            />
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -88,6 +97,8 @@ export function EntityProfileView({ entityType, entityId, backTo, backLabel }: P
           </div>
 
           <EntityLinks entityType={entityType} entityId={entityId} />
+
+          <ProposalThread targetType={targetType} targetId={entityId} />
 
           <AnnotationThread entityType={entityType} entityId={entityId} />
         </div>

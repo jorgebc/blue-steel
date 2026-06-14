@@ -186,13 +186,13 @@ describe('RelationsPage', () => {
     expect(screen.getByTestId('node-a1')).toHaveAttribute('data-highlighted', 'true')
   })
 
-  it('shows the disabled propose-change button in the relation detail panel', async () => {
+  it('does not offer propose-a-change on relations (actor/space only, D-108)', async () => {
     renderPage()
 
     await openRelationsList()
     await userEvent.click(screen.getByRole('button', { name: /show annotations/i }))
 
-    expect(screen.getByRole('button', { name: /propose a change/i })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /propose a change/i })).not.toBeInTheDocument()
   })
 
   it('shows the skeleton while any query is loading', () => {

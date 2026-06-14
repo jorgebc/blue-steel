@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   Compass,
   Home,
+  Inbox,
   Library,
   Search,
   Settings,
@@ -138,6 +139,17 @@ export function Sidebar() {
           >
             <Compass className="h-5 w-5 shrink-0" aria-hidden />
             {expanded && <span>Exploration</span>}
+          </NavLink>
+        )}
+        {activeRole === 'gm' && activeCampaignId && (
+          <NavLink
+            to={`/campaigns/${activeCampaignId}/proposals`}
+            className={({ isActive }) =>
+              `${itemBaseClass} ${isActive ? activeLinkClass : inactiveLinkClass}`
+            }
+          >
+            <Inbox className="h-5 w-5 shrink-0" aria-hidden />
+            {expanded && <span>Review queue</span>}
           </NavLink>
         )}
         <ComingSoonItem label="Settings" icon={Settings} expanded={expanded} />
