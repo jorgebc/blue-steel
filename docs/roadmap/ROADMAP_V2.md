@@ -24,14 +24,14 @@ entity versions. Activates the workflow v1 shipped as data model only (D-016): `
 
 **Phase 5 Gate — design decisions to record in DECISIONS.md before F5.1 starts:**
 
-- [ ] TTL value + semantics for proposal expiry — which statuses expire, clock source, env knob (resolves the open part of D-019)
-- [ ] Concurrent-proposal rule — what happens when two open proposals target the same entity (PRD §7 v2 scope); blocks F5.6
-- [ ] **Proposal↔session linkage (provenance) + version stamp** — the author selects a campaign `session_id` at creation as **provenance/context only** (`proposals.session_id`, FK `sessions`). On approval the resulting entity version is written through the existing `WorldStatePort.writeEntity` path but stamped with the campaign's **latest committed session id**, keeping `version_number`↔`sessions.sequence_number` co-monotonic (current state stays `MAX(version_number)`; no as-of-session reconstruction anomaly). Record as a new D-number. Shapes F5.1.1, F5.2.2, F5.4.2–F5.4.4.
-- [ ] **v2 target scope = `actor` + `space` only** — defer event/relation (structured endpoints) and new-entity proposals; D-012's "relation" affordance is explicitly deferred. Creation validation rejects other target types (422). Record as a new D-number. Shapes F5.1.2, F5.2.2, F5.4.3, F5.7.1.
-- [ ] **GM decision recorded as a vote** — approve/veto writes a `proposal_votes('approve'|'reject')` row (who/when audit) in addition to flipping `proposal.status`; co-sign writes a `cosign` row. Record as a new D-number. Shapes F5.3.2, F5.4.4.
-- [ ] **GM edit-on-approve** — the GM decision accepts an optional GM-edited delta applied in place of the author's `proposed_delta` when approving; record as a new D-number. Shapes F5.4.1, F5.4.3, F5.9.2.
-- [ ] **`proposed_delta` shape (resolve first)** — field-level JSONB contract that **mirrors entity-version `changed_fields`** (ARCHITECTURE §7.6) so the approve-time apply-mapper is trivial. Note: `target_entity_type`/`target_entity_id`/`proposed_delta` stay nullable in the DB but are enforced **non-null in the application** at creation.
-- [ ] v2 build sequence (Phase 5 → 6 → 7 or otherwise) + post-1.0 version mapping (extends D-090)
+- [x] TTL value + semantics for proposal expiry — which statuses expire, clock source, env knob (resolves the open part of D-019) (**D-105**)
+- [x] Concurrent-proposal rule — what happens when two open proposals target the same entity (PRD §7 v2 scope); blocks F5.6 (**D-106**)
+- [x] **Proposal↔session linkage (provenance) + version stamp** — the author selects a campaign `session_id` at creation as **provenance/context only** (`proposals.session_id`, FK `sessions`). On approval the resulting entity version is written through the existing `WorldStatePort.writeEntity` path but stamped with the campaign's **latest committed session id**, keeping `version_number`↔`sessions.sequence_number` co-monotonic (current state stays `MAX(version_number)`; no as-of-session reconstruction anomaly). (**D-107**) Shapes F5.1.1, F5.2.2, F5.4.2–F5.4.4.
+- [x] **v2 target scope = `actor` + `space` only** — defer event/relation (structured endpoints) and new-entity proposals; D-012's "relation" affordance is explicitly deferred. Creation validation rejects other target types (422). (**D-108**) Shapes F5.1.2, F5.2.2, F5.4.3, F5.7.1.
+- [x] **GM decision recorded as a vote** — approve/veto writes a `proposal_votes('approve'|'reject')` row (who/when audit) in addition to flipping `proposal.status`; co-sign writes a `cosign` row. (**D-109**) Shapes F5.3.2, F5.4.4.
+- [x] **GM edit-on-approve** — the GM decision accepts an optional GM-edited delta applied in place of the author's `proposed_delta` when approving. (**D-110**) Shapes F5.4.1, F5.4.3, F5.9.2.
+- [x] **`proposed_delta` shape (resolve first)** — field-level JSONB contract that **mirrors entity-version `changed_fields`** (ARCHITECTURE §7.6) so the approve-time apply-mapper is trivial. Note: `target_entity_type`/`target_entity_id`/`proposed_delta` stay nullable in the DB but are enforced **non-null in the application** at creation. (**D-104**)
+- [x] v2 build sequence (Phase 5 → 6 → 7 → 8 → 9) + post-1.0 version mapping (extends D-090) (**D-111**)
 
 #### Summary
 
@@ -103,7 +103,7 @@ one append-only migration (so this task is no longer strictly "no schema change"
 
 **Scope (out):** Any domain/JPA code (F5.1.2+); any change to `*_versions` tables (the approved version is stamped with the **latest committed session id**, not a new version-table column).
 
-**Skills:** `database-migration`  **Decisions:** D-016, D-021, *gate(session-linkage)*  **Dependencies:** Phase 5 Gate
+**Skills:** `database-migration`  **Decisions:** D-016, D-021, D-107  **Dependencies:** Phase 5 Gate
 
 #### F5.1.2 — Domain: `Proposal` aggregate + status machine
 
@@ -190,7 +190,7 @@ browse them, scoped per entity and per campaign.
 
 **Scope (out):** Listing (F5.2.3); controller/DTOs (F5.2.4); concurrent-proposal rule (F5.6).
 
-**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-016, D-019, D-043, *gate(session-linkage, target-scope, delta-shape, TTL)*  **Dependencies:** F5.2.1, F5.1.6
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-016, D-019, D-043, D-104, D-105, D-107, D-108  **Dependencies:** F5.2.1, F5.1.6
 
 #### F5.2.3 — `ListProposalsService`
 
@@ -286,7 +286,7 @@ visible to Query Mode. v2 scope is **actor/space targets only**.
 
 **Scope (out):** Session lookup (F5.4.2); delta mapping (F5.4.3); service (F5.4.4); endpoint (F5.4.5).
 
-**Skills:** `backend-endpoint`  **Decisions:** D-018, *gate(gm-edit)*  **Dependencies:** F5.1.4
+**Skills:** `backend-endpoint`  **Decisions:** D-018, D-110  **Dependencies:** F5.1.4
 
 #### F5.4.2 — Latest-committed-session lookup
 
@@ -297,7 +297,7 @@ visible to Query Mode. v2 scope is **actor/space targets only**.
 
 **Scope (out):** Delta mapping (F5.4.3); decision orchestration (F5.4.4).
 
-**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-001, *gate(session-linkage)*  **Dependencies:** F5.1.4
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-001, D-107  **Dependencies:** F5.1.4
 
 #### F5.4.3 — `ProposalDeltaMapper`
 
@@ -308,7 +308,7 @@ visible to Query Mode. v2 scope is **actor/space targets only**.
 
 **Scope (out):** Event/relation targets (deferred); orchestration (F5.4.4); endpoint (F5.4.5).
 
-**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-001, D-076, *gate(session-linkage, target-scope, gm-edit)*  **Dependencies:** F5.4.1, F5.4.2, F5.1.6
+**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-001, D-076, D-107, D-108, D-110  **Dependencies:** F5.4.1, F5.4.2, F5.1.6
 
 #### F5.4.4 — `ProposalDecisionService`
 
@@ -319,7 +319,7 @@ visible to Query Mode. v2 scope is **actor/space targets only**.
 
 **Scope (out):** Endpoint/DTOs (F5.4.5); concurrent-proposal rule (F5.6).
 
-**Skills:** `backend-endpoint`, `backend-domain-model`, `backend-testing`  **Decisions:** D-001, D-017, D-018, D-063, *gate(gm-decision-vote)*  **Dependencies:** F5.4.3, F5.3.2
+**Skills:** `backend-endpoint`, `backend-domain-model`, `backend-testing`  **Decisions:** D-001, D-017, D-018, D-063, D-109  **Dependencies:** F5.4.3, F5.3.2
 
 #### F5.4.5 — Decision endpoint + DTO + error mapping
 
@@ -360,7 +360,7 @@ queue clean (D-019).
 
 **Scope (out):** Changing `expires_at` semantics (fixed by the gate decision).
 
-**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-019, *gate(TTL)*  **Dependencies:** F5.5.1, Phase 5 Gate (TTL decision)
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-019, D-105  **Dependencies:** F5.5.1
 
 #### F5.6 — Backend: concurrent-proposal conflict rule
 
@@ -378,7 +378,7 @@ submission, or flag at GM decision time) so approvals never silently clobber eac
 
 **Scope (out):** Enforcement / error code (F5.6.2).
 
-**Skills:** `backend-testing`  **Decisions:** *gate(concurrent-rule)*  **Dependencies:** F5.1.5
+**Skills:** `backend-testing`  **Decisions:** D-106  **Dependencies:** F5.1.5
 
 #### F5.6.2 — Enforce the conflict rule
 
@@ -389,7 +389,7 @@ submission, or flag at GM decision time) so approvals never silently clobber eac
 
 **Scope (out):** Merge/rebase tooling for deltas (out of v2 scope entirely).
 
-**Skills:** `backend-endpoint`, `error-handling`, `backend-testing`  **Decisions:** *gate(concurrent-rule, new D-number)*  **Dependencies:** F5.6.1, F5.4.4
+**Skills:** `backend-endpoint`, `error-handling`, `backend-testing`  **Decisions:** D-106  **Dependencies:** F5.6.1, F5.4.4
 
 #### F5.7 — Frontend: activate "Propose a change" + submission overlay
 
@@ -543,7 +543,7 @@ option to edit the delta first) or vetoing; approval feedback links to the resul
 
 **Scope (out):** The queue page (F5.9.3); routing (F5.9.4).
 
-**Skills:** `ux-focused-overlay`, `ux-inline-feedback`, `react-hook-form`, `frontend-testing`  **Decisions:** D-018, D-076, D-082, D-083, *gate(gm-edit)*  **Dependencies:** F5.9.1, F5.7.3
+**Skills:** `ux-focused-overlay`, `ux-inline-feedback`, `react-hook-form`, `frontend-testing`  **Decisions:** D-018, D-076, D-082, D-083, D-110  **Dependencies:** F5.9.1, F5.7.3
 
 #### F5.9.3 — `ProposalReviewQueuePage`
 
