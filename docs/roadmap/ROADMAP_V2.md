@@ -579,74 +579,371 @@ streaming path (D-052).
 
 | # | Feature | Status |
 |---|---|---|
-| F6.1 | Backend: commit-payload `add` action | 🔲 |
-| F6.2 | Frontend: "Add entity" affordance in diff review | 🔲 |
-| F6.3 | Backend: Q&A log persistence | 🔲 |
-| F6.4 | Backend: Q&A log read API | 🔲 |
-| F6.5 | Frontend: Q&A history panel in Query Mode | 🔲 |
+| F6.1 | Backend: commit-payload `add` action *(umbrella)* | 🔲 |
+| F6.1.1 | Model: `AddedEntity` + `CommitPayload.addedEntities` + ARCHITECTURE §7.6 | 🔲 |
+| F6.1.2 | Web DTO `AddedEntityRequest` + map to payload in `SessionController` | 🔲 |
+| F6.1.3 | Validator: replace check #8 with `addedEntities` validation | 🔲 |
+| F6.1.4 | `CommitService` creates added entities + first versions (embeds) | 🔲 |
+| F6.1.5 | IT: commit with `addedEntities` end-to-end | 🔲 |
+| F6.2 | Frontend: "Add entity" affordance in diff review *(umbrella)* | 🔲 |
+| F6.2.1 | `types/session.ts` — `AddedEntityPayload` + `CommitPayload.addedEntities` | 🔲 |
+| F6.2.2 | `useDiffState` — track added entities | 🔲 |
+| F6.2.3 | `useCommitPayload` — emit `addedEntities` | 🔲 |
+| F6.2.4 | `AddEntityForm.tsx` — RHF+zod form + InlineBanner | 🔲 |
+| F6.2.5 | `AddedEntityCard.tsx` — new card category + remove | 🔲 |
+| F6.2.6 | `DiffReviewPage` — FocusedOverlay trigger + render + wiring | 🔲 |
+| F6.3 | Backend: Q&A log persistence *(umbrella)* | 🔲 |
+| F6.3.1 | Migration 0028 — `query_log` table + master include | 🔲 |
+| F6.3.2 | `QueryLogEntry` model + `QueryLogRepository` port | 🔲 |
+| F6.3.3 | `QueryLogJpaEntity` + JPA repo (IT) | 🔲 |
+| F6.3.4 | `QueryLogPersistenceAdapter` + retention bound (IT) | 🔲 |
+| F6.3.5 | `QueryService` persistence hook (success-only) | 🔲 |
+| F6.4 | Backend: Q&A log read API *(umbrella)* | 🔲 |
+| F6.4.1 | `GetQueryHistoryUseCase` port + page/result models | 🔲 |
+| F6.4.2 | `QueryHistoryService` — member auth, offset, newest-first | 🔲 |
+| F6.4.3 | `QueryController` `GET /history` + DTOs (no rate-limit consume) | 🔲 |
+| F6.5 | Frontend: Q&A history panel in Query Mode *(umbrella)* | 🔲 |
+| F6.5.1 | `types/query.ts` — `QueryHistoryEntry` + page meta | 🔲 |
+| F6.5.2 | `api/queries.ts` — `fetchQueryHistory` + `useQueryHistory` | 🔲 |
+| F6.5.3 | `QueryHistorySkeleton.tsx` — DTO-derived loading state | 🔲 |
+| F6.5.4 | `QueryHistoryPanel.tsx` — list + select answer/citations | 🔲 |
+| F6.5.5 | Wire panel into `QueryPage.tsx` | 🔲 |
 | F6.6 | Query streaming / SSE (contingent — latency evidence only) | 🔲 |
 
 #### F6.1 — Backend: commit-payload `add` action
 
-**Goal:** Reviewers can introduce an entity the extraction missed: the commit payload accepts `add`
-entries that create new entities + first versions at commit, with the same campaign/session
-traceability as extracted ones.
+> **Umbrella task — run the F6.1.N sub-tasks below, not this.**
+
+Reviewers can introduce an entity the extraction missed: the commit payload gains a dedicated
+`addedEntities` list (the chosen representation — added entities have no stored-diff card, so
+reusing `cardDecisions` would collide with validator checks #1–#3) that creates new entities +
+first versions at commit, with the same campaign/session traceability as extracted ones. The
+former `422 UNSUPPORTED_ACTION` rejection becomes positive validation of the new list.
+
+#### F6.1.1 — Model: `AddedEntity` + `CommitPayload.addedEntities` + contract doc
+
+**Goal:** Define the added-entity wire shape on the commit payload and record it in the canonical contract.
 
 **Scope (in):**
-- replace `CommitPayloadValidator` check #8 (`422 UNSUPPORTED_ACTION`) with validation of added entities (type, non-blank name, field contract)
-- extend `CommitService` / the world-state write path to create the added entities; update the canonical CommitPayload contract (ARCHITECTURE §7.6, D-076)
+- `apps/api/src/main/java/com/bluesteel/application/model/commit/AddedEntity.java` — new record `{String entityType, String name, Map<String,Object> fields}` (camelCase, no `@JsonProperty`)
+- extend `apps/api/src/main/java/com/bluesteel/application/model/commit/CommitPayload.java` with a fourth component `List<AddedEntity> addedEntities`
+- update `docs/ARCHITECTURE.md` §7.6 CommitPayload contract to document `addedEntities` (D-076)
+- (+ serialization unit test asserting the camelCase JSON round-trip)
 
-**Scope (out):** The UI affordance (F6.2); editing extracted cards (shipped in v1).
+**Scope (out):** Web DTO (F6.1.2); validation (F6.1.3); world-state write (F6.1.4).
 
-**Skills:** `session-ingestion-pipeline`, `backend-endpoint`, `backend-testing`  **Decisions:** D-053, D-076, D-001  **Dependencies:** v1 F2.x commit path
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-053, D-076, D-001  **Dependencies:** v1 F2.x commit path
+
+#### F6.1.2 — Web DTO `AddedEntityRequest` + map to payload
+
+**Goal:** Accept added entities on the commit request DTO with format validation and map them into the application `CommitPayload`.
+
+**Scope (in):**
+- extend `apps/api/src/main/java/com/bluesteel/adapters/in/web/session/CommitSessionRequest.java` with a nested `AddedEntityRequest(String entityType, String name, Map<String,Object> fields)` (Bean Validation: `@NotBlank` entityType + name) on a new `addedEntities` list
+- map `addedEntities` into `CommitPayload` where the request is assembled in `apps/api/src/main/java/com/bluesteel/adapters/in/web/session/SessionController.java`
+- (+ `@WebMvcTest` covering the new field and its `400` on blank type/name)
+
+**Scope (out):** Business-rule validation (F6.1.3); write path (F6.1.4).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-076  **Dependencies:** F6.1.1
+
+#### F6.1.3 — Validator: replace check #8 with `addedEntities` validation
+
+**Goal:** Turn the defensive `UNSUPPORTED_ACTION` check into positive validation of the added-entity list.
+
+**Scope (in):**
+- replace the `UNSUPPORTED_ACTION` switch (D-081 check #8) in `apps/api/src/main/java/com/bluesteel/application/service/session/CommitPayloadValidator.java` with validation of `payload.addedEntities`: known `entityType`, non-blank `name`, field contract → `422` `INVALID_ADDED_ENTITY` (the `CardAction` switch on `cardDecisions` stays as-is, ACCEPT/EDIT/DELETE only)
+- (+ unit test for each failure mode + the happy path)
+
+**Scope (out):** Creating the entities (F6.1.4).
+
+**Skills:** `session-ingestion-pipeline`, `error-handling`, `backend-testing`  **Decisions:** D-053, D-078, D-081  **Dependencies:** F6.1.1
+
+#### F6.1.4 — `CommitService` creates added entities + first versions
+
+**Goal:** Write each added entity as a brand-new entity + first version at commit, stamped with the session, so it rides the same traceability and embedding path as extracted ones.
+
+**Scope (in):**
+- extend `apps/api/src/main/java/com/bluesteel/application/service/session/CommitService.java` to build an `EntityWriteCommand` per `addedEntities` entry (`entityId=null`, full snapshot from `fields`, `session.id()` stamp — mirrors the existing `NewEntityCard` branch) in the existing actor/space→event→relation write order, and add the resulting versions to the `SessionCommittedEvent` (drives async embeddings, D-063)
+- (+ unit test with mocked `WorldStatePort` asserting the write commands + event contents)
+
+**Scope (out):** End-to-end DB coverage (F6.1.5).
+
+**Skills:** `session-ingestion-pipeline`, `backend-testing`  **Decisions:** D-001, D-063  **Dependencies:** F6.1.1, F6.1.3
+
+#### F6.1.5 — IT: commit with `addedEntities` end-to-end
+
+**Goal:** Prove a commit carrying `addedEntities` creates the entities + first versions against Postgres.
+
+**Scope (in):**
+- Testcontainers integration test exercising `POST .../sessions/{sid}/commit` (or the `CommitService` against a real DB) with an `addedEntities` payload, asserting the new `*` head rows + `*_versions` first versions exist with the session stamp
+
+**Scope (out):** Frontend (F6.2).
+
+**Skills:** `backend-testing`  **Decisions:** D-053  **Dependencies:** F6.1.2, F6.1.4
 
 #### F6.2 — Frontend: "Add entity" affordance in diff review
 
-**Goal:** An "Add entity" action on the diff review page opens a FocusedOverlay form; added entities
-appear as a new card category and ride the commit payload.
+> **Umbrella task — run the F6.2.N sub-tasks below, not this.**
 
-**Scope (in):** add-entity form + card rendering; extend `useDiffState` / `useCommitPayload` and the
-mirrored CommitPayload types (D-076); commit-button gating unchanged.
+An "Add entity" action on the diff review page opens a `FocusedOverlay` form (D-082); added entities
+appear as a new card category and ride the commit payload via `addedEntities` (F6.1). Commit-button
+gating is unchanged. All UI primitives already exist (`FocusedOverlay`, `InlineBanner`, shadcn
+`select`/`input`/`textarea`/`form`/`button`, RHF+zod) — no SETUP required.
 
-**Scope (out):** Backend validation/write (F6.1).
+#### F6.2.1 — `types/session.ts` — `AddedEntityPayload` + `CommitPayload.addedEntities`
 
-**Skills:** `frontend-diff-review`, `ux-focused-overlay`, `react-hook-form`, `frontend-testing`  **Decisions:** D-053, D-076, D-082  **Dependencies:** F6.1
+**Goal:** Mirror the F6.1 wire shape so the rest of the diff-review FE compiles against it (D-076).
+
+**Scope (in):**
+- `apps/web/src/types/session.ts` — add `AddedEntityPayload { entityType: EntityType; name: string; fields: Record<string, unknown> }` and `addedEntities: AddedEntityPayload[]` on `CommitPayload`
+
+**Scope (out):** State (F6.2.2); payload assembly (F6.2.3); UI (F6.2.4–F6.2.6).
+
+**Skills:** `frontend-api-resource`  **Decisions:** D-076  **Dependencies:** F6.1.1
+
+#### F6.2.2 — `useDiffState` — track added entities
+
+**Goal:** Hold the reviewer's added entities in the single diff-review state source.
+
+**Scope (in):**
+- extend `apps/web/src/features/input/hooks/useDiffState.ts` — an `addedEntities` slice + `addEntity`/`removeAddedEntity` reducer actions + a derived list (client-side id keying)
+- (+ extend `useDiffState.test.ts`)
+
+**Scope (out):** Serialization to the commit payload (F6.2.3).
+
+**Skills:** `frontend-diff-review`, `frontend-testing`  **Decisions:** D-053  **Dependencies:** F6.2.1
+
+#### F6.2.3 — `useCommitPayload` — emit `addedEntities`
+
+**Goal:** Serialize the tracked added entities into the §7.6 commit payload.
+
+**Scope (in):**
+- extend `apps/web/src/features/input/hooks/useCommitPayload.ts` (`buildCommitPayload`) to map the `addedEntities` slice into `CommitPayload.addedEntities` (drop client-only ids)
+- (+ extend `useCommitPayload.test.ts`)
+
+**Scope (out):** The form/overlay (F6.2.4); card rendering (F6.2.5).
+
+**Skills:** `frontend-diff-review`, `frontend-testing`  **Decisions:** D-076  **Dependencies:** F6.2.1, F6.2.2
+
+#### F6.2.4 — `AddEntityForm.tsx` — RHF+zod form + InlineBanner
+
+**Goal:** A form to capture a new entity (type, name, fields) with inline validation feedback.
+
+**Scope (in):**
+- `apps/web/src/features/input/components/AddEntityForm.tsx` — React Hook Form + zod; `entityType` shadcn `<Select>`, `name` `<Input>`, a simple key/value fields editor; `InlineBanner` for validation feedback (no toasts, D-083); `onAdd(entity)` / `onCancel` callbacks
+- (+ `AddEntityForm.test.tsx` incl. axe assertion)
+
+**Scope (out):** The overlay host + page wiring (F6.2.6).
+
+**Skills:** `react-hook-form`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-082, D-083  **Dependencies:** F6.2.2
+
+#### F6.2.5 — `AddedEntityCard.tsx` — new card category + remove
+
+**Goal:** Render an added entity as its own diff card with a remove affordance.
+
+**Scope (in):**
+- `apps/web/src/features/input/components/AddedEntityCard.tsx` — shows the added entity's type/name/fields and a remove button wired to `removeAddedEntity`
+- (+ `AddedEntityCard.test.tsx`)
+
+**Scope (out):** Page composition (F6.2.6).
+
+**Skills:** `frontend-diff-review`, `frontend-testing`  **Decisions:** D-007  **Dependencies:** F6.2.2
+
+#### F6.2.6 — `DiffReviewPage` — FocusedOverlay trigger + render + wiring
+
+**Goal:** Compose the affordance: button → overlay form → added-entity section, all feeding the commit payload.
+
+**Scope (in):**
+- `apps/web/src/features/input/DiffReviewPage.tsx` — an "Add entity" button that opens a `FocusedOverlay` hosting `AddEntityForm`; render added entities via `AddedEntityCard` in a new section; commit-button gating unchanged
+- (+ extend `DiffReviewPage.test.tsx`)
+
+**Scope (out):** Backend (F6.1).
+
+**Skills:** `frontend-diff-review`, `ux-focused-overlay`, `frontend-testing`  **Decisions:** D-053, D-082  **Dependencies:** F6.2.3, F6.2.4, F6.2.5
 
 #### F6.3 — Backend: Q&A log persistence
 
-**Goal:** Successful queries are persisted (question, answer, citations, asker, timestamp) per
-campaign so the table can revisit past answers (D-058 lifts v1 statelessness).
+> **Umbrella task — run the F6.3.N sub-tasks below, not this.**
+
+Successful queries are persisted (question, answer, citations, asker, timestamp) per campaign so the
+table can revisit past answers (D-058 lifts v1 statelessness). An append-only log — modelled as an
+application-model record + driven port + persistence adapter (no rich domain aggregate; minimal
+invariants) — with an env-overridable per-campaign retention bound. Failures and timeouts are never
+logged, and a log-write failure must never fail the query.
+
+#### F6.3.1 — Migration 0028 — `query_log` table + master include
+
+**Goal:** Append-only campaign-scoped query-log table.
 
 **Scope (in):**
-- append-only Liquibase migration for the query-log table (campaign-scoped, asker FK)
-- persistence hook in `QueryService` after a successful answer (failures/timeouts are not logged); retention/size bound as an env-overridable property
+- `apps/api/src/main/resources/db/changelog/0028_create_query_log.xml` — `query_log` (`id UUID PK`, `campaign_id UUID` FK → `campaigns(id)` ON DELETE CASCADE, `asker_id UUID` FK → `users(id)`, `question text`, `answer text`, `citations jsonb`, `created_at timestamptz`); index `(campaign_id, created_at DESC)`. Register the `<include>` in `db.changelog-master.xml`.
 
-**Scope (out):** Read API (F6.4); UI (F6.5); re-running past queries.
+**Scope (out):** Any Java code (F6.3.2+).
 
-**Skills:** `database-migration`, `query-pipeline`, `backend-testing`  **Decisions:** D-058, D-096  **Dependencies:** v1 F3.x query pipeline
+**Skills:** `database-migration`  **Decisions:** D-058  **Dependencies:** v1 F3.x query pipeline
+
+#### F6.3.2 — `QueryLogEntry` model + `QueryLogRepository` port
+
+**Goal:** The shared read/write record and the driven persistence port every later task depends on.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/query/QueryLogEntry.java` — record `{UUID id, UUID campaignId, UUID askerId, String question, String answer, List<Citation> citations, Instant createdAt}` (compact-constructor non-blank `question`/`answer`)
+- `apps/api/src/main/java/com/bluesteel/application/port/out/query/QueryLogRepository.java` — `save`, `findByCampaign(campaignId, offset, limit)`, `countByCampaign`, and a retention prune (`deleteOldestBeyond(campaignId, maxRows)`)
+- (+ model unit test for the invariants)
+
+**Scope (out):** JPA + adapter (F6.3.3, F6.3.4); the service hook (F6.3.5).
+
+**Skills:** `query-pipeline`, `backend-testing`  **Decisions:** D-058  **Dependencies:** F6.3.1
+
+#### F6.3.3 — `QueryLogJpaEntity` + JPA repo
+
+**Goal:** JPA entity + Spring Data repository over the `query_log` table.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/query/QueryLogJpaEntity.java` (`@JdbcTypeCode(SqlTypes.JSON)` for `citations`) + `QueryLogJpaRepository.java` (campaign-scoped, ordered, paged finder + count)
+- (+ repository Testcontainers IT)
+
+**Scope (out):** The domain↔JPA mapper / port impl (F6.3.4).
+
+**Skills:** `backend-testing`  **Decisions:** D-058  **Dependencies:** F6.3.1
+
+#### F6.3.4 — `QueryLogPersistenceAdapter` + retention bound
+
+**Goal:** Adapter implementing `QueryLogRepository` by mapping record ↔ JPA, enforcing the retention bound, validated against Postgres.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/query/QueryLogPersistenceAdapter.java` — maps `citations` ↔ JSONB, implements paged find/count/save, and prunes beyond an env-overridable per-campaign max (`query.history.max-per-campaign`)
+- (+ Testcontainers IT covering save/find/prune)
+
+**Scope (out):** The service hook (F6.3.5).
+
+**Skills:** `backend-testing`  **Decisions:** D-058, D-096  **Dependencies:** F6.3.2, F6.3.3
+
+#### F6.3.5 — `QueryService` persistence hook (success-only)
+
+**Goal:** Persist a log entry after a successful grounded answer, without ever affecting the answer path.
+
+**Scope (in):**
+- extend `apps/api/src/main/java/com/bluesteel/application/service/query/QueryService.java` — after `withGroundedCitations(...)` succeeds, build + `save` a `QueryLogEntry`; timeouts/cost-cap/failures are not logged; a log-write failure is caught + logged (ERROR) and not propagated
+- (+ unit test: `ArgumentCaptor` asserts the saved entry; `verify(..., never())` on timeout/cost-cap paths)
+
+**Scope (out):** Read API (F6.4); UI (F6.5).
+
+**Skills:** `query-pipeline`, `backend-testing`  **Decisions:** D-058, D-096  **Dependencies:** F6.3.2
 
 #### F6.4 — Backend: Q&A log read API
 
-**Goal:** Campaign members browse the campaign's Q&A history, newest first.
+> **Umbrella task — run the F6.4.N sub-tasks below, not this.**
 
-**Scope (in):** `GET /api/v1/campaigns/{id}/queries/history` (member auth; offset pagination;
-read-only — does not consume the query rate limit, same as `GET /queries/usage`).
+Campaign members browse the campaign's Q&A history, newest first, via
+`GET /api/v1/campaigns/{id}/queries/history` (member auth; offset pagination; read-only — does not
+consume the query rate limit, same as `GET /queries/usage`). The log is append-only — no
+delete/edit.
 
-**Scope (out):** Deleting/editing history entries (log is append-only — not in scope).
+#### F6.4.1 — `GetQueryHistoryUseCase` port + page/result models
 
-**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-058, D-043  **Dependencies:** F6.3
+**Goal:** Driving port + offset-paged result models for reading the log.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/query/GetQueryHistoryUseCase.java`
+- offset page/result records in `apps/api/src/main/java/com/bluesteel/application/model/query/` (page request + a page wrapper over `QueryLogEntry`)
+
+**Scope (out):** Service (F6.4.2); controller (F6.4.3).
+
+**Skills:** `backend-endpoint`  **Decisions:** D-058, D-055  **Dependencies:** F6.3.2
+
+#### F6.4.2 — `QueryHistoryService` — member auth, offset, newest-first
+
+**Goal:** Use-case implementation enforcing membership and returning newest-first paged history.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/service/query/QueryHistoryService.java` — resolve caller membership (`401`/`403` via `CampaignMembershipPort`), read `QueryLogRepository.findByCampaign` + `countByCampaign`, newest-first
+- (+ unit test with mocked ports)
+
+**Scope (out):** HTTP wiring (F6.4.3).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-058, D-043  **Dependencies:** F6.4.1, F6.3.2
+
+#### F6.4.3 — `QueryController` `GET /history` + DTOs
+
+**Goal:** Expose the history endpoint, read-only and rate-limit-free.
+
+**Scope (in):**
+- add `@GetMapping("/history")` to `apps/api/src/main/java/com/bluesteel/adapters/in/web/query/QueryController.java` (offset `page`/`size` params; member auth; does **not** call `rateLimiter.check` — mirrors `GET /usage`) + response DTO(s) (history entry incl. citations, page `meta`)
+- (+ `@WebMvcTest`)
+
+**Scope (out):** Deleting/editing entries (out of scope — append-only).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-058, D-043  **Dependencies:** F6.4.2
 
 #### F6.5 — Frontend: Q&A history panel in Query Mode
 
-**Goal:** A history panel inside Query Mode lists past Q&As; selecting one shows its answer and
-citations (citations keep linking to session detail).
+> **Umbrella task — run the F6.5.N sub-tasks below, not this.**
 
-**Scope (in):** history panel + types/hooks for the read API; skeleton loading; the current-answer
-flow (v1 F3.4) stays unchanged.
+A history panel inside Query Mode lists past Q&As; selecting one shows its answer and citations
+(citations keep linking to session detail, reusing `AnswerDisplay`/`CitationList`). Loading uses a
+DTO-derived skeleton (no spinners, D-086); the current-answer flow (v1 F3.4) stays unchanged.
+Re-submitting a past question is out of scope (not in D-058). No SETUP required.
 
-**Scope (out):** Re-submitting a past question as a new query (not in D-058 scope).
+#### F6.5.1 — `types/query.ts` — `QueryHistoryEntry` + page meta
 
-**Skills:** `frontend-query-mode`, `frontend-api-resource`, `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-058, D-076  **Dependencies:** F6.4
+**Goal:** Mirror the F6.4 read-API shape (D-076).
+
+**Scope (in):**
+- `apps/web/src/types/query.ts` — `QueryHistoryEntry { id: string; question: string; answer: string; citations: Citation[]; createdAt: string }` + an offset page-meta type
+
+**Scope (out):** Fetching (F6.5.2); UI (F6.5.3–F6.5.5).
+
+**Skills:** `frontend-api-resource`  **Decisions:** D-058, D-076  **Dependencies:** F6.4.3
+
+#### F6.5.2 — `api/queries.ts` — `fetchQueryHistory` + `useQueryHistory`
+
+**Goal:** Typed resource + hook for the offset-paginated history (genuine server state, unlike the stateless query mutation).
+
+**Scope (in):**
+- extend `apps/web/src/api/queries.ts` — `queryHistoryKey(campaignId, page)`, `fetchQueryHistory(campaignId, page)`, `useQueryHistory(campaignId, page)` (offset pagination; `enabled` once a campaign is selected)
+- (+ extend the `queries` test with a mocked fetch)
+
+**Scope (out):** Panel + skeleton (F6.5.3, F6.5.4).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-058  **Dependencies:** F6.5.1
+
+#### F6.5.3 — `QueryHistorySkeleton.tsx` — DTO-derived loading state
+
+**Goal:** Zero-layout-shift skeleton matching the history list (D-086).
+
+**Scope (in):**
+- `apps/web/src/features/query/components/QueryHistorySkeleton.tsx` — `animate-pulse` blocks derived from `QueryHistoryEntry` dimensions
+- (+ `QueryHistorySkeleton.test.tsx`)
+
+**Scope (out):** The panel that uses it (F6.5.4).
+
+**Skills:** `ux-skeleton-crafting`, `frontend-testing`  **Decisions:** D-086  **Dependencies:** F6.5.1
+
+#### F6.5.4 — `QueryHistoryPanel.tsx` — list + select answer/citations
+
+**Goal:** The panel: a newest-first list whose selection surfaces the entry's answer + citations.
+
+**Scope (in):**
+- `apps/web/src/features/query/components/QueryHistoryPanel.tsx` — `useQueryHistory` list; `QueryHistorySkeleton` while loading; selecting an entry renders its answer + citations via the existing `AnswerDisplay`/`CitationList`
+- (+ `QueryHistoryPanel.test.tsx` incl. axe assertion)
+
+**Scope (out):** Mounting into the page (F6.5.5).
+
+**Skills:** `frontend-query-mode`, `frontend-testing`  **Decisions:** D-058, D-086  **Dependencies:** F6.5.2, F6.5.3
+
+#### F6.5.5 — Wire panel into `QueryPage.tsx`
+
+**Goal:** Surface the history panel in Query Mode without disturbing the live-answer flow.
+
+**Scope (in):**
+- `apps/web/src/features/query/QueryPage.tsx` — mount `QueryHistoryPanel`; the current-answer (v1 F3.4) flow unchanged
+- (+ extend `QueryPage.test.tsx`)
+
+**Scope (out):** Re-submitting a past question (not in D-058 scope).
+
+**Skills:** `frontend-query-mode`, `frontend-testing`  **Decisions:** D-058  **Dependencies:** F6.5.4
 
 #### F6.6 — Query streaming / SSE (contingent)
 
