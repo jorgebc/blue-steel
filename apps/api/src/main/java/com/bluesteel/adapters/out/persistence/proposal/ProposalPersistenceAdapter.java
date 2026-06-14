@@ -69,7 +69,10 @@ public class ProposalPersistenceAdapter implements ProposalRepository {
 
   @Override
   public void saveVote(ProposalVote vote) {
-    voteRepository.save(toEntity(vote));
+    // Flush eagerly so the uidx_proposal_votes_proposal_voter violation surfaces as a
+    // DataIntegrityViolationException at the call site (app-assigned UUID ids otherwise defer the
+    // INSERT to transaction commit, past the service's catch boundary). (D-109)
+    voteRepository.saveAndFlush(toEntity(vote));
   }
 
   @Override
