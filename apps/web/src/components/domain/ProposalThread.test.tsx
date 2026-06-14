@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import { ProposalThread } from './ProposalThread'
-import { useProposals, useCoSignProposal } from '@/api/proposals'
+import { useProposalsForTarget, useCoSignProposal } from '@/api/proposals'
 import { useAuthStore } from '@/store/authStore'
 import { useCampaignStore } from '@/store/campaignStore'
 import type { Proposal } from '@/types/proposal'
@@ -11,7 +11,7 @@ import type { CampaignRole } from '@/types/campaign'
 
 vi.mock('@/api/proposals')
 
-const mockUseProposals = vi.mocked(useProposals)
+const mockUseProposals = vi.mocked(useProposalsForTarget)
 const mockUseCoSign = vi.mocked(useCoSignProposal)
 
 const authorId = 'author-0000-0000-0000-000000000000'
@@ -31,8 +31,6 @@ const proposal: Proposal = {
   createdAt: '2026-06-14T10:00:00Z',
 }
 
-const otherTarget: Proposal = { ...proposal, proposalId: 'p2', targetId: 'e2' }
-
 const coSignMutate = vi.fn()
 
 function setStores(currentUserId: string | null, role: CampaignRole | null = 'player') {
@@ -46,13 +44,14 @@ function setStores(currentUserId: string | null, role: CampaignRole | null = 'pl
     )
 }
 
-function mockList(over: Partial<ReturnType<typeof useProposals>> = {}) {
+function mockList(over: Partial<ReturnType<typeof useProposalsForTarget>> = {}) {
+  // The backend scopes the list to this target server-side, so the hook returns only its proposals.
   mockUseProposals.mockReturnValue({
-    data: { proposals: [proposal, otherTarget], page: 0, size: 20, totalCount: 2 },
+    data: { proposals: [proposal], page: 0, size: 1, totalCount: 1 },
     isLoading: false,
     isError: false,
     ...over,
-  } as ReturnType<typeof useProposals>)
+  } as ReturnType<typeof useProposalsForTarget>)
 }
 
 beforeEach(() => {
@@ -66,16 +65,14 @@ beforeEach(() => {
 })
 
 describe('ProposalThread', () => {
-  it('renders only proposals for this target', () => {
+  it('requests the proposals scoped to this target', () => {
     render(<ProposalThread targetType="ACTOR" targetId="e1" />)
+    expect(mockUseProposals).toHaveBeenCalledWith('c1', 'ACTOR', 'e1')
     expect(screen.getByText('A reformed thief.')).toBeInTheDocument()
-    // The proposal targeting e2 is filtered out — its delta value happens to be identical, so assert
-    // a single rendered delta row instead.
-    expect(screen.getAllByText('A reformed thief.')).toHaveLength(1)
   })
 
   it('shows the empty state when this target has no proposals', () => {
-    mockList({ data: { proposals: [otherTarget], page: 0, size: 20, totalCount: 1 } })
+    mockList({ data: { proposals: [], page: 0, size: 0, totalCount: 0 } })
     render(<ProposalThread targetType="ACTOR" targetId="e1" />)
     expect(screen.getByText(/no proposals yet/i)).toBeInTheDocument()
   })
@@ -88,6 +85,12 @@ describe('ProposalThread', () => {
 
   it('hides co-sign from the proposal author', () => {
     setStores(authorId)
+    render(<ProposalThread targetType="ACTOR" targetId="e1" />)
+    expect(screen.queryByRole('button', { name: /co-sign/i })).not.toBeInTheDocument()
+  })
+
+  it('hides co-sign from the GM (the GM decides, not co-signs)', () => {
+    setStores(otherId, 'gm')
     render(<ProposalThread targetType="ACTOR" targetId="e1" />)
     expect(screen.queryByRole('button', { name: /co-sign/i })).not.toBeInTheDocument()
   })

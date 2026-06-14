@@ -33,7 +33,11 @@ public class ProposalPersistenceAdapter implements ProposalRepository {
 
   @Override
   public void save(Proposal proposal) {
-    proposalRepository.save(toEntity(proposal));
+    // Flush eagerly so the uidx_proposals_open_target violation (the race-safe backstop for the
+    // D-106 concurrent-proposal rule) surfaces as a DataIntegrityViolationException at the call
+    // site rather than deferring to transaction commit, past the service's catch boundary — same
+    // rationale as saveVote. Proposal writes are low-frequency (create/transition/decide).
+    proposalRepository.saveAndFlush(toEntity(proposal));
   }
 
   @Override

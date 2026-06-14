@@ -17,6 +17,7 @@ import com.bluesteel.application.service.proposal.ProposalCoSignService;
 import com.bluesteel.domain.campaign.CampaignRole;
 import com.bluesteel.domain.exception.AuthorCannotCoSignException;
 import com.bluesteel.domain.exception.DuplicateVoteException;
+import com.bluesteel.domain.exception.GmCannotCoSignException;
 import com.bluesteel.domain.exception.InvalidProposalStateTransitionException;
 import com.bluesteel.domain.exception.ProposalNotFoundException;
 import com.bluesteel.domain.exception.UnauthorizedException;
@@ -88,6 +89,18 @@ class ProposalCoSignServiceTest {
     assertThatThrownBy(
             () -> sut.coSign(new CoSignProposalCommand(AUTHOR_ID, CAMPAIGN_ID, PROPOSAL_ID)))
         .isInstanceOf(AuthorCannotCoSignException.class);
+    verify(proposalRepository, never()).saveVote(any(ProposalVote.class));
+  }
+
+  @Test
+  @DisplayName("should throw GmCannotCoSignException when the GM co-signs (D-017)")
+  void coSign_byGm_throwsGmCannotCoSign() {
+    when(membershipPort.resolveRole(CAMPAIGN_ID, COSIGNER_ID))
+        .thenReturn(Optional.of(CampaignRole.GM));
+
+    assertThatThrownBy(
+            () -> sut.coSign(new CoSignProposalCommand(COSIGNER_ID, CAMPAIGN_ID, PROPOSAL_ID)))
+        .isInstanceOf(GmCannotCoSignException.class);
     verify(proposalRepository, never()).saveVote(any(ProposalVote.class));
   }
 

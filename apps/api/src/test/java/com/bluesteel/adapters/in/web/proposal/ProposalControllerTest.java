@@ -29,6 +29,7 @@ import com.bluesteel.domain.exception.AuthorCannotCoSignException;
 import com.bluesteel.domain.exception.ConcurrentProposalException;
 import com.bluesteel.domain.exception.DuplicateVoteException;
 import com.bluesteel.domain.exception.EmptyDeltaException;
+import com.bluesteel.domain.exception.GmCannotCoSignException;
 import com.bluesteel.domain.exception.InvalidProposalStateTransitionException;
 import com.bluesteel.domain.exception.ProposalNotFoundException;
 import com.bluesteel.domain.exception.ProposalTargetNotFoundException;
@@ -292,7 +293,7 @@ class ProposalControllerTest {
   @DisplayName("should return 200 with a paginated list and meta")
   @WithMockUser(username = CALLER, roles = "USER")
   void list_member_returns200() throws Exception {
-    when(listProposalsUseCase.list(CAMPAIGN_ID, CALLER_ID, null, 0, 20))
+    when(listProposalsUseCase.list(CAMPAIGN_ID, CALLER_ID, null, null, null, 0, 20))
         .thenReturn(new ProposalListView(List.of(view(ProposalStatus.OPEN)), 1L, 0, 20));
 
     mockMvc
@@ -302,6 +303,24 @@ class ProposalControllerTest {
         .andExpect(jsonPath("$.meta.totalCount").value(1))
         .andExpect(jsonPath("$.meta.page").value(0))
         .andExpect(jsonPath("$.meta.size").value(20));
+  }
+
+  @Test
+  @DisplayName("should scope the list to a target entity when targetType and targetId are given")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void list_withTarget_passesTargetThrough() throws Exception {
+    UUID targetId = UUID.fromString("44444444-4444-4444-4444-444444444444");
+    when(listProposalsUseCase.list(
+            CAMPAIGN_ID, CALLER_ID, null, ProposalTargetType.ACTOR, targetId, 0, 20))
+        .thenReturn(new ProposalListView(List.of(view(ProposalStatus.OPEN)), 1L, 0, 1));
+
+    mockMvc
+        .perform(
+            get("/api/v1/campaigns/{id}/proposals", CAMPAIGN_ID)
+                .param("targetType", "ACTOR")
+                .param("targetId", targetId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].proposalId").value(PROPOSAL_ID.toString()));
   }
 
   @Test
@@ -345,6 +364,20 @@ class ProposalControllerTest {
         .perform(post("/api/v1/campaigns/{id}/proposals/{pid}/votes", CAMPAIGN_ID, PROPOSAL_ID))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.errors[0].code").value("AUTHOR_CANNOT_COSIGN"));
+  }
+
+  @Test
+  @DisplayName("should return 422 GM_CANNOT_COSIGN when the GM co-signs")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void coSign_gm_returns422() throws Exception {
+    when(coSignProposalUseCase.coSign(
+            new CoSignProposalCommand(CALLER_ID, CAMPAIGN_ID, PROPOSAL_ID)))
+        .thenThrow(new GmCannotCoSignException("gm"));
+
+    mockMvc
+        .perform(post("/api/v1/campaigns/{id}/proposals/{pid}/votes", CAMPAIGN_ID, PROPOSAL_ID))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.errors[0].code").value("GM_CANNOT_COSIGN"));
   }
 
   @Test

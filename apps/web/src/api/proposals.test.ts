@@ -6,10 +6,12 @@ import { apiClient } from './client'
 import {
   proposalKeys,
   getProposals,
+  getProposalsForTarget,
   createProposal,
   coSignProposal,
   decideProposal,
   useProposals,
+  useProposalsForTarget,
   useCosignedProposals,
   useCreateProposal,
   useCoSignProposal,
@@ -63,6 +65,12 @@ describe('proposalKeys', () => {
       'list',
       { status: null, page: 1 },
     ])
+    expect(proposalKeys.target('c1', 'ACTOR', 'e1')).toEqual([
+      'proposals',
+      'c1',
+      'target',
+      { targetType: 'ACTOR', targetId: 'e1' },
+    ])
   })
 })
 
@@ -86,6 +94,36 @@ describe('getProposals', () => {
     expect(apiClient.get).toHaveBeenCalledWith(
       '/api/v1/campaigns/c1/proposals?status=COSIGNED&page=2&size=20'
     )
+  })
+})
+
+describe('getProposalsForTarget', () => {
+  it('requests the list scoped to the target entity', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope([proposal], { totalCount: 1 }))
+
+    const result = await getProposalsForTarget('c1', 'ACTOR', 'e1')
+
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/api/v1/campaigns/c1/proposals?targetType=ACTOR&targetId=e1'
+    )
+    expect(result.proposals).toEqual([proposal])
+  })
+})
+
+describe('useProposalsForTarget', () => {
+  it('fetches the target-scoped proposals on success', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope([proposal], { totalCount: 1 }))
+
+    const { result } = renderHook(() => useProposalsForTarget('c1', 'ACTOR', 'e1'), { wrapper })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.proposals).toEqual([proposal])
+  })
+
+  it('does not fetch when the campaign id is empty', () => {
+    renderHook(() => useProposalsForTarget('', 'ACTOR', 'e1'), { wrapper })
+
+    expect(apiClient.get).not.toHaveBeenCalled()
   })
 })
 

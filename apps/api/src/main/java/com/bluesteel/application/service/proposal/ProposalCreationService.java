@@ -25,6 +25,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -100,6 +101,8 @@ public class ProposalCreationService implements CreateProposalUseCase {
                             + command.sessionId()
                             + " does not exist in this campaign"));
 
+    // Fast path for the common case (D-106). The race window between this check and the insert is
+    // closed by the uidx_proposals_open_target partial unique index, caught below.
     if (proposalRepository.existsOpenForTarget(
         command.campaignId(), targetType, command.targetId())) {
       throw new ConcurrentProposalException(
@@ -118,7 +121,13 @@ public class ProposalCreationService implements CreateProposalUseCase {
             serializeDelta(command.proposedDelta()),
             now.plus(ttlDays, ChronoUnit.DAYS),
             now);
-    proposalRepository.save(proposal);
+    try {
+      proposalRepository.save(proposal);
+    } catch (DataIntegrityViolationException e) {
+      // Lost the race: a concurrent submission created the open/cosigned proposal first.
+      throw new ConcurrentProposalException(
+          "An open or cosigned proposal already exists for this target");
+    }
 
     log.info("Proposal created proposalId={} campaignId={}", proposal.id(), command.campaignId());
     return ProposalView.from(proposal);

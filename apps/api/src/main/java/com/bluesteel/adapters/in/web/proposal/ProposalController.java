@@ -12,6 +12,7 @@ import com.bluesteel.application.port.in.proposal.CreateProposalUseCase;
 import com.bluesteel.application.port.in.proposal.DecideProposalUseCase;
 import com.bluesteel.application.port.in.proposal.ListProposalsUseCase;
 import com.bluesteel.domain.proposal.ProposalStatus;
+import com.bluesteel.domain.proposal.ProposalTargetType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -71,15 +72,22 @@ public class ProposalController {
         .body(ApiResponse.success(ProposalResponse.from(view, objectMapper)));
   }
 
-  /** Lists the campaign's proposals (offset-paginated), accessible to any campaign member. */
+  /**
+   * Lists the campaign's proposals, accessible to any campaign member. Passing both {@code
+   * targetType} and {@code targetId} scopes the result to one entity (the profile thread, returned
+   * unpaginated); otherwise the campaign list is offset-paginated.
+   */
   @GetMapping
   public ResponseEntity<ApiResponse<List<ProposalResponse>>> list(
       @PathVariable UUID id,
       @RequestParam(required = false) ProposalStatus status,
+      @RequestParam(required = false) ProposalTargetType targetType,
+      @RequestParam(required = false) UUID targetId,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
     UUID callerId = resolveCallerId();
-    ProposalListView view = listProposalsUseCase.list(id, callerId, status, page, size);
+    ProposalListView view =
+        listProposalsUseCase.list(id, callerId, status, targetType, targetId, page, size);
     List<ProposalResponse> proposals =
         view.proposals().stream().map(p -> ProposalResponse.from(p, objectMapper)).toList();
     Map<String, Object> meta =

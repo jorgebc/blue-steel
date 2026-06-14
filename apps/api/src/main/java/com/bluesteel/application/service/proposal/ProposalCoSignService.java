@@ -5,8 +5,10 @@ import com.bluesteel.application.model.proposal.ProposalView;
 import com.bluesteel.application.port.in.proposal.CoSignProposalUseCase;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
 import com.bluesteel.application.port.out.proposal.ProposalRepository;
+import com.bluesteel.domain.campaign.CampaignRole;
 import com.bluesteel.domain.exception.AuthorCannotCoSignException;
 import com.bluesteel.domain.exception.DuplicateVoteException;
+import com.bluesteel.domain.exception.GmCannotCoSignException;
 import com.bluesteel.domain.exception.ProposalNotFoundException;
 import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.proposal.Proposal;
@@ -47,9 +49,16 @@ public class ProposalCoSignService implements CoSignProposalUseCase {
         command.campaignId(),
         command.callerId());
 
-    membershipPort
-        .resolveRole(command.campaignId(), command.callerId())
-        .orElseThrow(() -> new UnauthorizedException("Caller is not a member of this campaign"));
+    CampaignRole role =
+        membershipPort
+            .resolveRole(command.campaignId(), command.callerId())
+            .orElseThrow(
+                () -> new UnauthorizedException("Caller is not a member of this campaign"));
+    // The GM is the decider, not an endorser (D-017). Letting the GM co-sign would also consume
+    // their one vote slot and collide with the later approve/veto vote (D-109).
+    if (role == CampaignRole.GM) {
+      throw new GmCannotCoSignException("The GM decides proposals and cannot co-sign them");
+    }
 
     Proposal proposal =
         proposalRepository

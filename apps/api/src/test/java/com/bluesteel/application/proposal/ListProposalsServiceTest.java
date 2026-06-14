@@ -54,7 +54,7 @@ class ListProposalsServiceTest {
         .thenReturn(List.of(openProposal()));
     when(proposalRepository.countByCampaign(CAMPAIGN_ID, new ProposalFilter(null))).thenReturn(1L);
 
-    ProposalListView view = sut.list(CAMPAIGN_ID, CALLER_ID, null, 0, 20);
+    ProposalListView view = sut.list(CAMPAIGN_ID, CALLER_ID, null, null, null, 0, 20);
 
     assertThat(view.proposals()).hasSize(1);
     assertThat(view.totalCount()).isEqualTo(1L);
@@ -73,7 +73,8 @@ class ListProposalsServiceTest {
     when(proposalRepository.countByCampaign(CAMPAIGN_ID, new ProposalFilter(ProposalStatus.OPEN)))
         .thenReturn(0L);
 
-    ProposalListView view = sut.list(CAMPAIGN_ID, CALLER_ID, ProposalStatus.OPEN, 0, 20);
+    ProposalListView view =
+        sut.list(CAMPAIGN_ID, CALLER_ID, ProposalStatus.OPEN, null, null, 0, 20);
 
     assertThat(view.proposals()).isEmpty();
     assertThat(view.totalCount()).isZero();
@@ -89,7 +90,7 @@ class ListProposalsServiceTest {
         .thenReturn(List.of());
     when(proposalRepository.countByCampaign(CAMPAIGN_ID, new ProposalFilter(null))).thenReturn(0L);
 
-    ProposalListView view = sut.list(CAMPAIGN_ID, CALLER_ID, null, 0, 500);
+    ProposalListView view = sut.list(CAMPAIGN_ID, CALLER_ID, null, null, null, 0, 500);
 
     assertThat(view.size()).isEqualTo(100);
   }
@@ -99,8 +100,48 @@ class ListProposalsServiceTest {
   void list_nonMember_throwsUnauthorized() {
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> sut.list(CAMPAIGN_ID, CALLER_ID, null, 0, 20))
+    assertThatThrownBy(() -> sut.list(CAMPAIGN_ID, CALLER_ID, null, null, null, 0, 20))
         .isInstanceOf(UnauthorizedException.class);
+  }
+
+  @Test
+  @DisplayName("should scope to a single target entity unpaginated when target params are given")
+  void list_withTarget_usesFindByTarget() {
+    UUID targetId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(proposalRepository.findByTarget(CAMPAIGN_ID, ProposalTargetType.ACTOR, targetId))
+        .thenReturn(List.of(openProposal(), openProposal()));
+
+    ProposalListView view =
+        sut.list(CAMPAIGN_ID, CALLER_ID, null, ProposalTargetType.ACTOR, targetId, 0, 20);
+
+    assertThat(view.proposals()).hasSize(2);
+    assertThat(view.totalCount()).isEqualTo(2L);
+    assertThat(view.page()).isZero();
+  }
+
+  @Test
+  @DisplayName("should apply the status filter in memory over a target-scoped thread")
+  void list_withTargetAndStatus_filtersInMemory() {
+    UUID targetId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(proposalRepository.findByTarget(CAMPAIGN_ID, ProposalTargetType.ACTOR, targetId))
+        .thenReturn(List.of(openProposal()));
+
+    ProposalListView view =
+        sut.list(
+            CAMPAIGN_ID,
+            CALLER_ID,
+            ProposalStatus.APPROVED,
+            ProposalTargetType.ACTOR,
+            targetId,
+            0,
+            20);
+
+    assertThat(view.proposals()).isEmpty();
+    assertThat(view.totalCount()).isZero();
   }
 
   private static Proposal openProposal() {

@@ -7,6 +7,7 @@ import type {
   ProposalDecisionResult,
   ProposalListPage,
   ProposalStatus,
+  ProposalTargetType,
 } from '@/types/proposal'
 
 const PAGE_SIZE = 20
@@ -16,12 +17,13 @@ export const proposalKeys = {
   all: (campaignId: string) => ['proposals', campaignId] as const,
   list: (campaignId: string, status: ProposalStatus | undefined, page: number) =>
     [...proposalKeys.all(campaignId), 'list', { status: status ?? null, page }] as const,
+  target: (campaignId: string, targetType: ProposalTargetType, targetId: string) =>
+    [...proposalKeys.all(campaignId), 'target', { targetType, targetId }] as const,
 }
 
 /**
  * Fetches one offset-paginated page of proposals, optionally filtered by status. Reads the envelope
- * `meta` ({ page, size, totalCount }) so callers can drive paging; the endpoint has no target filter,
- * so per-entity views filter client-side.
+ * `meta` ({ page, size, totalCount }) so callers can drive paging.
  */
 export async function getProposals(
   campaignId: string,
@@ -33,6 +35,29 @@ export async function getProposals(
   if (status) params.set('status', status)
   params.set('page', String(page))
   params.set('size', String(size))
+  return fetchProposals(campaignId, params, page)
+}
+
+/**
+ * Fetches every proposal for one entity (the profile thread), server-side filtered by target so no
+ * proposal is missed beyond the first page. Returned unpaginated by the backend.
+ */
+export async function getProposalsForTarget(
+  campaignId: string,
+  targetType: ProposalTargetType,
+  targetId: string
+): Promise<ProposalListPage> {
+  const params = new URLSearchParams()
+  params.set('targetType', targetType)
+  params.set('targetId', targetId)
+  return fetchProposals(campaignId, params, 0)
+}
+
+async function fetchProposals(
+  campaignId: string,
+  params: URLSearchParams,
+  page: number
+): Promise<ProposalListPage> {
   const res = await apiClient.get<Proposal[]>(
     `/api/v1/campaigns/${campaignId}/proposals?${params.toString()}`
   )
@@ -80,6 +105,19 @@ export function useProposals(campaignId: string, status?: ProposalStatus, page =
   return useQuery({
     queryKey: proposalKeys.list(campaignId, status, page),
     queryFn: () => getProposals(campaignId, status, page),
+    enabled: campaignId !== '',
+  })
+}
+
+/** Every proposal for a single entity, newest first (the profile thread, F5.8). */
+export function useProposalsForTarget(
+  campaignId: string,
+  targetType: ProposalTargetType,
+  targetId: string
+) {
+  return useQuery({
+    queryKey: proposalKeys.target(campaignId, targetType, targetId),
+    queryFn: () => getProposalsForTarget(campaignId, targetType, targetId),
     enabled: campaignId !== '',
   })
 }

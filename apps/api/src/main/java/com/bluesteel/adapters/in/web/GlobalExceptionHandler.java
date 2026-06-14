@@ -14,6 +14,7 @@ import com.bluesteel.domain.exception.DuplicateVoteException;
 import com.bluesteel.domain.exception.EmailDeliveryException;
 import com.bluesteel.domain.exception.EmptyDeltaException;
 import com.bluesteel.domain.exception.EntityNotFoundException;
+import com.bluesteel.domain.exception.GmCannotCoSignException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
 import com.bluesteel.domain.exception.InvalidSessionStateTransitionException;
@@ -272,6 +273,13 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
   public ApiResponse<Void> handleAuthorCannotCoSign(AuthorCannotCoSignException ex) {
     return ApiResponse.error(ApiError.of("AUTHOR_CANNOT_COSIGN", ex.getMessage()));
+  }
+
+  /** The GM tried to co-sign; the GM decides proposals and never co-signs (D-017). */
+  @ExceptionHandler(GmCannotCoSignException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
+  public ApiResponse<Void> handleGmCannotCoSign(GmCannotCoSignException ex) {
+    return ApiResponse.error(ApiError.of("GM_CANNOT_COSIGN", ex.getMessage()));
   }
 
   /** A member voted twice on the same proposal (D-109). */
