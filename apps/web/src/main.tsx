@@ -16,6 +16,7 @@ import { DiffReviewPage } from '@/features/input/DiffReviewPage'
 import { SessionsListPage } from '@/features/input/SessionsListPage'
 import { SessionDetailPage } from '@/features/input/SessionDetailPage'
 import { QueryPage } from '@/features/query/QueryPage'
+import { ProposalReviewQueuePage } from '@/features/proposals/ProposalReviewQueuePage'
 import { ExplorationLayout } from '@/features/exploration/ExplorationLayout'
 import { EntitiesPage } from '@/features/exploration/entities/EntitiesPage'
 import { EntityProfilePage } from '@/features/exploration/entities/EntityProfilePage'
@@ -74,6 +75,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                   <Route path="sessions/:sessionId" element={<SessionDetailPage />} />
                   <Route path="sessions/:sessionId/diff" element={<DiffReviewPage />} />
                   <Route path="query" element={<QueryPage />} />
+                  <Route path="proposals" element={<ProposalReviewQueuePage />} />
                   <Route path="explore" element={<ExplorationLayout />}>
                     <Route index element={<Navigate to="timeline" replace />} />
                     <Route path="timeline" element={<TimelinePage />} />

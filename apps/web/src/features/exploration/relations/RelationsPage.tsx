@@ -16,7 +16,6 @@ import { useAllEntities } from '@/api/worldstate'
 import { useRelations } from '@/api/relations'
 import { AnnotationThread } from '@/components/domain/AnnotationThread'
 import { InlineBanner } from '@/components/domain/InlineBanner'
-import { ProposeChangeButton } from '@/components/domain/ProposeChangeButton'
 import { graphTransform } from './graphTransform'
 import { RelationNode } from './RelationNode'
 import { RelationEdge } from './RelationEdge'
@@ -195,9 +194,8 @@ export function RelationsPage() {
 
       {!isLoading && !isError && selectedRelationId !== null && (
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-start justify-between gap-4">
+          <div className="mb-4">
             <h2 className="text-sm font-semibold text-slate-700">{selectedRelationLabel}</h2>
-            <ProposeChangeButton />
           </div>
           <AnnotationThread entityType="relation" entityId={selectedRelationId} />
         </div>

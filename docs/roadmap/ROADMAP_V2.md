@@ -66,23 +66,23 @@ entity versions. Activates the workflow v1 shipped as data model only (D-016): `
 | F5.6 | Backend: concurrent-proposal conflict rule *(umbrella)* | ✅ |
 | F5.6.1 | Repository `existsOpenProposalForTarget` query (IT) — shipped with F5.1 data layer | ✅ |
 | F5.6.2 | Enforce gate rule in creation/decision + error code → handler — shipped with F5.2 | ✅ |
-| F5.7 | Frontend: activate "Propose a change" + submission overlay *(umbrella)* | 🔲 |
-| F5.7-SETUP | Human: `shadcn add select` | 👤 |
-| F5.7.1 | `types/proposal.ts` — DTO mirrors (Proposal incl `sessionId`, requests, statuses) | 🔲 |
-| F5.7.2 | `api/proposals.ts` — keys + `getProposals`/`createProposal` + hooks | 🔲 |
-| F5.7.3 | `ProposalSubmitForm.tsx` — RHF+zod, session `<Select>`, field-change capture, banner | 🔲 |
-| F5.7.4 | Activate `ProposeChangeButton.tsx` → opens `FocusedOverlay` with the form | 🔲 |
-| F5.8 | Frontend: proposal list/detail on profiles + co-sign *(umbrella)* | 🔲 |
-| F5.8.1 | `ProposalStatusBadge.tsx` — five states → shadcn `Badge` | 🔲 |
-| F5.8.2 | `api/proposals.ts` — add `useCoSignProposal` hook | 🔲 |
-| F5.8.3 | `ProposalThreadSkeleton.tsx` — DTO-derived loading state | 🔲 |
-| F5.8.4 | `ProposalThread.tsx` — per-entity list + co-sign (role/author gated) | 🔲 |
-| F5.8.5 | Mount `ProposalThread` in `EntityProfileView.tsx` | 🔲 |
-| F5.9 | Frontend: GM review queue (approve/veto) *(umbrella)* | 🔲 |
-| F5.9.1 | `api/proposals.ts` — add `useDecideProposal` + cosigned-queue hook | 🔲 |
-| F5.9.2 | `ProposalReviewCard.tsx` — approve (editable overlay) / veto + result link | 🔲 |
-| F5.9.3 | `ProposalReviewQueuePage.tsx` — GM-gated queue + skeleton | 🔲 |
-| F5.9.4 | Route + Sidebar nav entry (GM-gated) | 🔲 |
+| F5.7 | Frontend: activate "Propose a change" + submission overlay *(umbrella)* | ✅ |
+| F5.7-SETUP | Human: `shadcn add select` | ✅ |
+| F5.7.1 | `types/proposal.ts` — DTO mirrors (Proposal incl `sessionId`, requests, statuses) | ✅ |
+| F5.7.2 | `api/proposals.ts` — keys + `getProposals`/`createProposal` + hooks | ✅ |
+| F5.7.3 | `ProposalSubmitForm.tsx` — RHF+zod, session `<Select>`, field-change capture, banner | ✅ |
+| F5.7.4 | Activate `ProposeChangeButton.tsx` → opens `FocusedOverlay` with the form | ✅ |
+| F5.8 | Frontend: proposal list/detail on profiles + co-sign *(umbrella)* | ✅ |
+| F5.8.1 | `ProposalStatusBadge.tsx` — five states → shadcn `Badge` | ✅ |
+| F5.8.2 | `api/proposals.ts` — add `useCoSignProposal` hook | ✅ |
+| F5.8.3 | `ProposalThreadSkeleton.tsx` — DTO-derived loading state | ✅ |
+| F5.8.4 | `ProposalThread.tsx` — per-entity list + co-sign (role/author gated) | ✅ |
+| F5.8.5 | Mount `ProposalThread` in `EntityProfileView.tsx` | ✅ |
+| F5.9 | Frontend: GM review queue (approve/veto) *(umbrella)* | ✅ |
+| F5.9.1 | `api/proposals.ts` — add `useDecideProposal` + cosigned-queue hook | ✅ |
+| F5.9.2 | `ProposalReviewCard.tsx` — approve (editable overlay) / veto + result link | ✅ |
+| F5.9.3 | `ProposalReviewQueuePage.tsx` — GM-gated queue + skeleton | ✅ |
+| F5.9.4 | Route + Sidebar nav entry (GM-gated) | ✅ |
 
 #### F5.1 — Backend: proposal domain model + ports
 
