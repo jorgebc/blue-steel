@@ -114,6 +114,14 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-101 | Hybrid preference persistence (DB source of truth + localStorage mirror) | ✅ Active | Phase 8 |
 | D-102 | Global settings live in a top-right account menu; removed from campaign sidebar | ✅ Active | Phase 8 |
 | D-103 | Per-campaign content language, fixed at creation, injected into LLM prompts | ✅ Active | Phase 9 |
+| D-104 | `proposed_delta` JSONB shape mirrors entity-version `changed_fields` | ✅ Active | Phase 5 |
+| D-105 | Proposal TTL: 30-day default, open/cosigned expiry, env-overridable | ✅ Active | Phase 5 |
+| D-106 | Concurrent-proposal rule: block at submission, 409 CONCURRENT_PROPOSAL_EXISTS | ✅ Active | Phase 5 |
+| D-107 | Proposal↔session linkage is provenance only; approved versions stamped with latest committed session | ✅ Active | Phase 5 |
+| D-108 | v2 proposal target scope: actor and space only; events and relations deferred | ✅ Active | Phase 5 |
+| D-109 | GM decision recorded as a proposal_votes row; co-sign recorded as cosign row | ✅ Active | Phase 5 |
+| D-110 | GM edit-on-approve: optional editedDelta replaces author's proposed_delta | ✅ Active | Phase 5 |
+| D-111 | v2 build sequence: phases 5→6→7→8→9; post-1.0 SemVer minor mapping | ✅ Active | Phase 5 |
 
 ---
 
@@ -2125,6 +2133,154 @@ A campaign's canonical record must be single-language: mixing languages produces
 - Auto-detect language from each summary — rejected; non-deterministic and allows drift within a campaign.
 
 **Cross-refs:** D-099 (two language axes), D-093 (Gemini chat + embeddings), D-088 (Ollama + embedding dimension), D-062 (native pgvector, no Spring AI VectorStore), D-003 (grounded citations — unchanged).
+
+---
+
+### D-104 — `proposed_delta` JSONB shape mirrors entity-version `changed_fields`
+
+**Date:** 2026-06-14
+**Status:** Active
+
+**Decision:**
+`proposals.proposed_delta` uses the same `{ "fieldName": "newValue" }` JSONB shape as the `changed_fields` column in entity version tables (`actor_versions`, `space_versions`, etc.) and the `changedFields`/`editedFields` keys in the DiffPayload/CommitPayload contracts (D-076, ARCHITECTURE §7.6). It is a flat JSON object mapping writable field names to their proposed new values. The field set is constrained to the writable fields of the target entity type (e.g., for `ACTOR`: `name`, `description`, `aliases`, `status`; for `SPACE`: `name`, `description`, `location`). All values are strings or JSON-serializable primitives — the same types that appear in `full_snapshot`. `target_entity_type`, `target_entity_id`, and `proposed_delta` are nullable in the DB (schema 0018) but enforced **non-null** in the application at creation (`ProposalCreationService`). An empty `{}` delta is rejected with `422 EMPTY_DELTA`.
+
+This shape directly enables the approve-time `ProposalDeltaMapper`: it reads the target's current `full_snapshot`, merges the effective delta (GM-edited if supplied, else `proposed_delta`), and produces an `EntityWriteCommand` with `changed_fields = proposed_delta` and the merged `full_snapshot`. No translation layer is required.
+
+**Reason:**
+Mirroring `changed_fields` eliminates any translation at approval time — the proposal delta IS the new version's `changed_fields`. Using a custom delta shape would require a translation step that could diverge from the version history schema over time, producing subtle mismatches. Keeping the shapes identical is the "one less thing to maintain" principle (Bloch: minimal surface, no surprises). The linchpin property: `ProposalDeltaMapper.apply(delta, snapshot)` is structurally identical to how `CommitService` applies `editedFields` at session commit.
+
+**Alternatives considered:**
+- Array-of-patch form (`[{ "field": "name", "from": "...", "to": "..." }]`) — rejected; adds a `from` value not present in `changed_fields`, requiring translation at approval time and storing redundant data the DB already holds in `full_snapshot`.
+- Nested delta by category — rejected; `changed_fields` is a flat map. Nesting adds schema complexity with no query benefit.
+
+---
+
+### D-105 — Proposal TTL: 30-day default, open/cosigned expiry, env-overridable
+
+**Date:** 2026-06-14
+**Status:** Active
+**Extends:** D-019
+
+**Decision:**
+Proposal TTL is **30 days** from creation time. `expires_at` is computed at creation as `now() + ttl_days` and stored in `proposals.expires_at`. The expiry scheduler (F5.5.2) sweeps `open` and `cosigned` proposals whose `expires_at < now()` and flips them to `expired` in one bulk SQL statement. Terminal statuses (`approved`, `rejected`, `expired`) are never touched by the expiry sweep. Clock source: **database wall clock** (`NOW()` in the bulk-flip SQL), consistent with how `sessions.updated_at` is managed. Two env knobs: `PROPOSAL_TTL_DAYS` → `blue-steel.proposals.ttl-days` (default `30`) controls the TTL applied at creation; `PROPOSAL_EXPIRY_SWEEP_CRON` → `blue-steel.proposals.expiry-sweep-cron` (default `0 0 * * * *` — hourly) controls the scheduler interval, matching the `SessionTimeoutRecoveryScheduler` pattern (D-074).
+
+**Reason:**
+30 days maps to the weekly RPG session cadence: a proposal survives approximately four game sessions, enough for a co-signer to appear and the GM to review, without letting stale proposals pile up for months. Using the DB clock (rather than Java's `LocalDateTime.now()`) eliminates clock-drift concerns. Two separate knobs let operators tune sweep frequency independently of the business TTL.
+
+**Alternatives considered:**
+- 7-day TTL — too short; a proposal submitted mid-session might not have a co-signer by the next session, which is 7 days away.
+- 90-day TTL — too long; stale proposals degrade the GM queue signal-to-noise ratio.
+- Application clock (`LocalDateTime.now()`) — rejected; inconsistent with the existing `sessions.updated_at` SQL pattern. DB clock is the authoritative source.
+
+---
+
+### D-106 — Concurrent-proposal rule: block at submission, 409 CONCURRENT_PROPOSAL_EXISTS
+
+**Date:** 2026-06-14
+**Status:** Active
+
+**Decision:**
+If an `open` or `cosigned` proposal already exists for `(campaign_id, target_entity_type, target_entity_id)`, a new proposal submission is rejected with `409 CONCURRENT_PROPOSAL_EXISTS`. The block lifts automatically when the conflicting proposal reaches any terminal state (`approved`, `rejected`, `expired`). No merge logic, no queueing, no exception for the same author. `ProposalCreationService` calls `ProposalRepository.existsOpenProposalForTarget(campaignId, targetType, targetId)` inside the creation transaction (F5.6.1); if it returns `true`, it throws `ConcurrentProposalException` → `GlobalExceptionHandler` maps to `409`.
+
+**Reason:**
+Allowing two concurrent proposals on the same entity creates approval-order dependency: approving proposal #1 changes the entity's `full_snapshot`, making proposal #2's `proposed_delta` apply against a different baseline than intended. Blocking at submission is the simplest rule that avoids this: a player waits for the existing proposal to resolve. Because proposals resolve relatively quickly (TTL 30d, GM decisions typically faster), the user-visible friction is minimal.
+
+**Alternatives considered:**
+- Flag at GM decision time (allow concurrent submissions, detect on approval) — rejected; the GM sees both proposals, approves #1, then must re-validate #2 against the new snapshot. Higher implementation complexity, less visible failure mode.
+- Block only if same author — rejected; two different players proposing conflicting changes to the same entity create the identical snapshot-race problem. Author identity does not change the baseline concern.
+
+---
+
+### D-107 — Proposal↔session linkage is provenance only; approved versions stamped with latest committed session
+
+**Date:** 2026-06-14
+**Status:** Active
+
+**Decision:**
+`proposals.session_id` (migration 0020, nullable FK → `sessions.id`) is a creator-selected **provenance/context** field — the session the author believes prompted the change. It is not the session the resulting entity version is attributed to. When the GM approves: (1) `ProposalDecisionService` calls `SessionRepository.findLatestCommittedSessionId(campaignId)` (F5.4.2); (2) the result is passed to `ProposalDeltaMapper` as `sessionId` (F5.4.3); (3) the new entity version row is written via the existing `WorldStatePort.writeEntity` path stamped with this latest committed session ID.
+
+This preserves two invariants: `version_number` co-monotonicity with `sessions.sequence_number` (current state = MAX(version_number) = version written against the most recently committed session), and no as-of-session reconstruction anomaly (point-in-time reads by session remain consistent). The provenance `session_id` is surfaced read-only in `ProposalResponse.sessionId` for display; it does not influence entity version attribution.
+
+**Reason:**
+Stamping with the provenance session would break co-monotonicity: if session 5 is the latest and a proposal references session 3 (provenance), the new version would be attributed to session 3 even though the world has advanced to session 5. Point-in-time queries "as of session 4" would then silently include this change, which was not committed until after session 5. Using the latest committed session is the only consistent choice.
+
+**Alternatives considered:**
+- Stamp with the proposal's provenance `session_id` — rejected; breaks as-of-session reconstruction and co-monotonicity. Point-in-time queries would silently include retroactively applied changes.
+- No session stamp on proposal-approved versions — rejected; would create version rows with no session attribution, breaking the world-state versioning model (D-035) and Timeline queries.
+
+---
+
+### D-108 — v2 proposal target scope: actor and space only; events and relations deferred
+
+**Date:** 2026-06-14
+**Status:** Active
+
+**Decision:**
+In v2, proposals may target `ACTOR` and `SPACE` entity types only. Proposals targeting `EVENT` or `RELATION` are rejected with `422 UNSUPPORTED_TARGET_TYPE`. The D-012 "relation" proposal affordance is explicitly deferred beyond v2. `ProposalTargetType` has two values: `ACTOR | SPACE`. Enforcement: `ProposalCreationService` validates `targetType ∈ {ACTOR, SPACE}` before persisting; the frontend `ProposeChangeButton` is rendered only on actor/space profile views.
+
+**Reason:**
+Actor and space proposals cover the highest-value corrections (character traits, location descriptions) and map cleanly onto the flat `changed_fields` shape (D-104). Events and relations have structured entity-link fields (participant lists, source/target endpoints from D-095) that cannot be expressed cleanly in a flat `{ "fieldName": "newValue" }` delta without either flattening structural data or extending the delta schema. Restricting to actor/space keeps `ProposalDeltaMapper` to two well-understood entity types, deferring the complexity until there is user demand.
+
+**Alternatives considered:**
+- Include events and relations in v2 — rejected; their structured entity-link fields (D-095) require a different delta shape, making `ProposalDeltaMapper` significantly more complex with no confirmed user demand.
+- Defer all proposals to v3 — rejected; actors and spaces are the most commonly corrected entity types and the co-sign/approval pipeline is the primary v2 deliverable (D-016).
+
+---
+
+### D-109 — GM decision recorded as a proposal_votes row; co-sign recorded as cosign row
+
+**Date:** 2026-06-14
+**Status:** Active
+
+**Decision:**
+Every proposal vote action is recorded as a `proposal_votes` row using the existing `vote_kind` column:
+- Player co-sign → `vote_kind = 'cosign'`, any non-author campaign member
+- GM approve → `vote_kind = 'approve'`, GM only
+- GM reject → `vote_kind = 'reject'`, GM only
+
+The `proposal.status` flip and the `proposal_votes` INSERT are atomic within the same `@Transactional` in `ProposalCoSignService` / `ProposalDecisionService`. The `uidx_proposal_votes_proposal_voter` unique index (schema 0019) enforces one vote per voter per proposal; a duplicate vote attempt is caught as `DataIntegrityViolationException` → `409 DUPLICATE_VOTE`.
+
+**Reason:**
+Using `proposal_votes` for all vote kinds provides a complete, queryable audit trail: who voted, when, and what they voted — in a uniform row structure with co-signs. A separate `approved_by`/`decided_at` column on `proposals` would give the same data for GM decisions but break the uniform structure; any report needing "who interacted with this proposal" would join two sources. The `proposal_votes` schema (from D-016's v1 data model) already carries `vote_kind` for exactly this purpose.
+
+**Alternatives considered:**
+- GM decision fields on `proposals` (`approved_by`, `rejected_by`, `decided_at`) — rejected; second data source for the same audit trail, inconsistent with the co-sign row structure.
+- No vote row for GM decisions (status flip only) — rejected; loses the audit trail. Who approved and when is a critical campaign governance record.
+
+---
+
+### D-110 — GM edit-on-approve: optional `editedDelta` replaces author's `proposed_delta`
+
+**Date:** 2026-06-14
+**Status:** Active
+
+**Decision:**
+`POST .../proposals/{pid}/decision` accepts an optional `editedDelta` field in `DecideProposalRequest` (same `{ "fieldName": "newValue" }` shape as `proposed_delta`, D-104). When `decision = approve` and `editedDelta` is present and non-empty, it **replaces** `proposed_delta` as the effective delta passed to `ProposalDeltaMapper`. When absent or null, the author's original `proposed_delta` is used unchanged. `editedDelta` must not be sent with `decision = reject` (validated at the adapter, `400` if present). The `DecideProposalCommand` carries both `decision` and `Optional<Map<String, Object>> editedDelta`. The GM review UI (F5.9.2) pre-fills the approval overlay with the author's delta so the GM edits only the fields they want to change.
+
+**Reason:**
+Without edit-on-approve, a GM who agrees with the intent but disagrees with the phrasing must either reject (harsh, loses the co-sign social signal) or approve a suboptimal delta. Edit-on-approve gives the GM editorial authority — they can refine the player's proposal without blocking the workflow. The `editedDelta` follows D-104's shape so no new validation logic is required; the same field-set constraints applied to `proposed_delta` at submission apply to `editedDelta` at approval.
+
+**Alternatives considered:**
+- No GM editing — rejected; forces approve-or-reject with no middle path, undermining the GM's canonical authority over world state phrasing (D-018).
+- GM edits by creating a replacement proposal — rejected; loses the original co-sign social proof and player attribution. Edit-on-approve keeps the proposal as the unit of record.
+
+---
+
+### D-111 — v2 build sequence: phases 5→6→7→8→9; post-1.0 SemVer minor mapping
+
+**Date:** 2026-06-14
+**Status:** Active
+**Extends:** D-090
+
+**Decision:**
+v2 phases are built in numerical order: **Phase 5 (Proposals) → Phase 6 (Input & Query Enhancements) → Phase 7 (Campaign Export) → Phase 8 (User Profile & Settings) → Phase 9 (Per-Campaign Content Language)**. No resequencing (unlike v1's Phase 4 before Phase 3 per D-094). Post-1.0 SemVer minor mapping: `1.1.0` = Phase 5, `1.2.0` = Phase 6, `1.3.0` = Phase 7, `1.4.0` = Phase 8, `1.5.0` = Phase 9. Version bumps follow D-090 conventions (both `apps/web/package.json` and `apps/api/pom.xml` bumped in one `chore:` commit; annotated tag on `main` after merge).
+
+**Reason:**
+Phase 5 (Proposals) is the v2 headline feature and unlocks the social approval loop the v1 data model anticipated (D-016). Phases 6–7 extend existing v1 features and are independent of Phase 5 completion. Phases 8–9 are infrastructure/personalization layers; Phase 8's i18n infrastructure is reused by Phase 9's frontend, making 8→9 order natural. Numerical order avoids the resequencing complexity that D-094 introduced in v1.
+
+**Alternatives considered:**
+- Phase 8/9 before Phase 7 — considered; user personalization is more broadly useful than export. Rejected in favour of numerical order; campaign export is a safety feature (pre-deletion guard) that logically precedes personalization in the product value hierarchy.
+- Resequence Phase 6 after Phase 8/9 — rejected; Phase 6 closes the most visible v1 UX gaps (add entity in diff review, Q&A history) and should ship while Phase 5's workflow is fresh in users' minds.
 
 ---
 
