@@ -3,10 +3,13 @@ package com.bluesteel.adapters.in.web.proposal;
 import com.bluesteel.adapters.in.web.ApiResponse;
 import com.bluesteel.application.model.proposal.CoSignProposalCommand;
 import com.bluesteel.application.model.proposal.CreateProposalCommand;
+import com.bluesteel.application.model.proposal.DecideProposalCommand;
+import com.bluesteel.application.model.proposal.ProposalDecisionResult;
 import com.bluesteel.application.model.proposal.ProposalListView;
 import com.bluesteel.application.model.proposal.ProposalView;
 import com.bluesteel.application.port.in.proposal.CoSignProposalUseCase;
 import com.bluesteel.application.port.in.proposal.CreateProposalUseCase;
+import com.bluesteel.application.port.in.proposal.DecideProposalUseCase;
 import com.bluesteel.application.port.in.proposal.ListProposalsUseCase;
 import com.bluesteel.domain.proposal.ProposalStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,16 +37,19 @@ public class ProposalController {
   private final CreateProposalUseCase createProposalUseCase;
   private final ListProposalsUseCase listProposalsUseCase;
   private final CoSignProposalUseCase coSignProposalUseCase;
+  private final DecideProposalUseCase decideProposalUseCase;
   private final ObjectMapper objectMapper;
 
   public ProposalController(
       CreateProposalUseCase createProposalUseCase,
       ListProposalsUseCase listProposalsUseCase,
       CoSignProposalUseCase coSignProposalUseCase,
+      DecideProposalUseCase decideProposalUseCase,
       ObjectMapper objectMapper) {
     this.createProposalUseCase = createProposalUseCase;
     this.listProposalsUseCase = listProposalsUseCase;
     this.coSignProposalUseCase = coSignProposalUseCase;
+    this.decideProposalUseCase = decideProposalUseCase;
     this.objectMapper = objectMapper;
   }
 
@@ -88,6 +94,23 @@ public class ProposalController {
     UUID callerId = resolveCallerId();
     ProposalView view = coSignProposalUseCase.coSign(new CoSignProposalCommand(callerId, id, pid));
     return ResponseEntity.ok(ApiResponse.success(ProposalResponse.from(view, objectMapper)));
+  }
+
+  /**
+   * Records the GM's approve-with-edit or veto decision; returns 200 with the resulting entity
+   * version id (null on veto). GM-only gating is enforced in the service (D-018).
+   */
+  @PostMapping("/{pid}/decision")
+  public ResponseEntity<ApiResponse<ProposalDecisionResponse>> decide(
+      @PathVariable UUID id,
+      @PathVariable UUID pid,
+      @Valid @RequestBody DecideProposalRequest request) {
+    UUID callerId = resolveCallerId();
+    ProposalDecisionResult result =
+        decideProposalUseCase.decide(
+            new DecideProposalCommand(
+                callerId, id, pid, request.decision(), request.editedDelta()));
+    return ResponseEntity.ok(ApiResponse.success(ProposalDecisionResponse.from(result)));
   }
 
   private UUID resolveCallerId() {

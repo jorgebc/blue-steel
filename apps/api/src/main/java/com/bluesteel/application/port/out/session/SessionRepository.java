@@ -35,4 +35,11 @@ public interface SessionRepository {
    * {@code @Transactional} boundary so the result is serialized by the one-active-draft lock.
    */
   int nextSequenceNumber(UUID campaignId);
+
+  /**
+   * Returns the id of the campaign's committed session with the highest {@code sequence_number}, or
+   * empty when none has committed. Backs the proposal-approval version stamp, keeping {@code
+   * version_number}↔session ordering monotonic (D-107).
+   */
+  Optional<UUID> findLatestCommittedSessionId(UUID campaignId);
 }

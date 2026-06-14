@@ -55,6 +55,11 @@ public class SessionPersistenceAdapter implements SessionRepository {
     return jpaRepository.nextSequenceNumber(campaignId);
   }
 
+  @Override
+  public Optional<UUID> findLatestCommittedSessionId(UUID campaignId) {
+    return jpaRepository.findLatestCommittedSessionId(campaignId);
+  }
+
   private Session toDomain(SessionJpaEntity e) {
     return Session.reconstitute(
         e.getId(),

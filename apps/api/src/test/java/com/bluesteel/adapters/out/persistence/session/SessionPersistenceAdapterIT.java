@@ -222,6 +222,28 @@ class SessionPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
     assertThat(adapter.countByCampaignId(campaignId)).isEqualTo(2);
   }
 
+  @Test
+  @DisplayName("should return empty latest-committed-session id when none has committed (D-107)")
+  void findLatestCommittedSessionId_noneCommitted_returnsEmpty() {
+    assertThat(adapter.findLatestCommittedSessionId(campaignId)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("should return the committed session with the highest sequence number (D-107)")
+  void findLatestCommittedSessionId_returnsHighestSequence() {
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    committedSession(1, now);
+    Session latest = committedSession(2, now);
+
+    // a later non-committed draft must not win over the committed session
+    Session draft = Session.create(UUID.randomUUID(), campaignId, ownerId, now);
+    draft.startProcessing();
+    draft.toDraft("{}");
+    adapter.save(draft);
+
+    assertThat(adapter.findLatestCommittedSessionId(campaignId)).contains(latest.id());
+  }
+
   private Session committedSession(int sequenceNumber, Instant now) {
     Session s = Session.create(UUID.randomUUID(), campaignId, ownerId, now);
     s.startProcessing();

@@ -10,12 +10,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.proposal.CoSignProposalCommand;
 import com.bluesteel.application.model.proposal.CreateProposalCommand;
+import com.bluesteel.application.model.proposal.DecideProposalCommand;
+import com.bluesteel.application.model.proposal.ProposalDecisionResult;
+import com.bluesteel.application.model.proposal.ProposalDecisionType;
 import com.bluesteel.application.model.proposal.ProposalListView;
 import com.bluesteel.application.model.proposal.ProposalView;
 import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.health.CheckHealthUseCase;
 import com.bluesteel.application.port.in.proposal.CoSignProposalUseCase;
 import com.bluesteel.application.port.in.proposal.CreateProposalUseCase;
+import com.bluesteel.application.port.in.proposal.DecideProposalUseCase;
 import com.bluesteel.application.port.in.proposal.ListProposalsUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
@@ -25,8 +29,10 @@ import com.bluesteel.domain.exception.AuthorCannotCoSignException;
 import com.bluesteel.domain.exception.ConcurrentProposalException;
 import com.bluesteel.domain.exception.DuplicateVoteException;
 import com.bluesteel.domain.exception.EmptyDeltaException;
+import com.bluesteel.domain.exception.InvalidProposalStateTransitionException;
 import com.bluesteel.domain.exception.ProposalNotFoundException;
 import com.bluesteel.domain.exception.ProposalTargetNotFoundException;
+import com.bluesteel.domain.exception.UnauthorizedException;
 import com.bluesteel.domain.exception.UnsupportedTargetTypeException;
 import com.bluesteel.domain.proposal.ProposalStatus;
 import com.bluesteel.domain.proposal.ProposalTargetType;
@@ -66,6 +72,7 @@ class ProposalControllerTest {
   @MockitoBean private CreateProposalUseCase createProposalUseCase;
   @MockitoBean private ListProposalsUseCase listProposalsUseCase;
   @MockitoBean private CoSignProposalUseCase coSignProposalUseCase;
+  @MockitoBean private DecideProposalUseCase decideProposalUseCase;
 
   @MockitoBean private CheckHealthUseCase checkHealthUseCase;
   @MockitoBean private AdminBootstrapUseCase adminBootstrapUseCase;
@@ -366,6 +373,136 @@ class ProposalControllerTest {
         .perform(post("/api/v1/campaigns/{id}/proposals/{pid}/votes", CAMPAIGN_ID, PROPOSAL_ID))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.errors[0].code").value("PROPOSAL_NOT_FOUND"));
+  }
+
+  // -------------------------------------------------------------------------
+  // POST /api/v1/campaigns/{id}/proposals/{pid}/decision
+  // -------------------------------------------------------------------------
+
+  private static final UUID VERSION_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
+
+  @Test
+  @DisplayName("should return 200 with the resulting entity version id on approve")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void decide_approve_returns200() throws Exception {
+    when(decideProposalUseCase.decide(
+            new DecideProposalCommand(
+                CALLER_ID, CAMPAIGN_ID, PROPOSAL_ID, ProposalDecisionType.APPROVE, null)))
+        .thenReturn(new ProposalDecisionResult(VERSION_ID));
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/proposals/{pid}/decision", CAMPAIGN_ID, PROPOSAL_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{ \"decision\": \"APPROVE\" }"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.resultingEntityVersionId").value(VERSION_ID.toString()));
+  }
+
+  @Test
+  @DisplayName("should pass the GM-edited delta through on approve-with-edit")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void decide_approveWithEdit_passesEditedDelta() throws Exception {
+    when(decideProposalUseCase.decide(
+            new DecideProposalCommand(
+                CALLER_ID,
+                CAMPAIGN_ID,
+                PROPOSAL_ID,
+                ProposalDecisionType.APPROVE,
+                Map.of("name", "GM Name"))))
+        .thenReturn(new ProposalDecisionResult(VERSION_ID));
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/proposals/{pid}/decision", CAMPAIGN_ID, PROPOSAL_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{ \"decision\": \"APPROVE\", \"editedDelta\": { \"name\": \"GM Name\" } }"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("should return 200 with a null version id on veto")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void decide_veto_returns200() throws Exception {
+    when(decideProposalUseCase.decide(
+            new DecideProposalCommand(
+                CALLER_ID, CAMPAIGN_ID, PROPOSAL_ID, ProposalDecisionType.REJECT, null)))
+        .thenReturn(new ProposalDecisionResult(null));
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/proposals/{pid}/decision", CAMPAIGN_ID, PROPOSAL_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{ \"decision\": \"REJECT\" }"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.resultingEntityVersionId").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("should return 400 when the decision field is missing")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void decide_missingDecision_returns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/proposals/{pid}/decision", CAMPAIGN_ID, PROPOSAL_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{ }"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("should return 403 FORBIDDEN when the caller is not the GM")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void decide_nonGm_returns403() throws Exception {
+    when(decideProposalUseCase.decide(
+            new DecideProposalCommand(
+                CALLER_ID, CAMPAIGN_ID, PROPOSAL_ID, ProposalDecisionType.APPROVE, null)))
+        .thenThrow(new UnauthorizedException("Only the GM may decide a proposal"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/proposals/{pid}/decision", CAMPAIGN_ID, PROPOSAL_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{ \"decision\": \"APPROVE\" }"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errors[0].code").value("FORBIDDEN"));
+  }
+
+  @Test
+  @DisplayName("should return 404 PROPOSAL_NOT_FOUND when the proposal is missing")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void decide_missing_returns404() throws Exception {
+    when(decideProposalUseCase.decide(
+            new DecideProposalCommand(
+                CALLER_ID, CAMPAIGN_ID, PROPOSAL_ID, ProposalDecisionType.APPROVE, null)))
+        .thenThrow(new ProposalNotFoundException("missing"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/proposals/{pid}/decision", CAMPAIGN_ID, PROPOSAL_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{ \"decision\": \"APPROVE\" }"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.errors[0].code").value("PROPOSAL_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("should return 422 when the proposal is not cosigned")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void decide_notCosigned_returns422() throws Exception {
+    when(decideProposalUseCase.decide(
+            new DecideProposalCommand(
+                CALLER_ID, CAMPAIGN_ID, PROPOSAL_ID, ProposalDecisionType.APPROVE, null)))
+        .thenThrow(
+            new InvalidProposalStateTransitionException("decide requires COSIGNED but was OPEN"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/proposals/{pid}/decision", CAMPAIGN_ID, PROPOSAL_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{ \"decision\": \"APPROVE\" }"))
+        .andExpect(status().isUnprocessableEntity());
   }
 
   private static ProposalView view(ProposalStatus status) {
