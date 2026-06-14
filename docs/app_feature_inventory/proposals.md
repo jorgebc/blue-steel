@@ -40,14 +40,15 @@ order monotonic (D-107).
 ---
 
 - **Use Case / Action:** Browse an entity's proposal thread and co-sign — ✅ Implemented
-- **Actor:** Any campaign member (co-sign limited to non-authors)
+- **Actor:** Any campaign member (co-sign limited to non-author members who are not the GM)
 - **Functional Description:** Each actor/space profile shows a thread of that entity's proposals with
   a status badge for the five states (`open`, `cosigned`, `approved`, `rejected`, `expired`). The
   thread is scoped to the entity server-side (target filter on the list endpoint), so no proposal is
-  missed beyond the first page. Any member other than the author may co-sign an open proposal once;
+  missed beyond the first page. Any non-author member who is **not the GM** may co-sign an open proposal once;
   the first co-sign transitions it `open → cosigned` and surfaces it to the GM (D-017). The author
-  cannot co-sign (422 `AUTHOR_CANNOT_COSIGN`) and a repeat vote is rejected (409 `DUPLICATE_VOTE`,
-  backed by `uidx_proposal_votes_proposal_voter`).
+  cannot co-sign (422 `AUTHOR_CANNOT_COSIGN`), the GM cannot co-sign — the GM decides (422
+  `GM_CANNOT_COSIGN`) — and a repeat vote is rejected (409 `DUPLICATE_VOTE`, backed by
+  `uidx_proposal_votes_proposal_voter`).
 - **Technical Reference / Source Files:** `POST .../proposals/{pid}/votes`,
   `GET .../proposals?targetType=&targetId=` — `ProposalController.java`,
   `apps/api/.../application/service/proposal/ProposalCoSignService.java`,

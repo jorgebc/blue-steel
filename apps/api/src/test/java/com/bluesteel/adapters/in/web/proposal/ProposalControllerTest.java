@@ -29,6 +29,7 @@ import com.bluesteel.domain.exception.AuthorCannotCoSignException;
 import com.bluesteel.domain.exception.ConcurrentProposalException;
 import com.bluesteel.domain.exception.DuplicateVoteException;
 import com.bluesteel.domain.exception.EmptyDeltaException;
+import com.bluesteel.domain.exception.GmCannotCoSignException;
 import com.bluesteel.domain.exception.InvalidProposalStateTransitionException;
 import com.bluesteel.domain.exception.ProposalNotFoundException;
 import com.bluesteel.domain.exception.ProposalTargetNotFoundException;
@@ -363,6 +364,20 @@ class ProposalControllerTest {
         .perform(post("/api/v1/campaigns/{id}/proposals/{pid}/votes", CAMPAIGN_ID, PROPOSAL_ID))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.errors[0].code").value("AUTHOR_CANNOT_COSIGN"));
+  }
+
+  @Test
+  @DisplayName("should return 422 GM_CANNOT_COSIGN when the GM co-signs")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void coSign_gm_returns422() throws Exception {
+    when(coSignProposalUseCase.coSign(
+            new CoSignProposalCommand(CALLER_ID, CAMPAIGN_ID, PROPOSAL_ID)))
+        .thenThrow(new GmCannotCoSignException("gm"));
+
+    mockMvc
+        .perform(post("/api/v1/campaigns/{id}/proposals/{pid}/votes", CAMPAIGN_ID, PROPOSAL_ID))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.errors[0].code").value("GM_CANNOT_COSIGN"));
   }
 
   @Test

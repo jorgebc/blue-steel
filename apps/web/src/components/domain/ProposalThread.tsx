@@ -40,6 +40,7 @@ function DeltaList({ delta }: { delta: Record<string, unknown> }) {
  */
 export function ProposalThread({ targetType, targetId }: Props) {
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
+  const activeRole = useCampaignStore((s) => s.activeRole)
   const currentUserId = useAuthStore((s) => s.currentUser?.id)
 
   const { data, isLoading, isError } = useProposalsForTarget(
@@ -54,7 +55,12 @@ export function ProposalThread({ targetType, targetId }: Props) {
   const proposals = data?.proposals ?? []
 
   function canCoSign(proposal: Proposal): boolean {
-    return proposal.status === 'OPEN' && currentUserId !== proposal.ownerId
+    // The GM decides proposals and cannot co-sign them (D-017); the author cannot co-sign their own.
+    return (
+      proposal.status === 'OPEN' &&
+      activeRole !== 'gm' &&
+      currentUserId !== proposal.ownerId
+    )
   }
 
   function handleCoSign(proposalId: string) {

@@ -26,6 +26,7 @@ import com.bluesteel.domain.campaign.Campaign;
 import com.bluesteel.domain.campaign.CampaignMember;
 import com.bluesteel.domain.campaign.CampaignRole;
 import com.bluesteel.domain.exception.ConcurrentProposalException;
+import com.bluesteel.domain.exception.GmCannotCoSignException;
 import com.bluesteel.domain.proposal.Proposal;
 import com.bluesteel.domain.proposal.ProposalStatus;
 import com.bluesteel.domain.proposal.ProposalTargetType;
@@ -165,6 +166,17 @@ class ProposalDecisionFlowIT extends TestcontainersPostgresBaseIT {
 
     assertThatThrownBy(() -> createProposal(actorId, Map.of("description", "A different change.")))
         .isInstanceOf(ConcurrentProposalException.class);
+  }
+
+  @Test
+  @DisplayName("the GM cannot co-sign a proposal — the GM decides (D-017)")
+  void gmCannotCoSign() {
+    UUID actorId = seedActor("Wren", "A herald.");
+    UUID proposalId = createProposal(actorId, Map.of("description", "A retired herald."));
+
+    assertThatThrownBy(
+            () -> coSignService.coSign(new CoSignProposalCommand(gmId, campaignId, proposalId)))
+        .isInstanceOf(GmCannotCoSignException.class);
   }
 
   @Test

@@ -89,6 +89,12 @@ describe('ProposalThread', () => {
     expect(screen.queryByRole('button', { name: /co-sign/i })).not.toBeInTheDocument()
   })
 
+  it('hides co-sign from the GM (the GM decides, not co-signs)', () => {
+    setStores(otherId, 'gm')
+    render(<ProposalThread targetType="ACTOR" targetId="e1" />)
+    expect(screen.queryByRole('button', { name: /co-sign/i })).not.toBeInTheDocument()
+  })
+
   it('hides co-sign once a proposal is no longer open', () => {
     mockList({
       data: {
