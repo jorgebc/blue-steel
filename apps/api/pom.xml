@@ -23,7 +23,7 @@
     <java.version>25</java.version>
 
     <!-- Spring AI — ChatClient + EmbeddingModel via Google GenAI / Gemini (D-093) -->
-    <spring-ai.version>2.0.0-RC1</spring-ai.version>
+    <spring-ai.version>2.0.0</spring-ai.version>
 
     <!-- Testing -->
     <archunit.version>1.4.2</archunit.version>
