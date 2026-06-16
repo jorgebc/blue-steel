@@ -819,7 +819,7 @@ Supported actions per card: `accept` (no change to extracted data), `edit` (user
   ],
   "addedEntities": [
     {
-      "entityType": "actor | space | event | relation",
+      "entityType": "actor | space",
       "name":       "non-blank display name of the new entity",
       "fields":     { "fieldName": "value" }
     }
@@ -836,7 +836,7 @@ Supported actions per card: `accept` (no change to extracted data), `edit` (user
 - `cardDecisions` must contain an explicit entry for **every** non-UNCERTAIN `DiffCard` in the stored diff. A missing entry for any card is rejected → `422 INCOMPLETE_CARD_DECISIONS` (D-080). There is no implicit accept for omitted cards.
 - `editedFields` is required and non-empty when `action = edit`. It is omitted or null for `accept` and `delete`.
 - `cardDecisions` must not be empty (at least one card must be in the diff for commit to be valid).
-- Each `addedEntities` entry must have a known `entityType` (`actor | space | event | relation`), a non-blank `name`, and a non-null `fields` map → otherwise `422 INVALID_ADDED_ENTITY`. Blank `entityType`/`name` are rejected earlier at the adapter as `400` (Bean Validation). Each added entry is written as a brand-new entity + first version stamped with the committing session, riding the same async-embedding path as extracted entities (F6.1, D-053).
+- Each `addedEntities` entry must have an **addable** `entityType` (`actor | space` only — events and relations need structured links the form cannot supply), a non-blank `name`, and a non-null `fields` map → otherwise `422 INVALID_ADDED_ENTITY`. Blank `entityType`/`name` are rejected earlier at the adapter as `400` (Bean Validation). Because manual-add bypasses entity resolution, an added `name` that collides (case-insensitive) with a same-type `NEW` card in the diff or an already-committed same-type entity → `422 ADDED_ENTITY_NAME_COLLISION`. Each accepted entry is written as a brand-new entity + first version stamped with the committing session, riding the same async-embedding path as extracted entities (F6.1, D-053).
 
 **Draft state persistence:** The draft diff is stored server-side in `sessions.diff_payload` (status `draft`). This enables failure recovery — if the user closes the browser mid-review, the diff is retrievable on return. Client-side edits to diff cards are submitted as part of the final commit payload, not persisted incrementally.
 

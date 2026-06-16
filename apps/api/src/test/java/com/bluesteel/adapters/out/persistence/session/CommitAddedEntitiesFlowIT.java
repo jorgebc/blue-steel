@@ -1,6 +1,7 @@
 package com.bluesteel.adapters.out.persistence.session;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bluesteel.TestcontainersPostgresBaseIT;
 import com.bluesteel.adapters.out.persistence.campaign.CampaignMembershipAdapter;
@@ -15,6 +16,7 @@ import com.bluesteel.application.service.session.CommitService;
 import com.bluesteel.domain.campaign.Campaign;
 import com.bluesteel.domain.campaign.CampaignMember;
 import com.bluesteel.domain.campaign.CampaignRole;
+import com.bluesteel.domain.exception.CommitValidationException;
 import com.bluesteel.domain.session.Session;
 import com.bluesteel.domain.user.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -96,7 +98,44 @@ class CommitAddedEntitiesFlowIT extends TestcontainersPostgresBaseIT {
                     && e.committedVersions().size() == 2);
   }
 
+  @Test
+  @DisplayName("rejects an added entity whose name collides with an already-committed entity")
+  void commit_addedEntityNameCollision_rejectedWithoutDuplicate() throws Exception {
+    CommitPayload first =
+        new CommitPayload(
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(new AddedEntity("actor", "Gandalf", Map.of("description", "A grey wizard"))));
+    commitService.commit(new CommitSessionCommand(gmId, campaignId, draftSessionId, first));
+
+    UUID secondDraft = savedDraftSession(campaignId, gmId);
+    CommitPayload collision =
+        new CommitPayload(
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(new AddedEntity("actor", "gandalf", Map.of("description", "An imposter"))));
+
+    assertThatThrownBy(
+            () ->
+                commitService.commit(
+                    new CommitSessionCommand(gmId, campaignId, secondDraft, collision)))
+        .isInstanceOf(CommitValidationException.class)
+        .extracting("code")
+        .isEqualTo("ADDED_ENTITY_NAME_COLLISION");
+
+    assertThat(headCount("actors")).isEqualTo(1);
+  }
+
   // --- assertion helpers --------------------------------------------------
+
+  private int headCount(String table) {
+    Integer n =
+        jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM " + table + " WHERE campaign_id = ?", Integer.class, campaignId);
+    return n == null ? 0 : n;
+  }
 
   private UUID headId(String table, String name) {
     return jdbcTemplate.queryForObject(

@@ -1066,6 +1066,8 @@ The "add" action requires a distinct frontend flow (a creation form embedded in 
 **Alternatives considered:**
 - Include "add" in v1 — considered; deprioritized after scoping review. Users who need to add missed entities in v1 can submit a corrected session summary or use the proposal system in v2.
 
+**Status update (2026-06-16):** Delivered in v2 Phase 6 (F6.1 backend, F6.2 frontend). The deferred "add" capability shipped not as a card action but as a dedicated top-level `addedEntities` list on the commit payload (added entities have no stored-diff card, so reusing `cardDecisions` would collide with validator checks #1–3). Scope is intentionally limited to **actor** and **space**: events and relations require structured links (endpoints, involved actors, event type) the generic form cannot supply, so the backend rejects them with `422 INVALID_ADDED_ENTITY`. Because manual-add bypasses entity resolution, an added name colliding with a same-type diff card or committed entity is rejected with `422 ADDED_ENTITY_NAME_COLLISION`.
+
 ---
 
 ### D-054 — Draft session policy: single active draft per campaign, GM-discardable

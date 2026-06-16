@@ -20,15 +20,18 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
 /**
- * Application-layer gatekeeper for commit payload integrity (D-081). All 8 checks run before any
+ * Application-layer gatekeeper for commit payload integrity (D-081). All checks run before any
  * world-state write. A single failing check throws {@link CommitValidationException} immediately.
  */
 @Component
 public class CommitPayloadValidator {
 
-  /** Entity types an added entity may target — the four world-state concepts (F6.1, D-053). */
-  private static final Set<String> KNOWN_ENTITY_TYPES =
-      Set.of("actor", "space", "event", "relation");
+  /**
+   * Entity types a reviewer may add manually (F6.1, D-053). Limited to the self-contained concepts:
+   * events and relations depend on structured links (endpoints, involved actors, event type) the
+   * add-entity form cannot supply, so they are rejected here as defence in depth.
+   */
+  private static final Set<String> ADDABLE_ENTITY_TYPES = Set.of("actor", "space");
 
   private final WorldStatePort worldStatePort;
 
@@ -123,13 +126,13 @@ public class CommitPayloadValidator {
       }
     }
 
-    // Check 8: each reviewer-added entity must declare a known type, a non-blank name, and a
+    // Check 8: each reviewer-added entity must declare an addable type, a non-blank name, and a
     // non-null fields map (F6.1, D-053). This replaces the former defensive `add`-action rejection
     // (UNSUPPORTED_ACTION) with positive validation of the dedicated addedEntities list.
     for (AddedEntity added : payload.addedEntities()) {
-      if (added.entityType() == null || !KNOWN_ENTITY_TYPES.contains(added.entityType())) {
+      if (added.entityType() == null || !ADDABLE_ENTITY_TYPES.contains(added.entityType())) {
         throw new CommitValidationException(
-            "INVALID_ADDED_ENTITY", "Unknown added entity type: " + added.entityType());
+            "INVALID_ADDED_ENTITY", "Entity type cannot be added manually: " + added.entityType());
       }
       if (added.name() == null || added.name().isBlank()) {
         throw new CommitValidationException(
@@ -139,7 +142,29 @@ public class CommitPayloadValidator {
         throw new CommitValidationException(
             "INVALID_ADDED_ENTITY", "Added entity fields must not be null: " + added.name());
       }
+      // Check 9: manual-add bypasses entity resolution, so guard world-state integrity by rejecting
+      // a name that collides (case-insensitive) with a same-type new card in this diff or an
+      // already-committed entity of the same type (F6.1, D-053).
+      String trimmedName = added.name().trim();
+      if (collidesWithNewCard(allCards, added.entityType(), trimmedName)
+          || worldStatePort
+              .findEntityIdByName(campaignId, trimmedName, added.entityType())
+              .isPresent()) {
+        throw new CommitValidationException(
+            "ADDED_ENTITY_NAME_COLLISION",
+            "An entity with this name already exists: " + trimmedName);
+      }
     }
+  }
+
+  private static boolean collidesWithNewCard(
+      Map<UUID, DiffCard> allCards, String entityType, String name) {
+    return allCards.values().stream()
+        .anyMatch(
+            card ->
+                card instanceof com.bluesteel.application.model.session.NewEntityCard newCard
+                    && entityType.equals(newCard.entityType())
+                    && newCard.name().equalsIgnoreCase(name));
   }
 
   private static Map<UUID, DiffCard> buildCardMap(DiffPayload diff) {

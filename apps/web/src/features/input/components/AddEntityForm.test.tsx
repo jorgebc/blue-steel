@@ -17,6 +17,17 @@ describe('AddEntityForm', () => {
     expect(screen.getByRole('button', { name: /add field/i })).toBeInTheDocument()
   })
 
+  it('offers only Actor and Space (events/relations are not manually addable)', async () => {
+    render(<AddEntityForm onAdd={vi.fn()} onCancel={vi.fn()} />)
+
+    await userEvent.click(screen.getByRole('combobox', { name: /type/i }))
+
+    expect(await screen.findByRole('option', { name: 'Actor' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Space' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Event' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Relation' })).not.toBeInTheDocument()
+  })
+
   it('blocks submission and shows a message when the name is blank', async () => {
     const onAdd = vi.fn()
     render(<AddEntityForm onAdd={onAdd} onCancel={vi.fn()} />)

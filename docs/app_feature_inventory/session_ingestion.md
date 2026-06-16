@@ -56,7 +56,7 @@ Session lifecycle: `PENDING → PROCESSING → DRAFT → COMMITTED` (or `FAILED`
 
 - **Use Case / Action:** Commit the reviewed diff to world state — ✅ Implemented
 - **Actor:** GM, Editor
-- **Functional Description:** Sends every card decision, every UNCERTAIN resolution, and the conflict acknowledgments. The backend re-validates the payload as defence in depth (unknown/duplicate card IDs, incomplete decisions, unresolved UNCERTAIN cards → 422 `UNCERTAIN_ENTITIES_PRESENT`, unacknowledged conflicts, cross-campaign entity references, unsupported `add` action). On success it writes the entities and their new versions, assigns the session's sequence number, transitions it to `COMMITTED`, clears the stored diff, and returns 200 immediately — embeddings follow asynchronously. The UI commit button is disabled until the diff is fully resolved.
+- **Functional Description:** Sends every card decision, every UNCERTAIN resolution, the conflict acknowledgments, and any reviewer-added entities (`addedEntities`). The backend re-validates the payload as defence in depth (unknown/duplicate card IDs, incomplete decisions, unresolved UNCERTAIN cards → 422 `UNCERTAIN_ENTITIES_PRESENT`, unacknowledged conflicts, cross-campaign entity references, and added-entity integrity → 422 `INVALID_ADDED_ENTITY` / `ADDED_ENTITY_NAME_COLLISION`). On success it writes the entities and their new versions, assigns the session's sequence number, transitions it to `COMMITTED`, clears the stored diff, and returns 200 immediately — embeddings follow asynchronously. The UI commit button is disabled until the diff is fully resolved.
 - **Technical Reference / Source Files:** `POST /api/v1/campaigns/{id}/sessions/{sid}/commit` — `SessionController.java`, `apps/api/src/main/java/com/bluesteel/application/service/session/CommitService.java`, `CommitPayloadValidator.java`, `apps/web/src/features/input/components/CommitButton.tsx`, `hooks/useCommitPayload.ts`
 
 ---
@@ -82,10 +82,10 @@ Session lifecycle: `PENDING → PROCESSING → DRAFT → COMMITTED` (or `FAILED`
 
 ---
 
-- **Use Case / Action:** Manually add an entity the AI missed (`add` action) — 🚧 Planned (deferred to v2, D-053)
+- **Use Case / Action:** Manually add an entity the AI missed — ✅ Implemented (v2, F6.1/F6.2, D-053)
 - **Actor:** GM, Editor
-- **Functional Description:** Not available in v1; the backend explicitly rejects `add` actions in the commit payload (422 `UNSUPPORTED_ACTION`). Workaround: discard and resubmit a corrected summary.
-- **Technical Reference / Source Files:** Rejection check in `CommitPayloadValidator.java`
+- **Functional Description:** From the diff review screen, a reviewer opens an "Add entity" focused overlay (D-082) and supplies a type, a name, and free-form key/value profile fields for an entity the extraction missed. Added entities appear as their own card category with a remove affordance and ride the commit payload via the dedicated `addedEntities` list (separate from card decisions, so they never collide with card-id validation). On commit they are written as brand-new heads + first versions, stamped with the committing session and embedded asynchronously, exactly like extracted entities. Scope is limited to **actor** and **space**: events and relations depend on structured links (endpoints, involved actors, event type) that the generic form cannot supply, so the backend rejects them with 422 `INVALID_ADDED_ENTITY`. To protect world-state integrity (manual-add bypasses entity resolution), an added name that collides with a same-type diff card or an already-committed entity is rejected with 422 `ADDED_ENTITY_NAME_COLLISION`.
+- **Technical Reference / Source Files:** `CommitPayloadValidator.java`, `CommitService.java` (write path), `apps/web/src/features/input/components/AddEntityForm.tsx`, `AddedEntityCard.tsx`, `hooks/useDiffState.ts`, `hooks/useCommitPayload.ts`
 
 ## 3. Core User Journeys (Workflows)
 
