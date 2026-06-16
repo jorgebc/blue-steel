@@ -2,6 +2,7 @@ package com.bluesteel.adapters.in.web.session;
 
 import com.bluesteel.adapters.in.web.ApiResponse;
 import com.bluesteel.application.model.commit.AcknowledgedConflict;
+import com.bluesteel.application.model.commit.AddedEntity;
 import com.bluesteel.application.model.commit.CardAction;
 import com.bluesteel.application.model.commit.CardDecision;
 import com.bluesteel.application.model.commit.CommitPayload;
@@ -197,7 +198,14 @@ public class SessionController {
                 .map(a -> new AcknowledgedConflict(a.conflictId()))
                 .toList();
 
-    return new CommitPayload(decisions, resolutions, acknowledged);
+    List<AddedEntity> addedEntities =
+        request.addedEntities() == null
+            ? List.of()
+            : request.addedEntities().stream()
+                .map(a -> new AddedEntity(a.entityType(), a.name(), a.fields()))
+                .toList();
+
+    return new CommitPayload(decisions, resolutions, acknowledged, addedEntities);
   }
 
   private UUID resolveCallerId() {

@@ -1,6 +1,7 @@
 package com.bluesteel.application.service.session;
 
 import com.bluesteel.application.event.SessionCommittedEvent;
+import com.bluesteel.application.model.commit.AddedEntity;
 import com.bluesteel.application.model.commit.CardDecision;
 import com.bluesteel.application.model.commit.ResolutionType;
 import com.bluesteel.application.model.commit.UncertainResolution;
@@ -29,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -120,17 +122,24 @@ public class CommitService implements CommitSessionUseCase {
       versions.add(worldStatePort.writeEntity(cmd));
     }
 
+    // Reviewer-added entities (F6.1, D-053) ride the same type-ordered write so added actors/spaces
+    // are committed before added events/relations can name-match their links against them.
+    List<AddedEntity> added = command.payload().addedEntities();
+    writeAddedEntities(added, t -> !"event".equals(t) && !"relation".equals(t), session, versions);
+
     for (CardDecision decision : command.payload().cardDecisions()) {
       if (isEventCard(cardMap.get(decision.cardId()))) {
         writeDecision(decision, cardMap, session, versions);
       }
     }
+    writeAddedEntities(added, "event"::equals, session, versions);
 
     for (CardDecision decision : command.payload().cardDecisions()) {
       if (isRelationCard(cardMap.get(decision.cardId()))) {
         writeDecision(decision, cardMap, session, versions);
       }
     }
+    writeAddedEntities(added, "relation"::equals, session, versions);
 
     int seq = sessionRepository.nextSequenceNumber(command.campaignId());
     session.commit(seq);
@@ -195,6 +204,39 @@ public class CommitService implements CommitSessionUseCase {
       case NewEntityCard c -> c.entityType();
       case UncertainEntityCard c -> c.entityType();
     };
+  }
+
+  private void writeAddedEntities(
+      List<AddedEntity> added,
+      Predicate<String> typeFilter,
+      Session session,
+      List<CommittedEntityVersion> versions) {
+    for (AddedEntity entity : added) {
+      if (typeFilter.test(entity.entityType())) {
+        versions.add(worldStatePort.writeEntity(buildAddedEntityWriteCommand(entity, session)));
+      }
+    }
+  }
+
+  /**
+   * Builds the write command for a reviewer-added entity: a brand-new head ({@code existingEntityId
+   * == null}) whose full snapshot is the supplied fields, stamped with the committing session.
+   * Mirrors the {@link NewEntityCard} branch, including link resolution so added events/relations
+   * resolve their mentions (F6.1, D-053).
+   */
+  private EntityWriteCommand buildAddedEntityWriteCommand(AddedEntity entity, Session session) {
+    Map<String, Object> fullSnapshot = new HashMap<>(entity.fields());
+    EntityWriteCommand cmd =
+        new EntityWriteCommand(
+            entity.entityType(),
+            null,
+            session.campaignId(),
+            session.ownerId(),
+            entity.name(),
+            null,
+            fullSnapshot,
+            session.id());
+    return applyLinks(cmd, fullSnapshot, session.campaignId());
   }
 
   private EntityWriteCommand buildWriteCommand(

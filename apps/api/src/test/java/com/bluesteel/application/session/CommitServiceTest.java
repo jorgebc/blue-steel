@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bluesteel.application.event.SessionCommittedEvent;
+import com.bluesteel.application.model.commit.AddedEntity;
 import com.bluesteel.application.model.commit.CardAction;
 import com.bluesteel.application.model.commit.CardDecision;
 import com.bluesteel.application.model.commit.CommitPayload;
@@ -438,6 +439,69 @@ class CommitServiceTest {
     verify(worldStatePort, org.mockito.Mockito.times(2)).writeEntity(captor.capture());
     assertThat(captor.getAllValues().get(0).entityType()).isEqualTo("actor");
     assertThat(captor.getAllValues().get(1).entityType()).isEqualTo("event");
+  }
+
+  @Test
+  @DisplayName(
+      "should write added entities as new session-stamped heads and include them in the event")
+  void commit_addedEntities_writesNewHeadsAndPublishesThem() {
+    CommitPayload payloadWithAdded =
+        new CommitPayload(
+            List.of(
+                new CardDecision(existingCardId, CardAction.ACCEPT, null),
+                new CardDecision(newCardId, CardAction.ACCEPT, null)),
+            List.of(),
+            List.of(),
+            List.of(new AddedEntity("actor", "Gandalf", Map.of("description", "A grey wizard"))));
+
+    service.commit(new CommitSessionCommand(callerId, campaignId, sessionId, payloadWithAdded));
+
+    ArgumentCaptor<EntityWriteCommand> captor = forClass(EntityWriteCommand.class);
+    verify(worldStatePort, org.mockito.Mockito.times(3)).writeEntity(captor.capture());
+    EntityWriteCommand addedCmd =
+        captor.getAllValues().stream()
+            .filter(c -> "Gandalf".equals(c.name()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(addedCmd.entityType()).isEqualTo("actor");
+    assertThat(addedCmd.existingEntityId()).isNull();
+    assertThat(addedCmd.sessionId()).isEqualTo(sessionId);
+    assertThat(addedCmd.fullSnapshot()).containsEntry("description", "A grey wizard");
+
+    ArgumentCaptor<SessionCommittedEvent> eventCaptor = forClass(SessionCommittedEvent.class);
+    verify(eventPublisher).publishEvent(eventCaptor.capture());
+    assertThat(eventCaptor.getValue().committedVersions()).hasSize(3);
+  }
+
+  @Test
+  @DisplayName(
+      "should write an added actor before an added relation regardless of list order (F6.1)")
+  void commit_addedEntities_writesActorBeforeRelation() throws Exception {
+    DiffPayload emptyDiff =
+        new DiffPayload("header", List.of(), List.of(), List.of(), List.of(), List.of());
+    CommitService addedService = commitServiceFor(emptyDiff);
+    when(worldStatePort.findEndpointByName(campaignId, "Gandalf")).thenReturn(Optional.empty());
+
+    // The relation is listed BEFORE the actor — the service must still write the actor first so the
+    // relation's endpoint name-match can see it.
+    addedService.commit(
+        new CommitSessionCommand(
+            callerId,
+            campaignId,
+            sessionId,
+            new CommitPayload(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(
+                    new AddedEntity(
+                        "relation", "Gandalf aids Frodo", Map.of("sourceMention", "Gandalf")),
+                    new AddedEntity("actor", "Gandalf", Map.of())))));
+
+    ArgumentCaptor<EntityWriteCommand> captor = forClass(EntityWriteCommand.class);
+    verify(worldStatePort, org.mockito.Mockito.times(2)).writeEntity(captor.capture());
+    assertThat(captor.getAllValues().get(0).entityType()).isEqualTo("actor");
+    assertThat(captor.getAllValues().get(1).entityType()).isEqualTo("relation");
   }
 
   private DiffPayload relationDiffWithEndpoints(UUID relationCardId) {
