@@ -121,7 +121,7 @@ A failing ArchUnit test is a layer violation in production code — fix the code
 - Version history is **never updated or deleted** (D-001, D-003)
 - All carry `campaign_id` + `owner_id` (D-021); name must be non-blank
 
-**Commit validation — 8 mandatory checks** (CommitService, D-078–D-081):
+**Commit validation — mandatory checks** (CommitService, D-078–D-081):
 1. All `card_id` values exist in stored diff → `422 UNKNOWN_CARD_ID`
 2. No duplicate `card_id` entries → `422 DUPLICATE_CARD_DECISION`
 3. Every non-UNCERTAIN card has an explicit decision → `422 INCOMPLETE_CARD_DECISIONS`
@@ -129,7 +129,7 @@ A failing ArchUnit test is a layer violation in production code — fix the code
 5. All ConflictCards acknowledged → `422 CONFLICTS_NOT_ACKNOWLEDGED`
 6. `matched_entity_id` non-null for MATCH → `400` (adapter Bean Validation)
 7. `matched_entity_id` belongs to same campaign → `422 INVALID_ENTITY_REFERENCE`
-8. No `add` action in v1 → `422 UNSUPPORTED_ACTION`
+8. Each `addedEntities` entry is an addable type (`actor`/`space` only), non-blank name, non-null fields, and its name does not collide with a same-type diff card or committed entity → `422 INVALID_ADDED_ENTITY` / `422 ADDED_ENTITY_NAME_COLLISION` (F6.1, D-053)
 
 **Auth:**
 - JWT carries only `user_id` + `is_admin`. Campaign role resolved from `campaign_members` via DB on every authorized request (AUTH-01, D-043).

@@ -102,7 +102,7 @@ npx shadcn@latest add <component> --yes
 - `DiffPayload` has 4 card types: `NEW` (full profile), `EXISTING` (delta only), `UNCERTAIN` (resolution required), `ConflictCard` (non-blocking, must acknowledge)
 - **UNCERTAIN cards block commit** — commit button disabled until all resolved. Backend enforces `422 UNCERTAIN_ENTITIES_PRESENT` as defence in depth (D-042).
 - `CommitPayload` uses `card_decisions` + `uncertain_resolutions` + `acknowledged_conflicts` — match ARCHITECTURE.md §7.6 exactly.
-- No `add` action in v1 (D-053). Do not render an "Add entity" affordance.
+- "Add entity" affordance ships in v2 (F6.2, D-053): a `FocusedOverlay` form in diff review lets a reviewer add an entity the extraction missed. Manual-add is limited to **actor/space** (events/relations need structured links the form can't supply); added entities ride the `addedEntities` list in the commit payload and are dropped of their client-only id before sending.
 
 **Session ingestion polling:**
 - `POST /sessions` returns `{ sessionId, status: 'processing' }`. Must poll `GET .../status` until `draft` or `failed`.

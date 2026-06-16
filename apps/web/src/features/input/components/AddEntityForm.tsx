@@ -23,10 +23,13 @@ import {
 } from '@/components/ui/select'
 import type { AddedEntityPayload, EntityType } from '@/types/session'
 
-const ENTITY_TYPES: EntityType[] = ['actor', 'space', 'event', 'relation']
+// Manual-add is limited to self-contained entities. Events and relations depend on structured
+// links (endpoints, involved actors, event type) this generic form can't supply, so they are
+// excluded here and rejected by the backend (F6.1, D-053).
+const ENTITY_TYPES: EntityType[] = ['actor', 'space']
 
 const schema = z.object({
-  entityType: z.enum(['actor', 'space', 'event', 'relation']),
+  entityType: z.enum(['actor', 'space']),
   name: z.string().trim().min(1, 'Name is required'),
   fields: z.array(z.object({ key: z.string(), value: z.string() })),
 })

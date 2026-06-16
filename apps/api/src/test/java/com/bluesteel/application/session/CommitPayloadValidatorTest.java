@@ -270,4 +270,82 @@ class CommitPayloadValidatorTest {
         .extracting("code")
         .isEqualTo("INVALID_ADDED_ENTITY");
   }
+
+  @Test
+  @DisplayName("should throw INVALID_ADDED_ENTITY when an added entity is an event (not addable)")
+  void validate_addedEntityEvent_throwsInvalidAddedEntity() {
+    CommitPayload payload =
+        payloadWithAddedEntities(List.of(new AddedEntity("event", "The Council", Map.of())));
+
+    assertThatThrownBy(() -> validator.validate(minimalDiff, payload, campaignId))
+        .isInstanceOf(CommitValidationException.class)
+        .extracting("code")
+        .isEqualTo("INVALID_ADDED_ENTITY");
+  }
+
+  @Test
+  @DisplayName("should throw INVALID_ADDED_ENTITY when an added entity is a relation (not addable)")
+  void validate_addedEntityRelation_throwsInvalidAddedEntity() {
+    CommitPayload payload =
+        payloadWithAddedEntities(List.of(new AddedEntity("relation", "ally-of", Map.of())));
+
+    assertThatThrownBy(() -> validator.validate(minimalDiff, payload, campaignId))
+        .isInstanceOf(CommitValidationException.class)
+        .extracting("code")
+        .isEqualTo("INVALID_ADDED_ENTITY");
+  }
+
+  @Test
+  @DisplayName(
+      "should throw ADDED_ENTITY_NAME_COLLISION when an added name matches a same-type NEW card")
+  void validate_addedEntityCollidesWithNewCard_throwsCollision() {
+    // minimalDiff has a NEW space card named "Shire"; case-insensitive match must be rejected.
+    CommitPayload payload =
+        payloadWithAddedEntities(List.of(new AddedEntity("space", "shire", Map.of())));
+
+    assertThatThrownBy(() -> validator.validate(minimalDiff, payload, campaignId))
+        .isInstanceOf(CommitValidationException.class)
+        .extracting("code")
+        .isEqualTo("ADDED_ENTITY_NAME_COLLISION");
+  }
+
+  @Test
+  @DisplayName(
+      "should throw ADDED_ENTITY_NAME_COLLISION when an added name matches a committed entity")
+  void validate_addedEntityCollidesWithCommittedEntity_throwsCollision() {
+    when(worldStatePort.findEntityIdByName(campaignId, "Aragorn", "actor"))
+        .thenReturn(java.util.Optional.of(UUID.randomUUID()));
+    CommitPayload payload =
+        payloadWithAddedEntities(List.of(new AddedEntity("actor", "Aragorn", Map.of())));
+
+    assertThatThrownBy(() -> validator.validate(minimalDiff, payload, campaignId))
+        .isInstanceOf(CommitValidationException.class)
+        .extracting("code")
+        .isEqualTo("ADDED_ENTITY_NAME_COLLISION");
+  }
+
+  @Test
+  @DisplayName("should reject an unresolved UNCERTAIN card before any added entity is considered")
+  void validate_unresolvedUncertainWithAddedEntity_throwsUncertainEntitiesPresent() {
+    DiffPayload diffWithUncertain =
+        new DiffPayload(
+            "header",
+            List.of(new UncertainEntityCard(uncertainCardId, "actor", "Strider", null)),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of());
+
+    CommitPayload payload =
+        new CommitPayload(
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(new AddedEntity("actor", "Gandalf", Map.of())));
+
+    assertThatThrownBy(() -> validator.validate(diffWithUncertain, payload, campaignId))
+        .isInstanceOf(CommitValidationException.class)
+        .extracting("code")
+        .isEqualTo("UNCERTAIN_ENTITIES_PRESENT");
+  }
 }
