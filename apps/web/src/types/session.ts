@@ -114,10 +114,21 @@ export interface AcknowledgedConflictPayload {
   conflictId: string
 }
 
+/**
+ * An entity the reviewer adds during diff review that the extraction missed (D-053). Mirrors the
+ * backend `AddedEntity` record; written as a brand-new entity + first version at commit (F6.1).
+ */
+export interface AddedEntityPayload {
+  entityType: EntityType
+  name: string
+  fields: Record<string, unknown>
+}
+
 export interface CommitPayload {
   cardDecisions: CardDecisionPayload[]
   uncertainResolutions: UncertainResolutionPayload[]
   acknowledgedConflicts: AcknowledgedConflictPayload[]
+  addedEntities: AddedEntityPayload[]
 }
 
 // ─── Session list (F2.13, TR-1) ──────────────────────────────────────────────

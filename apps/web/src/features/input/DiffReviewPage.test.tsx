@@ -253,6 +253,70 @@ describe('DiffReviewPage', () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/campaigns/c1/sessions/new'))
   })
 
+  it('adds an entity via the overlay and renders it as a card', async () => {
+    mockDiff({
+      data: fullDiff({ actors: [existing], detectedConflicts: [] }),
+      isLoading: false,
+      isError: false,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add entity' }))
+    const dialog = screen.getByRole('dialog', { name: /add entity/i })
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Madam Eva')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add entity' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /added/i })).toBeInTheDocument()
+    expect(screen.getByText('Madam Eva')).toBeInTheDocument()
+  })
+
+  it('removes a previously added entity', async () => {
+    mockDiff({
+      data: fullDiff({ actors: [existing], detectedConflicts: [] }),
+      isLoading: false,
+      isError: false,
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add entity' }))
+    const dialog = screen.getByRole('dialog', { name: /add entity/i })
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Madam Eva')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add entity' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+
+    expect(screen.queryByText('Madam Eva')).not.toBeInTheDocument()
+  })
+
+  it('includes added entities in the committed payload', async () => {
+    let captured: { addedEntities?: unknown } | undefined
+    mockDiff({
+      data: fullDiff({ actors: [existing], detectedConflicts: [] }),
+      isLoading: false,
+      isError: false,
+    })
+    mockCommit((payload, opts) => {
+      captured = payload as { addedEntities?: unknown }
+      opts?.onSuccess?.()
+    })
+
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add entity' }))
+    const dialog = screen.getByRole('dialog', { name: /add entity/i })
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Madam Eva')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add entity' }))
+
+    await userEvent.click(screen.getByRole('button', { name: /commit to world state/i }))
+
+    expect(captured?.addedEntities).toEqual([
+      { entityType: 'actor', name: 'Madam Eva', fields: {} },
+    ])
+  })
+
   it('has no accessibility violations on the loaded screen', async () => {
     mockDiff({ data: fullDiff({ detectedConflicts: [] }), isLoading: false, isError: false })
 

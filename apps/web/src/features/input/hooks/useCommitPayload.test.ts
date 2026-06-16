@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildCommitPayload, type DiffStateSlice } from './useCommitPayload'
 import type { CardDecision, UncertainResolution } from './useDiffState'
 import type {
+  AddedEntityPayload,
   ConflictCard,
   DiffPayload,
   ExistingDiffCard,
@@ -61,6 +62,7 @@ function makeState(overrides: Partial<DiffStateSlice> = {}): DiffStateSlice {
     decisions: new Map<string, CardDecision>(),
     uncertainResolutions: new Map<string, UncertainResolution>(),
     acknowledgedConflicts: new Set<string>(),
+    addedEntities: new Map<string, AddedEntityPayload>(),
     ...overrides,
   }
 }
@@ -126,5 +128,20 @@ describe('buildCommitPayload', () => {
     expect(payload.cardDecisions).toEqual([])
     expect(payload.uncertainResolutions).toEqual([])
     expect(payload.acknowledgedConflicts).toEqual([])
+    expect(payload.addedEntities).toEqual([])
+  })
+
+  it('emits reviewer-added entities and drops their client-only ids', () => {
+    const addedEntities = new Map<string, AddedEntityPayload>([
+      ['client-1', { entityType: 'actor', name: 'Madam Eva', fields: { role: 'seer' } }],
+      ['client-2', { entityType: 'space', name: 'Tser Pool', fields: {} }],
+    ])
+
+    const payload = buildCommitPayload(makeDiff(), makeState({ addedEntities }))
+
+    expect(payload.addedEntities).toEqual([
+      { entityType: 'actor', name: 'Madam Eva', fields: { role: 'seer' } },
+      { entityType: 'space', name: 'Tser Pool', fields: {} },
+    ])
   })
 })

@@ -7,8 +7,11 @@ import { useCampaignStore } from '@/store/campaignStore'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Button } from '@/components/ui/button'
 import type { DiffCard, DiffPayload, ExistingDiffCard, NewDiffCard } from '@/types/session'
+import { FocusedOverlay } from '@/components/domain/FocusedOverlay'
 import { useDiffState } from './hooks/useDiffState'
 import { buildCommitPayload } from './hooks/useCommitPayload'
+import { AddEntityForm } from './components/AddEntityForm'
+import { AddedEntityCard } from './components/AddedEntityCard'
 import { CommitButton } from './components/CommitButton'
 import { ConflictWarningCard } from './components/ConflictWarningCard'
 import { DeltaCard } from './components/DeltaCard'
@@ -54,13 +57,17 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
     decisions,
     uncertainResolutions,
     acknowledgedConflicts,
+    addedEntities,
     setDecision,
     resolveUncertain,
     acknowledgeConflict,
+    addEntity,
+    removeAddedEntity,
     unresolvedUncertainCount,
     unacknowledgedConflictCount,
   } = diffState
   const [editingCard, setEditingCard] = useState<EditableCard | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
   const [commitError, setCommitError] = useState<string | null>(null)
   const [discardError, setDiscardError] = useState<string | null>(null)
@@ -168,6 +175,30 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
             {c.cards.map(renderCard)}
           </DiffCategorySection>
         ))}
+
+      {addedEntities.size > 0 && (
+        <DiffCategorySection title="Added" count={addedEntities.size}>
+          {[...addedEntities].map(([id, entity]) => (
+            <AddedEntityCard key={id} entity={entity} onRemove={() => removeAddedEntity(id)} />
+          ))}
+        </DiffCategorySection>
+      )}
+
+      <div>
+        <Button type="button" variant="outline" onClick={() => setAddOpen(true)}>
+          Add entity
+        </Button>
+      </div>
+
+      <FocusedOverlay open={addOpen} onClose={() => setAddOpen(false)} ariaLabel="Add entity">
+        <AddEntityForm
+          onAdd={(entity) => {
+            addEntity(entity)
+            setAddOpen(false)
+          }}
+          onCancel={() => setAddOpen(false)}
+        />
+      </FocusedOverlay>
 
       {editingCard && (
         <EditCardOverlay

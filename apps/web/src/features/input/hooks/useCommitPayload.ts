@@ -1,4 +1,5 @@
 import type {
+  AddedEntityPayload,
   CardDecisionPayload,
   CommitPayload,
   DiffCard,
@@ -12,6 +13,7 @@ export interface DiffStateSlice {
   decisions: Map<string, CardDecision>
   uncertainResolutions: Map<string, UncertainResolution>
   acknowledgedConflicts: Set<string>
+  addedEntities: Map<string, AddedEntityPayload>
 }
 
 function nonUncertainCards(diff: DiffPayload): DiffCard[] {
@@ -23,7 +25,8 @@ function nonUncertainCards(diff: DiffPayload): DiffCard[] {
 /**
  * Translates the live diff + decision state into the §7.6 commit payload. Every
  * non-UNCERTAIN card gets an explicit decision (default `accept`, D-080);
- * `editedFields` is emitted only for `edit` decisions (no `add` action, D-053).
+ * `editedFields` is emitted only for `edit` decisions. Reviewer-added entities
+ * ride the `addedEntities` list, with their client-only ids dropped (F6.2, D-053).
  */
 export function buildCommitPayload(diff: DiffPayload, state: DiffStateSlice): CommitPayload {
   const cardDecisions: CardDecisionPayload[] = nonUncertainCards(diff).map((card) => {
@@ -45,5 +48,7 @@ export function buildCommitPayload(diff: DiffPayload, state: DiffStateSlice): Co
     conflictId,
   }))
 
-  return { cardDecisions, uncertainResolutions, acknowledgedConflicts }
+  const addedEntities = [...state.addedEntities.values()]
+
+  return { cardDecisions, uncertainResolutions, acknowledgedConflicts, addedEntities }
 }

@@ -118,4 +118,32 @@ describe('useDiffState', () => {
     expect(result.current.unresolvedUncertainCount).toBe(0)
     expect(result.current.unacknowledgedConflictCount).toBe(0)
   })
+
+  it('starts with no reviewer-added entities', () => {
+    const { result } = renderHook(() => useDiffState(makeDiff()))
+
+    expect(result.current.addedEntities.size).toBe(0)
+  })
+
+  it('tracks an added entity under a generated id', () => {
+    const { result } = renderHook(() => useDiffState(makeDiff()))
+
+    act(() =>
+      result.current.addEntity({ entityType: 'actor', name: 'Madam Eva', fields: { role: 'seer' } })
+    )
+
+    expect(result.current.addedEntities.size).toBe(1)
+    const [, entity] = [...result.current.addedEntities][0]
+    expect(entity).toEqual({ entityType: 'actor', name: 'Madam Eva', fields: { role: 'seer' } })
+  })
+
+  it('removes an added entity by its id', () => {
+    const { result } = renderHook(() => useDiffState(makeDiff()))
+
+    act(() => result.current.addEntity({ entityType: 'space', name: 'Tser Pool', fields: {} }))
+    const [id] = [...result.current.addedEntities.keys()]
+    act(() => result.current.removeAddedEntity(id))
+
+    expect(result.current.addedEntities.size).toBe(0)
+  })
 })
