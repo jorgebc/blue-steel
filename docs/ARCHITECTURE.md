@@ -794,7 +794,7 @@ This is the formal, authoritative definition of the `DiffPayload` JSON contract.
 
 This is the formal, authoritative definition of the body submitted to `POST .../commit`. Backend Java records and frontend TypeScript types must mirror this schema exactly.
 
-Supported actions per card: `accept` (no change to extracted data), `edit` (user-modified fields), `delete` (discard AI-extracted item — no world state change). The `add` action (manually introducing entities the AI missed) is deferred to v2 (D-053).
+Supported actions per card: `accept` (no change to extracted data), `edit` (user-modified fields), `delete` (discard AI-extracted item — no world state change). Manually introducing entities the AI missed (formerly the deferred `add` action, D-053) ships in v2 via the dedicated top-level `addedEntities` list rather than a card action — added entities have no stored-diff card, so they cannot reuse `cardDecisions` (F6.1).
 
 ```json
 {
@@ -816,6 +816,13 @@ Supported actions per card: `accept` (no change to extracted data), `edit` (user
     {
       "conflictId": "uuid — references a ConflictCard.conflictId"
     }
+  ],
+  "addedEntities": [
+    {
+      "entityType": "actor | space | event | relation",
+      "name":       "non-blank display name of the new entity",
+      "fields":     { "fieldName": "value" }
+    }
   ]
 }
 ```
@@ -829,6 +836,7 @@ Supported actions per card: `accept` (no change to extracted data), `edit` (user
 - `cardDecisions` must contain an explicit entry for **every** non-UNCERTAIN `DiffCard` in the stored diff. A missing entry for any card is rejected → `422 INCOMPLETE_CARD_DECISIONS` (D-080). There is no implicit accept for omitted cards.
 - `editedFields` is required and non-empty when `action = edit`. It is omitted or null for `accept` and `delete`.
 - `cardDecisions` must not be empty (at least one card must be in the diff for commit to be valid).
+- Each `addedEntities` entry must have a known `entityType` (`actor | space | event | relation`), a non-blank `name`, and a non-null `fields` map → otherwise `422 INVALID_ADDED_ENTITY`. Blank `entityType`/`name` are rejected earlier at the adapter as `400` (Bean Validation). Each added entry is written as a brand-new entity + first version stamped with the committing session, riding the same async-embedding path as extracted entities (F6.1, D-053).
 
 **Draft state persistence:** The draft diff is stored server-side in `sessions.diff_payload` (status `draft`). This enables failure recovery — if the user closes the browser mid-review, the diff is retrievable on return. Client-side edits to diff cards are submitted as part of the final commit payload, not persisted incrementally.
 

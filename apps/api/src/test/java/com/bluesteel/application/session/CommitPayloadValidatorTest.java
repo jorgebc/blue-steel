@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bluesteel.application.model.commit.AcknowledgedConflict;
+import com.bluesteel.application.model.commit.AddedEntity;
 import com.bluesteel.application.model.commit.CardAction;
 import com.bluesteel.application.model.commit.CardDecision;
 import com.bluesteel.application.model.commit.CommitPayload;
@@ -212,5 +213,61 @@ class CommitPayloadValidatorTest {
 
     assertThatNoException()
         .isThrownBy(() -> validator.validate(diffWithUncertain, payload, campaignId));
+  }
+
+  private CommitPayload payloadWithAddedEntities(List<AddedEntity> added) {
+    return new CommitPayload(
+        List.of(
+            new CardDecision(existingCardId, CardAction.ACCEPT, null),
+            new CardDecision(newCardId, CardAction.ACCEPT, null)),
+        List.of(),
+        List.of(new AcknowledgedConflict(conflictId)),
+        added);
+  }
+
+  @Test
+  @DisplayName("should pass validation when an added entity is well-formed")
+  void validate_validAddedEntity_noException() {
+    CommitPayload payload =
+        payloadWithAddedEntities(
+            List.of(new AddedEntity("actor", "Gandalf", Map.of("description", "A grey wizard"))));
+
+    assertThatNoException().isThrownBy(() -> validator.validate(minimalDiff, payload, campaignId));
+  }
+
+  @Test
+  @DisplayName("should throw INVALID_ADDED_ENTITY when an added entity type is unknown")
+  void validate_addedEntityUnknownType_throwsInvalidAddedEntity() {
+    CommitPayload payload =
+        payloadWithAddedEntities(List.of(new AddedEntity("dragon", "Smaug", Map.of())));
+
+    assertThatThrownBy(() -> validator.validate(minimalDiff, payload, campaignId))
+        .isInstanceOf(CommitValidationException.class)
+        .extracting("code")
+        .isEqualTo("INVALID_ADDED_ENTITY");
+  }
+
+  @Test
+  @DisplayName("should throw INVALID_ADDED_ENTITY when an added entity name is blank")
+  void validate_addedEntityBlankName_throwsInvalidAddedEntity() {
+    CommitPayload payload =
+        payloadWithAddedEntities(List.of(new AddedEntity("actor", "  ", Map.of())));
+
+    assertThatThrownBy(() -> validator.validate(minimalDiff, payload, campaignId))
+        .isInstanceOf(CommitValidationException.class)
+        .extracting("code")
+        .isEqualTo("INVALID_ADDED_ENTITY");
+  }
+
+  @Test
+  @DisplayName("should throw INVALID_ADDED_ENTITY when an added entity fields map is null")
+  void validate_addedEntityNullFields_throwsInvalidAddedEntity() {
+    CommitPayload payload =
+        payloadWithAddedEntities(List.of(new AddedEntity("space", "Rivendell", null)));
+
+    assertThatThrownBy(() -> validator.validate(minimalDiff, payload, campaignId))
+        .isInstanceOf(CommitValidationException.class)
+        .extracting("code")
+        .isEqualTo("INVALID_ADDED_ENTITY");
   }
 }

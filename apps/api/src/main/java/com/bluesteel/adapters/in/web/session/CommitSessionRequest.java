@@ -2,6 +2,7 @@ package com.bluesteel.adapters.in.web.session;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 import java.util.Map;
@@ -11,7 +12,8 @@ import java.util.UUID;
 public record CommitSessionRequest(
     @NotEmpty List<@Valid CardDecisionRequest> cardDecisions,
     List<@Valid UncertainResolutionRequest> uncertainResolutions,
-    List<AcknowledgedConflictRequest> acknowledgedConflicts) {
+    List<AcknowledgedConflictRequest> acknowledgedConflicts,
+    List<@Valid AddedEntityRequest> addedEntities) {
 
   /** Decision for a single diff card. */
   public record CardDecisionRequest(UUID cardId, String action, Map<String, Object> editedFields) {
@@ -41,4 +43,8 @@ public record CommitSessionRequest(
 
   /** Acknowledgement of a detected conflict card. */
   public record AcknowledgedConflictRequest(UUID conflictId) {}
+
+  /** A reviewer-added entity the extraction missed (F6.1, D-053). */
+  public record AddedEntityRequest(
+      @NotBlank String entityType, @NotBlank String name, Map<String, Object> fields) {}
 }

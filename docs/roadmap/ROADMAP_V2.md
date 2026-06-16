@@ -579,12 +579,12 @@ streaming path (D-052).
 
 | # | Feature | Status |
 |---|---|---|
-| F6.1 | Backend: commit-payload `add` action *(umbrella)* | 🔲 |
-| F6.1.1 | Model: `AddedEntity` + `CommitPayload.addedEntities` + ARCHITECTURE §7.6 | 🔲 |
-| F6.1.2 | Web DTO `AddedEntityRequest` + map to payload in `SessionController` | 🔲 |
-| F6.1.3 | Validator: replace check #8 with `addedEntities` validation | 🔲 |
-| F6.1.4 | `CommitService` creates added entities + first versions (embeds) | 🔲 |
-| F6.1.5 | IT: commit with `addedEntities` end-to-end | 🔲 |
+| F6.1 | Backend: commit-payload `add` action *(umbrella)* | ✅ |
+| F6.1.1 | Model: `AddedEntity` + `CommitPayload.addedEntities` + ARCHITECTURE §7.6 | ✅ |
+| F6.1.2 | Web DTO `AddedEntityRequest` + map to payload in `SessionController` | ✅ |
+| F6.1.3 | Validator: replace check #8 with `addedEntities` validation | ✅ |
+| F6.1.4 | `CommitService` creates added entities + first versions (embeds) | ✅ |
+| F6.1.5 | IT: commit with `addedEntities` end-to-end | ✅ |
 | F6.2 | Frontend: "Add entity" affordance in diff review *(umbrella)* | 🔲 |
 | F6.2.1 | `types/session.ts` — `AddedEntityPayload` + `CommitPayload.addedEntities` | 🔲 |
 | F6.2.2 | `useDiffState` — track added entities | 🔲 |

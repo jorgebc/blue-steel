@@ -1,5 +1,6 @@
 package com.bluesteel.application.service.session;
 
+import com.bluesteel.application.model.commit.AddedEntity;
 import com.bluesteel.application.model.commit.CardDecision;
 import com.bluesteel.application.model.commit.CommitPayload;
 import com.bluesteel.application.model.commit.ResolutionType;
@@ -24,6 +25,10 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class CommitPayloadValidator {
+
+  /** Entity types an added entity may target — the four world-state concepts (F6.1, D-053). */
+  private static final Set<String> KNOWN_ENTITY_TYPES =
+      Set.of("actor", "space", "event", "relation");
 
   private final WorldStatePort worldStatePort;
 
@@ -115,6 +120,24 @@ public class CommitPayloadValidator {
               "INVALID_ENTITY_REFERENCE",
               "Matched entity does not exist in campaign: " + resolution.matchedEntityId());
         }
+      }
+    }
+
+    // Check 8: each reviewer-added entity must declare a known type, a non-blank name, and a
+    // non-null fields map (F6.1, D-053). This replaces the former defensive `add`-action rejection
+    // (UNSUPPORTED_ACTION) with positive validation of the dedicated addedEntities list.
+    for (AddedEntity added : payload.addedEntities()) {
+      if (added.entityType() == null || !KNOWN_ENTITY_TYPES.contains(added.entityType())) {
+        throw new CommitValidationException(
+            "INVALID_ADDED_ENTITY", "Unknown added entity type: " + added.entityType());
+      }
+      if (added.name() == null || added.name().isBlank()) {
+        throw new CommitValidationException(
+            "INVALID_ADDED_ENTITY", "Added entity name must not be blank");
+      }
+      if (added.fields() == null) {
+        throw new CommitValidationException(
+            "INVALID_ADDED_ENTITY", "Added entity fields must not be null: " + added.name());
       }
     }
   }

@@ -65,4 +65,40 @@ class CommitPayloadTest {
     assertThat(deserialized.acknowledgedConflicts()).hasSize(1);
     assertThat(deserialized.acknowledgedConflicts().get(0).conflictId()).isEqualTo(conflictId);
   }
+
+  @Test
+  @DisplayName("should round-trip addedEntities with camelCase keys (entityType, name, fields)")
+  void roundTrip_addedEntitiesCamelCase() throws Exception {
+    CommitPayload payload =
+        new CommitPayload(
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(new AddedEntity("actor", "Gandalf", Map.of("description", "A grey wizard"))));
+
+    String json = objectMapper.writeValueAsString(payload);
+
+    assertThat(json).contains("\"addedEntities\"");
+    assertThat(json).contains("\"entityType\":\"actor\"");
+    assertThat(json).contains("\"name\":\"Gandalf\"");
+    assertThat(json).contains("\"fields\"");
+
+    CommitPayload deserialized = objectMapper.readValue(json, CommitPayload.class);
+
+    assertThat(deserialized.addedEntities()).hasSize(1);
+    assertThat(deserialized.addedEntities().get(0).entityType()).isEqualTo("actor");
+    assertThat(deserialized.addedEntities().get(0).name()).isEqualTo("Gandalf");
+    assertThat(deserialized.addedEntities().get(0).fields())
+        .containsEntry("description", "A grey wizard");
+  }
+
+  @Test
+  @DisplayName("should default addedEntities to empty list when omitted from JSON")
+  void roundTrip_addedEntitiesDefaultsToEmpty() throws Exception {
+    String json = "{\"cardDecisions\":[],\"uncertainResolutions\":[],\"acknowledgedConflicts\":[]}";
+
+    CommitPayload deserialized = objectMapper.readValue(json, CommitPayload.class);
+
+    assertThat(deserialized.addedEntities()).isEmpty();
+  }
 }

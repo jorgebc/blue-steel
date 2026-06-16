@@ -337,6 +337,78 @@ class SessionControllerTest {
   }
 
   @Test
+  @DisplayName("should return 200 when commit payload carries valid addedEntities")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void commit_validAddedEntities_returns200() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/sessions/{sid}/commit", CAMPAIGN_ID, SESSION_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "cardDecisions": [
+                        { "cardId": "33333333-3333-3333-3333-333333333333", "action": "accept" }
+                      ],
+                      "uncertainResolutions": [],
+                      "acknowledgedConflicts": [],
+                      "addedEntities": [
+                        { "entityType": "actor", "name": "Gandalf", "fields": { "description": "A grey wizard" } }
+                      ]
+                    }
+                    """))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("should return 400 when an addedEntities entry has a blank entityType")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void commit_addedEntityBlankType_returns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/sessions/{sid}/commit", CAMPAIGN_ID, SESSION_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "cardDecisions": [
+                        { "cardId": "33333333-3333-3333-3333-333333333333", "action": "accept" }
+                      ],
+                      "uncertainResolutions": [],
+                      "acknowledgedConflicts": [],
+                      "addedEntities": [
+                        { "entityType": "", "name": "Gandalf", "fields": {} }
+                      ]
+                    }
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("should return 400 when an addedEntities entry has a blank name")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void commit_addedEntityBlankName_returns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns/{id}/sessions/{sid}/commit", CAMPAIGN_ID, SESSION_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "cardDecisions": [
+                        { "cardId": "33333333-3333-3333-3333-333333333333", "action": "accept" }
+                      ],
+                      "uncertainResolutions": [],
+                      "acknowledgedConflicts": [],
+                      "addedEntities": [
+                        { "entityType": "actor", "name": "  ", "fields": {} }
+                      ]
+                    }
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   @DisplayName("should return 400 when action is edit but editedFields is empty")
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
   void commit_editActionWithoutEditedFields_returns400() throws Exception {
