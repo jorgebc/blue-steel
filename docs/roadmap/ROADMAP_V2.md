@@ -585,13 +585,13 @@ streaming path (D-052).
 | F6.1.3 | Validator: replace check #8 with `addedEntities` validation | ✅ |
 | F6.1.4 | `CommitService` creates added entities + first versions (embeds) | ✅ |
 | F6.1.5 | IT: commit with `addedEntities` end-to-end | ✅ |
-| F6.2 | Frontend: "Add entity" affordance in diff review *(umbrella)* | 🔲 |
-| F6.2.1 | `types/session.ts` — `AddedEntityPayload` + `CommitPayload.addedEntities` | 🔲 |
-| F6.2.2 | `useDiffState` — track added entities | 🔲 |
-| F6.2.3 | `useCommitPayload` — emit `addedEntities` | 🔲 |
-| F6.2.4 | `AddEntityForm.tsx` — RHF+zod form + InlineBanner | 🔲 |
-| F6.2.5 | `AddedEntityCard.tsx` — new card category + remove | 🔲 |
-| F6.2.6 | `DiffReviewPage` — FocusedOverlay trigger + render + wiring | 🔲 |
+| F6.2 | Frontend: "Add entity" affordance in diff review *(umbrella)* | ✅ |
+| F6.2.1 | `types/session.ts` — `AddedEntityPayload` + `CommitPayload.addedEntities` | ✅ |
+| F6.2.2 | `useDiffState` — track added entities | ✅ |
+| F6.2.3 | `useCommitPayload` — emit `addedEntities` | ✅ |
+| F6.2.4 | `AddEntityForm.tsx` — RHF+zod form + InlineBanner | ✅ |
+| F6.2.5 | `AddedEntityCard.tsx` — new card category + remove | ✅ |
+| F6.2.6 | `DiffReviewPage` — FocusedOverlay trigger + render + wiring | ✅ |
 | F6.3 | Backend: Q&A log persistence *(umbrella)* | 🔲 |
 | F6.3.1 | Migration 0028 — `query_log` table + master include | 🔲 |
 | F6.3.2 | `QueryLogEntry` model + `QueryLogRepository` port | 🔲 |

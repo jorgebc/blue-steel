@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useReducer } from 'react'
-import type { DiffCard, DiffPayload } from '@/types/session'
+import type { AddedEntityPayload, DiffCard, DiffPayload } from '@/types/session'
 
 /** Per-card decision held in client state (the commit-payload shape is derived later, F2.11). */
 export type CardDecision =
@@ -21,12 +21,16 @@ interface State {
   decisions: Map<string, CardDecision>
   uncertainResolutions: Map<string, UncertainResolution>
   acknowledgedConflicts: Set<string>
+  // Reviewer-added entities the extraction missed, keyed by a client-generated id (F6.2, D-053).
+  addedEntities: Map<string, AddedEntityPayload>
 }
 
 type Action =
   | { type: 'setDecision'; cardId: string; decision: CardDecision }
   | { type: 'resolveUncertain'; resolution: UncertainResolution }
   | { type: 'acknowledgeConflict'; conflictId: string }
+  | { type: 'addEntity'; id: string; entity: AddedEntityPayload }
+  | { type: 'removeAddedEntity'; id: string }
 
 function allCards(diff: DiffPayload): DiffCard[] {
   return [...diff.actors, ...diff.spaces, ...diff.events, ...diff.relations]
@@ -38,7 +42,12 @@ function init(diff: DiffPayload): State {
     // UNCERTAIN cards have no default — they must be explicitly resolved (D-042).
     if (card.cardType !== 'UNCERTAIN') decisions.set(card.cardId, { action: 'accept' })
   }
-  return { decisions, uncertainResolutions: new Map(), acknowledgedConflicts: new Set() }
+  return {
+    decisions,
+    uncertainResolutions: new Map(),
+    acknowledgedConflicts: new Set(),
+    addedEntities: new Map(),
+  }
 }
 
 function reducer(state: State, action: Action): State {
@@ -57,6 +66,16 @@ function reducer(state: State, action: Action): State {
       const acknowledgedConflicts = new Set(state.acknowledgedConflicts)
       acknowledgedConflicts.add(action.conflictId)
       return { ...state, acknowledgedConflicts }
+    }
+    case 'addEntity': {
+      const addedEntities = new Map(state.addedEntities)
+      addedEntities.set(action.id, action.entity)
+      return { ...state, addedEntities }
+    }
+    case 'removeAddedEntity': {
+      const addedEntities = new Map(state.addedEntities)
+      addedEntities.delete(action.id)
+      return { ...state, addedEntities }
     }
   }
 }
@@ -79,6 +98,17 @@ export function useDiffState(diff: DiffPayload) {
   )
   const acknowledgeConflict = useCallback(
     (conflictId: string) => dispatch({ type: 'acknowledgeConflict', conflictId }),
+    []
+  )
+  // The client id is generated here (not in the reducer) to keep the reducer pure; it lives only
+  // as a Map key for list rendering/removal and is dropped when the commit payload is assembled.
+  const addEntity = useCallback(
+    (entity: AddedEntityPayload) =>
+      dispatch({ type: 'addEntity', id: crypto.randomUUID(), entity }),
+    []
+  )
+  const removeAddedEntity = useCallback(
+    (id: string) => dispatch({ type: 'removeAddedEntity', id }),
     []
   )
 
@@ -105,9 +135,12 @@ export function useDiffState(diff: DiffPayload) {
     decisions: state.decisions,
     uncertainResolutions: state.uncertainResolutions,
     acknowledgedConflicts: state.acknowledgedConflicts,
+    addedEntities: state.addedEntities,
     setDecision,
     resolveUncertain,
     acknowledgeConflict,
+    addEntity,
+    removeAddedEntity,
     unresolvedUncertainCount,
     unacknowledgedConflictCount,
   }

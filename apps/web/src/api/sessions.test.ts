@@ -180,6 +180,7 @@ const commitPayload: CommitPayload = {
   cardDecisions: [{ cardId: 'e1', action: 'accept' }],
   uncertainResolutions: [],
   acknowledgedConflicts: [],
+  addedEntities: [],
 }
 
 describe('commitSession', () => {
