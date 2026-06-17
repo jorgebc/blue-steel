@@ -2,6 +2,7 @@ package com.bluesteel.application.service.query;
 
 import com.bluesteel.application.model.ingestion.EntityContext;
 import com.bluesteel.application.model.query.Citation;
+import com.bluesteel.application.model.query.QueryLogEntry;
 import com.bluesteel.application.model.query.QueryResponse;
 import com.bluesteel.application.port.in.query.AnswerQueryUseCase;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
@@ -9,9 +10,11 @@ import com.bluesteel.application.port.out.cost.LlmCostAccountingPort;
 import com.bluesteel.application.port.out.embedding.EmbeddingPort;
 import com.bluesteel.application.port.out.query.QueryAnsweringPort;
 import com.bluesteel.application.port.out.query.QueryContextRetrievalPort;
+import com.bluesteel.application.port.out.query.QueryLogRepository;
 import com.bluesteel.domain.exception.CostCapExceededException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.UnauthorizedException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,6 +55,7 @@ public class QueryService implements AnswerQueryUseCase {
   private final QueryContextRetrievalPort retrievalPort;
   private final QueryAnsweringPort queryAnsweringPort;
   private final LlmCostAccountingPort costAccountingPort;
+  private final QueryLogRepository queryLogRepository;
   private final Executor queryExecutor;
   private final int timeoutSeconds;
   private final int topN;
@@ -63,6 +67,7 @@ public class QueryService implements AnswerQueryUseCase {
       QueryContextRetrievalPort retrievalPort,
       QueryAnsweringPort queryAnsweringPort,
       LlmCostAccountingPort costAccountingPort,
+      QueryLogRepository queryLogRepository,
       @Qualifier("queryTaskExecutor") Executor queryExecutor,
       @Value("${query.timeout-seconds:20}") int timeoutSeconds,
       @Value("${query.retrieval.top-n:8}") int topN,
@@ -72,6 +77,7 @@ public class QueryService implements AnswerQueryUseCase {
     this.retrievalPort = retrievalPort;
     this.queryAnsweringPort = queryAnsweringPort;
     this.costAccountingPort = costAccountingPort;
+    this.queryLogRepository = queryLogRepository;
     this.queryExecutor = queryExecutor;
     this.timeoutSeconds = timeoutSeconds;
     this.topN = topN;
@@ -123,7 +129,9 @@ public class QueryService implements AnswerQueryUseCase {
       try {
         QueryResponse response = future.get(timeoutSeconds, TimeUnit.SECONDS);
         log.info("Answered query campaignId={} callerId={}", campaignId, callerId);
-        return withGroundedCitations(response, context, campaignId);
+        QueryResponse grounded = withGroundedCitations(response, context, campaignId);
+        persistLog(campaignId, callerId, question, grounded);
+        return grounded;
       } catch (TimeoutException e) {
         future.cancel(true);
         throw new QueryTimeoutException();
@@ -164,5 +172,27 @@ public class QueryService implements AnswerQueryUseCase {
       return new QueryResponse(response.answer(), grounded);
     }
     return response;
+  }
+
+  /**
+   * Records a successful grounded answer in the Q&amp;A log (D-058). Persistence never affects the
+   * answer path: a log-write failure is caught, logged at ERROR, and swallowed so the caller still
+   * receives the answer. Only reached on success — timeouts and cost-cap trips throw earlier.
+   */
+  private void persistLog(UUID campaignId, UUID callerId, String question, QueryResponse grounded) {
+    try {
+      queryLogRepository.save(
+          new QueryLogEntry(
+              UUID.randomUUID(),
+              campaignId,
+              callerId,
+              question,
+              grounded.answer(),
+              grounded.citations(),
+              Instant.now()));
+    } catch (RuntimeException e) {
+      log.error(
+          "Failed to persist Q&A log entry campaignId={} callerId={}", campaignId, callerId, e);
+    }
   }
 }

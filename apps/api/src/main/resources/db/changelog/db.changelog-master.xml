@@ -67,4 +67,7 @@
   <!-- Phase 5 hardening: race-safe D-106 unique index + listing covering index -->
   <include file="db/changelog/0027_proposal_indexes.xml"/>
 
+  <!-- F6.3.1: Q&A log — append-only per-campaign query history (D-058) -->
+  <include file="db/changelog/0028_create_query_log.xml"/>
+
 </databaseChangeLog>

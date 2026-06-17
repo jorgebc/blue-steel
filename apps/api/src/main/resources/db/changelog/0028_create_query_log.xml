@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    F6.3.1: append-only Q&A log — successful query answers persisted per campaign so the
+    history panel can revisit past answers (D-058 lifts v1 statelessness). Pruned to a bounded
+    per-campaign retention by the persistence adapter (query.history.max-per-campaign).
+  -->
+  <changeSet id="0028-create-query-log" author="jorge">
+
+    <createTable tableName="query_log">
+      <column name="id" type="UUID">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="campaign_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_query_log_campaign"
+                     references="campaigns(id)"
+                     deleteCascade="true"/>
+      </column>
+      <column name="asker_id" type="UUID">
+        <constraints nullable="false"
+                     foreignKeyName="fk_query_log_asker"
+                     references="users(id)"/>
+      </column>
+      <column name="question" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <column name="answer" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <column name="citations" type="JSONB">
+        <constraints nullable="true"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+
+    <sql>
+      CREATE INDEX idx_query_log_campaign_created
+      ON query_log (campaign_id, created_at DESC);
+    </sql>
+
+    <rollback>
+      <sql>DROP INDEX IF EXISTS idx_query_log_campaign_created;</sql>
+      <dropTable tableName="query_log"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>
