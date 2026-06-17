@@ -592,12 +592,12 @@ streaming path (D-052).
 | F6.2.4 | `AddEntityForm.tsx` — RHF+zod form + InlineBanner | ✅ |
 | F6.2.5 | `AddedEntityCard.tsx` — new card category + remove | ✅ |
 | F6.2.6 | `DiffReviewPage` — FocusedOverlay trigger + render + wiring | ✅ |
-| F6.3 | Backend: Q&A log persistence *(umbrella)* | 🔲 |
-| F6.3.1 | Migration 0028 — `query_log` table + master include | 🔲 |
-| F6.3.2 | `QueryLogEntry` model + `QueryLogRepository` port | 🔲 |
-| F6.3.3 | `QueryLogJpaEntity` + JPA repo (IT) | 🔲 |
-| F6.3.4 | `QueryLogPersistenceAdapter` + retention bound (IT) | 🔲 |
-| F6.3.5 | `QueryService` persistence hook (success-only) | 🔲 |
+| F6.3 | Backend: Q&A log persistence *(umbrella)* | ✅ |
+| F6.3.1 | Migration 0028 — `query_log` table + master include | ✅ |
+| F6.3.2 | `QueryLogEntry` model + `QueryLogRepository` port | ✅ |
+| F6.3.3 | `QueryLogJpaEntity` + JPA repo (IT) | ✅ |
+| F6.3.4 | `QueryLogPersistenceAdapter` + retention bound (IT) | ✅ |
+| F6.3.5 | `QueryService` persistence hook (success-only) | ✅ |
 | F6.4 | Backend: Q&A log read API *(umbrella)* | 🔲 |
 | F6.4.1 | `GetQueryHistoryUseCase` port + page/result models | 🔲 |
 | F6.4.2 | `QueryHistoryService` — member auth, offset, newest-first | 🔲 |

@@ -2,6 +2,8 @@ package com.bluesteel.application.service.query;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,12 +14,14 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.bluesteel.application.model.ingestion.EntityContext;
 import com.bluesteel.application.model.query.Citation;
+import com.bluesteel.application.model.query.QueryLogEntry;
 import com.bluesteel.application.model.query.QueryResponse;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
 import com.bluesteel.application.port.out.cost.LlmCostAccountingPort;
 import com.bluesteel.application.port.out.embedding.EmbeddingPort;
 import com.bluesteel.application.port.out.query.QueryAnsweringPort;
 import com.bluesteel.application.port.out.query.QueryContextRetrievalPort;
+import com.bluesteel.application.port.out.query.QueryLogRepository;
 import com.bluesteel.domain.campaign.CampaignRole;
 import com.bluesteel.domain.exception.CostCapExceededException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
@@ -32,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -47,6 +52,7 @@ class QueryServiceTest {
   @Mock private QueryContextRetrievalPort retrievalPort;
   @Mock private QueryAnsweringPort queryAnsweringPort;
   @Mock private LlmCostAccountingPort costAccountingPort;
+  @Mock private QueryLogRepository queryLogRepository;
 
   private QueryService sut;
 
@@ -74,6 +80,7 @@ class QueryServiceTest {
         retrievalPort,
         queryAnsweringPort,
         costAccountingPort,
+        queryLogRepository,
         executor,
         1,
         TOP_N,
@@ -135,6 +142,7 @@ class QueryServiceTest {
 
     verify(embeddingPort, never()).embed(QUESTION);
     verify(queryAnsweringPort, never()).answer(QUESTION, CONTEXT);
+    verify(queryLogRepository, never()).save(any(QueryLogEntry.class));
   }
 
   @Test
@@ -266,5 +274,71 @@ class QueryServiceTest {
 
     assertThatThrownBy(() -> sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION))
         .isInstanceOf(QueryTimeoutException.class);
+
+    verify(queryLogRepository, never()).save(any(QueryLogEntry.class));
+  }
+
+  @Test
+  @DisplayName("should persist a Q&A log entry with the grounded answer on success")
+  void answer_success_persistsLogEntry() {
+    Citation grounded = new Citation(CONTEXT_SESSION, 1, "Mira appears.");
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
+    when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+        .thenReturn(new QueryResponse("Mira is a rogue.", List.of(grounded)));
+
+    sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
+
+    ArgumentCaptor<QueryLogEntry> captor = ArgumentCaptor.forClass(QueryLogEntry.class);
+    verify(queryLogRepository).save(captor.capture());
+    QueryLogEntry saved = captor.getValue();
+    assertThat(saved.campaignId()).isEqualTo(CAMPAIGN_ID);
+    assertThat(saved.askerId()).isEqualTo(CALLER_ID);
+    assertThat(saved.question()).isEqualTo(QUESTION);
+    assertThat(saved.answer()).isEqualTo("Mira is a rogue.");
+    assertThat(saved.citations()).containsExactly(grounded);
+    assertThat(saved.id()).isNotNull();
+    assertThat(saved.createdAt()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("should persist only the grounded citations, not the dropped ungrounded ones")
+  void answer_persistsOnlyGroundedCitations() {
+    Citation grounded = new Citation(CONTEXT_SESSION, 1, "Mira appears.");
+    Citation hallucinated = new Citation(UUID.randomUUID(), 2, "Invented.");
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
+    when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+        .thenReturn(new QueryResponse("Answer.", List.of(grounded, hallucinated)));
+
+    sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
+
+    ArgumentCaptor<QueryLogEntry> captor = ArgumentCaptor.forClass(QueryLogEntry.class);
+    verify(queryLogRepository).save(captor.capture());
+    assertThat(captor.getValue().citations()).containsExactly(grounded);
+  }
+
+  @Test
+  @DisplayName("should still return the answer when persisting the Q&A log entry fails")
+  void answer_logWriteFails_stillReturnsAnswer() {
+    QueryResponse expected =
+        new QueryResponse(
+            "Mira is a rogue.", List.of(new Citation(CONTEXT_SESSION, 1, "Mira appears.")));
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
+    when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT)).thenReturn(expected);
+    doThrow(new RuntimeException("db down"))
+        .when(queryLogRepository)
+        .save(any(QueryLogEntry.class));
+
+    QueryResponse actual = sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
+
+    assertThat(actual).isEqualTo(expected);
   }
 }
