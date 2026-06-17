@@ -10,11 +10,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.query.Citation;
+import com.bluesteel.application.model.query.QueryHistoryView;
+import com.bluesteel.application.model.query.QueryLogEntry;
 import com.bluesteel.application.model.query.QueryResponse;
 import com.bluesteel.application.model.query.QueryUsage;
 import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.health.CheckHealthUseCase;
 import com.bluesteel.application.port.in.query.AnswerQueryUseCase;
+import com.bluesteel.application.port.in.query.GetQueryHistoryUseCase;
 import com.bluesteel.application.port.in.query.GetQueryUsageUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
@@ -24,6 +27,8 @@ import com.bluesteel.domain.exception.QueryResponseParseException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.RateLimitExceededException;
 import com.bluesteel.domain.exception.TokenBudgetExceededException;
+import com.bluesteel.domain.exception.UnauthorizedException;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +62,7 @@ class QueryControllerTest {
 
   @MockitoBean private AnswerQueryUseCase answerQueryUseCase;
   @MockitoBean private GetQueryUsageUseCase getQueryUsageUseCase;
+  @MockitoBean private GetQueryHistoryUseCase getQueryHistoryUseCase;
   @MockitoBean private QueryRateLimiter rateLimiter;
 
   // Mocked so the full application context loads without database/infra-backed beans.
@@ -239,6 +245,56 @@ class QueryControllerTest {
   void usage_unauthenticated_returns401() throws Exception {
     mockMvc
         .perform(get("/api/v1/campaigns/{id}/queries/usage", CAMPAIGN_ID))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("should return 200 with the history entries and pagination meta for a member")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void history_member_returns200() throws Exception {
+    QueryLogEntry entry =
+        new QueryLogEntry(
+            UUID.fromString("33333333-3333-3333-3333-333333333333"),
+            CAMPAIGN_ID,
+            CALLER_ID,
+            "Who is Mira?",
+            "Mira is a rogue.",
+            List.of(new Citation(SESSION_ID, 4, "Mira joined the party.")),
+            Instant.parse("2026-06-17T10:00:00Z"));
+    when(getQueryHistoryUseCase.getHistory(CAMPAIGN_ID, CALLER_ID, 0, 20))
+        .thenReturn(new QueryHistoryView(List.of(entry), 1L, 0, 20));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/queries/history", CAMPAIGN_ID))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].question").value("Who is Mira?"))
+        .andExpect(jsonPath("$.data[0].answer").value("Mira is a rogue."))
+        .andExpect(jsonPath("$.data[0].citations[0].sessionId").value(SESSION_ID.toString()))
+        .andExpect(jsonPath("$.data[0].citations[0].sequenceNumber").value(4))
+        .andExpect(jsonPath("$.meta.page").value(0))
+        .andExpect(jsonPath("$.meta.size").value(20))
+        .andExpect(jsonPath("$.meta.totalCount").value(1))
+        .andExpect(jsonPath("$.errors").isEmpty());
+  }
+
+  @Test
+  @DisplayName("should return 403 when a non-member requests the history")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
+  void history_nonMember_returns403() throws Exception {
+    when(getQueryHistoryUseCase.getHistory(CAMPAIGN_ID, CALLER_ID, 0, 20))
+        .thenThrow(new UnauthorizedException("Caller is not a member of this campaign"));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/queries/history", CAMPAIGN_ID))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errors[0].code").value("FORBIDDEN"));
+  }
+
+  @Test
+  @DisplayName("should return 401 when history is requested unauthenticated")
+  void history_unauthenticated_returns401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/queries/history", CAMPAIGN_ID))
         .andExpect(status().isUnauthorized());
   }
 }

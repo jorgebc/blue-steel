@@ -598,10 +598,10 @@ streaming path (D-052).
 | F6.3.3 | `QueryLogJpaEntity` + JPA repo (IT) | ✅ |
 | F6.3.4 | `QueryLogPersistenceAdapter` + retention bound (IT) | ✅ |
 | F6.3.5 | `QueryService` persistence hook (success-only) | ✅ |
-| F6.4 | Backend: Q&A log read API *(umbrella)* | 🔲 |
-| F6.4.1 | `GetQueryHistoryUseCase` port + page/result models | 🔲 |
-| F6.4.2 | `QueryHistoryService` — member auth, offset, newest-first | 🔲 |
-| F6.4.3 | `QueryController` `GET /history` + DTOs (no rate-limit consume) | 🔲 |
+| F6.4 | Backend: Q&A log read API *(umbrella)* | ✅ |
+| F6.4.1 | `GetQueryHistoryUseCase` port + page/result models | ✅ |
+| F6.4.2 | `QueryHistoryService` — member auth, offset, newest-first | ✅ |
+| F6.4.3 | `QueryController` `GET /history` + DTOs (no rate-limit consume) | ✅ |
 | F6.5 | Frontend: Q&A history panel in Query Mode *(umbrella)* | 🔲 |
 | F6.5.1 | `types/query.ts` — `QueryHistoryEntry` + page meta | 🔲 |
 | F6.5.2 | `api/queries.ts` — `fetchQueryHistory` + `useQueryHistory` | 🔲 |
