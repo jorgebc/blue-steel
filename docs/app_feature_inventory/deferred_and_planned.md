@@ -13,10 +13,10 @@ This register consolidates everything that exists in the repository only as sche
 
 ---
 
-- **Use Case / Action:** Browse the campaign's Q&A history — 🚧 Planned (v2, D-058)
+- **Use Case / Action:** Browse the campaign's Q&A history — ✅ Implemented (v2, Phase 6)
 - **Actor:** Any campaign member
-- **Functional Description:** Query Mode is stateless in v1; questions and answers are not persisted. A browsable Q&A log requires new storage plus a history UI.
-- **Technical Reference / Source Files:** None (intentionally no storage)
+- **Functional Description:** Shipped in Phase 6 (F6.3–F6.5). Every successful query is persisted to a campaign-scoped, append-only Q&A log and surfaced through a history panel inside Query Mode (not a 5th Exploration view, per D-058). The live-answer flow remains component-local; the log is read-only with an env-overridable per-campaign retention bound. See [query_mode.md](query_mode.md) for the capability inventory.
+- **Technical Reference / Source Files:** [query_mode.md](query_mode.md); schema `apps/api/src/main/resources/db/changelog/0028_create_query_log.xml`
 
 ---
 

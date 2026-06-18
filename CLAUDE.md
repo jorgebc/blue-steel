@@ -191,4 +191,6 @@ Read `skills/SKILLS_INDEX.md` before starting any non-trivial task.
 
 ## 8. Out of Scope (v1)
 
-**Never implement:** proposal approval UI/logic, `add` action in commit payload (D-053), Q&A log (D-058), SSE streaming for queries (D-052), Spring AI `VectorStore` (D-062), E2E tests (D-056), staging environment (D-044), self-registration (D-051), real-time collaboration, audio/image ingestion, mobile app.
+**Never implement:** proposal approval UI/logic, `add` action in commit payload (D-053), SSE streaming for queries (D-052), Spring AI `VectorStore` (D-062), E2E tests (D-056), staging environment (D-044), self-registration (D-051), real-time collaboration, audio/image ingestion, mobile app.
+
+> The campaign Q&A log (D-058), once deferred, shipped in v2 Phase 6 (F6.3–F6.5): successful queries are persisted and browsable via a read-only history panel inside Query Mode.

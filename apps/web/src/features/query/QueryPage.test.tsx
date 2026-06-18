@@ -239,6 +239,37 @@ describe('QueryPage', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['query-usage', 'c1'] })
   })
 
+  it('refreshes the Q&A history after a successful query so the new entry shows without a reload', async () => {
+    const client = createTestQueryClient()
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <QueryPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+    await ask()
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['query-history', 'c1'] })
+  })
+
+  it('does not refresh the Q&A history when the query fails', async () => {
+    stubMutation({ rejectWith: new ApiClientError('boom', 500, []) })
+    const client = createTestQueryClient()
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <QueryPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+    await ask()
+
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['query-history', 'c1'] })
+  })
+
   it('mounts the question history panel alongside the live-answer flow', () => {
     renderPage()
     expect(screen.getByRole('heading', { name: /question history/i })).toBeInTheDocument()

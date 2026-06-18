@@ -110,6 +110,26 @@ describe('QueryHistoryPanel', () => {
     expect(mockUseQueryHistory).toHaveBeenLastCalledWith('c1', 1)
   })
 
+  it('jumps back to page 0 when the refresh signal changes after a new query', async () => {
+    stub({ data: { ...page, totalCount: 40 }, isLoading: false, isError: false })
+    const { rerender } = render(
+      <MemoryRouter>
+        <QueryHistoryPanel campaignId="c1" refreshSignal={0} />
+      </MemoryRouter>
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: /next/i }))
+    expect(mockUseQueryHistory).toHaveBeenLastCalledWith('c1', 1)
+
+    rerender(
+      <MemoryRouter>
+        <QueryHistoryPanel campaignId="c1" refreshSignal={1} />
+      </MemoryRouter>
+    )
+
+    expect(mockUseQueryHistory).toHaveBeenLastCalledWith('c1', 0)
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = renderPanel()
     expect(await axe(container)).toHaveNoViolations()

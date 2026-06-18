@@ -188,7 +188,7 @@ Exploration mode is a set of interconnected views, not a single screen:
 - Player proposal and approval workflow (UI + approval logic)
 - Proposal expiry / TTL enforcement
 - Conflict resolution between concurrent proposals
-- Q&A log — campaign history of queries and answers, with a history panel inside Query Mode (D-058)
+- Q&A log — campaign history of queries and answers, with a history panel inside Query Mode (D-058) — ✅ delivered in v2 (Phase 6, F6.3–F6.5)
 
 ### Out of scope entirely (post-v2)
 - Real-time collaborative editing
