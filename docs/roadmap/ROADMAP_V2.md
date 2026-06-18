@@ -966,42 +966,221 @@ that point (backend and frontend as separate sub-tasks).
 events, relations, annotations, sessions, version history) in a portable format — primarily a guard
 rail before campaign deletion.
 
-**Phase 7 Gate — design decisions to record in DECISIONS.md before F7.1 starts:**
+**Phase 7 Gate — resolved; recorded as D-112 in DECISIONS.md before F7.1 starts (run F7-GATE):**
 
-- [ ] Resolve the scope tension: PRD §7 lists "public sharing or export" as post-v2, while the v1 roadmap's v2 stub included this narrower pre-deletion export — confirm scope and update PRD or roadmap accordingly
-- [ ] Export format (e.g., structured JSON archive vs. static HTML bundle) and authorization rule (GM and/or admin)
+- [x] Scope tension resolved: the narrower pre-deletion export proceeds in v2; PRD §7 "public sharing / sharable links" stays post-v2 (D-112)
+- [x] Format = single **structured JSON archive** (campaign + members + actors/spaces/events/relations with full version history + annotations + sessions); download = raw archive JSON as a file attachment (`Content-Disposition: attachment`), **not** the `{data,meta,errors}` envelope; authorization = **GM or admin** (D-112)
 
 #### Summary
 
 | # | Feature | Status |
 |---|---|---|
+| F7-GATE | 👤 Human: record export format + GM/admin authz as D-112 in DECISIONS.md | ✅ |
 | F7.1 | Backend: campaign export endpoint | 🔲 |
+| F7.1.1 | Archive model records for the campaign export tree | 🔲 |
+| F7.1.2 | CampaignExportReadPort + native-SQL bulk-read adapter (+IT) | 🔲 |
+| F7.1.3 | ExportCampaignUseCase + ExportCampaignService (GM/admin authz, size cap) | 🔲 |
+| F7.1.4 | CampaignExportController — raw-JSON attachment download (+WebMvc test) | 🔲 |
 | F7.2 | Frontend: export affordance in campaign danger zone | 🔲 |
+| F7.2.1 | apiClient.download() — blob + Content-Disposition filename (+test) | 🔲 |
+| F7.2.2 | api/campaigns.ts exportCampaign + useExportCampaign (+test) | 🔲 |
+| F7.2.3 | CampaignExportButton — pending state, file save, InlineBanner (+test) | 🔲 |
+| F7.2.4 | Wire export into CampaignHomePage danger zone (GM+admin gating) | 🔲 |
+
+#### F7-GATE — Human: record the Phase 7 Gate decision (run once before F7.1.1)
+
+> 👤 **Human step — not a pipeline sub-task.** Add **D-112** to `docs/DECISIONS.md` capturing:
+> export format = structured JSON archive; download = raw archive JSON file attachment (not the
+> response envelope); authorization = GM or admin; PRD §7 public/sharable links remain post-v2.
+> Check the two Phase 7 Gate boxes above. No code or CLI scaffolding.
 
 #### F7.1 — Backend: campaign export endpoint
 
-**Goal:** One endpoint assembles the complete campaign dataset in the gate-decided format, without
-blowing the Render free-tier memory budget.
+> **Umbrella task — run the F7.1.N sub-tasks below, not this.**
 
-**Scope (in):** export endpoint (authorization per gate decision); streamed/chunked assembly — heavy
-lifting in SQL, bounded result sets in the JVM, limits env-overridable (per `apps/api/CLAUDE.md`
-resource-budget conventions).
+One endpoint assembles a campaign's complete dataset (members, actors/spaces/events/relations with
+full version history, annotations, sessions) into a single downloadable JSON archive, authorized to
+GM or admin.
 
-**Scope (out):** Public/sharable links (post-v2 per PRD); import.
+> ⚠️ **Memory budget — Render free tier is ~512 MB RAM (heap << that after the JVM + app baseline).**
+> Export is the one "load the whole campaign at once" path in the system, and the dominant heap cost
+> is the **full JSONB snapshot stored per entity version** (N entities × M versions × snapshot size).
+> Three mitigations, split across the sub-tasks below, must all be present:
+> 1. **Fail-fast cap** (F7.1.3) — a cheap `COUNT` precheck rejects oversized campaigns with
+>    `422 EXPORT_TOO_LARGE` *before* any rows are materialized; `campaign.export.max-entities` is
+>    env-overridable (raise from the Render dashboard, never re-implement — `apps/api/CLAUDE.md` §7).
+> 2. **Bounded reads** (F7.1.2) — set-based queries (no N+1) with an explicit JDBC fetch size so the
+>    driver streams rows instead of buffering the whole result set client-side.
+> 3. **Streaming serialization** (F7.1.4) — write JSON straight to the response `OutputStream` via
+>    `StreamingResponseBody` + `ObjectMapper.writeValue(outputStream, …)`; never build a full
+>    `byte[]`/`String` of the archive, and never let the converter pre-buffer for `Content-Length`.
 
-**Skills:** `backend-endpoint`, `security-hardening`, `backend-testing`  **Decisions:** Phase 7 Gate (new D-number), D-001  **Dependencies:** Phase 7 Gate
+#### F7.1.1 — Archive model records (`application/model/campaign/`)
+
+**Goal:** Provider-neutral value records describing the export archive tree the read port returns
+and the service assembles (no Spring/JPA/web imports — ARCH-01/ARCH-07).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/model/campaign/CampaignArchive.java` — top record:
+  campaign metadata, members, world-state entities (by type, each with ordered version history),
+  annotations, sessions, and an `exportedAt` / schema-version marker
+- supporting nested records as needed (e.g. `ArchivedEntity` { type, id, name, ownerId, versions[] },
+  `ArchivedEntityVersion`, `ArchivedAnnotation`, `ArchivedSession`) in the same package
+- (+ a small domain unit test asserting record construction / null-handling if any invariant exists)
+
+**Scope (out):** Persistence reads (F7.1.2); orchestration (F7.1.3); web serialization (F7.1.4).
+
+**Skills:** `backend-domain-model`, `backend-testing`  **Decisions:** D-112, D-001, ARCH-07  **Dependencies:** F7-GATE
+
+#### F7.1.2 — `CampaignExportReadPort` + native-SQL bulk-read adapter
+
+**Goal:** One driven port + native-SQL adapter that bulk-reads everything an archive needs for a
+campaign — all actors/spaces/events/relations with their full ordered version history, plus
+annotations and sessions — in bounded queries (heavy lifting in SQL, D-062), returning F7.1.1
+model records.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/out/campaign/CampaignExportReadPort.java` —
+  `long countEntities(UUID campaignId)` (cheap cap precheck, mitigation 1) **plus** the bulk-read
+  methods returning F7.1.1 records (per-section methods, or one `readForExport`)
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/campaign/CampaignExportReadAdapter.java` —
+  `JdbcTemplate` + `ObjectMapper` (JSONB), few set-based queries (heads + all versions per type
+  joined by entity id, ordered by version_number), **no N+1**; set an explicit fetch size
+  (`JdbcTemplate.setFetchSize` / statement fetch size) so the driver streams rather than buffering
+  the full result set (mitigation 2)
+- (+ Testcontainers IT seeding a campaign with multi-version entities + annotations + sessions and
+  asserting the assembled data + `countEntities`)
+
+**Scope (out):** Authorization + cap-exceeded error (F7.1.3); campaign/member reads (reuse existing
+`CampaignRepository`/`CampaignMembershipRepository` in F7.1.3); web layer + streaming serialization (F7.1.4).
+
+> ⚠️ **Memory:** the per-version full JSONB snapshot is the heap multiplier — keep the queries
+> set-based and the fetch size bounded; do not eager-load related entities or re-read per row.
+
+**Skills:** `database-migration`, `backend-testing`, `security-hardening`  **Decisions:** D-112, D-062, D-001  **Dependencies:** F7.1.1, F7-GATE
+
+#### F7.1.3 — `ExportCampaignUseCase` + `ExportCampaignService`
+
+**Goal:** Driving port + service that authorizes (GM via `resolveRole`, or admin) and composes the
+campaign, members, and the F7.1.2 bulk reads into a `CampaignArchive`, enforcing an env-overridable
+entity cap.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/campaign/ExportCampaignUseCase.java` —
+  `CampaignArchive export(UUID campaignId, UUID callerId, boolean callerIsAdmin)`
+- `apps/api/src/main/java/com/bluesteel/application/service/campaign/ExportCampaignService.java` —
+  `CampaignNotFoundException` if absent; `UnauthorizedException` unless admin or
+  `resolveRole == GM` (D-043); reuses `CampaignRepository` + `CampaignMembershipRepository`
+  + `CampaignExportReadPort`. **Order matters for memory:** authorize → `countEntities` → if it
+  exceeds `campaign.export.max-entities` (env-overridable, conservative default sized for ~512 MB
+  Render free tier) throw `422 EXPORT_TOO_LARGE` **before** loading any rows (mitigation 1) → only
+  then assemble the bounded archive
+- (+ application unit test, mocked ports, real expected values per TEST-02: GM allowed, editor/player
+  rejected, admin allowed, not-found, **cap-exceeded throws before any bulk read is invoked**)
+
+**Scope (out):** Controller + HTTP/download + streaming serialization (F7.1.4); the SQL itself (F7.1.2).
+
+**Skills:** `backend-endpoint`, `security-hardening`, `backend-testing`  **Decisions:** D-112, D-043, D-001  **Dependencies:** F7.1.2
+
+#### F7.1.4 — `CampaignExportController` — raw-JSON attachment download
+
+**Goal:** `GET /api/v1/campaigns/{id}/export` streams the archive as a downloadable
+`application/json` attachment (raw archive, **not** the response envelope), with a
+`Content-Disposition: attachment; filename="<campaign>-export.json"` header, writing JSON directly
+to the response output stream so no full copy is buffered in heap (mitigation 3).
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/campaign/CampaignExportController.java` —
+  resolves `callerId` + admin authority from the security context (mirroring `CampaignController`),
+  delegates to `ExportCampaignUseCase`, and returns a `StreamingResponseBody` that serializes the
+  archive with `ObjectMapper.writeValue(outputStream, response)` (streams to the socket, no
+  `byte[]`/`String`, no `Content-Length` pre-buffer); sets the `Content-Disposition` +
+  `application/json` headers; 403/404/422 flow through `GlobalExceptionHandler` (thrown by the use
+  case **before** streaming begins, so the error envelope is still emitted cleanly)
+- optional `CampaignExportResponse` web record in the same package if the model must not leak directly
+- (+ `@WebMvcTest` slice: 200 + `Content-Disposition` + streamed body for GM/admin, 403 for
+  non-member/player, 404; assert the cap path surfaces `422` before any body is written)
+
+**Scope (out):** Chunked/multipart or ZIP-per-entity transfer (deferred — the cap + streaming
+serialization bound memory for v2; revisit only if the cap proves too small, D-112); import (post-v2).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-112, D-043  **Dependencies:** F7.1.3
 
 #### F7.2 — Frontend: export affordance in campaign danger zone
 
-**Goal:** The campaign home danger zone offers "Export campaign" before deletion; the file downloads
-with clear progress and feedback.
+> **Umbrella task — run the F7.2.N sub-tasks below, not this.**
 
-**Scope (in):** export button + download handling; InlineBanner success/failure; placement beside the
-existing delete flow (`CampaignHomePage` danger zone).
+The campaign home danger zone offers "Export campaign" (visible to GM + admin, beside the
+admin-only delete), downloading the JSON archive with a clear pending state and `InlineBanner`
+success/failure feedback. Export is non-destructive → no confirmation overlay, no skeleton. No SETUP
+required (no new shadcn components or packages).
 
-**Scope (out):** Backend assembly (F7.1).
+#### F7.2.1 — `apiClient.download()` — blob + Content-Disposition filename
 
-**Skills:** `frontend-api-resource`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** Phase 7 Gate  **Dependencies:** F7.1
+**Goal:** Add a download transport to the shared client that fetches a binary/file response (no
+`Content-Type: application/json` forcing, reads `blob()`), parses the `Content-Disposition`
+filename, and reuses the existing 401 silent-refresh path.
+
+**Scope (in):**
+- extend `apps/web/src/api/client.ts` — `apiClient.download(path): Promise<{ blob: Blob; filename: string }>`
+  built on the existing auth/refresh machinery (factor a shared helper if cleaner); parse the
+  filename from `Content-Disposition`, fall back to a default
+- (+ extend `apps/web/src/api/client.test.ts` — mocked fetch returning a blob + header; assert
+  filename parse + that a 401 triggers one refresh+retry)
+
+**Scope (out):** The campaign-specific call + hook (F7.2.2); browser save (F7.2.3).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-112  **Dependencies:** F7.1.4
+
+#### F7.2.2 — `api/campaigns.ts` — `exportCampaign` + `useExportCampaign`
+
+**Goal:** Typed resource fn + TanStack mutation hook for the export download (no cache invalidation —
+read-only).
+
+**Scope (in):**
+- extend `apps/web/src/api/campaigns.ts` — `exportCampaign(id): Promise<{ blob; filename }>` via
+  `apiClient.download(\`/api/v1/campaigns/${id}/export\`)`; `useExportCampaign()` `useMutation`
+  returning the blob+filename (no `onSuccess` invalidation)
+- (+ extend `apps/web/src/api/campaigns.test.ts` — mocked `apiClient.download`, assert hook success
+  payload + error surfacing)
+
+**Scope (out):** The DOM file-save + button UI (F7.2.3); page wiring (F7.2.4).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-112  **Dependencies:** F7.2.1
+
+#### F7.2.3 — `CampaignExportButton.tsx` — pending state, file save, InlineBanner
+
+**Goal:** The danger-zone button: triggers `useExportCampaign`, saves the returned blob to disk, and
+shows inline success/error feedback with a pending ("Exporting…") state.
+
+**Scope (in):**
+- `apps/web/src/features/campaigns/components/CampaignExportButton.tsx` — `Button` calling
+  `useExportCampaign().mutate`; on success saves via a small `downloadBlob(blob, filename)` helper
+  (createObjectURL → anchor click → revoke), then `InlineBanner variant="success"`; on error
+  `InlineBanner variant="error"`; disabled + "Exporting…" while pending (no toast D-083, no modal,
+  no skeleton)
+- `apps/web/src/lib/downloadBlob.ts` — the pure DOM save helper
+- (+ `CampaignExportButton.test.tsx` incl. axe; mock the hook + `URL.createObjectURL`/anchor)
+
+**Scope (out):** Placement + role gating in the page (F7.2.4).
+
+**Skills:** `frontend-api-resource`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-112, D-083  **Dependencies:** F7.2.2
+
+#### F7.2.4 — Wire export into `CampaignHomePage` danger zone (GM + admin gating)
+
+**Goal:** Mount `CampaignExportButton` in the danger zone for GM **and** admin, while the existing
+delete stays admin-only.
+
+**Scope (in):**
+- `apps/web/src/features/campaigns/CampaignHomePage.tsx` — render the danger-zone section when
+  `isAdmin || campaign.role === 'gm'`; show `CampaignExportButton` to GM+admin and keep the delete
+  button/overlay gated to `isAdmin` only
+- (+ extend `CampaignHomePage.test.tsx` — export visible for GM and admin, hidden for editor/player;
+  delete still admin-only)
+
+**Scope (out):** The button internals (F7.2.3); backend (F7.1.*).
+
+**Skills:** `frontend-api-resource`, `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-112, D-043  **Dependencies:** F7.2.3
 
 ---
 
