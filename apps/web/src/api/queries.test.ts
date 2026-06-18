@@ -3,9 +3,15 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 import { apiClient, ApiClientError } from './client'
-import { fetchQueryUsage, submitQuery, useSubmitQuery } from './queries'
+import {
+  fetchQueryHistory,
+  fetchQueryUsage,
+  submitQuery,
+  useQueryHistory,
+  useSubmitQuery,
+} from './queries'
 import { createTestQueryClient } from '@/test/createTestQueryClient'
-import type { QueryResponse, QueryUsage } from '@/types/query'
+import type { QueryHistoryEntry, QueryResponse, QueryUsage } from '@/types/query'
 
 vi.mock('./client', () => ({
   apiClient: { get: vi.fn(), post: vi.fn(), delete: vi.fn() },
@@ -21,8 +27,8 @@ vi.mock('./client', () => ({
   },
 }))
 
-function envelope<T>(data: T) {
-  return { data, meta: null, errors: [] }
+function envelope<T>(data: T, meta: unknown = null) {
+  return { data, meta, errors: [] }
 }
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -81,6 +87,71 @@ describe('fetchQueryUsage', () => {
 
     expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/queries/usage')
     expect(result).toEqual(usage)
+  })
+})
+
+describe('fetchQueryHistory', () => {
+  const entries: QueryHistoryEntry[] = [
+    {
+      id: 'q1',
+      question: 'Where did Aldric go?',
+      answer: 'Aldric fled north after the battle.',
+      citations: [
+        { sessionId: 's1', sequenceNumber: 3, snippet: 'Aldric was last seen heading north.' },
+      ],
+      createdAt: '2026-06-18T10:00:00Z',
+    },
+  ]
+
+  it('GETs the paginated history endpoint and maps the envelope meta', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(
+      envelope(entries, { page: 1, size: 20, totalCount: 25 })
+    )
+
+    const result = await fetchQueryHistory('c1', 1)
+
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/api/v1/campaigns/c1/queries/history?page=1&size=20'
+    )
+    expect(result).toEqual({ items: entries, page: 1, size: 20, totalCount: 25 })
+  })
+
+  it('falls back to the requested page and item count when meta is absent', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(entries))
+
+    const result = await fetchQueryHistory('c1', 0)
+
+    expect(result).toEqual({ items: entries, page: 0, size: 20, totalCount: 1 })
+  })
+})
+
+describe('useQueryHistory', () => {
+  const entries: QueryHistoryEntry[] = [
+    {
+      id: 'q1',
+      question: 'Where did Aldric go?',
+      answer: 'Aldric fled north after the battle.',
+      citations: [],
+      createdAt: '2026-06-18T10:00:00Z',
+    },
+  ]
+
+  it('fetches the page once a campaign is selected', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(
+      envelope(entries, { page: 0, size: 20, totalCount: 1 })
+    )
+
+    const { result } = renderHook(() => useQueryHistory('c1', 0), { wrapper })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual({ items: entries, page: 0, size: 20, totalCount: 1 })
+  })
+
+  it('stays disabled until a campaign is selected', () => {
+    const { result } = renderHook(() => useQueryHistory('', 0), { wrapper })
+
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(apiClient.get).not.toHaveBeenCalled()
   })
 })
 

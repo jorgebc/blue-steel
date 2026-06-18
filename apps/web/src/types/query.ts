@@ -22,6 +22,27 @@ export interface QueryResponse {
 }
 
 /**
+ * One persisted Q&A from the campaign's query log (D-058) — mirrors the backend
+ * `QueryHistoryResponse`. `createdAt` is an ISO 8601 UTC timestamp parsed only at the render
+ * boundary.
+ */
+export interface QueryHistoryEntry {
+  id: string
+  question: string
+  answer: string
+  citations: Citation[]
+  createdAt: string
+}
+
+/** One offset-paginated page of query-history entries, carrying the envelope `meta` (D-055). */
+export interface QueryHistoryPage {
+  items: QueryHistoryEntry[]
+  page: number
+  size: number
+  totalCount: number
+}
+
+/**
  * Shared Query Mode usage against the free-tier guards (D-096). `consumedUsd`/`capUsd` are the
  * instance-wide daily LLM budget; `requestsRemaining` is how many more questions the caller may ask
  * in the current `windowSeconds` window before the per-(user,campaign) rate limit of `maxRequests`.

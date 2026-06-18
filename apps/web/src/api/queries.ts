@@ -1,6 +1,14 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiClient } from './client'
-import type { QueryRequest, QueryResponse, QueryUsage } from '@/types/query'
+import type {
+  QueryHistoryEntry,
+  QueryHistoryPage,
+  QueryRequest,
+  QueryResponse,
+  QueryUsage,
+} from '@/types/query'
+
+const HISTORY_PAGE_SIZE = 20
 
 /**
  * Posts a natural-language question and waits synchronously for the grounded answer (D-052).
@@ -41,6 +49,44 @@ export function useQueryUsage(campaignId: string) {
   return useQuery({
     queryKey: queryUsageKey(campaignId),
     queryFn: () => fetchQueryUsage(campaignId),
+    enabled: campaignId !== '',
+  })
+}
+
+/** Key for one offset page of the campaign's Q&A history. */
+export const queryHistoryKey = (campaignId: string, page: number) =>
+  ['query-history', campaignId, page] as const
+
+/**
+ * Fetches one offset-paginated page of the campaign's logged Q&A history, newest first (F6.4,
+ * D-058). Reads the envelope `meta` ({ page, size, totalCount }) so callers can drive prev/next
+ * paging, mirroring {@link getEntities}. Read-only — does not consume the query rate limit.
+ */
+export async function fetchQueryHistory(
+  campaignId: string,
+  page: number,
+  size: number = HISTORY_PAGE_SIZE
+): Promise<QueryHistoryPage> {
+  const res = await apiClient.get<QueryHistoryEntry[]>(
+    `/api/v1/campaigns/${campaignId}/queries/history?page=${page}&size=${size}`
+  )
+  const meta = (res.meta ?? {}) as { page?: number; size?: number; totalCount?: number }
+  return {
+    items: res.data,
+    page: meta.page ?? page,
+    size: meta.size ?? HISTORY_PAGE_SIZE,
+    totalCount: meta.totalCount ?? res.data.length,
+  }
+}
+
+/**
+ * Q&A history is genuine server state (unlike the stateless query mutation, D-058), so it lives in
+ * the TanStack Query cache. Enabled only once a campaign is selected. Page is zero-based.
+ */
+export function useQueryHistory(campaignId: string, page: number) {
+  return useQuery({
+    queryKey: queryHistoryKey(campaignId, page),
+    queryFn: () => fetchQueryHistory(campaignId, page),
     enabled: campaignId !== '',
   })
 }

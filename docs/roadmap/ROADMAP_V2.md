@@ -602,12 +602,12 @@ streaming path (D-052).
 | F6.4.1 | `GetQueryHistoryUseCase` port + page/result models | ✅ |
 | F6.4.2 | `QueryHistoryService` — member auth, offset, newest-first | ✅ |
 | F6.4.3 | `QueryController` `GET /history` + DTOs (no rate-limit consume) | ✅ |
-| F6.5 | Frontend: Q&A history panel in Query Mode *(umbrella)* | 🔲 |
-| F6.5.1 | `types/query.ts` — `QueryHistoryEntry` + page meta | 🔲 |
-| F6.5.2 | `api/queries.ts` — `fetchQueryHistory` + `useQueryHistory` | 🔲 |
-| F6.5.3 | `QueryHistorySkeleton.tsx` — DTO-derived loading state | 🔲 |
-| F6.5.4 | `QueryHistoryPanel.tsx` — list + select answer/citations | 🔲 |
-| F6.5.5 | Wire panel into `QueryPage.tsx` | 🔲 |
+| F6.5 | Frontend: Q&A history panel in Query Mode *(umbrella)* | ✅ |
+| F6.5.1 | `types/query.ts` — `QueryHistoryEntry` + page meta | ✅ |
+| F6.5.2 | `api/queries.ts` — `fetchQueryHistory` + `useQueryHistory` | ✅ |
+| F6.5.3 | `QueryHistorySkeleton.tsx` — DTO-derived loading state | ✅ |
+| F6.5.4 | `QueryHistoryPanel.tsx` — list + select answer/citations | ✅ |
+| F6.5.5 | Wire panel into `QueryPage.tsx` | ✅ |
 | F6.6 | Query streaming / SSE (contingent — latency evidence only) | 🔲 |
 
 #### F6.1 — Backend: commit-payload `add` action

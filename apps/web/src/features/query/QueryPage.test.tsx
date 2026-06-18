@@ -6,17 +6,18 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
 import { QueryPage } from './QueryPage'
 import { ApiClientError } from '@/api/client'
-import { useSubmitQuery, useQueryUsage } from '@/api/queries'
+import { useSubmitQuery, useQueryUsage, useQueryHistory } from '@/api/queries'
 import { useCampaignStore } from '@/store/campaignStore'
 import { createTestQueryClient } from '@/test/createTestQueryClient'
 import type { QueryResponse, QueryUsage } from '@/types/query'
 
 vi.mock('@/api/queries', async () => {
   const actual = await vi.importActual<typeof import('@/api/queries')>('@/api/queries')
-  return { ...actual, useSubmitQuery: vi.fn(), useQueryUsage: vi.fn() }
+  return { ...actual, useSubmitQuery: vi.fn(), useQueryUsage: vi.fn(), useQueryHistory: vi.fn() }
 })
 const mockUseSubmitQuery = vi.mocked(useSubmitQuery)
 const mockUseQueryUsage = vi.mocked(useQueryUsage)
+const mockUseQueryHistory = vi.mocked(useQueryHistory)
 
 const usage: QueryUsage = {
   consumedUsd: 0.25,
@@ -77,6 +78,11 @@ beforeEach(() => {
   useCampaignStore.setState({ activeCampaignId: 'c1', activeRole: 'player' })
   stubMutation({ resolveWith: answer })
   mockUseQueryUsage.mockReturnValue({ data: usage } as unknown as ReturnType<typeof useQueryUsage>)
+  mockUseQueryHistory.mockReturnValue({
+    data: { items: [], page: 0, size: 20, totalCount: 0 },
+    isLoading: false,
+    isError: false,
+  } as unknown as ReturnType<typeof useQueryHistory>)
 })
 
 describe('QueryPage', () => {
@@ -231,6 +237,12 @@ describe('QueryPage', () => {
     await ask()
 
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['query-usage', 'c1'] })
+  })
+
+  it('mounts the question history panel alongside the live-answer flow', () => {
+    renderPage()
+    expect(screen.getByRole('heading', { name: /question history/i })).toBeInTheDocument()
+    expect(screen.getByText(/no questions have been asked yet/i)).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
