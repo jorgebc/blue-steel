@@ -122,6 +122,7 @@ Decision log for Blue Steel, an AI-assisted narrative memory system for tabletop
 | D-109 | GM decision recorded as a proposal_votes row; co-sign recorded as cosign row | ✅ Active | Phase 5 |
 | D-110 | GM edit-on-approve: optional editedDelta replaces author's proposed_delta | ✅ Active | Phase 5 |
 | D-111 | v2 build sequence: phases 5→6→7→8→9; post-1.0 SemVer minor mapping | ✅ Active | Phase 5 |
+| D-112 | Campaign export: structured JSON archive, raw-file download, GM-or-admin | ✅ Active | Phase 7 |
 
 ---
 
@@ -2283,6 +2284,34 @@ Phase 5 (Proposals) is the v2 headline feature and unlocks the social approval l
 **Alternatives considered:**
 - Phase 8/9 before Phase 7 — considered; user personalization is more broadly useful than export. Rejected in favour of numerical order; campaign export is a safety feature (pre-deletion guard) that logically precedes personalization in the product value hierarchy.
 - Resequence Phase 6 after Phase 8/9 — rejected; Phase 6 closes the most visible v1 UX gaps (add entity in diff review, Q&A history) and should ship while Phase 5's workflow is fresh in users' minds.
+
+---
+
+### D-112 — Campaign export: structured JSON archive, raw-file download, GM-or-admin authorization
+
+**Date:** 2026-06-18
+**Status:** Active
+**Relates to:** D-001, D-043, D-062
+**Resolves:** Phase 7 Gate (ROADMAP_V2.md)
+
+**Decision:**
+The Phase 7 campaign export (`GET /api/v1/campaigns/{id}/export`) is fixed as follows:
+
+- **Format** — a single **structured JSON archive** assembling the full campaign: metadata, members, the four world-state entity types (actors, spaces, events, relations) each with their **complete append-only version history**, annotations, and sessions. World-state snapshots are already JSONB, so a JSON archive reuses the native-SQL read path (D-062) with no transformation layer.
+- **Download shape** — the endpoint returns the **raw archive JSON** as a file attachment (`Content-Disposition: attachment; filename="<campaign>-export.json"`), deliberately **not** wrapped in the standard `{ data, meta, errors }` response envelope. The export is a portable file meant to outlive the platform, not a data API to be consumed by the frontend. Error responses (403/404/422) still use the standard envelope via `GlobalExceptionHandler`.
+- **Authorization** — **GM or admin.** GM role is resolved from `campaign_members` via DB on every request (D-043); admin is read from the JWT authority. This is wider than the admin-only `DELETE /campaigns/{id}` so a GM can take their own campaign data out before deletion.
+- **Resource budget (Render free tier ~512 MB RAM)** — export is the only "load the whole campaign at once" path, and the per-entity-version full JSONB snapshot is the heap multiplier. Three layered mitigations: (1) a **fail-fast cap** — a cheap `COUNT` precheck rejects oversized campaigns with `422 EXPORT_TOO_LARGE` before any rows load, via env-overridable `campaign.export.max-entities`; (2) **bounded reads** — set-based queries (no N+1) with an explicit JDBC fetch size so the driver streams rows; (3) **streaming serialization** — the response is written straight to the output stream with `StreamingResponseBody` + `ObjectMapper.writeValue(outputStream, …)`, so no full `byte[]`/`String` of the archive is buffered and no `Content-Length` pre-buffering occurs. Chunked/multipart or ZIP-per-entity transfer is deferred until the cap proves too small.
+
+**Scope tension resolved:** PRD §7 lists "public sharing or export" as post-v2. This decision confirms only the **narrower pre-deletion export** ships in v2; public/sharable links remain post-v2. Import is out of scope.
+
+**Reason:**
+Export is primarily a pre-deletion guard rail — a campaign's data should outlive the platform. JSON is the lowest-friction portable format given the system is already JSON/REST end to end and world state is stored as JSONB; a static HTML bundle would add templating and asset concerns for no portability gain. A raw-file download (rather than the envelope) produces a clean, re-importable artefact. GM-or-admin authorization lets the people who own a campaign's narrative export it, not just platform admins.
+
+**Alternatives considered:**
+- **ZIP of per-entity JSON files** — more scalable for very large campaigns, but adds zip-streaming and a binary multipart path for a v2 feature whose campaigns are small; rejected for simplicity. Revisit if the entity cap proves limiting.
+- **Static HTML bundle** — human-browsable without tooling, but needs templating + static assets and is not re-importable; rejected as heavier and lower-value than JSON.
+- **Wrap the archive in the standard `{data,meta,errors}` envelope** — consistent with every other endpoint, but pollutes the downloaded file with API wrapper noise; rejected because the export is a file, not a data API. The envelope is retained for error responses only.
+- **Admin-only authorization** (matching `DELETE`) — simplest and consistent with the current admin-gated danger zone, but blocks a GM from exporting their own campaign; rejected in favour of GM-or-admin.
 
 ---
 
