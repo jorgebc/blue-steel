@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ApiClientError } from '@/api/client'
-import { queryUsageKey, useQueryUsage, useSubmitQuery } from '@/api/queries'
+import {
+  queryHistoryKeyPrefix,
+  queryUsageKey,
+  useQueryUsage,
+  useSubmitQuery,
+} from '@/api/queries'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { useCampaignStore } from '@/store/campaignStore'
 import { QuestionForm } from './components/QuestionForm'
@@ -42,14 +47,17 @@ function toBanner(err: unknown): Banner {
 
 /**
  * Query Mode screen: ask a question, wait synchronously, render the grounded answer (D-052).
- * Stateless by design — the answer lives in local `useState` and is discarded on navigation;
- * there is no Q&A history (D-058). Feedback (504 timeout, generic errors) uses `InlineBanner`,
- * never a toast (D-083); the loading state is a skeleton, never a spinner (D-086).
+ * The live answer lives in local `useState` and is discarded on navigation; the persisted Q&A log
+ * is surfaced separately by the history panel below (F6.4/F6.5, D-058 resolved in v2). Feedback
+ * (504 timeout, generic errors) uses `InlineBanner`, never a toast (D-083); the loading state is a
+ * skeleton, never a spinner (D-086).
  */
 export function QueryPage() {
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
   const [answer, setAnswer] = useState<QueryResponse | null>(null)
   const [banner, setBanner] = useState<Banner | null>(null)
+  // Bumped on each successful submit so the history panel jumps back to its newest (page 0) entry.
+  const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0)
   const queryClient = useQueryClient()
   const { mutate, isPending } = useSubmitQuery(campaignId ?? '')
   const { data: usage } = useQueryUsage(campaignId ?? '')
@@ -59,7 +67,12 @@ export function QueryPage() {
     setAnswer(null)
     setBanner(null)
     mutate(question, {
-      onSuccess: (data) => setAnswer(data),
+      onSuccess: (data) => {
+        setAnswer(data)
+        // The query was persisted server-side — refetch the history so it shows without a reload.
+        queryClient.invalidateQueries({ queryKey: queryHistoryKeyPrefix(campaignId ?? '') })
+        setHistoryRefreshSignal((n) => n + 1)
+      },
       onError: (err) => setBanner(toBanner(err)),
       // A submission moves the shared budget and the per-minute window — refresh the figure.
       onSettled: () => queryClient.invalidateQueries({ queryKey: queryUsageKey(campaignId ?? '') }),
@@ -101,7 +114,7 @@ export function QueryPage() {
         <h2 id="query-history-heading" className="text-lg font-semibold text-slate-900">
           Question history
         </h2>
-        <QueryHistoryPanel campaignId={campaignId ?? ''} />
+        <QueryHistoryPanel campaignId={campaignId ?? ''} refreshSignal={historyRefreshSignal} />
       </section>
     </section>
   )

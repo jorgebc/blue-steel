@@ -122,7 +122,7 @@ npx shadcn@latest add <component> --yes
 
 **Query Mode:**
 - Synchronous — no streaming (D-052). `504 QUERY_TIMEOUT` → user-friendly message with rephrasing suggestion.
-- Stateless — no Q&A history (D-058). Use component `useState` for the answer; do not cache in TanStack Query.
+- The live answer is component-local — hold it in `useState`, not the TanStack Query cache. The persisted Q&A log (F6.3–F6.5, resolving D-058) is separate genuine server state: read it via `useQueryHistory` and invalidate `queryHistoryKeyPrefix` after a successful submit so the history panel refreshes without a reload.
 - Citations must render as navigable links to session detail.
 - Never render answer with `dangerouslySetInnerHTML` — LLM output is plain text.
 

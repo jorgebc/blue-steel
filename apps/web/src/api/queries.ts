@@ -23,8 +23,10 @@ export async function submitQuery(campaignId: string, question: string): Promise
 }
 
 /**
- * Mutation for submitting a query. Stateless by design — no query key, no cache, no
- * invalidation (Query Mode keeps no Q&A history in v1, D-058).
+ * Mutation for submitting a query. The mutation itself is stateless — the live answer lives in
+ * component state, not the cache. The Q&A is now persisted server-side (F6.3) and surfaced via
+ * {@link useQueryHistory} (F6.4/F6.5), so the caller invalidates {@link queryHistoryKeyPrefix} on
+ * success to refresh the history panel (D-058 resolved in v2).
  */
 export function useSubmitQuery(campaignId: string) {
   return useMutation({
@@ -56,6 +58,9 @@ export function useQueryUsage(campaignId: string) {
 /** Key for one offset page of the campaign's Q&A history. */
 export const queryHistoryKey = (campaignId: string, page: number) =>
   ['query-history', campaignId, page] as const
+
+/** Prefix key covering every paged Q&A-history query for a campaign (for invalidation). */
+export const queryHistoryKeyPrefix = (campaignId: string) => ['query-history', campaignId] as const
 
 /**
  * Fetches one offset-paginated page of the campaign's logged Q&A history, newest first (F6.4,

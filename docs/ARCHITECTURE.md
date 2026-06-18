@@ -936,6 +936,7 @@ All endpoints are read-only. All require campaign membership. Pagination follows
 | Method + Path | Description |
 |---|---|
 | `POST /api/v1/campaigns/{id}/queries` | Submit a natural language question; returns answer text and session citations |
+| `GET /api/v1/campaigns/{id}/queries/history` | Read the campaign's Q&A log, newest-first; offset-paginated (`page`, `size`), member-authorized, read-only (F6.4, D-058) |
 
 **Request shape (outline):**
 ```json
@@ -960,7 +961,7 @@ All endpoints are read-only. All require campaign membership. Pagination follows
 
 Queries are stateless — each call is independent. No conversation history is maintained between queries.
 
-**Q&A persistence:** Queries are stateless in v1 — no query history is stored. A campaign Q&A log with a history panel inside Query Mode is deferred to v2 (D-058).
+**Q&A persistence:** Each successful query is persisted to a campaign-scoped, append-only Q&A log (question, answer, grounded citations, asker, timestamp) and surfaced through a history panel inside Query Mode (v2 Phase 6 — F6.3/F6.4/F6.5, resolving D-058). Persistence is synchronous best-effort — a log-write failure is logged and never fails the query — and the log is bounded by an env-overridable per-campaign retention cap (`query.history.max-per-campaign`). The log is read-only (no edit/delete) and the read endpoint is member-authorized, offset-paginated, newest-first, and exempt from the query rate limit.
 
 **Error responses:**
 

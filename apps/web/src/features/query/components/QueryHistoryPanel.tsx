@@ -7,6 +7,8 @@ import type { QueryHistoryEntry } from '@/types/query'
 
 interface Props {
   campaignId: string
+  /** Bumped by the parent on each successful submit; jumps the panel back to the newest entry. */
+  refreshSignal?: number
 }
 
 const PAGE_SIZE = 20
@@ -24,10 +26,20 @@ function formatAskedAt(createdAt: string): string {
  * which stays untouched. Loading uses a DTO-derived skeleton, never a spinner (D-086); load
  * failures surface through `InlineBanner`, never a toast (D-083).
  */
-export function QueryHistoryPanel({ campaignId }: Props) {
+export function QueryHistoryPanel({ campaignId, refreshSignal }: Props) {
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<QueryHistoryEntry | null>(null)
   const [errorDismissed, setErrorDismissed] = useState(false)
+  const [seenRefreshSignal, setSeenRefreshSignal] = useState(refreshSignal)
+
+  // A new query (signalled by the parent) lands on page 0 newest-first — return there so it shows.
+  // Resetting during render (not in an effect) is React's recommended prop-change-reset pattern.
+  if (refreshSignal !== seenRefreshSignal) {
+    setSeenRefreshSignal(refreshSignal)
+    setPage(0)
+    setSelected(null)
+  }
+
   const { data, isLoading, isError } = useQueryHistory(campaignId, page)
 
   function goToPage(next: number) {
