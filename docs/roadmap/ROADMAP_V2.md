@@ -1207,136 +1207,402 @@ settled at sub-task decomposition.)
 
 | # | Feature | Status |
 |---|---|---|
-| F8.1 | Backend: user profile/settings persistence + domain | 🔲 |
-| F8.2 | Backend: `GET /me` extension + `PATCH /me` profile/settings API | 🔲 |
-| F8.3 | Frontend: settings store + API hooks + DTO types | 🔲 |
-| F8.4 | Frontend: top-right account menu (header redesign) | 🔲 |
-| F8.5 | Frontend: User Settings page (`/settings`) | 🔲 |
-| F8.6 | Frontend: i18n infrastructure + EN/ES catalogs | 🔲 |
-| F8.7 | Frontend: dark-mode theme system | 🔲 |
+| F8.1 | Backend: user profile/settings persistence + domain (umbrella) | 🔲 |
+| F8.1.1 | Backend: Liquibase 0029 — profile/settings columns on `users` | 🔲 |
+| F8.1.2 | Backend: extend `User` aggregate + `UserProfile` read model | 🔲 |
+| F8.1.3 | Backend: `UserJpaEntity` columns + `UserPersistenceAdapter` mapping | 🔲 |
+| F8.2 | Backend: `GET /me` extension + `PATCH /me` profile/settings API (umbrella) | 🔲 |
+| F8.2.1 | Backend: `UpdateCurrentUserProfileUseCase` + command + service | 🔲 |
+| F8.2.2 | Backend: `PATCH /me` + `UpdateProfileRequest` + `UserMeResponse` fields | 🔲 |
+| F8.3 | Frontend: settings store + API hooks + DTO types (umbrella) | 🔲 |
+| F8.3.1 | Frontend: profile/settings DTO + `Theme`/`UiLocale` types | 🔲 |
+| F8.3.2 | Frontend: `useSettingsStore` (Zustand persist) + login hydration | 🔲 |
+| F8.3.3 | Frontend: `updateProfile()` + `useUpdateProfile()` (refetch `/me` → authStore + store) | 🔲 |
+| F8.4 | Frontend: top-right account menu (header redesign) (umbrella) | 🔲 |
+| F8.4-SETUP | Human: `npx shadcn@latest add dropdown-menu` | 👤 |
+| F8.4.1 | Frontend: `InitialsAvatar` (initials + accent) | 🔲 |
+| F8.4.2 | Frontend: `UserMenu` dropdown (name/email, Settings, theme + EN/ES, Log out) | 🔲 |
+| F8.4.3 | Frontend: wire `UserMenu` into `AppBar`; retire Sidebar Settings stub | 🔲 |
+| F8.5 | Frontend: User Settings page (`/settings`) (umbrella) | 🔲 |
+| F8.5.1 | Frontend: accent palette + `AccentColorPicker` | 🔲 |
+| F8.5.2 | Frontend: `UserSettingsPage` (form + live preview + InlineBanner) | 🔲 |
+| F8.5.3 | Frontend: global `/settings` route wiring | 🔲 |
+| F8.6 | Frontend: i18n infrastructure + EN/ES catalogs (umbrella) | 🔲 |
+| F8.6-SETUP | Human: `npm install i18next react-i18next` | 👤 |
+| F8.6.1 | Frontend: i18next init + provider driven by `useSettingsStore.uiLocale` | 🔲 |
+| F8.6.2 | Frontend: EN/ES catalogs + extract Sidebar/AppBar/UserMenu strings | 🔲 |
+| F8.7 | Frontend: dark-mode theme system (umbrella) | 🔲 |
+| F8.7.1 | Frontend: `.dark` CSS-variable overrides in `index.css` | 🔲 |
+| F8.7.2 | Frontend: theme-apply hook (toggle `<html class="dark">`, `system` via matchMedia) | 🔲 |
+| F8.7.3 | Frontend: no-flash pre-paint script in `index.html` | 🔲 |
 
 #### F8.1 — Backend: user profile/settings persistence + domain
 
-**Goal:** Persist the four new profile/settings fields so every later task reads and writes a stable
-user model.
+> **Umbrella task — run the F8.1.N sub-tasks below, not this.** No SETUP (hand-written migration).
+
+Persist the four new profile/settings fields (`display_name`, `avatar_accent_color`, `ui_locale`,
+`theme`) so every later task reads and writes a stable user model. Split into schema (F8.1.1),
+pure-domain model (F8.1.2), and persistence mapping (F8.1.3).
+
+**Acceptance (whole task):**
+- A `users` row created before the migration loads afterward with `ui_locale='en'` and `theme='system'` (defaults applied), `display_name`/`avatar_accent_color` null.
+- The domain user model round-trips all four fields through persistence (write → read returns the same values).
+
+#### F8.1.1 — Liquibase 0029: profile/settings columns on `users`
+
+**Goal:** Append-only migration adding the four columns so later tasks read a stable schema.
 
 **Scope (in):**
-- append-only Liquibase migration `0026_add_user_profile_settings.xml` adding to `users`: `display_name TEXT NULL`, `avatar_accent_color TEXT NULL`, `ui_locale TEXT NOT NULL DEFAULT 'en'`, `theme TEXT NOT NULL DEFAULT 'system'`; registered in `db.changelog-master.xml`
-- extend `UserJpaEntity` and the `UserProfile` domain model with the four fields
+- `apps/api/src/main/resources/db/changelog/0029_add_user_profile_settings.xml` — `<addColumn tableName="users">` with `display_name TEXT NULL`, `avatar_accent_color TEXT NULL`, `ui_locale TEXT NOT NULL DEFAULT 'en'`, `theme TEXT NOT NULL DEFAULT 'system'`; include a `<rollback>` dropping the columns
+- register the `<include file="db/changelog/0029_add_user_profile_settings.xml"/>` in `apps/api/src/main/resources/db/changelog/db.changelog-master.xml`
+- (+ Testcontainers IT seeding a `users` row, then asserting it loads with `ui_locale='en'`, `theme='system'`, and `display_name`/`avatar_accent_color` null)
 
-**Scope (out):** Read/update API (F8.2); any UI.
-
-**Acceptance:**
-- A `users` row created before this migration loads afterward with `ui_locale='en'` and `theme='system'` (defaults applied), `display_name`/`avatar_accent_color` null.
-- The domain user model round-trips all four fields through persistence (write → read returns the same values).
+**Scope (out):** Entity/domain/mapper (F8.1.2/F8.1.3); API (F8.2).
 
 **Skills:** `database-migration`, `backend-testing`  **Decisions:** D-100, D-101  **Dependencies:** —
 
-#### F8.2 — Backend: `GET /me` extension + `PATCH /me` profile/settings API
+#### F8.1.2 — `User` aggregate + `UserProfile` read model
 
-**Goal:** Expose the profile/settings on the current-user endpoint and let the user update them.
+**Goal:** Carry the four fields through the pure-domain model with an immutable update mutator.
 
 **Scope (in):**
-- extend `UserMeResponse` (`GET /api/v1/users/me`) with `displayName`, `avatarAccentColor`, `uiLocale`, `theme`
-- new `PATCH /api/v1/users/me` with `UpdateProfileRequest` (validates `uiLocale ∈ {en,es}`, `theme ∈ {light,dark,system}`, accent-color hex) + `UpdateCurrentUserProfileUseCase`, mirroring the existing `ChangePasswordUseCase` shape
-- error mapping in `GlobalExceptionHandler` (400 validation)
+- `apps/api/src/main/java/com/bluesteel/domain/user/User.java` — add the four fields, extend the `create(...)` factory, and add `withUpdatedProfile(displayName, avatarAccentColor, uiLocale, theme)` returning a new `User` (mirroring the existing `withUpdatedPassword` shape)
+- `apps/api/src/main/java/com/bluesteel/application/model/user/UserProfile.java` — add `displayName`, `avatarAccentColor`, `uiLocale`, `theme` to the record
+- (+ domain unit test: `withUpdatedProfile` sets the four fields and leaves id/email/passwordHash/etc. untouched)
+
+**Scope (out):** JPA/mapper (F8.1.3); service + web (F8.2).
+
+**Skills:** `backend-testing`  **Decisions:** D-100, D-101  **Dependencies:** — *(pure Java; no Spring/DB)*
+
+#### F8.1.3 — `UserJpaEntity` columns + `UserPersistenceAdapter` mapping
+
+**Goal:** Persist and read the four fields end-to-end.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/user/UserJpaEntity.java` — add the four `@Column`s, extend the constructor, add package-private getters
+- `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/user/UserPersistenceAdapter.java` — map the four fields in both `toDomain` and `toEntity`
+- (+ persistence IT: save a `User` carrying profile values → `findById` returns the same four values)
+
+**Scope (out):** API (F8.2).
+
+**Skills:** `database-migration`, `backend-testing`  **Decisions:** D-100, D-101  **Dependencies:** F8.1.1, F8.1.2
+
+#### F8.2 — Backend: `GET /me` extension + `PATCH /me` profile/settings API
+
+> **Umbrella task — run the F8.2.N sub-tasks below, not this.** No SETUP. (400 validation rides the
+> existing `MethodArgumentNotValidException` handler in `GlobalExceptionHandler` — **no handler change
+> needed**; the Bean-Validation annotations on the request DTO are sufficient.)
+
+Expose the profile/settings on the current-user endpoint and let the user update them. Split into the
+application layer (F8.2.1) and the HTTP boundary (F8.2.2).
+
+**Acceptance (whole task):**
+- `GET /me` returns the four new fields for the authenticated user.
+- `PATCH /me` with valid values persists them; a subsequent `GET /me` reflects the change.
+- Invalid `uiLocale`, `theme`, or accent-color → `400` with a field-level error; one user's update never affects another's settings.
+
+#### F8.2.1 — `UpdateCurrentUserProfileUseCase` + command + service
+
+**Goal:** Application-layer update mirroring the `ChangePassword*` shape.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/application/port/in/user/UpdateCurrentUserProfileUseCase.java` — `void update(UpdateProfileCommand command)`
+- `apps/api/src/main/java/com/bluesteel/application/model/user/UpdateProfileCommand.java` — `record(UUID callerId, String displayName, String avatarAccentColor, String uiLocale, String theme)`
+- `apps/api/src/main/java/com/bluesteel/application/service/user/UpdateCurrentUserProfileService.java` — `@Service @Transactional`: load by `callerId` → `UserNotFoundException` if absent → `user.withUpdatedProfile(...)` → `userRepository.save(...)`
+- (+ application unit test, mocked `UserRepository`, real expected values per TEST-02: persists updated profile; not-found throws)
+
+**Scope (out):** HTTP boundary (F8.2.2).
+
+**Skills:** `backend-endpoint`, `backend-testing`  **Decisions:** D-100, D-101, D-043  **Dependencies:** F8.1.2
+
+#### F8.2.2 — `PATCH /me` + `UpdateProfileRequest` + `UserMeResponse` fields
+
+**Goal:** Expose the four fields on `GET /me` and accept updates on `PATCH /me`.
+
+**Scope (in):**
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/user/UpdateProfileRequest.java` — `displayName` optional `@Size`; `uiLocale` `@Pattern("^(en|es)$")`; `theme` `@Pattern("^(light|dark|system)$")`; `avatarAccentColor` nullable hex `@Pattern`
+- extend `apps/api/src/main/java/com/bluesteel/adapters/in/web/user/UserMeResponse.java` with `displayName`, `avatarAccentColor`, `uiLocale`, `theme`
+- `apps/api/src/main/java/com/bluesteel/adapters/in/web/user/UserController.java` — new `@PatchMapping` on `/api/v1/users/me` mapping `UpdateProfileRequest` + security-context `callerId` to `UpdateProfileCommand` → `UpdateCurrentUserProfileUseCase`; extend the `getMe()` response mapping with the four fields
+- (+ `@WebMvcTest` slice: GET returns the four fields; PATCH valid → 200 + persists; invalid `uiLocale`/`theme`/hex → 400 field-level error)
 
 **Scope (out):** UI (F8.3+).
 
-**Acceptance:**
-- `GET /me` returns the four new fields for the authenticated user.
-- `PATCH /me` with valid values persists them; a subsequent `GET /me` reflects the change.
-- Invalid `ui_locale`, `theme`, or accent-color → `400` with a field-level error; one user's update never affects another's settings.
-
-**Skills:** `backend-endpoint`, `error-handling`, `backend-testing`  **Decisions:** D-100, D-101, D-043  **Dependencies:** F8.1
+**Skills:** `backend-endpoint`, `error-handling`, `backend-testing`  **Decisions:** D-100, D-101, D-043  **Dependencies:** F8.2.1, F8.1.3
 
 #### F8.3 — Frontend: settings store + API hooks + DTO types
 
-**Goal:** Client-side settings state synced to the server, with a localStorage mirror for no-flash
-first paint.
+> **Umbrella task — run the F8.3.N sub-tasks below, not this.** No SETUP (`zustand` + `@tanstack/react-query` already installed).
+
+Client-side settings state synced to the server, with a localStorage mirror for no-flash first paint.
+**Correction to the original framing:** `/me` is fetched imperatively in `api/auth.ts` (`getCurrentUser()`,
+called inside `useLogin`) and stored in `store/authStore.ts` `currentUser` — there is **no TanStack `/me`
+query to invalidate**. So the update hook re-fetches `/me` on success and writes `authStore` +
+`settingsStore` directly. Split into types (F8.3.1), store (F8.3.2), and the mutation hook (F8.3.3).
+
+**Acceptance (whole task):**
+- After login, the settings store is populated from `/me`.
+- Calling the update hook writes to the server and `authStore.currentUser` + the settings store reflect the change without a manual refetch.
+- `theme`/`uiLocale` survive a page reload (read from the localStorage mirror) even before `/me` resolves.
+
+#### F8.3.1 — Profile/settings DTO + `Theme`/`UiLocale` types
+
+**Goal:** Typed contract shared by the store and the api hook (type-check is the verification — no runtime test).
 
 **Scope (in):**
-- extend the `UserMeResponse` type in `types/auth.ts`; add `updateProfile()` + `useUpdateProfile()` in `api/users.ts` (invalidate the `/me` query on success)
-- `useSettingsStore` (Zustand `persist`, key `blue-steel-settings`) mirroring `theme` + `uiLocale`, hydrated from `/me` on login
+- `apps/web/src/types/auth.ts` — extend `UserMeResponse` with `displayName: string | null`, `avatarAccentColor: string | null`, `uiLocale: UiLocale`, `theme: Theme`; add `export type UiLocale = 'en' | 'es'`, `export type Theme = 'light' | 'dark' | 'system'`, and `export interface UpdateProfilePayload { displayName?: string | null; avatarAccentColor?: string | null; uiLocale?: UiLocale; theme?: Theme }`
+
+**Scope (out):** Store (F8.3.2); api mutation (F8.3.3).
+
+**Skills:** `frontend-api-resource`  **Decisions:** D-101, D-076  **Dependencies:** F8.2.2 *(contract source)*
+
+#### F8.3.2 — `useSettingsStore` (Zustand persist) + login hydration
+
+**Goal:** Client mirror of `theme` + `uiLocale` for no-flash first paint, hydrated from `/me` on login.
+
+**Scope (in):**
+- `apps/web/src/store/settingsStore.ts` — Zustand `persist` (key `blue-steel-settings`, following the `uiStore` pattern) with `theme` + `uiLocale` and actions `setTheme`, `setUiLocale`, `hydrateFromUser(me: UserMeResponse)`
+- wire `hydrateFromUser` into the existing `useLogin` success path in `apps/web/src/api/auth.ts` (right after `setCurrentUser`)
+- (+ store test: `hydrateFromUser` populates `theme`/`uiLocale`; values survive a reload via the localStorage mirror)
+
+**Scope (out):** The mutation hook (F8.3.3); visible UI (F8.4/F8.5).
+
+**Skills:** `frontend-api-resource`, `frontend-testing`, `auth`  **Decisions:** D-101  **Dependencies:** F8.3.1
+
+#### F8.3.3 — `updateProfile()` + `useUpdateProfile()`
+
+**Goal:** PATCH the profile and propagate the new server truth (no `/me` query exists → refetch + restore).
+
+**Scope (in):**
+- `apps/web/src/api/users.ts` — `updateProfile(payload: UpdateProfilePayload): Promise<void>` via `apiClient.patch('/api/v1/users/me', payload)`; `useUpdateProfile()` `useMutation` whose `onSuccess` calls `getCurrentUser()` → `useAuthStore.getState().setCurrentUser(me)` + `useSettingsStore.getState().hydrateFromUser(me)`
+- (+ test: PATCH body asserted; on success `authStore.currentUser` + `settingsStore` reflect the refetched `/me`)
 
 **Scope (out):** Visible UI (F8.4/F8.5).
 
-**Acceptance:**
-- After login, the settings store is populated from `/me`.
-- Calling the update hook writes to the server and the `/me` cache reflects the change without a manual refetch.
-- `theme`/`uiLocale` survive a page reload (read from the localStorage mirror) even before `/me` resolves.
-
-**Skills:** `frontend-api-resource`, `frontend-testing`, `auth`  **Decisions:** D-101, D-076  **Dependencies:** F8.2
+**Skills:** `frontend-api-resource`, `frontend-testing`  **Decisions:** D-101, D-076  **Dependencies:** F8.3.2
 
 #### F8.4 — Frontend: top-right account menu (header redesign)
 
-**Goal:** Replace the raw-email header element and retire the sidebar Settings stub with a standard
-top-right account menu.
+> **Umbrella task — run F8.4-SETUP then the F8.4.N sub-tasks below, not this.**
 
-**Scope (in):**
-- new `components/domain/UserMenu.tsx` — avatar (initials + accent) trigger opening a top-right shadcn `dropdown-menu` with name + email, a Settings link, inline theme toggle, inline EN/ES switch, and Log out (relocated from `AppBar`)
-- wire into `AppBar.tsx`, replacing the email span; **remove** the `ComingSoonItem` "Settings" entry and its now-unused `Settings` icon import from `Sidebar.tsx`
+Replace the raw-email header element and retire the sidebar Settings stub with a standard top-right
+account menu. Split into the avatar primitive (F8.4.1), the menu (F8.4.2), and the AppBar/Sidebar
+wiring (F8.4.3).
 
-**Scope (out):** The Settings page body (F8.5).
-
-**Acceptance:**
+**Acceptance (whole task):**
 - The top-right header shows an avatar rendered from initials (display name, or email fallback); the campaign sidebar no longer shows a Settings item.
 - Opening the menu reveals name + email, a Settings link, theme and EN/ES toggles, and Log out; logging out from it signs the user out from any page.
 - The menu is keyboard-operable and passes an axe check.
 
-**Skills:** `ux-navigation-logic`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-102, D-087  **Dependencies:** F8.3
+##### F8.4-SETUP 👤 (human, run before the sub-tasks)
+
+```
+cd apps/web
+npx shadcn@latest add dropdown-menu     # generates src/components/ui/dropdown-menu.tsx
+```
+
+No new npm packages (`radix-ui` is already a dependency). The avatar is custom (initials + accent), so
+no shadcn `avatar` component is added.
+
+#### F8.4.1 — `InitialsAvatar` (initials + accent)
+
+**Goal:** Reusable initials+accent avatar (also used by the F8.5 settings live preview).
+
+**Scope (in):**
+- `apps/web/src/components/domain/InitialsAvatar.tsx` — props `{ displayName?: string | null; email: string; accentColor?: string | null; size? }`; deterministic initials (display name → email fallback); accent background with a readable foreground; `aria-hidden` glyph + an accessible label
+- (+ `InitialsAvatar.test.tsx` incl. axe)
+
+**Scope (out):** The menu (F8.4.2); the settings page (F8.5).
+
+**Skills:** `frontend-testing`; design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-100, D-087  **Dependencies:** —
+
+#### F8.4.2 — `UserMenu` dropdown
+
+**Goal:** The top-right account menu itself.
+
+**Scope (in):**
+- `apps/web/src/components/domain/UserMenu.tsx` — `InitialsAvatar` trigger opening `@/components/ui/dropdown-menu`; shows display name + email; a Settings `NavLink` to `/settings`; an inline theme toggle and EN/ES switch (read/write `useSettingsStore`, persisted via `useUpdateProfile`); Log out (relocated logic: `authStore.logout()` + navigate `/login`)
+- (+ `UserMenu.test.tsx` incl. axe + keyboard open/close)
+
+**Scope (out):** AppBar/Sidebar wiring (F8.4.3). The toggles here only **persist** the preference; the
+visible theme effect lands with F8.7 (no dependency on F8.7).
+
+**Skills:** `ux-navigation-logic`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-102, D-087  **Dependencies:** F8.4-SETUP, F8.4.1, F8.3.3
+
+#### F8.4.3 — Wire `UserMenu` into `AppBar`; retire Sidebar Settings stub
+
+**Goal:** Replace the raw-email header chrome and remove the inert sidebar Settings item.
+
+**Scope (in):**
+- `apps/web/src/components/domain/AppBar.tsx` — replace the email span and the standalone Log out button with `<UserMenu/>`
+- `apps/web/src/components/domain/Sidebar.tsx` — remove the `ComingSoonItem label="Settings"` entry and the now-unused `Settings` lucide import
+- (+ update `AppBar.test.tsx` and `Sidebar.test.tsx`)
+
+**Scope (out):** Menu internals (F8.4.2); the Settings page (F8.5).
+
+**Skills:** `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-102, D-087  **Dependencies:** F8.4.2
 
 #### F8.5 — Frontend: User Settings page (`/settings`)
 
-**Goal:** A full settings surface for profile + preferences, on a global (non-campaign) route.
+> **Umbrella task — run the F8.5.N sub-tasks below, not this.** No SETUP (`select`, `radio-group`,
+> `input`, `label`, `form`, `button` already in `src/components/ui/`).
 
-**Scope (in):**
-- `/settings` route in `main.tsx` (global, authenticated, sibling to `CampaignListPage` — **not** campaign-scoped) → `UserSettingsPage` with a display-name field, accent-color picker + live initials preview, locale selector, and theme control; writes via `useUpdateProfile`; InlineBanner feedback (no toasts, D-083)
+A full settings surface for profile + preferences, on a global (non-campaign) route. Split into the
+accent picker (F8.5.1), the page (F8.5.2), and the route (F8.5.3).
 
-**Scope (out):** Account-menu chrome (F8.4).
-
-**Acceptance:**
+**Acceptance (whole task):**
 - `/settings` is reachable only while authenticated and works independently of any active campaign.
 - Editing display name / accent color / locale / theme and saving shows inline success feedback (no toast) and the changes persist across reload.
 - The initials preview updates live as the display name or accent color changes.
 
-**Skills:** `frontend-api-resource`, `react-hook-form`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-100, D-102, D-082, D-083  **Dependencies:** F8.4
+#### F8.5.1 — Accent palette + `AccentColorPicker`
+
+**Goal:** A bounded accent-color choice (the palette is settled here per the Phase-8 gate).
+
+**Scope (in):**
+- `apps/web/src/features/settings/accentPalette.ts` — the named hex preset list
+- `apps/web/src/features/settings/components/AccentColorPicker.tsx` — controlled `value`/`onChange` swatch group built on `@/components/ui/radio-group`, with accessible labels
+- (+ `AccentColorPicker.test.tsx` incl. axe)
+
+**Scope (out):** The page (F8.5.2).
+
+**Skills:** `frontend-testing`; design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-100, D-087  **Dependencies:** —
+
+#### F8.5.2 — `UserSettingsPage` (form + live preview + InlineBanner)
+
+**Goal:** The full profile/preferences surface with inline feedback.
+
+**Scope (in):**
+- `apps/web/src/features/settings/UserSettingsPage.tsx` — react-hook-form (`@/components/ui/form`) with a display-name `input`, `AccentColorPicker`, locale `@/components/ui/select`, and a theme control; a live `InitialsAvatar` preview bound to the form values; submit via `useUpdateProfile`; `InlineBanner` success/error (no toast, D-083; no modal, D-082); low-density layout (`p-8`) per UX
+- (+ `UserSettingsPage.test.tsx` incl. axe: edit → save shows the success banner; the preview updates live)
+
+**Scope (out):** Account-menu chrome (F8.4); the route (F8.5.3).
+
+**Skills:** `frontend-api-resource`, `react-hook-form`, `ux-inline-feedback`, `frontend-testing`  **Decisions:** D-100, D-102, D-082, D-083, D-087  **Dependencies:** F8.5.1, F8.4.1, F8.3.3
+
+#### F8.5.3 — Global `/settings` route wiring
+
+**Goal:** Reach the page on a global (non-campaign) authenticated route.
+
+**Scope (in):**
+- `apps/web/src/main.tsx` — add `<Route path="/settings" element={<UserSettingsPage/>} />` as a **sibling of `/`** inside the `RequireAuth`/`AuthenticatedLayout` group (**not** under `/campaigns/:campaignId`)
+- (+ routing test: `/settings` renders only while authenticated and independently of any active campaign)
+
+**Scope (out):** Page body (F8.5.2).
+
+**Skills:** `ux-navigation-logic`, `frontend-testing`  **Decisions:** D-102  **Dependencies:** F8.5.2
 
 #### F8.6 — Frontend: i18n infrastructure + EN/ES catalogs
 
-**Goal:** Internationalize the UI with English and Spanish catalogs, driven by the user's UI locale.
+> **Umbrella task — run F8.6-SETUP then the F8.6.N sub-tasks below, not this.** Scope this phase =
+> **mechanism + nav chrome only**; per-page string extraction (Query / Sessions / Settings / older
+> pages) is deferred to incremental follow-on tasks.
 
-**Scope (in):**
-- add `i18next` + `react-i18next`; provider at app root driven by `useSettingsStore.uiLocale`
-- catalogs `src/i18n/locales/{en,es}.json`; extract hardcoded strings starting with `Sidebar.tsx`, `AppBar.tsx`, `UserMenu`, then page by page
+Internationalize the UI with English and Spanish catalogs, driven by the user's UI locale. Split into
+the i18n runtime (F8.6.1) and the catalogs + nav-chrome extraction (F8.6.2).
 
-**Scope (out):** Campaign content language (Phase 9).
+*Note:* there is still no i18n skill in `skills/SKILLS_INDEX.md` — `frontend-testing` +
+`docs/UX_CONSTITUTION.md` are the authority here; optionally add a `frontend-i18n` skill later.
 
-**Acceptance:**
-- Switching the UI locale (menu or settings) re-renders all visible UI strings in the chosen language without a full page reload.
+**Acceptance (this phase's scope):**
+- Switching the UI locale (menu or settings) re-renders the nav-chrome strings in the chosen language without a full page reload.
 - A string with no translation falls back to English rather than displaying a raw key.
 - The chosen locale persists across reloads.
 
-**Skills:** `frontend-testing`; design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-099, D-101, D-087  **Dependencies:** F8.3 (locale source)
-*Note:* no existing i18n skill in `skills/SKILLS_INDEX.md` — consider adding one during decomposition.
+**Scope (out):** Campaign content language (Phase 9); per-page extraction beyond nav chrome (follow-on).
+
+##### F8.6-SETUP 👤 (human, run before the sub-tasks)
+
+```
+cd apps/web
+npm install i18next react-i18next
+```
+
+#### F8.6.1 — i18next init + provider driven by `useSettingsStore.uiLocale`
+
+**Goal:** An i18n runtime driven by the user's UI locale, with an English fallback.
+
+**Scope (in):**
+- `apps/web/src/i18n/index.ts` — configure `i18next` + `react-i18next` (`fallbackLng: 'en'`, `resources` from the en/es catalogs, initial `lng` from `useSettingsStore.getState().uiLocale`)
+- import-init in `apps/web/src/main.tsx`; subscribe `i18n.changeLanguage` to `useSettingsStore` `uiLocale` changes
+- (+ test: changing `uiLocale` switches language without a reload; a missing key falls back to EN, not a raw key)
+
+**Scope (out):** String extraction (F8.6.2).
+
+**Skills:** `frontend-testing`; design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-099, D-101, D-087  **Dependencies:** F8.6-SETUP, F8.3.2 *(locale source)*
+
+#### F8.6.2 — EN/ES catalogs + extract Sidebar/AppBar/UserMenu strings
+
+**Goal:** Prove end-to-end translation on the always-visible nav chrome.
+
+**Scope (in):**
+- `apps/web/src/i18n/locales/en.json` + `apps/web/src/i18n/locales/es.json` — keys for `Sidebar`, `AppBar`, `UserMenu`
+- replace the hardcoded strings in `components/domain/Sidebar.tsx`, `AppBar.tsx`, and `UserMenu.tsx` with `t('…')`
+- (+ update those component tests to assert the translated text per locale)
+
+**Scope (out):** Per-page extraction (Query / Sessions / Settings / etc.) — deferred follow-on; add sibling `F8.6.N` extraction tasks later if wanted.
+
+**Skills:** `frontend-testing`; design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-099, D-101, D-087  **Dependencies:** F8.6.1, F8.4.2
 
 #### F8.7 — Frontend: dark-mode theme system
 
-**Goal:** Light/dark/system theming wired to the user's theme preference, with no flash on load.
+> **Umbrella task — run the F8.7.N sub-tasks below, not this.** No SETUP (Tailwind v4 + shadcn
+> `cssVariables: true` already configured).
 
-**Scope (in):**
-- `.dark` CSS-variable overrides in `src/index.css` `@theme` (currently light-only, Tailwind v4)
-- theme provider toggling `<html class="dark">` from `useSettingsStore.theme`; `system` follows `prefers-color-scheme`; the localStorage mirror prevents first-paint flash. shadcn is already `cssVariables: true`
+Light/dark/system theming wired to the user's theme preference, with no flash on load. Split into the
+dark palette (F8.7.1), the reactive theme-apply hook (F8.7.2), and the first-paint guard (F8.7.3).
 
-**Scope (out):** Per-component restyle beyond variable wiring.
+*Note:* there is still no dark-mode skill in `skills/SKILLS_INDEX.md` — `docs/UX_CONSTITUTION.md` is the
+authority here.
 
-**Acceptance:**
+**Acceptance (whole task):**
 - Selecting Dark applies the dark palette across the app; Light restores it; System follows the OS preference and reacts to OS changes live.
 - On reload the correct theme is applied on first paint — no flash of the wrong theme.
 - shadcn components render in the active theme.
 
-**Skills:** `ux-focused-overlay`; design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-101, D-087  **Dependencies:** F8.3
-*Note:* no existing dark-mode skill in `skills/SKILLS_INDEX.md` — consider adding one during decomposition.
+#### F8.7.1 — `.dark` CSS-variable overrides in `index.css`
+
+**Goal:** A dark palette for the existing color tokens.
+
+**Scope (in):**
+- `apps/web/src/index.css` — add a `.dark { … }` block overriding the `@theme` color tokens (surface / background / border / foreground / card / popover / primary / secondary / muted / destructive / input / ring) with dark values
+- (verification is manual/visual — CSS has no unit test; shadcn `cssVariables: true` is already wired)
+
+**Scope (out):** The toggle logic (F8.7.2); per-component restyle beyond variable wiring.
+
+**Skills:** design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-101, D-087  **Dependencies:** —
+
+#### F8.7.2 — Theme-apply hook
+
+**Goal:** Apply the user's theme to `<html>`, with live `system` following.
+
+**Scope (in):**
+- `apps/web/src/hooks/useApplyTheme.ts` — toggle `document.documentElement.classList` `dark` from `useSettingsStore.theme`; resolve `system` via `matchMedia('(prefers-color-scheme: dark)')` with a change listener; mount it in `main.tsx` / `AuthenticatedLayout`
+- (+ test: `theme='dark'` adds `.dark`; `'light'` removes it; `'system'` follows and reacts to a mocked `matchMedia` change)
+
+**Scope (out):** First-paint flash (F8.7.3).
+
+**Skills:** `frontend-testing`  **Decisions:** D-101, D-087  **Dependencies:** F8.3.2
+
+#### F8.7.3 — No-flash pre-paint script
+
+**Goal:** Apply the correct theme on first paint, before React mounts.
+
+**Scope (in):**
+- `apps/web/index.html` — a small inline `<script>` reading `localStorage['blue-steel-settings']` (the Zustand persist mirror), resolving `system` via `matchMedia`, and setting `<html class="dark">` synchronously before the module bundle loads
+
+**Scope (out):** Reactive toggling (F8.7.2).
+
+**Skills:** design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-101, D-087  **Dependencies:** F8.7.2
+
+> ⚠️ **On Phase 8 completion (after the last F8.x.N is ✅):**
+> 1. **Update `docs/app_feature_inventory/` if needed** — the new user profile/settings, account menu,
+>    i18n, and theming surfaces touch `user_management.md`, `authentication.md`, `system_platform.md`,
+>    and `deferred_and_planned.md` (move the now-shipped items out of deferred). Reconcile the inventory
+>    with what actually shipped.
+> 2. **Repo-wide version bump (D-090)** — completing the Phase 8 milestone triggers a SemVer bump:
+>    raise `apps/web/package.json` and `apps/api/pom.xml` `<version>` **together** (they must stay
+>    equal) in one `chore:` commit on a branch, then an annotated `vMAJOR.MINOR.PATCH` tag on `main`
+>    **after merge** (never tag a branch; don't push/tag unless asked).
 
 ---
 
