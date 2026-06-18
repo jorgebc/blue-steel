@@ -8,6 +8,7 @@ import { QuestionForm } from './components/QuestionForm'
 import { QueryAnswerSkeleton } from './components/QueryAnswerSkeleton'
 import { QueryUsageNotice } from './components/QueryUsageNotice'
 import { AnswerDisplay } from './components/AnswerDisplay'
+import { QueryHistoryPanel } from './components/QueryHistoryPanel'
 import type { QueryResponse } from '@/types/query'
 
 interface Banner {
@@ -92,6 +93,16 @@ export function QueryPage() {
       )}
 
       {!isPending && answer && <AnswerDisplay response={answer} campaignId={campaignId ?? ''} />}
+
+      <section
+        aria-labelledby="query-history-heading"
+        className="space-y-4 border-t border-slate-200 pt-6"
+      >
+        <h2 id="query-history-heading" className="text-lg font-semibold text-slate-900">
+          Question history
+        </h2>
+        <QueryHistoryPanel campaignId={campaignId ?? ''} />
+      </section>
     </section>
   )
 }
