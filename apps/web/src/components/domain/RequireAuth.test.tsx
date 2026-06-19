@@ -11,6 +11,10 @@ const mockUser: CurrentUser = {
   email: 'gm@example.com',
   isAdmin: false,
   forcePasswordChange: false,
+  displayName: null,
+  avatarAccentColor: null,
+  uiLocale: 'en',
+  theme: 'system',
 }
 
 describe('RequireAuth', () => {

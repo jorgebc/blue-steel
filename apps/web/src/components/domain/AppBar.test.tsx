@@ -14,7 +14,16 @@ vi.mock('react-router-dom', async () => {
 
 function setup() {
   useAuthStore.setState({
-    currentUser: { id: 'u1', email: 'gm@example.com', isAdmin: false, forcePasswordChange: false },
+    currentUser: {
+      id: 'u1',
+      email: 'gm@example.com',
+      isAdmin: false,
+      forcePasswordChange: false,
+      displayName: null,
+      avatarAccentColor: null,
+      uiLocale: 'en',
+      theme: 'system',
+    },
   })
   return render(
     <MemoryRouter>

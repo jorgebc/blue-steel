@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiBaseUrl, apiClient } from './client'
 import { useAuthStore } from '@/store/authStore'
+import { useSettingsStore } from '@/store/settingsStore'
 import type { ApiEnvelope } from '@/types/api'
 import type { AuthLoginResponse, RefreshResponse, UserMeResponse } from '@/types/auth'
 
@@ -61,6 +62,7 @@ export function useLogin() {
       useAuthStore.getState().setAccessToken(loginData.accessToken)
       const me = await getCurrentUser()
       useAuthStore.getState().setCurrentUser(me)
+      useSettingsStore.getState().hydrateFromUser(me)
       return loginData
     },
   })

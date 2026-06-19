@@ -23,7 +23,16 @@ const mockUseUserSearch = vi.mocked(useUserSearch)
 
 function setAdmin(isAdmin: boolean) {
   useAuthStore.setState({
-    currentUser: { id: 'u0', email: 'admin@example.com', isAdmin, forcePasswordChange: false },
+    currentUser: {
+      id: 'u0',
+      email: 'admin@example.com',
+      isAdmin,
+      forcePasswordChange: false,
+      displayName: null,
+      avatarAccentColor: null,
+      uiLocale: 'en',
+      theme: 'system',
+    },
   })
 }
 
