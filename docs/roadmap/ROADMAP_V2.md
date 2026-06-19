@@ -1207,10 +1207,10 @@ settled at sub-task decomposition.)
 
 | # | Feature | Status |
 |---|---|---|
-| F8.1 | Backend: user profile/settings persistence + domain (umbrella) | 🔲 |
-| F8.1.1 | Backend: Liquibase 0029 — profile/settings columns on `users` | 🔲 |
-| F8.1.2 | Backend: extend `User` aggregate + `UserProfile` read model | 🔲 |
-| F8.1.3 | Backend: `UserJpaEntity` columns + `UserPersistenceAdapter` mapping | 🔲 |
+| F8.1 | Backend: user profile/settings persistence + domain (umbrella) | ✅ |
+| F8.1.1 | Backend: Liquibase 0029 — profile/settings columns on `users` | ✅ |
+| F8.1.2 | Backend: extend `User` aggregate + `UserProfile` read model | ✅ |
+| F8.1.3 | Backend: `UserJpaEntity` columns + `UserPersistenceAdapter` mapping | ✅ |
 | F8.2 | Backend: `GET /me` extension + `PATCH /me` profile/settings API (umbrella) | 🔲 |
 | F8.2.1 | Backend: `UpdateCurrentUserProfileUseCase` + command + service | 🔲 |
 | F8.2.2 | Backend: `PATCH /me` + `UpdateProfileRequest` + `UserMeResponse` fields | 🔲 |

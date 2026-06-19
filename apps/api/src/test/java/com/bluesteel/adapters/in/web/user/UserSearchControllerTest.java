@@ -77,8 +77,17 @@ class UserSearchControllerTest {
     when(searchUsersUseCase.searchByEmail("jor", CALLER_ID, true))
         .thenReturn(
             List.of(
-                new UserProfile(FOUND_ID, "jorge@example.com", false, false),
-                new UserProfile(UUID.randomUUID(), "jordan@example.com", false, false)));
+                new UserProfile(
+                    FOUND_ID, "jorge@example.com", false, false, null, null, "en", "system"),
+                new UserProfile(
+                    UUID.randomUUID(),
+                    "jordan@example.com",
+                    false,
+                    false,
+                    null,
+                    null,
+                    "en",
+                    "system")));
 
     mockMvc
         .perform(get("/api/v1/users").param("email", "jor"))
@@ -106,7 +115,10 @@ class UserSearchControllerTest {
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
   void search_gmCaller_returns200() throws Exception {
     when(searchUsersUseCase.searchByEmail("found@example.com", CALLER_ID, false))
-        .thenReturn(List.of(new UserProfile(FOUND_ID, "found@example.com", false, false)));
+        .thenReturn(
+            List.of(
+                new UserProfile(
+                    FOUND_ID, "found@example.com", false, false, null, null, "en", "system")));
 
     mockMvc
         .perform(get("/api/v1/users").param("email", "found@example.com"))

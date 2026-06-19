@@ -24,6 +24,14 @@ public class GetCurrentUserService implements GetCurrentUserUseCase {
         userRepository
             .findById(userId)
             .orElseThrow(() -> new UserNotFoundException("User not found"));
-    return new UserProfile(user.id(), user.email(), user.isAdmin(), user.forcePasswordChange());
+    return new UserProfile(
+        user.id(),
+        user.email(),
+        user.isAdmin(),
+        user.forcePasswordChange(),
+        user.displayName(),
+        user.avatarAccentColor(),
+        user.uiLocale(),
+        user.theme());
   }
 }

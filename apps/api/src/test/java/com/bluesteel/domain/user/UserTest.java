@@ -79,4 +79,45 @@ class UserTest {
     assertThat(refreshed.isAdmin()).isEqualTo(original.isAdmin());
     assertThat(refreshed.createdAt()).isEqualTo(original.createdAt());
   }
+
+  @Test
+  @DisplayName("should apply default profile/settings when created via the six-arg factory")
+  void create_sixArg_appliesProfileDefaults() {
+    User user = User.create(ID, EMAIL, HASH, false, false, NOW);
+
+    assertThat(user.displayName()).isNull();
+    assertThat(user.avatarAccentColor()).isNull();
+    assertThat(user.uiLocale()).isEqualTo("en");
+    assertThat(user.theme()).isEqualTo("system");
+  }
+
+  @Test
+  @DisplayName("should carry explicit profile/settings when created via the ten-arg factory")
+  void create_tenArg_carriesProfileValues() {
+    User user = User.create(ID, EMAIL, HASH, false, false, NOW, "Jorge", "#FF8800", "es", "dark");
+
+    assertThat(user.displayName()).isEqualTo("Jorge");
+    assertThat(user.avatarAccentColor()).isEqualTo("#FF8800");
+    assertThat(user.uiLocale()).isEqualTo("es");
+    assertThat(user.theme()).isEqualTo("dark");
+  }
+
+  @Test
+  @DisplayName("should set the four profile fields and leave identity fields untouched")
+  void withUpdatedProfile_replacesProfileFieldsOnly() {
+    User original = User.create(ID, EMAIL, HASH, true, true, NOW);
+    User updated = original.withUpdatedProfile("Jorge", "#3366FF", "es", "light");
+
+    assertThat(updated.displayName()).isEqualTo("Jorge");
+    assertThat(updated.avatarAccentColor()).isEqualTo("#3366FF");
+    assertThat(updated.uiLocale()).isEqualTo("es");
+    assertThat(updated.theme()).isEqualTo("light");
+
+    assertThat(updated.id()).isEqualTo(original.id());
+    assertThat(updated.email()).isEqualTo(original.email());
+    assertThat(updated.passwordHash()).isEqualTo(original.passwordHash());
+    assertThat(updated.isAdmin()).isEqualTo(original.isAdmin());
+    assertThat(updated.forcePasswordChange()).isEqualTo(original.forcePasswordChange());
+    assertThat(updated.createdAt()).isEqualTo(original.createdAt());
+  }
 }

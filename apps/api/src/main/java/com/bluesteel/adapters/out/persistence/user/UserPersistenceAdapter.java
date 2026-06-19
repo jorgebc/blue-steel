@@ -52,11 +52,24 @@ public class UserPersistenceAdapter implements UserRepository {
         e.getPasswordHash(),
         e.isAdmin(),
         e.isForcePasswordChange(),
-        e.getCreatedAt());
+        e.getCreatedAt(),
+        e.getDisplayName(),
+        e.getAvatarAccentColor(),
+        e.getUiLocale(),
+        e.getTheme());
   }
 
   private UserJpaEntity toEntity(User u) {
     return new UserJpaEntity(
-        u.id(), u.email(), u.passwordHash(), u.isAdmin(), u.forcePasswordChange(), u.createdAt());
+        u.id(),
+        u.email(),
+        u.passwordHash(),
+        u.isAdmin(),
+        u.forcePasswordChange(),
+        u.createdAt(),
+        u.displayName(),
+        u.avatarAccentColor(),
+        u.uiLocale(),
+        u.theme());
   }
 }

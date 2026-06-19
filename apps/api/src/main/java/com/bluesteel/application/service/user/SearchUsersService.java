@@ -46,6 +46,14 @@ public class SearchUsersService implements SearchUsersUseCase {
   }
 
   private UserProfile toProfile(User user) {
-    return new UserProfile(user.id(), user.email(), user.isAdmin(), user.forcePasswordChange());
+    return new UserProfile(
+        user.id(),
+        user.email(),
+        user.isAdmin(),
+        user.forcePasswordChange(),
+        user.displayName(),
+        user.avatarAccentColor(),
+        user.uiLocale(),
+        user.theme());
   }
 }
