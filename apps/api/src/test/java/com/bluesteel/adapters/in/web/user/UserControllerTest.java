@@ -70,7 +70,8 @@ class UserControllerTest {
   void getMe_authenticated_returnsProfile() throws Exception {
     UUID userId = UUID.fromString(USER_ID);
     when(getCurrentUserUseCase.getCurrentUser(userId))
-        .thenReturn(new UserProfile(userId, "user@example.com", false, true));
+        .thenReturn(
+            new UserProfile(userId, "user@example.com", false, true, null, null, "en", "system"));
 
     mockMvc
         .perform(get("/api/v1/users/me"))

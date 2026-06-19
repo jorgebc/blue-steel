@@ -70,4 +70,7 @@
   <!-- F6.3.1: Q&A log — append-only per-campaign query history (D-058) -->
   <include file="db/changelog/0028_create_query_log.xml"/>
 
+  <!-- F8.1.1: per-user profile + settings columns on users (D-100, D-101) -->
+  <include file="db/changelog/0029_add_user_profile_settings.xml"/>
+
 </databaseChangeLog>

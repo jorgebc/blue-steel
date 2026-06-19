@@ -30,6 +30,18 @@ class UserJpaEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @Column(name = "display_name")
+  private String displayName;
+
+  @Column(name = "avatar_accent_color")
+  private String avatarAccentColor;
+
+  @Column(name = "ui_locale", nullable = false)
+  private String uiLocale;
+
+  @Column(name = "theme", nullable = false)
+  private String theme;
+
   protected UserJpaEntity() {}
 
   UserJpaEntity(
@@ -38,13 +50,21 @@ class UserJpaEntity {
       String passwordHash,
       boolean isAdmin,
       boolean forcePasswordChange,
-      Instant createdAt) {
+      Instant createdAt,
+      String displayName,
+      String avatarAccentColor,
+      String uiLocale,
+      String theme) {
     this.id = id;
     this.email = email;
     this.passwordHash = passwordHash;
     this.isAdmin = isAdmin;
     this.forcePasswordChange = forcePasswordChange;
     this.createdAt = createdAt;
+    this.displayName = displayName;
+    this.avatarAccentColor = avatarAccentColor;
+    this.uiLocale = uiLocale;
+    this.theme = theme;
   }
 
   UUID getId() {
@@ -69,5 +89,21 @@ class UserJpaEntity {
 
   Instant getCreatedAt() {
     return createdAt;
+  }
+
+  String getDisplayName() {
+    return displayName;
+  }
+
+  String getAvatarAccentColor() {
+    return avatarAccentColor;
+  }
+
+  String getUiLocale() {
+    return uiLocale;
+  }
+
+  String getTheme() {
+    return theme;
   }
 }

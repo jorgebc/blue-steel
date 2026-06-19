@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    F8.1.1: per-user profile + settings fields stored as columns on the lean users table
+    (D-100 — no separate settings table). display_name is cosmetic and non-unique; the avatar is
+    rendered from initials + a chosen accent color (no uploaded images). ui_locale and theme are
+    the personalization axis with DB defaults so a row created before this migration loads with
+    sensible values (D-101). Append-only (DB-02).
+  -->
+  <changeSet id="0029-add-user-profile-settings" author="jorge">
+
+    <addColumn tableName="users">
+      <!-- Cosmetic display name; non-unique, falls back to email when null (D-100) -->
+      <column name="display_name" type="TEXT"/>
+      <!-- Accent color for the initials avatar; null until the user picks one (D-100) -->
+      <column name="avatar_accent_color" type="TEXT"/>
+      <!-- UI locale (en|es); default en applied to existing rows (D-101) -->
+      <column name="ui_locale" type="TEXT" defaultValue="en">
+        <constraints nullable="false"/>
+      </column>
+      <!-- Theme (light|dark|system); default system applied to existing rows (D-101) -->
+      <column name="theme" type="TEXT" defaultValue="system">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+
+    <rollback>
+      <dropColumn tableName="users" columnName="display_name"/>
+      <dropColumn tableName="users" columnName="avatar_accent_color"/>
+      <dropColumn tableName="users" columnName="ui_locale"/>
+      <dropColumn tableName="users" columnName="theme"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

@@ -12,11 +12,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @DisplayName("UserPersistenceAdapter")
 class UserPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
 
   @Autowired private UserPersistenceAdapter adapter;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   @Test
   @DisplayName("should save and find a user by id")
@@ -132,6 +134,56 @@ class UserPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
     assertThat(found).isPresent();
     assertThat(found.get().passwordHash()).isEqualTo("$2a$10$newhash");
     assertThat(found.get().forcePasswordChange()).isFalse();
+  }
+
+  @Test
+  @DisplayName("should load a pre-migration users row with default ui_locale=en and theme=system")
+  void findById_rowWithoutProfileColumns_appliesSchemaDefaults() {
+    UUID id = UUID.randomUUID();
+    // Insert via raw SQL omitting the F8.1.1 columns, simulating a row created before the
+    // migration — the DB DEFAULTs (ui_locale='en', theme='system') must fill them in.
+    jdbcTemplate.update(
+        """
+        INSERT INTO users (id, email, password_hash, is_admin, force_password_change, created_at)
+        VALUES (?, ?, '$2a$10$hash', FALSE, FALSE, now())
+        """,
+        id,
+        "defaults-" + id + "@example.com");
+
+    Optional<User> found = adapter.findById(id);
+
+    assertThat(found).isPresent();
+    assertThat(found.get().uiLocale()).isEqualTo("en");
+    assertThat(found.get().theme()).isEqualTo("system");
+    assertThat(found.get().displayName()).isNull();
+    assertThat(found.get().avatarAccentColor()).isNull();
+  }
+
+  @Test
+  @DisplayName("should round-trip profile/settings values through save and findById")
+  void saveAndFindById_roundTripsProfileFields() {
+    UUID id = UUID.randomUUID();
+    User user =
+        User.create(
+            id,
+            id + "-profile@example.com",
+            "$2a$10$hash",
+            false,
+            false,
+            Instant.now().truncatedTo(ChronoUnit.MICROS),
+            "Jorge",
+            "#FF8800",
+            "es",
+            "dark");
+
+    adapter.save(user);
+    Optional<User> found = adapter.findById(id);
+
+    assertThat(found).isPresent();
+    assertThat(found.get().displayName()).isEqualTo("Jorge");
+    assertThat(found.get().avatarAccentColor()).isEqualTo("#FF8800");
+    assertThat(found.get().uiLocale()).isEqualTo("es");
+    assertThat(found.get().theme()).isEqualTo("dark");
   }
 
   private void save(String email) {
