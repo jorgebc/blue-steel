@@ -2,9 +2,11 @@ package com.bluesteel.adapters.in.web.user;
 
 import com.bluesteel.adapters.in.web.ApiResponse;
 import com.bluesteel.application.model.user.ChangePasswordCommand;
+import com.bluesteel.application.model.user.UpdateProfileCommand;
 import com.bluesteel.application.model.user.UserProfile;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
 import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
+import com.bluesteel.application.port.in.user.UpdateCurrentUserProfileUseCase;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -23,11 +25,15 @@ public class UserController {
 
   private final GetCurrentUserUseCase getCurrentUserUseCase;
   private final ChangePasswordUseCase changePasswordUseCase;
+  private final UpdateCurrentUserProfileUseCase updateCurrentUserProfileUseCase;
 
   public UserController(
-      GetCurrentUserUseCase getCurrentUserUseCase, ChangePasswordUseCase changePasswordUseCase) {
+      GetCurrentUserUseCase getCurrentUserUseCase,
+      ChangePasswordUseCase changePasswordUseCase,
+      UpdateCurrentUserProfileUseCase updateCurrentUserProfileUseCase) {
     this.getCurrentUserUseCase = getCurrentUserUseCase;
     this.changePasswordUseCase = changePasswordUseCase;
+    this.updateCurrentUserProfileUseCase = updateCurrentUserProfileUseCase;
   }
 
   /** Returns the authenticated user's profile. */
@@ -38,7 +44,29 @@ public class UserController {
     return ResponseEntity.ok(
         ApiResponse.success(
             new UserMeResponse(
-                profile.id(), profile.email(), profile.isAdmin(), profile.forcePasswordChange())));
+                profile.id(),
+                profile.email(),
+                profile.isAdmin(),
+                profile.forcePasswordChange(),
+                profile.displayName(),
+                profile.avatarAccentColor(),
+                profile.uiLocale(),
+                profile.theme())));
+  }
+
+  /** Replaces the authenticated user's profile/settings fields. */
+  @PatchMapping
+  public ResponseEntity<ApiResponse<Void>> updateProfile(
+      @Valid @RequestBody UpdateProfileRequest request) {
+    UUID userId = resolveUserId();
+    updateCurrentUserProfileUseCase.update(
+        new UpdateProfileCommand(
+            userId,
+            request.displayName(),
+            request.avatarAccentColor(),
+            request.uiLocale(),
+            request.theme()));
+    return ResponseEntity.ok(ApiResponse.success(null));
   }
 
   /** Changes the authenticated user's password and clears the force_password_change flag. */

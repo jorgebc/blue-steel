@@ -8,4 +8,8 @@ public record UserMeResponse(
     UUID id,
     String email,
     @JsonProperty("isAdmin") boolean isAdmin,
-    @JsonProperty("forcePasswordChange") boolean forcePasswordChange) {}
+    @JsonProperty("forcePasswordChange") boolean forcePasswordChange,
+    String displayName,
+    String avatarAccentColor,
+    String uiLocale,
+    String theme) {}
