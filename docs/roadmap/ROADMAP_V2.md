@@ -1211,9 +1211,9 @@ settled at sub-task decomposition.)
 | F8.1.1 | Backend: Liquibase 0029 — profile/settings columns on `users` | ✅ |
 | F8.1.2 | Backend: extend `User` aggregate + `UserProfile` read model | ✅ |
 | F8.1.3 | Backend: `UserJpaEntity` columns + `UserPersistenceAdapter` mapping | ✅ |
-| F8.2 | Backend: `GET /me` extension + `PATCH /me` profile/settings API (umbrella) | 🔲 |
-| F8.2.1 | Backend: `UpdateCurrentUserProfileUseCase` + command + service | 🔲 |
-| F8.2.2 | Backend: `PATCH /me` + `UpdateProfileRequest` + `UserMeResponse` fields | 🔲 |
+| F8.2 | Backend: `GET /me` extension + `PATCH /me` profile/settings API (umbrella) | ✅ |
+| F8.2.1 | Backend: `UpdateCurrentUserProfileUseCase` + command + service | ✅ |
+| F8.2.2 | Backend: `PATCH /me` + `UpdateProfileRequest` + `UserMeResponse` fields | ✅ |
 | F8.3 | Frontend: settings store + API hooks + DTO types (umbrella) | 🔲 |
 | F8.3.1 | Frontend: profile/settings DTO + `Theme`/`UiLocale` types | 🔲 |
 | F8.3.2 | Frontend: `useSettingsStore` (Zustand persist) + login hydration | 🔲 |

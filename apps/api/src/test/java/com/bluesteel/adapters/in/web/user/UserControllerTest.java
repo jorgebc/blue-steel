@@ -1,6 +1,7 @@
 package com.bluesteel.adapters.in.web.user;
 
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,12 +11,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bluesteel.BlueSteelApplication;
 import com.bluesteel.application.model.user.ChangePasswordCommand;
+import com.bluesteel.application.model.user.UpdateProfileCommand;
 import com.bluesteel.application.model.user.UserProfile;
 import com.bluesteel.application.port.in.campaign.InviteCampaignMemberUseCase;
 import com.bluesteel.application.port.in.user.AdminBootstrapUseCase;
 import com.bluesteel.application.port.in.user.ChangePasswordUseCase;
 import com.bluesteel.application.port.in.user.GetCurrentUserUseCase;
 import com.bluesteel.application.port.in.user.InvitePlatformUserUseCase;
+import com.bluesteel.application.port.in.user.UpdateCurrentUserProfileUseCase;
 import com.bluesteel.domain.exception.InvalidPasswordException;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +57,7 @@ class UserControllerTest {
   @MockitoBean private InviteCampaignMemberUseCase inviteCampaignMemberUseCase;
   @MockitoBean private GetCurrentUserUseCase getCurrentUserUseCase;
   @MockitoBean private ChangePasswordUseCase changePasswordUseCase;
+  @MockitoBean private UpdateCurrentUserProfileUseCase updateCurrentUserProfileUseCase;
 
   @Autowired private WebApplicationContext context;
 
@@ -71,14 +75,99 @@ class UserControllerTest {
     UUID userId = UUID.fromString(USER_ID);
     when(getCurrentUserUseCase.getCurrentUser(userId))
         .thenReturn(
-            new UserProfile(userId, "user@example.com", false, true, null, null, "en", "system"));
+            new UserProfile(
+                userId, "user@example.com", false, true, "Ada Lovelace", "#3366FF", "es", "dark"));
 
     mockMvc
         .perform(get("/api/v1/users/me"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.email").value("user@example.com"))
         .andExpect(jsonPath("$.data.isAdmin").value(false))
-        .andExpect(jsonPath("$.data.forcePasswordChange").value(true));
+        .andExpect(jsonPath("$.data.forcePasswordChange").value(true))
+        .andExpect(jsonPath("$.data.displayName").value("Ada Lovelace"))
+        .andExpect(jsonPath("$.data.avatarAccentColor").value("#3366FF"))
+        .andExpect(jsonPath("$.data.uiLocale").value("es"))
+        .andExpect(jsonPath("$.data.theme").value("dark"));
+  }
+
+  @Test
+  @DisplayName("should return 200 and update the profile on valid PATCH /me")
+  @WithMockUser(username = USER_ID, roles = "USER")
+  void updateProfile_valid_returns200() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/users/me")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "displayName": "Ada Lovelace", "avatarAccentColor": "#3366FF", \
+                    "uiLocale": "es", "theme": "dark" }
+                    """))
+        .andExpect(status().isOk());
+
+    verify(updateCurrentUserProfileUseCase)
+        .update(
+            new UpdateProfileCommand(
+                UUID.fromString(USER_ID), "Ada Lovelace", "#3366FF", "es", "dark"));
+  }
+
+  @Test
+  @DisplayName("should return 400 when uiLocale is not en or es")
+  @WithMockUser(username = USER_ID, roles = "USER")
+  void updateProfile_invalidUiLocale_returns400() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/users/me")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "uiLocale": "fr" }
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("should return 400 when theme is not light, dark, or system")
+  @WithMockUser(username = USER_ID, roles = "USER")
+  void updateProfile_invalidTheme_returns400() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/users/me")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "theme": "neon" }
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("should return 400 when avatarAccentColor is not a 6-digit hex color")
+  @WithMockUser(username = USER_ID, roles = "USER")
+  void updateProfile_invalidAccentColor_returns400() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/users/me")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "avatarAccentColor": "blue" }
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("should return 401 when PATCH /me is unauthenticated")
+  void updateProfile_unauthenticated_returns401() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/users/me")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "theme": "dark" }
+                    """))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
