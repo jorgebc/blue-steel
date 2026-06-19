@@ -39,7 +39,16 @@ function setStores(currentUserId: string | null, role: CampaignRole | null = 'pl
     .getState()
     .setCurrentUser(
       currentUserId
-        ? { id: currentUserId, email: 'x@y.z', isAdmin: false, forcePasswordChange: false }
+        ? {
+            id: currentUserId,
+            email: 'x@y.z',
+            isAdmin: false,
+            forcePasswordChange: false,
+            displayName: null,
+            avatarAccentColor: null,
+            uiLocale: 'en',
+            theme: 'system',
+          }
         : null
     )
 }

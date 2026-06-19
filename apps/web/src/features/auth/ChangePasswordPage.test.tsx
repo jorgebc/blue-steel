@@ -25,6 +25,10 @@ const mockUser: CurrentUser = {
   email: 'gm@example.com',
   isAdmin: false,
   forcePasswordChange: true,
+  displayName: null,
+  avatarAccentColor: null,
+  uiLocale: 'en',
+  theme: 'system',
 }
 
 function renderPage() {

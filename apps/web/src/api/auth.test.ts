@@ -36,6 +36,10 @@ const mockUser: UserMeResponse = {
   email: 'gm@example.com',
   isAdmin: false,
   forcePasswordChange: false,
+  displayName: null,
+  avatarAccentColor: null,
+  uiLocale: 'en',
+  theme: 'system',
 }
 
 // ─── Test wrapper ────────────────────────────────────────────────────────────

@@ -1214,10 +1214,10 @@ settled at sub-task decomposition.)
 | F8.2 | Backend: `GET /me` extension + `PATCH /me` profile/settings API (umbrella) | ✅ |
 | F8.2.1 | Backend: `UpdateCurrentUserProfileUseCase` + command + service | ✅ |
 | F8.2.2 | Backend: `PATCH /me` + `UpdateProfileRequest` + `UserMeResponse` fields | ✅ |
-| F8.3 | Frontend: settings store + API hooks + DTO types (umbrella) | 🔲 |
-| F8.3.1 | Frontend: profile/settings DTO + `Theme`/`UiLocale` types | 🔲 |
-| F8.3.2 | Frontend: `useSettingsStore` (Zustand persist) + login hydration | 🔲 |
-| F8.3.3 | Frontend: `updateProfile()` + `useUpdateProfile()` (refetch `/me` → authStore + store) | 🔲 |
+| F8.3 | Frontend: settings store + API hooks + DTO types (umbrella) | ✅ |
+| F8.3.1 | Frontend: profile/settings DTO + `Theme`/`UiLocale` types | ✅ |
+| F8.3.2 | Frontend: `useSettingsStore` (Zustand persist) + login hydration | ✅ |
+| F8.3.3 | Frontend: `updateProfile()` + `useUpdateProfile()` (refetch `/me` → authStore + store) | ✅ |
 | F8.4 | Frontend: top-right account menu (header redesign) (umbrella) | 🔲 |
 | F8.4-SETUP | Human: `npx shadcn@latest add dropdown-menu` | 👤 |
 | F8.4.1 | Frontend: `InitialsAvatar` (initials + accent) | 🔲 |

@@ -2,9 +2,19 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
-import { changePassword, searchUsers, useChangePassword, useUserSearch } from './users'
+import {
+  changePassword,
+  searchUsers,
+  updateProfile,
+  useChangePassword,
+  useUpdateProfile,
+  useUserSearch,
+} from './users'
 import { ApiClientError } from './client'
+import { useAuthStore } from '@/store/authStore'
+import { useSettingsStore } from '@/store/settingsStore'
 import type { ApiEnvelope } from '@/types/api'
+import type { UserMeResponse } from '@/types/auth'
 
 const BASE = 'http://localhost:8080'
 
@@ -91,6 +101,51 @@ describe('users API', () => {
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
+  })
+
+  // ── updateProfile() ────────────────────────────────────────────────────────────
+
+  it('updateProfile() makes PATCH to /api/v1/users/me with the supplied payload', async () => {
+    fetchSpy.mockResolvedValueOnce(envelopeResponse({}))
+
+    await updateProfile({ theme: 'dark', uiLocale: 'es' })
+
+    const [url, init] = fetchSpy.mock.calls[0]
+    expect(url).toBe(`${BASE}/api/v1/users/me`)
+    expect((init as RequestInit).method).toBe('PATCH')
+    expect((init as RequestInit).body).toBe(JSON.stringify({ theme: 'dark', uiLocale: 'es' }))
+  })
+
+  // ── useUpdateProfile ───────────────────────────────────────────────────────────
+
+  it('useUpdateProfile on success: refetches /me and updates authStore + settingsStore', async () => {
+    const refreshedUser: UserMeResponse = {
+      id: 'u1',
+      email: 'gm@example.com',
+      isAdmin: false,
+      forcePasswordChange: false,
+      displayName: 'Game Master',
+      avatarAccentColor: '#3b82f6',
+      uiLocale: 'es',
+      theme: 'dark',
+    }
+    useAuthStore.setState({ currentUser: null })
+    useSettingsStore.setState({ theme: 'system', uiLocale: 'en' })
+    fetchSpy
+      .mockResolvedValueOnce(envelopeResponse({})) // PATCH /users/me
+      .mockResolvedValueOnce(envelopeResponse(refreshedUser)) // GET /users/me
+
+    const { result } = renderHook(() => useUpdateProfile(), { wrapper: createWrapper() })
+
+    await act(async () => {
+      await result.current.mutateAsync({ theme: 'dark', uiLocale: 'es' })
+    })
+
+    await waitFor(() => {
+      expect(useAuthStore.getState().currentUser).toEqual(refreshedUser)
+      expect(useSettingsStore.getState().theme).toBe('dark')
+      expect(useSettingsStore.getState().uiLocale).toBe('es')
+    })
   })
 
   // ── searchUsers() ─────────────────────────────────────────────────────────────
