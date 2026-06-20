@@ -1223,10 +1223,10 @@ settled at sub-task decomposition.)
 | F8.4.1 | Frontend: `InitialsAvatar` (initials + accent) | ✅ |
 | F8.4.2 | Frontend: `UserMenu` dropdown (name/email, Settings, theme + EN/ES, Log out) | ✅ |
 | F8.4.3 | Frontend: wire `UserMenu` into `AppBar`; retire Sidebar Settings stub | ✅ |
-| F8.5 | Frontend: User Settings page (`/settings`) (umbrella) | 🔲 |
-| F8.5.1 | Frontend: accent palette + `AccentColorPicker` | 🔲 |
-| F8.5.2 | Frontend: `UserSettingsPage` (form + live preview + InlineBanner) | 🔲 |
-| F8.5.3 | Frontend: global `/settings` route wiring | 🔲 |
+| F8.5 | Frontend: User Settings page (`/settings`) (umbrella) | ✅ |
+| F8.5.1 | Frontend: accent palette + `AccentColorPicker` | ✅ |
+| F8.5.2 | Frontend: `UserSettingsPage` (form + live preview + InlineBanner) | ✅ |
+| F8.5.3 | Frontend: global `/settings` route wiring | ✅ |
 | F8.6 | Frontend: i18n infrastructure + EN/ES catalogs (umbrella) | 🔲 |
 | F8.6-SETUP | Human: `npm install i18next react-i18next` | 👤 |
 | F8.6.1 | Frontend: i18next init + provider driven by `useSettingsStore.uiLocale` | 🔲 |
