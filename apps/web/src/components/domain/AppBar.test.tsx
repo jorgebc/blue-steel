@@ -12,6 +12,10 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate }
 })
 
+vi.mock('@/api/users', () => ({
+  useUpdateProfile: () => ({ mutate: vi.fn() }),
+}))
+
 function setup() {
   useAuthStore.setState({
     currentUser: {
@@ -42,14 +46,16 @@ describe('AppBar', () => {
     expect(screen.getByRole('link', { name: /blue steel/i })).toHaveAttribute('href', '/')
   })
 
-  it('shows the current user email', () => {
+  it('shows the current user email inside the account menu', async () => {
     setup()
-    expect(screen.getByText('gm@example.com')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /account menu/i }))
+    expect(screen.getAllByText('gm@example.com').length).toBeGreaterThan(0)
   })
 
-  it('logs out and navigates to /login', async () => {
+  it('logs out from the account menu and navigates to /login', async () => {
     setup()
-    await userEvent.click(screen.getByRole('button', { name: /log out/i }))
+    await userEvent.click(screen.getByRole('button', { name: /account menu/i }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /log out/i }))
     expect(useAuthStore.getState().currentUser).toBeNull()
     expect(mockNavigate).toHaveBeenCalledWith('/login')
   })

@@ -1,15 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
-import {
-  ChevronLeft,
-  Compass,
-  Home,
-  Inbox,
-  Library,
-  Search,
-  Settings,
-  Upload,
-  type LucideIcon,
-} from 'lucide-react'
+import { ChevronLeft, Compass, Home, Inbox, Library, Search, Upload } from 'lucide-react'
 import { useCampaign } from '@/api/campaigns'
 import { useCampaignStore } from '@/store/campaignStore'
 import { useUiStore } from '@/store/uiStore'
@@ -25,37 +15,11 @@ const activeLinkClass = 'bg-blue-50 text-blue-600 border-r-2 border-blue-500 fon
 const inactiveLinkClass = 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
 const itemBaseClass = 'flex items-center gap-3 px-4 py-3 text-sm transition-colors'
 
-/** A mode-nav entry whose feature has not shipped yet — visible but inert. */
-function ComingSoonItem({
-  label,
-  icon: Icon,
-  expanded,
-}: {
-  label: string
-  icon: LucideIcon
-  expanded: boolean
-}) {
-  return (
-    <div
-      aria-disabled="true"
-      title="Coming soon"
-      className={`${itemBaseClass} cursor-not-allowed text-slate-400`}
-    >
-      <Icon className="h-5 w-5 shrink-0" aria-hidden />
-      {expanded && (
-        <span className="flex flex-1 items-center justify-between">
-          {label}
-          <span className="text-xs text-slate-400">Coming soon</span>
-        </span>
-      )}
-    </div>
-  )
-}
-
 /**
- * Persistent campaign navigation: campaign switcher, role-gated mode nav
- * (Input live; Query/Exploration/Settings stubbed), collapse toggle, and the
- * current user with logout. Collapsed renders icons only.
+ * Persistent campaign navigation: campaign switcher and role-gated mode nav
+ * (Home / Input / Query / Exploration / Review queue) plus the collapse toggle.
+ * Collapsed renders icons only. User-global settings live in the top-right
+ * account menu, not here (D-102).
  */
 export function Sidebar() {
   const expanded = useUiStore((s) => s.sidebarExpanded)
@@ -152,7 +116,6 @@ export function Sidebar() {
             {expanded && <span>Review queue</span>}
           </NavLink>
         )}
-        <ComingSoonItem label="Settings" icon={Settings} expanded={expanded} />
       </div>
 
       {/* Collapse toggle */}

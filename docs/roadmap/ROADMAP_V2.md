@@ -1218,11 +1218,11 @@ settled at sub-task decomposition.)
 | F8.3.1 | Frontend: profile/settings DTO + `Theme`/`UiLocale` types | ✅ |
 | F8.3.2 | Frontend: `useSettingsStore` (Zustand persist) + login hydration | ✅ |
 | F8.3.3 | Frontend: `updateProfile()` + `useUpdateProfile()` (refetch `/me` → authStore + store) | ✅ |
-| F8.4 | Frontend: top-right account menu (header redesign) (umbrella) | 🔲 |
-| F8.4-SETUP | Human: `npx shadcn@latest add dropdown-menu` | 👤 |
-| F8.4.1 | Frontend: `InitialsAvatar` (initials + accent) | 🔲 |
-| F8.4.2 | Frontend: `UserMenu` dropdown (name/email, Settings, theme + EN/ES, Log out) | 🔲 |
-| F8.4.3 | Frontend: wire `UserMenu` into `AppBar`; retire Sidebar Settings stub | 🔲 |
+| F8.4 | Frontend: top-right account menu (header redesign) (umbrella) | ✅ |
+| F8.4-SETUP | Human: `npx shadcn@latest add dropdown-menu` | ✅ |
+| F8.4.1 | Frontend: `InitialsAvatar` (initials + accent) | ✅ |
+| F8.4.2 | Frontend: `UserMenu` dropdown (name/email, Settings, theme + EN/ES, Log out) | ✅ |
+| F8.4.3 | Frontend: wire `UserMenu` into `AppBar`; retire Sidebar Settings stub | ✅ |
 | F8.5 | Frontend: User Settings page (`/settings`) (umbrella) | 🔲 |
 | F8.5.1 | Frontend: accent palette + `AccentColorPicker` | 🔲 |
 | F8.5.2 | Frontend: `UserSettingsPage` (form + live preview + InlineBanner) | 🔲 |
