@@ -108,10 +108,9 @@ describe('Sidebar', () => {
     }
   })
 
-  it('renders Settings as a disabled coming-soon item', () => {
+  it('does not show a Settings item (it now lives in the account menu)', () => {
     setup('gm')
-    const item = screen.getByText('Settings').closest('[aria-disabled]')
-    expect(item).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.queryByText('Settings')).not.toBeInTheDocument()
   })
 
   it('shows the Exploration link pointing at the explore route for all roles', () => {
