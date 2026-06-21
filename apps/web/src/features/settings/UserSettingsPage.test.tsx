@@ -70,7 +70,7 @@ describe('UserSettingsPage', () => {
     expect(screen.getByText('Settings saved.')).toBeInTheDocument()
   })
 
-  it('sends null when the display name is cleared', async () => {
+  it('sends an empty string when the display name is cleared (backend clear sentinel, D-113)', async () => {
     const mutate = vi.fn()
     mockUseUpdateProfile.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<
       typeof useUpdateProfile
@@ -81,7 +81,7 @@ describe('UserSettingsPage', () => {
 
     await waitFor(() =>
       expect(mutate).toHaveBeenCalledWith(
-        expect.objectContaining({ displayName: null }),
+        expect.objectContaining({ displayName: '' }),
         expect.anything()
       )
     )

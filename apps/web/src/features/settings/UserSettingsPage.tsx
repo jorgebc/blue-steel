@@ -92,7 +92,9 @@ export function UserSettingsPage() {
     useSettingsStore.getState().setUiLocale(values.uiLocale)
     updateProfile(
       {
-        displayName: trimmedName || null,
+        // Empty string is the backend's explicit "clear display name" sentinel; null would mean
+        // "leave unchanged" under the PATCH partial-merge contract.
+        displayName: trimmedName,
         avatarAccentColor: values.avatarAccentColor,
         uiLocale: values.uiLocale,
         theme: values.theme,
