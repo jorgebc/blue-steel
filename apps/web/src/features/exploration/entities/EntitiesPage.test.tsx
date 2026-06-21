@@ -7,6 +7,7 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { EntitiesPage } from './EntitiesPage'
 import { useEntityList } from '@/api/worldstate'
 import type { EntityListPage } from '@/types/worldstate'
+import i18n from '@/i18n'
 
 vi.mock('@/api/worldstate', () => ({ useEntityList: vi.fn() }))
 const mockUseEntityList = vi.mocked(useEntityList)
@@ -98,6 +99,23 @@ describe('EntitiesPage', () => {
     await userEvent.click(next)
 
     expect(mockUseEntityList).toHaveBeenLastCalledWith('actor', 1)
+  })
+
+  it('renders the localized title and description in English', () => {
+    renderPage()
+
+    expect(screen.getByText('Entities')).toBeInTheDocument()
+    expect(screen.getByText("Actors recorded across this campaign's sessions.")).toBeInTheDocument()
+  })
+
+  it('renders the title and description in Spanish when the UI locale is es', async () => {
+    await i18n.changeLanguage('es')
+    renderPage()
+
+    expect(screen.getByText('Entidades')).toBeInTheDocument()
+    expect(
+      screen.getByText('Actores registrados en las sesiones de esta campaña.')
+    ).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

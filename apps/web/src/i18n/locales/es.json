@@ -29,5 +29,21 @@
     "themeSystem": "Sistema",
     "language": "Idioma",
     "logOut": "Cerrar sesión"
+  },
+  "exploration": {
+    "entitiesTitle": "Entidades",
+    "entitiesDescription": "Actores registrados en las sesiones de esta campaña.",
+    "spacesTitle": "Espacios",
+    "spacesDescription": "Ubicaciones registradas en las sesiones de esta campaña.",
+    "backToEntities": "Volver a entidades",
+    "backToSpaces": "Volver a espacios",
+    "backToRelations": "Volver a relaciones",
+    "relation": "Relación",
+    "endpoints": "Extremos",
+    "source": "Origen",
+    "target": "Destino",
+    "versionHistory": "Historial de versiones",
+    "unresolved": "Sin resolver",
+    "relationLoadError": "No se pudo cargar esta relación. Actualiza la página."
   }
 }
