@@ -21,7 +21,9 @@ export function DeltaFieldsEditor({ baseline, values, onChange, idPrefix }: Prop
   const entries = Object.entries(baseline)
 
   if (entries.length === 0) {
-    return <p className="text-sm text-slate-500">This entity has no recorded fields to change.</p>
+    return (
+      <p className="text-sm text-muted-foreground">This entity has no recorded fields to change.</p>
+    )
   }
 
   return (
@@ -31,8 +33,8 @@ export function DeltaFieldsEditor({ baseline, values, onChange, idPrefix }: Prop
         if (!isEditablePrimitive(value)) {
           return (
             <div key={key}>
-              <Label className="text-slate-500">{key}</Label>
-              <p className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+              <Label className="text-muted-foreground">{key}</Label>
+              <p className="mt-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
                 {JSON.stringify(value)} <span className="text-xs">(not editable)</span>
               </p>
             </div>

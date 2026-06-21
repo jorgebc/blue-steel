@@ -13,9 +13,9 @@ interface Props {
 export function AddedEntityCard({ entity, onRemove }: Props) {
   const fields = Object.entries(entity.fields)
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <article className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
       <header className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-base font-medium text-slate-900">{entity.name}</h3>
+        <h3 className="text-base font-medium text-foreground">{entity.name}</h3>
         <div className="flex items-center gap-2">
           <Badge variant="outline">{entity.entityType}</Badge>
           <Badge>Added</Badge>
@@ -23,12 +23,12 @@ export function AddedEntityCard({ entity, onRemove }: Props) {
       </header>
       <dl className="mb-4 space-y-1 text-sm">
         {fields.length === 0 ? (
-          <p className="text-slate-500">No profile fields.</p>
+          <p className="text-muted-foreground">No profile fields.</p>
         ) : (
           fields.map(([key, value]) => (
             <div key={key} className="flex gap-2">
-              <dt className="text-slate-500">{key}</dt>
-              <dd className="text-slate-900">{formatFieldValue(value)}</dd>
+              <dt className="text-muted-foreground">{key}</dt>
+              <dd className="text-foreground">{formatFieldValue(value)}</dd>
             </div>
           ))
         )}

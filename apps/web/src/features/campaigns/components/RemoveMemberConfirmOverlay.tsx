@@ -23,9 +23,9 @@ export function RemoveMemberConfirmOverlay({
 }: Props) {
   return (
     <FocusedOverlay open={open} onClose={onClose} ariaLabel="Remove member">
-      <div className="w-[24rem] max-w-[90vw] bg-white p-6">
-        <h3 className="mb-2 text-base font-medium text-slate-900">Remove this member?</h3>
-        <p className="mb-6 text-sm text-slate-500">
+      <div className="w-[24rem] max-w-[90vw] bg-surface p-6">
+        <h3 className="mb-2 text-base font-medium text-foreground">Remove this member?</h3>
+        <p className="mb-6 text-sm text-muted-foreground">
           {memberEmail ? <span className="font-medium">{memberEmail}</span> : 'This member'} will
           lose access to the campaign. They can be invited again later.
         </p>

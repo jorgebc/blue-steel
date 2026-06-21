@@ -5,8 +5,8 @@ import { useCampaign } from '@/api/campaigns'
 import { useCampaignStore } from '@/store/campaignStore'
 import { useUiStore } from '@/store/uiStore'
 
-const activeLinkClass = 'bg-blue-50 text-blue-600 border-r-2 border-blue-500 font-medium'
-const inactiveLinkClass = 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+const activeLinkClass = 'bg-accent-subtle text-accent border-r-2 border-accent font-medium'
+const inactiveLinkClass = 'text-muted-foreground hover:bg-muted hover:text-foreground'
 const itemBaseClass = 'flex items-center gap-3 px-4 py-3 text-sm transition-colors'
 
 /**
@@ -28,21 +28,21 @@ export function Sidebar() {
       aria-label={t('sidebar.navAriaLabel')}
       className={`${
         expanded ? 'w-64' : 'w-16'
-      } sticky top-14 flex h-[calc(100vh-3.5rem)] flex-col border-r border-slate-200 bg-white transition-all duration-200`}
+      } sticky top-14 flex h-[calc(100vh-3.5rem)] flex-col border-r border-border bg-surface transition-all duration-200`}
     >
       {/* Campaign switcher */}
-      <div className="border-b border-slate-200 p-4">
+      <div className="border-b border-border p-4">
         {expanded ? (
           <>
-            <p className="truncate text-sm font-semibold text-slate-900">
+            <p className="truncate text-sm font-semibold text-foreground">
               {campaign?.name ?? t('sidebar.campaignFallback')}
             </p>
             {activeRole && (
-              <span className="mt-0.5 self-start rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+              <span className="mt-0.5 self-start rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                 {t(`sidebar.role.${activeRole}`)}
               </span>
             )}
-            <Link to="/" className="text-xs text-blue-500 underline-offset-4 hover:underline">
+            <Link to="/" className="text-xs text-accent underline-offset-4 hover:underline">
               {t('sidebar.switchCampaign')}
             </Link>
           </>
@@ -50,7 +50,7 @@ export function Sidebar() {
           <Link
             to="/"
             aria-label={t('sidebar.switchCampaign')}
-            className="flex justify-center text-slate-600"
+            className="flex justify-center text-muted-foreground"
           >
             <Library className="h-5 w-5" aria-hidden />
           </Link>
@@ -118,12 +118,12 @@ export function Sidebar() {
       </div>
 
       {/* Collapse toggle */}
-      <div className="border-t border-slate-200 p-2">
+      <div className="border-t border-border p-2">
         <button
           type="button"
           onClick={toggleSidebar}
           aria-label={expanded ? t('sidebar.collapse') : t('sidebar.expand')}
-          className="flex w-full items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+          className="flex w-full items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted"
         >
           <ChevronLeft
             className={`h-4 w-4 transition-transform duration-200 ${expanded ? '' : 'rotate-180'}`}

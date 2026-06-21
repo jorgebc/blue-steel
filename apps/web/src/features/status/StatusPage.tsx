@@ -7,17 +7,17 @@ function StatusSkeleton() {
     <div
       role="status"
       aria-label="Loading system status"
-      className="rounded-2xl bg-white p-8 shadow-sm"
+      className="rounded-2xl bg-surface p-8 shadow-sm"
     >
-      <div className="mb-6 h-6 w-1/3 rounded bg-slate-200 animate-pulse" />
+      <div className="mb-6 h-6 w-1/3 rounded bg-muted animate-pulse" />
       <div className="space-y-4">
         <div className="space-y-2">
-          <div className="h-3 w-12 rounded bg-slate-200 animate-pulse" />
-          <div className="h-4 w-8 rounded bg-slate-200 animate-pulse" />
+          <div className="h-3 w-12 rounded bg-muted animate-pulse" />
+          <div className="h-4 w-8 rounded bg-muted animate-pulse" />
         </div>
         <div className="space-y-2">
-          <div className="h-3 w-16 rounded bg-slate-200 animate-pulse" />
-          <div className="h-4 w-8 rounded bg-slate-200 animate-pulse" />
+          <div className="h-3 w-16 rounded bg-muted animate-pulse" />
+          <div className="h-4 w-8 rounded bg-muted animate-pulse" />
         </div>
       </div>
     </div>
@@ -29,7 +29,7 @@ export function StatusPage() {
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
+    <div className="flex min-h-screen items-center justify-center bg-background p-8">
       <div className="w-full max-w-sm">
         {error && !bannerDismissed && (
           <div className="mb-4">
@@ -42,16 +42,16 @@ export function StatusPage() {
         )}
         {isLoading && <StatusSkeleton />}
         {data && (
-          <div className="rounded-2xl bg-white p-8 shadow-sm">
-            <h1 className="mb-6 text-2xl font-semibold text-slate-900">System status</h1>
+          <div className="rounded-2xl bg-surface p-8 shadow-sm">
+            <h1 className="mb-6 text-2xl font-semibold text-foreground">System status</h1>
             <dl className="space-y-4">
               <div>
-                <dt className="text-sm text-slate-500">API</dt>
-                <dd className="text-sm font-medium text-slate-900">{data.status}</dd>
+                <dt className="text-sm text-muted-foreground">API</dt>
+                <dd className="text-sm font-medium text-foreground">{data.status}</dd>
               </div>
               <div>
-                <dt className="text-sm text-slate-500">Database</dt>
-                <dd className="text-sm font-medium text-slate-900">{data.db}</dd>
+                <dt className="text-sm text-muted-foreground">Database</dt>
+                <dd className="text-sm font-medium text-foreground">{data.db}</dd>
               </div>
             </dl>
           </div>

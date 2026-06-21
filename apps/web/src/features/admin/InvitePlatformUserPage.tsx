@@ -54,7 +54,7 @@ export function InvitePlatformUserPage() {
   return (
     <main className="mx-auto max-w-lg p-6">
       <h1 className="mb-2 text-2xl font-semibold">Invite a user</h1>
-      <p className="mb-6 text-sm text-slate-500">
+      <p className="mb-6 text-sm text-muted-foreground">
         Create a platform account so you can assign the user as a campaign GM. They receive a
         temporary password by email and set their own on first login.
       </p>

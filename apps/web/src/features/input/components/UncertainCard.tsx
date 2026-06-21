@@ -31,16 +31,16 @@ export function UncertainCard({ card, resolution, onResolve }: Props) {
   }
 
   return (
-    <article className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
+    <article className="rounded-2xl border border-amber-200 bg-surface p-6 shadow-sm">
       <header className="mb-3">
         <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">
           Requires Resolution
         </Badge>
       </header>
-      <p className="text-sm text-slate-900">
+      <p className="text-sm text-foreground">
         Extracted mention: <strong>{card.extractedMention}</strong>
       </p>
-      <p className="mb-4 text-sm text-slate-900">
+      <p className="mb-4 text-sm text-foreground">
         Possible match: <strong>{card.candidateEntityName}</strong>
       </p>
       <RadioGroup

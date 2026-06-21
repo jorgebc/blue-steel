@@ -66,13 +66,13 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
+    <div className="flex min-h-screen items-center justify-center bg-background p-8">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
           <Brand size="lg" />
         </div>
-        <div className="rounded-2xl bg-white p-8 shadow-sm">
-          <h1 className="mb-6 text-2xl font-semibold text-slate-900">Sign in</h1>
+        <div className="rounded-2xl bg-surface p-8 shadow-sm">
+          <h1 className="mb-6 text-2xl font-semibold text-foreground">Sign in</h1>
           {banner && (
             <div className="mb-4">
               <InlineBanner variant="error" message={banner} onDismiss={() => setBanner(null)} />
@@ -116,7 +116,12 @@ export function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isPending} aria-disabled={isPending}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isPending}
+                aria-disabled={isPending}
+              >
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
                 Sign in
               </Button>

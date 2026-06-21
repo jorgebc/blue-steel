@@ -65,7 +65,7 @@ export function QueryHistoryPanel({ campaignId, refreshSignal }: Props) {
   const hasNext = (page + 1) * PAGE_SIZE < totalCount
 
   if (items.length === 0) {
-    return <p className="text-sm text-slate-500">No questions have been asked yet.</p>
+    return <p className="text-sm text-muted-foreground">No questions have been asked yet.</p>
   }
 
   return (
@@ -82,12 +82,12 @@ export function QueryHistoryPanel({ campaignId, refreshSignal }: Props) {
                 className={[
                   'w-full rounded-lg border p-4 text-left',
                   isSelected
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-slate-200 bg-white hover:border-slate-300',
+                    ? 'border-accent bg-accent-subtle'
+                    : 'border-border bg-surface hover:border-border-strong',
                 ].join(' ')}
               >
-                <span className="block text-sm font-medium text-slate-900">{entry.question}</span>
-                <span className="mt-1 block text-xs text-slate-500">
+                <span className="block text-sm font-medium text-foreground">{entry.question}</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
                   {formatAskedAt(entry.createdAt)}
                 </span>
               </button>
@@ -102,7 +102,7 @@ export function QueryHistoryPanel({ campaignId, refreshSignal }: Props) {
             type="button"
             onClick={() => goToPage(page - 1)}
             disabled={!hasPrev}
-            className="rounded-lg border border-slate-200 px-3 py-1 text-sm text-slate-700 disabled:opacity-50"
+            className="rounded-lg border border-border px-3 py-1 text-sm text-foreground disabled:opacity-50"
           >
             Previous
           </button>
@@ -110,7 +110,7 @@ export function QueryHistoryPanel({ campaignId, refreshSignal }: Props) {
             type="button"
             onClick={() => goToPage(page + 1)}
             disabled={!hasNext}
-            className="rounded-lg border border-slate-200 px-3 py-1 text-sm text-slate-700 disabled:opacity-50"
+            className="rounded-lg border border-border px-3 py-1 text-sm text-foreground disabled:opacity-50"
           >
             Next
           </button>

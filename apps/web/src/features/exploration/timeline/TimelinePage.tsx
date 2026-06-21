@@ -28,14 +28,8 @@ export function TimelinePage() {
   const [inputs, setInputs] = useState({ actor: '', space: '', eventType: '' })
   const [appliedFilters, setAppliedFilters] = useState<TimelineFilters>(EMPTY_FILTERS)
 
-  const {
-    data,
-    isLoading,
-    isError,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
-  } = useTimeline(appliedFilters)
+  const { data, isLoading, isError, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useTimeline(appliedFilters)
 
   const events = data?.pages.flatMap((page) => page.events) ?? []
 
@@ -47,8 +41,8 @@ export function TimelinePage() {
   return (
     <section>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Timeline</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold text-foreground">Timeline</h1>
+        <p className="text-sm text-muted-foreground">
           Events recorded across this campaign&apos;s committed sessions.
         </p>
       </div>
@@ -96,7 +90,7 @@ export function TimelinePage() {
       {isLoading && <TimelineSkeleton />}
 
       {!isLoading && !isError && events.length === 0 && (
-        <p className="text-sm text-slate-500">No events yet.</p>
+        <p className="text-sm text-muted-foreground">No events yet.</p>
       )}
 
       {!isLoading && !isError && events.length > 0 && (

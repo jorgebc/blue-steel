@@ -9,8 +9,8 @@ import type { CampaignRole } from '@/types/campaign'
 
 function CampaignCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-slate-200 p-6">
-      <div className="h-5 w-1/2 animate-pulse rounded bg-slate-200" />
+    <div className="rounded-2xl border border-border p-6">
+      <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
     </div>
   )
 }
@@ -18,7 +18,7 @@ function CampaignCardSkeleton() {
 function RoleBadge({ role }: { role: CampaignRole | null }) {
   if (!role) return null
   return (
-    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium capitalize text-slate-600">
+    <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium capitalize text-muted-foreground">
       {role}
     </span>
   )
@@ -42,14 +42,14 @@ export function CampaignListPage() {
           <div className="flex items-center gap-2">
             <Link
               to="/invite"
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
               Invite user
             </Link>
             {campaigns && campaigns.length > 0 && (
               <Link
                 to="/campaigns/new"
-                className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-accent-hover"
               >
                 New campaign
               </Link>
@@ -78,7 +78,7 @@ export function CampaignListPage() {
             <li key={campaign.id}>
               <Link
                 to={`/campaigns/${campaign.id}`}
-                className="block rounded-2xl transition-colors hover:bg-slate-50"
+                className="block rounded-2xl transition-colors hover:bg-muted"
               >
                 <Card className="rounded-2xl">
                   <CardHeader className="flex-row items-center justify-between gap-3">
@@ -91,23 +91,23 @@ export function CampaignListPage() {
           ))}
         </ul>
       ) : (
-        <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <Library className="h-10 w-10 text-slate-400" aria-hidden />
-          <h2 className="mt-4 text-base font-medium text-slate-900">No campaigns yet</h2>
+        <div className="flex flex-col items-center rounded-2xl border border-border bg-surface p-8 text-center shadow-sm">
+          <Library className="h-10 w-10 text-muted-foreground" aria-hidden />
+          <h2 className="mt-4 text-base font-medium text-foreground">No campaigns yet</h2>
           {isAdmin ? (
             <>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Create your first campaign to start building its world.
               </p>
               <Link
                 to="/campaigns/new"
-                className="mt-6 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+                className="mt-6 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-accent-hover"
               >
                 New campaign
               </Link>
             </>
           ) : (
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Ask your GM or an admin to add you to a campaign.
             </p>
           )}

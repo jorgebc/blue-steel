@@ -26,7 +26,7 @@ export function AnswerDisplay({ response, campaignId }: Props) {
         <h2 id="answer-heading" ref={headingRef} tabIndex={-1} className="sr-only">
           Answer
         </h2>
-        <p className="whitespace-pre-wrap leading-relaxed text-slate-900">{response.answer}</p>
+        <p className="whitespace-pre-wrap leading-relaxed text-foreground">{response.answer}</p>
       </section>
 
       {response.citations.length > 0 && (

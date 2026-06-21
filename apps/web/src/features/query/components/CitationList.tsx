@@ -14,16 +14,16 @@ interface Props {
 export function CitationList({ citations, campaignId }: Props) {
   return (
     <aside aria-labelledby="citations-heading" className="space-y-2">
-      <h3 id="citations-heading" className="text-sm font-semibold text-slate-700">
+      <h3 id="citations-heading" className="text-sm font-semibold text-foreground">
         Sources
       </h3>
       <ol className="space-y-2">
         {citations.map((c) => (
-          <li key={`${c.sessionId}-${c.sequenceNumber}`} className="text-sm text-slate-700">
+          <li key={`${c.sessionId}-${c.sequenceNumber}`} className="text-sm text-foreground">
             <Link
               to={`/campaigns/${campaignId}/sessions/${c.sessionId}`}
               aria-label={`Session ${c.sequenceNumber}: ${c.snippet}`}
-              className="font-medium text-blue-500 underline-offset-4 hover:underline"
+              className="font-medium text-accent underline-offset-4 hover:underline"
             >
               Session {c.sequenceNumber}
             </Link>

@@ -27,8 +27,8 @@ export function AnnotationCard({ annotation, canDelete, onDelete }: Props) {
   return (
     <article className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-xs text-slate-500">
-          <span className="font-medium text-slate-700">{authorLabel(annotation.authorId)}</span>
+        <div className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{authorLabel(annotation.authorId)}</span>
           <span aria-hidden> · </span>
           <time dateTime={annotation.createdAt}>{formatTimestamp(annotation.createdAt)}</time>
         </div>
@@ -40,11 +40,11 @@ export function AnnotationCard({ annotation, canDelete, onDelete }: Props) {
             aria-label="Delete annotation"
             onClick={onDelete}
           >
-            <Trash2 className="h-4 w-4 text-slate-500" />
+            <Trash2 className="h-4 w-4 text-muted-foreground" />
           </Button>
         )}
       </div>
-      <p className="mt-2 text-sm whitespace-pre-wrap text-slate-900">{annotation.content}</p>
+      <p className="mt-2 text-sm whitespace-pre-wrap text-foreground">{annotation.content}</p>
     </article>
   )
 }

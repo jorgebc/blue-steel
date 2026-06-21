@@ -41,12 +41,12 @@ export function CampaignHomePage() {
   return (
     <main className="mx-auto max-w-3xl p-8">
       <div className="flex items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-subtle text-accent">
           <Sparkles className="h-6 w-6" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{campaign?.name ?? 'Campaign'}</h1>
-          <p className="mt-2 max-w-prose text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold text-foreground">{campaign?.name ?? 'Campaign'}</h1>
+          <p className="mt-2 max-w-prose text-sm text-muted-foreground">
             Welcome back. Use the sidebar to add a session or explore your world as it grows.
           </p>
         </div>
@@ -56,14 +56,14 @@ export function CampaignHomePage() {
         <div className="mt-8">
           <Link
             to={`/campaigns/${campaignId}/sessions`}
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
+            className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <History className="h-5 w-5" aria-hidden />
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-900">Session history</p>
-              <p className="text-xs text-slate-500">Browse past and in-progress sessions.</p>
+              <p className="text-sm font-medium text-foreground">Session history</p>
+              <p className="text-xs text-muted-foreground">Browse past and in-progress sessions.</p>
             </div>
           </Link>
         </div>
@@ -74,7 +74,7 @@ export function CampaignHomePage() {
       {isAdmin && campaignId && (
         <div className="mt-10 border-t border-red-100 pt-6">
           <h2 className="mb-1 text-sm font-medium text-red-700">Danger zone</h2>
-          <p className="mb-4 text-sm text-slate-500">
+          <p className="mb-4 text-sm text-muted-foreground">
             Permanently delete this campaign and all its data. This cannot be undone.
           </p>
           {deleteError && (

@@ -27,17 +27,19 @@ function Endpoint({ role, campaignId, entityId, entityType }: EndpointProps) {
   const segment = entityType ? PROFILE_SEGMENT[entityType] : undefined
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">{role}</p>
+    <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {role}
+      </p>
       {entityId && segment ? (
         <Link
           to={`/campaigns/${campaignId}/explore/${segment}/${entityId}`}
-          className="inline-flex items-center gap-2 font-medium text-blue-600 hover:underline"
+          className="inline-flex items-center gap-2 font-medium text-accent hover:underline"
         >
           <span className="capitalize">{entityType}</span>
         </Link>
       ) : (
-        <span className="text-sm text-slate-500">Unresolved</span>
+        <span className="text-sm text-muted-foreground">Unresolved</span>
       )}
     </div>
   )
@@ -58,7 +60,7 @@ export function RelationDetailPage() {
     <section>
       <Link
         to={`/campaigns/${campaignId}/explore/relations`}
-        className="mb-6 inline-flex items-center gap-1 text-sm text-slate-500 transition-colors duration-200 hover:text-slate-900"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
         Back to relations
@@ -80,18 +82,21 @@ export function RelationDetailPage() {
         <div className="space-y-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-semibold text-slate-900">{data.name}</h1>
-              <p className="text-sm text-slate-500">Relation</p>
+              <h1 className="text-2xl font-semibold text-foreground">{data.name}</h1>
+              <p className="text-sm text-muted-foreground">Relation</p>
             </div>
             {data.kind && (
-              <Badge variant="outline" className="shrink-0 bg-slate-100 capitalize text-slate-600">
+              <Badge
+                variant="outline"
+                className="shrink-0 bg-muted capitalize text-muted-foreground"
+              >
                 {data.kind}
               </Badge>
             )}
           </div>
 
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-slate-700">Endpoints</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">Endpoints</h2>
             <div className="grid gap-2 sm:grid-cols-2">
               <Endpoint
                 role="Source"
@@ -109,7 +114,7 @@ export function RelationDetailPage() {
           </div>
 
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-slate-700">Version history</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">Version history</h2>
             <EntityVersionHistory versions={data.versions} />
           </div>
         </div>

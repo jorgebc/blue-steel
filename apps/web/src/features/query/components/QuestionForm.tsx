@@ -17,9 +17,11 @@ export function QuestionForm({ onSubmit, isPending }: Props) {
   const trimmed = value.trim()
 
   const counterColor =
-    trimmed.length >= 2000 ? 'text-red-600' :
-    trimmed.length >= 1800 ? 'text-amber-600' :
-    'text-slate-500'
+    trimmed.length >= 2000
+      ? 'text-red-600'
+      : trimmed.length >= 1800
+        ? 'text-amber-600'
+        : 'text-muted-foreground'
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

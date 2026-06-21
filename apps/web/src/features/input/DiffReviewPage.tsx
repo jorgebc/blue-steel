@@ -28,14 +28,14 @@ type EditableCard = ExistingDiffCard | NewDiffCard
 function DiffReviewSkeleton() {
   return (
     <div role="status" aria-label="Loading session diff" className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-2 h-6 w-1/3 rounded bg-slate-200 animate-pulse" />
-        <div className="h-4 w-3/4 rounded bg-slate-200 animate-pulse" />
+      <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <div className="mb-2 h-6 w-1/3 rounded bg-muted animate-pulse" />
+        <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
       </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-3 h-5 w-1/4 rounded bg-slate-200 animate-pulse" />
-        <div className="mb-2 h-3 w-1/2 rounded bg-slate-200 animate-pulse" />
-        <div className="h-3 w-2/3 rounded bg-slate-200 animate-pulse" />
+      <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <div className="mb-3 h-5 w-1/4 rounded bg-muted animate-pulse" />
+        <div className="mb-2 h-3 w-1/2 rounded bg-muted animate-pulse" />
+        <div className="h-3 w-2/3 rounded bg-muted animate-pulse" />
       </div>
     </div>
   )

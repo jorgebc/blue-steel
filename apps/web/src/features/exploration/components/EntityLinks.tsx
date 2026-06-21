@@ -44,10 +44,10 @@ export function EntityLinks({ entityType, entityId }: Props) {
       <div role="status" aria-label="Loading connections" className="space-y-6">
         {[0, 1].map((i) => (
           <div key={i}>
-            <div className="mb-3 h-4 w-32 animate-pulse rounded bg-slate-200" />
+            <div className="mb-3 h-4 w-32 animate-pulse rounded bg-muted" />
             <div className="space-y-2">
-              <div className="h-14 animate-pulse rounded-2xl bg-slate-200" />
-              <div className="h-14 animate-pulse rounded-2xl bg-slate-200" />
+              <div className="h-14 animate-pulse rounded-2xl bg-muted" />
+              <div className="h-14 animate-pulse rounded-2xl bg-muted" />
             </div>
           </div>
         ))}
@@ -60,24 +60,24 @@ export function EntityLinks({ entityType, entityId }: Props) {
   return (
     <section aria-label="Connections" className="space-y-6">
       <div>
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Relations</h2>
+        <h2 className="mb-3 text-sm font-semibold text-foreground">Relations</h2>
         {data.relations.length === 0 ? (
-          <p className="text-sm text-slate-500">No relations.</p>
+          <p className="text-sm text-muted-foreground">No relations.</p>
         ) : (
           <ul className="space-y-2">
             {data.relations.map((relation) => (
               <li key={relation.relationId}>
                 <Link
                   to={`/campaigns/${campaignId}/explore/relations/${relation.relationId}`}
-                  className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
+                  className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
                 >
-                  <span className="flex-1 truncate font-medium text-slate-900">
+                  <span className="flex-1 truncate font-medium text-foreground">
                     {relation.name}
                   </span>
                   {relation.kind && (
                     <Badge
                       variant="outline"
-                      className="shrink-0 bg-slate-100 capitalize text-slate-600"
+                      className="shrink-0 bg-muted capitalize text-muted-foreground"
                     >
                       {relation.kind}
                     </Badge>
@@ -90,21 +90,21 @@ export function EntityLinks({ entityType, entityId }: Props) {
       </div>
 
       <div>
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Related entities</h2>
+        <h2 className="mb-3 text-sm font-semibold text-foreground">Related entities</h2>
         {data.relatedEntities.length === 0 ? (
-          <p className="text-sm text-slate-500">No related entities.</p>
+          <p className="text-sm text-muted-foreground">No related entities.</p>
         ) : (
           <ul className="space-y-2">
             {data.relatedEntities.map((entity) => (
               <li key={entity.entityId}>
                 <Link
                   to={`/campaigns/${campaignId}/explore/${PROFILE_SEGMENT[entity.entityType] ?? 'entities'}/${entity.entityId}`}
-                  className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
+                  className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
                 >
-                  <span className="flex-1 truncate font-medium text-slate-900">{entity.name}</span>
+                  <span className="flex-1 truncate font-medium text-foreground">{entity.name}</span>
                   <Badge
                     variant="outline"
-                    className="shrink-0 bg-slate-100 capitalize text-slate-600"
+                    className="shrink-0 bg-muted capitalize text-muted-foreground"
                   >
                     {entity.entityType}
                   </Badge>
@@ -116,9 +116,9 @@ export function EntityLinks({ entityType, entityId }: Props) {
       </div>
 
       <div>
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Events</h2>
+        <h2 className="mb-3 text-sm font-semibold text-foreground">Events</h2>
         {data.events.length === 0 ? (
-          <p className="text-sm text-slate-500">No events.</p>
+          <p className="text-sm text-muted-foreground">No events.</p>
         ) : (
           <ul className="space-y-2">
             {data.events.map((event) => (
@@ -131,20 +131,20 @@ export function EntityLinks({ entityType, entityId }: Props) {
       </div>
 
       <div>
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">
+        <h2 className="mb-3 text-sm font-semibold text-foreground">
           {sessionCount > 0
             ? `Appears in ${sessionCount} session${sessionCount === 1 ? '' : 's'}`
             : 'Appears in sessions'}
         </h2>
         {sessionCount === 0 ? (
-          <p className="text-sm text-slate-500">Does not appear in any sessions.</p>
+          <p className="text-sm text-muted-foreground">Does not appear in any sessions.</p>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {data.appearances.map((appearance) => (
               <li key={appearance.sessionId}>
                 <Link
                   to={`/campaigns/${campaignId}/sessions/${appearance.sessionId}`}
-                  className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm transition-shadow duration-200 hover:shadow-md"
+                  className="inline-flex rounded-full border border-border bg-surface px-3 py-1 text-sm font-medium text-foreground shadow-sm transition-shadow duration-200 hover:shadow-md"
                 >
                   Session #{appearance.sequenceNumber}
                 </Link>

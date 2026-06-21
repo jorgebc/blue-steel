@@ -33,7 +33,7 @@ export function FocusedOverlay({ open, onClose, children, className, ariaLabel }
           aria-modal="true"
           aria-label={ariaLabel}
           className={[
-            'pointer-events-auto overflow-hidden rounded-2xl shadow-xl ring-2 ring-blue-500/50',
+            'pointer-events-auto overflow-hidden rounded-2xl shadow-xl ring-2 ring-ring/50',
             'transition-shadow duration-200 ease-out',
             className,
           ]

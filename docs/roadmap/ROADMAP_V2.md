@@ -1235,7 +1235,7 @@ settled at sub-task decomposition.)
 | F8.7.1 | Frontend: `.dark` CSS-variable overrides in `index.css` | ✅ |
 | F8.7.2 | Frontend: theme-apply hook (toggle `<html class="dark">`, `system` via matchMedia) | ✅ |
 | F8.7.3 | Frontend: no-flash pre-paint script in `index.html` | ✅ |
-| F8.8 | Frontend: migrate raw color utilities → semantic tokens for full dark-mode coverage (non-blocking follow-on) | 🔲 |
+| F8.8 | Frontend: migrate raw color utilities → semantic tokens for full dark-mode coverage (non-blocking follow-on) | ✅ |
 
 #### F8.1 — Backend: user profile/settings persistence + domain
 

@@ -16,14 +16,14 @@ const VIEWS: ViewLink[] = [
   { to: 'relations', label: 'Relations', icon: Share2 },
 ]
 
-const activeTabClass = 'border-blue-500 text-blue-600'
-const inactiveTabClass = 'border-transparent text-slate-500 hover:text-slate-900'
+const activeTabClass = 'border-accent text-accent'
+const inactiveTabClass = 'border-transparent text-muted-foreground hover:text-foreground'
 
 /** Shared shell for the four Exploration views: a view switcher plus the active view via Outlet. */
 export function ExplorationLayout() {
   return (
     <main className="mx-auto max-w-5xl p-8">
-      <nav aria-label="Exploration views" className="mb-6 flex gap-1 border-b border-slate-200">
+      <nav aria-label="Exploration views" className="mb-6 flex gap-1 border-b border-border">
         {VIEWS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}

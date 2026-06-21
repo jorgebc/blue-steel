@@ -1,12 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ApiClientError } from '@/api/client'
-import {
-  queryHistoryKeyPrefix,
-  queryUsageKey,
-  useQueryUsage,
-  useSubmitQuery,
-} from '@/api/queries'
+import { queryHistoryKeyPrefix, queryUsageKey, useQueryUsage, useSubmitQuery } from '@/api/queries'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { useCampaignStore } from '@/store/campaignStore'
 import { QuestionForm } from './components/QuestionForm'
@@ -81,7 +76,7 @@ export function QueryPage() {
 
   return (
     <section aria-labelledby="query-mode-heading" className="mx-auto max-w-3xl space-y-6 p-8">
-      <h1 id="query-mode-heading" className="text-2xl font-semibold text-slate-900">
+      <h1 id="query-mode-heading" className="text-2xl font-semibold text-foreground">
         Ask the World
       </h1>
 
@@ -100,7 +95,7 @@ export function QueryPage() {
       {isPending && <QueryAnswerSkeleton />}
 
       {!isPending && !answer && !banner && (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           Submit a question to see the answer and its sources here.
         </p>
       )}
@@ -109,9 +104,9 @@ export function QueryPage() {
 
       <section
         aria-labelledby="query-history-heading"
-        className="space-y-4 border-t border-slate-200 pt-6"
+        className="space-y-4 border-t border-border pt-6"
       >
-        <h2 id="query-history-heading" className="text-lg font-semibold text-slate-900">
+        <h2 id="query-history-heading" className="text-lg font-semibold text-foreground">
           Question history
         </h2>
         <QueryHistoryPanel campaignId={campaignId ?? ''} refreshSignal={historyRefreshSignal} />

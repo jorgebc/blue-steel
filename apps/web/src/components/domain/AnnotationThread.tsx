@@ -126,7 +126,9 @@ export function AnnotationThread({ entityType, entityId }: Props) {
       {!isLoading && !isError && (
         <div className="space-y-4">
           {annotations.length === 0 ? (
-            <p className="text-sm text-slate-500">No annotations yet. Be the first to add one.</p>
+            <p className="text-sm text-muted-foreground">
+              No annotations yet. Be the first to add one.
+            </p>
           ) : (
             <div className="space-y-3">
               {annotations.map((annotation) => (
@@ -149,9 +151,9 @@ export function AnnotationThread({ entityType, entityId }: Props) {
         onClose={() => setPendingDelete(null)}
         ariaLabel="Delete annotation"
       >
-        <div className="w-[24rem] max-w-[90vw] bg-white p-6">
-          <h3 className="mb-2 text-base font-medium text-slate-900">Delete this annotation?</h3>
-          <p className="mb-6 text-sm text-slate-500">
+        <div className="w-[24rem] max-w-[90vw] bg-surface p-6">
+          <h3 className="mb-2 text-base font-medium text-foreground">Delete this annotation?</h3>
+          <p className="mb-6 text-sm text-muted-foreground">
             This permanently removes the annotation. This cannot be undone.
           </p>
           <div className="flex justify-end gap-3">

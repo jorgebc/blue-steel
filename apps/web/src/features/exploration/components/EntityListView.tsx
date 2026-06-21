@@ -39,8 +39,8 @@ export function EntityListView({ entityType, title, description }: Props) {
   return (
     <section>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-        <p className="text-sm text-slate-500">{description}</p>
+        <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
 
       {isError && (
@@ -56,7 +56,7 @@ export function EntityListView({ entityType, title, description }: Props) {
       {isLoading && <EntityListSkeleton />}
 
       {!isLoading && !isError && data && data.items.length === 0 && (
-        <p className="text-sm text-slate-500">Nothing here yet.</p>
+        <p className="text-sm text-muted-foreground">Nothing here yet.</p>
       )}
 
       {!isLoading && !isError && data && data.items.length > 0 && (
@@ -66,10 +66,10 @@ export function EntityListView({ entityType, title, description }: Props) {
               <li key={entity.entityId}>
                 <Link
                   to={`/campaigns/${campaignId}/explore/${segment}/${entity.entityId}`}
-                  className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
+                  className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
                 >
-                  <span className="flex-1 truncate font-medium text-slate-900">{entity.name}</span>
-                  <Badge variant="outline" className="bg-slate-100 text-slate-600 shrink-0">
+                  <span className="flex-1 truncate font-medium text-foreground">{entity.name}</span>
+                  <Badge variant="outline" className="bg-muted text-muted-foreground shrink-0">
                     v{entity.latestVersionNumber}
                   </Badge>
                 </Link>
@@ -86,7 +86,7 @@ export function EntityListView({ entityType, title, description }: Props) {
             >
               Previous
             </Button>
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-muted-foreground">
               Page {page + 1} of {totalPages}
             </span>
             <Button

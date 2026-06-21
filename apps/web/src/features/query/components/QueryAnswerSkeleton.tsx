@@ -8,16 +8,16 @@ export function QueryAnswerSkeleton() {
     <div role="status" aria-label="Searching the world state" className="space-y-6">
       {/* Answer paragraph */}
       <div className="space-y-2">
-        <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
-        <div className="h-4 w-11/12 animate-pulse rounded bg-slate-200" />
-        <div className="h-4 w-4/5 animate-pulse rounded bg-slate-200" />
+        <div className="h-4 w-full animate-pulse rounded bg-muted" />
+        <div className="h-4 w-11/12 animate-pulse rounded bg-muted" />
+        <div className="h-4 w-4/5 animate-pulse rounded bg-muted" />
       </div>
 
       {/* Citation lines */}
       <div className="space-y-3">
-        <div className="h-3 w-20 animate-pulse rounded bg-slate-200" />
-        <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
-        <div className="h-4 w-3/5 animate-pulse rounded bg-slate-200" />
+        <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+        <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+        <div className="h-4 w-3/5 animate-pulse rounded bg-muted" />
       </div>
     </div>
   )

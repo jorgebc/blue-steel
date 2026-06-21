@@ -49,8 +49,8 @@ export function RelationEdge({
             className={[
               'pointer-events-none absolute rounded-full border px-2 py-0.5 text-xs font-medium shadow-sm',
               selected
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                : 'border-slate-200 bg-white text-slate-700',
+                ? 'border-accent bg-accent-subtle text-accent'
+                : 'border-border bg-surface text-foreground',
             ].join(' ')}
           >
             {data.label}
