@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/store/authStore'
 import { Brand } from './Brand'
 import { UserMenu } from './UserMenu'
@@ -10,17 +11,18 @@ import { UserMenu } from './UserMenu'
  * campaign (D-102).
  */
 export function AppBar() {
+  const { t } = useTranslation()
   const isAdmin = useAuthStore((s) => s.currentUser?.isAdmin)
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 shadow-sm">
-      <Link to="/" aria-label="Blue Steel home" className="rounded-lg">
+      <Link to="/" aria-label={t('appBar.homeAriaLabel')} className="rounded-lg">
         <Brand size="sm" />
       </Link>
       <div className="flex items-center gap-4">
         {isAdmin && (
           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-            Admin
+            {t('appBar.admin')}
           </span>
         )}
         <UserMenu />

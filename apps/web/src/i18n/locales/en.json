@@ -1,0 +1,33 @@
+{
+  "sidebar": {
+    "navAriaLabel": "Campaign navigation",
+    "campaignFallback": "Campaign",
+    "switchCampaign": "Switch campaign",
+    "role": {
+      "gm": "GM",
+      "editor": "Editor",
+      "player": "Player"
+    },
+    "home": "Home",
+    "input": "Input",
+    "query": "Query",
+    "exploration": "Exploration",
+    "reviewQueue": "Review queue",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "appBar": {
+    "homeAriaLabel": "Blue Steel home",
+    "admin": "Admin"
+  },
+  "userMenu": {
+    "accountMenu": "Account menu",
+    "settings": "Settings",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "language": "Language",
+    "logOut": "Log out"
+  }
+}

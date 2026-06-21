@@ -6,6 +6,7 @@ import { axe } from 'vitest-axe'
 import { UserMenu } from './UserMenu'
 import { useAuthStore } from '@/store/authStore'
 import { useSettingsStore } from '@/store/settingsStore'
+import type { UiLocale } from '@/types/auth'
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -18,7 +19,7 @@ vi.mock('@/api/users', () => ({
   useUpdateProfile: () => ({ mutate: mockMutate }),
 }))
 
-function setup({ displayName = 'Jorge Buffa' as string | null } = {}) {
+function setup({ displayName = 'Jorge Buffa' as string | null, uiLocale = 'en' as UiLocale } = {}) {
   useAuthStore.setState({
     currentUser: {
       id: 'u1',
@@ -27,11 +28,11 @@ function setup({ displayName = 'Jorge Buffa' as string | null } = {}) {
       forcePasswordChange: false,
       displayName,
       avatarAccentColor: null,
-      uiLocale: 'en',
+      uiLocale,
       theme: 'system',
     },
   })
-  useSettingsStore.setState({ theme: 'system', uiLocale: 'en' })
+  useSettingsStore.setState({ theme: 'system', uiLocale })
   return render(
     <MemoryRouter>
       <UserMenu />
@@ -105,6 +106,18 @@ describe('UserMenu', () => {
 
     expect(useAuthStore.getState().currentUser).toBeNull()
     expect(mockNavigate).toHaveBeenCalledWith('/login')
+  })
+
+  it('renders the menu labels in Spanish when the locale is es', async () => {
+    const user = userEvent.setup()
+    setup({ uiLocale: 'es' })
+    await user.click(screen.getByRole('button', { name: /menú de cuenta/i }))
+
+    expect(screen.getByRole('menuitem', { name: /configuración/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /cerrar sesión/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitemradio', { name: 'Oscuro' })).toBeInTheDocument()
+    // Language names stay literal regardless of UI locale.
+    expect(screen.getByRole('menuitemradio', { name: 'Español' })).toBeInTheDocument()
   })
 
   it('has no accessibility violations when open', async () => {

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { axe } from 'vitest-axe'
 import { AppBar } from './AppBar'
+import i18n from '@/i18n'
 import { useAuthStore } from '@/store/authStore'
 
 const mockNavigate = vi.fn()
@@ -16,12 +17,12 @@ vi.mock('@/api/users', () => ({
   useUpdateProfile: () => ({ mutate: vi.fn() }),
 }))
 
-function setup() {
+function setup({ isAdmin = false } = {}) {
   useAuthStore.setState({
     currentUser: {
       id: 'u1',
       email: 'gm@example.com',
-      isAdmin: false,
+      isAdmin,
       forcePasswordChange: false,
       displayName: null,
       avatarAccentColor: null,
@@ -58,6 +59,18 @@ describe('AppBar', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: /log out/i }))
     expect(useAuthStore.getState().currentUser).toBeNull()
     expect(mockNavigate).toHaveBeenCalledWith('/login')
+  })
+
+  it('shows the admin badge for admin users', () => {
+    setup({ isAdmin: true })
+    expect(screen.getByText('Admin')).toBeInTheDocument()
+  })
+
+  it('translates the admin badge to Spanish when the locale is es', async () => {
+    await i18n.changeLanguage('es')
+    setup({ isAdmin: true })
+    expect(screen.getByText('Administrador')).toBeInTheDocument()
+    expect(screen.queryByText('Admin')).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
