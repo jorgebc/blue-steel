@@ -33,10 +33,21 @@ class GetCurrentUserServiceTest {
   }
 
   @Test
-  @DisplayName("should return user profile when user exists")
+  @DisplayName("should return the user profile including the four personalization fields")
   void getCurrentUser_existingUser_returnsProfile() {
     UUID userId = UUID.randomUUID();
-    User user = User.create(userId, "user@example.com", "$2a$10$hash", true, false, Instant.now());
+    User user =
+        User.create(
+            userId,
+            "user@example.com",
+            "$2a$10$hash",
+            true,
+            false,
+            Instant.now(),
+            "Ada Lovelace",
+            "#3366FF",
+            "es",
+            "dark");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
     UserProfile profile = service.getCurrentUser(userId);
@@ -45,6 +56,10 @@ class GetCurrentUserServiceTest {
     assertThat(profile.email()).isEqualTo("user@example.com");
     assertThat(profile.isAdmin()).isTrue();
     assertThat(profile.forcePasswordChange()).isFalse();
+    assertThat(profile.displayName()).isEqualTo("Ada Lovelace");
+    assertThat(profile.avatarAccentColor()).isEqualTo("#3366FF");
+    assertThat(profile.uiLocale()).isEqualTo("es");
+    assertThat(profile.theme()).isEqualTo("dark");
   }
 
   @Test

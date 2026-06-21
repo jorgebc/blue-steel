@@ -62,6 +62,63 @@ class UpdateCurrentUserProfileServiceTest {
   }
 
   @Test
+  @DisplayName("should leave fields the request omits (null) unchanged — partial merge (D-113)")
+  void update_nullFields_preserveExistingValues() {
+    UUID userId = UUID.randomUUID();
+    Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
+    User existing =
+        User.create(
+            userId,
+            "user@example.com",
+            "$2a$10$hash",
+            false,
+            false,
+            createdAt,
+            "Ada Lovelace",
+            "#3366FF",
+            "es",
+            "light");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
+
+    // Mirrors an account-menu theme toggle: only `theme` is sent, everything else null.
+    service.update(new UpdateProfileCommand(userId, null, null, null, "dark"));
+
+    ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(saved.capture());
+    User result = saved.getValue();
+    assertThat(result.theme()).isEqualTo("dark");
+    assertThat(result.displayName()).isEqualTo("Ada Lovelace");
+    assertThat(result.avatarAccentColor()).isEqualTo("#3366FF");
+    assertThat(result.uiLocale()).isEqualTo("es");
+  }
+
+  @Test
+  @DisplayName(
+      "should clear the display name to null when the request sends an empty string (D-113)")
+  void update_emptyDisplayName_clearsToNull() {
+    UUID userId = UUID.randomUUID();
+    User existing =
+        User.create(
+            userId,
+            "user@example.com",
+            "$2a$10$hash",
+            false,
+            false,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            "Ada Lovelace",
+            "#3366FF",
+            "es",
+            "light");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
+
+    service.update(new UpdateProfileCommand(userId, "", "#3366FF", "es", "light"));
+
+    ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(saved.capture());
+    assertThat(saved.getValue().displayName()).isNull();
+  }
+
+  @Test
   @DisplayName("should throw UserNotFoundException and not save when the user does not exist")
   void update_unknownUser_throwsAndDoesNotSave() {
     UUID userId = UUID.randomUUID();

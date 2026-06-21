@@ -2313,6 +2313,26 @@ Export is primarily a pre-deletion guard rail — a campaign's data should outli
 - **Wrap the archive in the standard `{data,meta,errors}` envelope** — consistent with every other endpoint, but pollutes the downloaded file with API wrapper noise; rejected because the export is a file, not a data API. The envelope is retained for error responses only.
 - **Admin-only authorization** (matching `DELETE`) — simplest and consistent with the current admin-gated danger zone, but blocks a GM from exporting their own campaign; rejected in favour of GM-or-admin.
 
+### D-113 — `PATCH /me` is a partial merge; empty string clears the display name
+
+**Date:** 2026-06-21
+**Status:** Active
+**Relates to:** D-100, D-101
+**Resolves:** F8 coherence review (account-menu quick toggles)
+
+**Decision:**
+`PATCH /api/v1/users/me` (`UpdateCurrentUserProfileService`) applies **partial-merge** semantics, matching the HTTP PATCH verb:
+
+- A `null` command field means **"leave the current value unchanged."** A client may therefore send only the fields it is changing — the top-right account-menu theme and language quick toggles send a single-field body (`{"theme":"dark"}` / `{"uiLocale":"es"}`).
+- The **display name** is the one field that can be cleared back to `null`: an **empty string `""` is the explicit "clear" sentinel**; `null`/absent preserves the current name. The `/settings` form sends the trimmed name verbatim (empty when cleared). Accent colour, UI locale, and theme have no clear path (the latter two are `NOT NULL`), so for them empty/null both collapse to "unchanged".
+
+**Reason:**
+The original implementation used full-replace (PUT) semantics: absent JSON fields deserialised to `null` on the request record and overwrote stored values. Because `ui_locale`/`theme` are `NOT NULL` (migration 0029), a single-field menu toggle nulled the other NOT-NULL field and the save failed with a constraint violation — swallowed by the fire-and-forget mutation, so menu toggles silently never persisted while the full-payload `/settings` page worked. Partial-merge makes the backend consistent with the PATCH verb and with what the frontend already sends.
+
+**Alternatives considered:**
+- **`JsonNullable<T>` wrapper** (distinguish absent from explicit-null cleanly) — the textbook JSON-Merge-Patch approach, but adds a dependency and ceremony for one clearable field; rejected for simplicity. The empty-string sentinel covers the only clear case (display name).
+- **Frontend always sends the full four-field payload** — smaller change, but contradicts the PATCH verb and leaves the full-replace trap for any future caller; rejected in favour of fixing the contract at the source.
+
 ---
 
 *Entries are added as decisions are made. See PRD.md and ARCHITECTURE.md for context.*
