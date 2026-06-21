@@ -36,8 +36,29 @@ User accounts in Blue Steel are created exclusively through invitations — ther
 
 - **Use Case / Action:** User views their own profile — ✅ Implemented
 - **Actor:** Authenticated User
-- **Functional Description:** Returns the caller's id, email, admin flag, and the `forcePasswordChange` flag. The frontend loads it after login to populate the auth store and the top bar (including the "Admin" badge for the Admin).
-- **Technical Reference / Source Files:** `GET /api/v1/users/me` — `apps/api/src/main/java/com/bluesteel/adapters/in/web/user/UserController.java`, `apps/api/src/main/java/com/bluesteel/application/service/user/GetCurrentUserService.java`, `apps/web/src/store/authStore.ts`
+- **Functional Description:** Returns the caller's id, email, admin flag, the `forcePasswordChange` flag, and (since Phase 8) the personalization fields `displayName`, `avatarAccentColor`, `uiLocale`, and `theme`. The frontend loads it after login to populate the auth store, the settings store (theme/locale), and the top-right account menu.
+- **Technical Reference / Source Files:** `GET /api/v1/users/me` — `apps/api/src/main/java/com/bluesteel/adapters/in/web/user/UserController.java`, `apps/api/src/main/java/com/bluesteel/application/service/user/GetCurrentUserService.java`, `apps/web/src/store/authStore.ts`, `apps/web/src/store/settingsStore.ts`
+
+---
+
+- **Use Case / Action:** User edits their profile & preferences — ✅ Implemented (v2, Phase 8)
+- **Actor:** Authenticated User
+- **Functional Description:** From the `/settings` page (or inline toggles in the account menu) the user updates a cosmetic **display name**, an **accent color** for their initials avatar, their **UI locale** (EN/ES), and their **theme** (light/dark/system). Changes are saved via `PATCH /me` with inline success/error feedback (no toast) and persist across reload; the avatar initials preview updates live. The server is the source of truth, mirrored to `localStorage` for first-paint application.
+- **Technical Reference / Source Files:** `PATCH /api/v1/users/me` — `apps/api/src/main/java/com/bluesteel/adapters/in/web/user/UserController.java`, `apps/api/src/main/java/com/bluesteel/application/service/user/UpdateCurrentUserProfileService.java`, `apps/web/src/features/settings/UserSettingsPage.tsx`, `apps/web/src/features/settings/components/AccentColorPicker.tsx`, `apps/web/src/store/settingsStore.ts`
+
+---
+
+- **Use Case / Action:** User reaches account actions from the top-right account menu — ✅ Implemented (v2, Phase 8)
+- **Actor:** Authenticated User
+- **Functional Description:** The AppBar shows an initials + accent-color avatar that opens a dropdown with the display name + email, a link to Settings, inline theme and EN/ES toggles, and Log out — replacing the previous raw-email header and the removed sidebar "Settings — Coming soon" stub.
+- **Technical Reference / Source Files:** `apps/web/src/components/domain/UserMenu.tsx`, `apps/web/src/components/domain/InitialsAvatar.tsx`, `apps/web/src/components/domain/AppBar.tsx`
+
+---
+
+- **Use Case / Action:** User's theme preference is applied (light/dark/system, no flash) — ✅ Implemented (v2, Phase 8)
+- **Actor:** Authenticated User
+- **Functional Description:** The stored `theme` toggles a `dark` class on `<html>`; `system` follows the OS color scheme live. A synchronous pre-paint script in `index.html` reads the `localStorage` mirror and applies the theme before the bundle loads, so a reload never flashes the wrong theme. Dark recolours the semantic design tokens (shadcn surfaces).
+- **Technical Reference / Source Files:** `apps/web/src/hooks/useApplyTheme.ts`, `apps/web/index.html` (pre-paint script), `apps/web/src/index.css` (`.dark` token overrides)
 
 ---
 

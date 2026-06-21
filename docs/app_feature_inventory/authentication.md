@@ -24,8 +24,8 @@ A deliberate design property (D-043): the JWT carries only the user ID and the p
 
 - **Use Case / Action:** User logs out — ✅ Implemented
 - **Actor:** Authenticated User
-- **Functional Description:** Revokes the refresh token server-side, clears the cookie, and clears the in-memory access token and user state in the frontend. The logout control is always available in the top application bar.
-- **Technical Reference / Source Files:** `POST /api/v1/auth/logout` — `AuthController.java`, `apps/api/src/main/java/com/bluesteel/application/service/auth/LogoutService.java`, `apps/web/src/components/domain/AppBar.tsx`, `apps/web/src/store/authStore.ts`
+- **Functional Description:** Revokes the refresh token server-side, clears the cookie, and clears the in-memory access token and user state in the frontend. Since Phase 8 the logout control lives in the top-right account menu (avatar dropdown) in the application bar, alongside the Settings link and theme/language toggles.
+- **Technical Reference / Source Files:** `POST /api/v1/auth/logout` — `AuthController.java`, `apps/api/src/main/java/com/bluesteel/application/service/auth/LogoutService.java`, `apps/web/src/components/domain/UserMenu.tsx`, `apps/web/src/components/domain/AppBar.tsx`, `apps/web/src/store/authStore.ts`
 
 ---
 

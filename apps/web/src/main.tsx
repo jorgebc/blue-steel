@@ -33,10 +33,12 @@ import { AppShell } from '@/components/domain/AppShell'
 import { AuthenticatedLayout } from '@/components/domain/AuthenticatedLayout'
 import { RequireAuth } from '@/components/domain/RequireAuth'
 import { useAuthStore } from '@/store/authStore'
+import { useApplyTheme } from '@/hooks/useApplyTheme'
 
 const queryClient = new QueryClient()
 
 function AppInitializer({ children }: { children: React.ReactNode }) {
+  useApplyTheme() // keep <html class="dark"> in sync with the theme preference on every route
   useEffect(() => {
     initAuth().finally(() => useAuthStore.getState().setInitialized())
   }, [])

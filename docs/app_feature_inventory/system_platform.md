@@ -64,6 +64,20 @@ This module covers the cross-cutting machinery that no single end-user "owns" bu
 - **Functional Description:** Committed entity versions are embedded into the `entity_embeddings` pgvector table (entity type/id/version, session, vector, content hash). Similarity search is implemented with native SQL rather than Spring AI's generic `VectorStore` (D-062) because retrieval needs domain filters (campaign scoping, entity type, session joins). This single table powers both ingestion-time entity resolution and Query Mode retrieval.
 - **Technical Reference / Source Files:** `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/embedding/EntityEmbeddingWriteAdapter.java`, `EntitySimilaritySearchAdapter.java`, `EntityQueryRetrievalAdapter.java`; migration `db/changelog/0016_create_entity_embeddings.xml`
 
+---
+
+- **Use Case / Action:** Render the UI in the user's language (EN/ES) — ✅ Implemented (v2, Phase 8)
+- **Actor:** System (frontend runtime)
+- **Functional Description:** An `i18next`/`react-i18next` runtime drives all internationalized strings from the user's UI locale preference, with an English fallback for missing keys; switching locale re-renders without a reload, and the `<html lang>` attribute follows the active locale (set on first paint by the pre-paint script and synced live on change) so assistive tech sees the right language. Phase 8 shipped the mechanism plus the always-visible nav chrome (Sidebar/AppBar/UserMenu); per-page string extraction proceeds as incremental follow-on work. This is the per-*user* language axis, distinct from a campaign's content language (D-099).
+- **Technical Reference / Source Files:** `apps/web/src/i18n/index.ts`, `apps/web/src/i18n/locales/en.json`, `es.json`, driven by `apps/web/src/store/settingsStore.ts`
+
+---
+
+- **Use Case / Action:** Apply the user's theme (light/dark/system) without a first-paint flash — ✅ Implemented (v2, Phase 8)
+- **Actor:** System (frontend runtime)
+- **Functional Description:** The stored theme preference toggles a `dark` class on `<html>`, recolouring the semantic design tokens (shadcn surfaces); `system` follows the OS color scheme live via `matchMedia`. A synchronous pre-paint script in `index.html` reads the `localStorage` mirror and applies the theme before the bundle loads, so a reload never flashes the wrong theme. *Known limitation:* most feature components and the app chrome still hardcode raw `slate-*` utilities and therefore stay light in Dark mode; full app-wide coverage is tracked as roadmap follow-on F8.8.
+- **Technical Reference / Source Files:** `apps/web/src/hooks/useApplyTheme.ts`, `apps/web/index.html` (pre-paint script), `apps/web/src/index.css` (`.dark` token overrides), `apps/web/src/store/settingsStore.ts`
+
 ## 3. Core User Journeys (Workflows)
 
 **Journey: Operator verifies a deployment**

@@ -4,6 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Blue Steel</title>
+    <!--
+      No-flash guard: apply the persisted theme + UI locale to <html>
+      synchronously, before the module bundle and first paint, so a reload never
+      flashes the wrong theme and assistive tech sees the right lang from the
+      start. Reads the Zustand persist mirror (key `blue-steel-settings`).
+      Failures fall back to the light/en defaults.
+    -->
+    <script>
+      try {
+        var s = JSON.parse(localStorage.getItem('blue-steel-settings')).state
+        if (s.uiLocale) document.documentElement.lang = s.uiLocale
+        var dark =
+          s.theme === 'dark' ||
+          (s.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) document.documentElement.classList.add('dark')
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
