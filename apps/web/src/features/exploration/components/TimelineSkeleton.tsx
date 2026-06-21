@@ -9,16 +9,16 @@ export function TimelineSkeleton() {
       {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+          className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 shadow-sm"
         >
           <div className="flex-1 space-y-2">
             {/* event name */}
-            <div className="h-4 w-48 rounded bg-slate-200 animate-pulse" />
+            <div className="h-4 w-48 rounded bg-muted animate-pulse" />
             {/* actors / space / session line */}
-            <div className="h-3 w-64 rounded bg-slate-200 animate-pulse" />
+            <div className="h-3 w-64 rounded bg-muted animate-pulse" />
           </div>
           {/* event-type badge */}
-          <div className="h-5 w-16 rounded-full bg-slate-200 animate-pulse shrink-0" />
+          <div className="h-5 w-16 rounded-full bg-muted animate-pulse shrink-0" />
         </div>
       ))}
     </div>

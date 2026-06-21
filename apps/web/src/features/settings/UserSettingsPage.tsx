@@ -137,8 +137,8 @@ export function UserSettingsPage() {
           size="lg"
         />
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Settings</h1>
-          <p className="mt-1 text-sm text-slate-500">{currentUser.email}</p>
+          <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{currentUser.email}</p>
         </div>
       </div>
 
@@ -155,7 +155,7 @@ export function UserSettingsPage() {
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-8 rounded-2xl border border-slate-200 bg-white p-8"
+          className="space-y-8 rounded-2xl border border-border bg-surface p-8"
           noValidate
         >
           <FormField
@@ -226,7 +226,7 @@ export function UserSettingsPage() {
                     {THEME_OPTIONS.map((option) => (
                       <label
                         key={option.value}
-                        className="flex items-center gap-2 text-sm text-slate-700"
+                        className="flex items-center gap-2 text-sm text-foreground"
                       >
                         <RadioGroupItem value={option.value} />
                         {option.label}

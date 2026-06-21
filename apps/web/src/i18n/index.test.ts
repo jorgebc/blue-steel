@@ -18,4 +18,9 @@ describe('i18n runtime', () => {
     await i18n.changeLanguage('es')
     expect(i18n.t('test.enOnly')).toBe('English only')
   })
+
+  it('mirrors the active language onto the <html lang> attribute', () => {
+    useSettingsStore.setState({ uiLocale: 'es' })
+    expect(document.documentElement.lang).toBe('es')
+  })
 })

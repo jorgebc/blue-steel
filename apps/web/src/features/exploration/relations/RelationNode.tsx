@@ -27,18 +27,18 @@ export function RelationNode({ data }: NodeProps<Node<NodeData>>) {
         // Disable the browser's native link-drag so React Flow's node drag takes over.
         draggable={false}
         className={[
-          'flex w-44 items-center gap-2 rounded-xl border bg-white px-3 py-2 shadow-sm transition-shadow duration-200 hover:shadow-md',
+          'flex w-44 items-center gap-2 rounded-xl border bg-surface px-3 py-2 shadow-sm transition-shadow duration-200 hover:shadow-md',
           data.highlighted
-            ? 'border-blue-500 ring-2 ring-blue-500/50'
-            : 'border-slate-200 hover:border-slate-300',
+            ? 'border-accent ring-2 ring-ring/50'
+            : 'border-border hover:border-border-strong',
         ].join(' ')}
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100">
-          <Icon className="h-4 w-4 text-slate-500" aria-hidden />
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+          <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
         </span>
         <span className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-medium text-slate-900">{data.name}</span>
-          <span className="text-xs text-slate-500">{typeLabel}</span>
+          <span className="truncate text-sm font-medium text-foreground">{data.name}</span>
+          <span className="text-xs text-muted-foreground">{typeLabel}</span>
         </span>
       </Link>
       <Handle type="source" position={Position.Right} />

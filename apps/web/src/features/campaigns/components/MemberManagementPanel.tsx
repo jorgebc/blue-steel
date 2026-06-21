@@ -27,7 +27,7 @@ function RosterSkeleton() {
   return (
     <ul className="flex flex-col gap-2" aria-hidden>
       {[0, 1, 2].map((i) => (
-        <li key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />
+        <li key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
       ))}
     </ul>
   )
@@ -110,10 +110,10 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
 
   return (
     <section className="mt-10" aria-labelledby="members-heading">
-      <h2 id="members-heading" className="text-lg font-semibold text-slate-900">
+      <h2 id="members-heading" className="text-lg font-semibold text-foreground">
         Members
       </h2>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-muted-foreground">
         Invite players and editors, change roles, or remove members.
       </p>
 
@@ -145,7 +145,7 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
             id="invite-role"
             value={inviteRole}
             onChange={(e) => setInviteRole(e.target.value as AssignableRole)}
-            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm capitalize"
+            className="h-9 rounded-lg border border-border bg-surface px-3 text-sm capitalize"
           >
             {ASSIGNABLE_ROLES.map((r) => (
               <option key={r} value={r}>
@@ -178,11 +178,11 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
             {(members ?? []).map((member) => (
               <li
                 key={member.userId}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
               >
-                <span className="text-sm text-slate-800">{member.email}</span>
+                <span className="text-sm text-foreground">{member.email}</span>
                 {member.role === 'gm' ? (
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium uppercase text-blue-600">
+                  <span className="rounded-full bg-accent-subtle px-3 py-1 text-xs font-medium uppercase text-accent">
                     GM
                   </span>
                 ) : (
@@ -194,10 +194,8 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
                       id={`role-${member.userId}`}
                       value={member.role}
                       disabled={changeRole.isPending}
-                      onChange={(e) =>
-                        handleRoleChange(member, e.target.value as AssignableRole)
-                      }
-                      className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-sm capitalize"
+                      onChange={(e) => handleRoleChange(member, e.target.value as AssignableRole)}
+                      className="h-8 rounded-lg border border-border bg-surface px-2 text-sm capitalize"
                     >
                       {ASSIGNABLE_ROLES.map((r) => (
                         <option key={r} value={r}>

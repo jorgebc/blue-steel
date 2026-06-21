@@ -23,9 +23,9 @@ export function DeleteCampaignConfirmOverlay({
 }: Props) {
   return (
     <FocusedOverlay open={open} onClose={onClose} ariaLabel="Delete campaign">
-      <div className="w-[28rem] max-w-[90vw] bg-white p-6">
-        <h3 className="mb-2 text-base font-medium text-slate-900">Delete this campaign?</h3>
-        <p className="mb-6 text-sm text-slate-500">
+      <div className="w-[28rem] max-w-[90vw] bg-surface p-6">
+        <h3 className="mb-2 text-base font-medium text-foreground">Delete this campaign?</h3>
+        <p className="mb-6 text-sm text-muted-foreground">
           <span className="font-medium">{campaignName}</span> and all its data — sessions, actors,
           spaces, events, relations, and annotations — will be permanently deleted. This cannot be
           undone.

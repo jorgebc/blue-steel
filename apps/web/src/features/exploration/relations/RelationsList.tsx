@@ -18,7 +18,7 @@ interface Props {
  */
 export function RelationsList({ relations, nameById, selectedId, onSelect }: Props) {
   if (relations.length === 0) {
-    return <p className="text-sm text-slate-500">No relations yet.</p>
+    return <p className="text-sm text-muted-foreground">No relations yet.</p>
   }
 
   return (
@@ -36,17 +36,17 @@ export function RelationsList({ relations, nameById, selectedId, onSelect }: Pro
               aria-label={`${source} ${label} ${target} — show annotations`}
               onClick={() => onSelect?.(relation.relationId)}
               className={[
-                'w-full rounded-lg border px-3 py-2 text-left text-sm text-slate-700 transition-colors duration-200',
+                'w-full rounded-lg border px-3 py-2 text-left text-sm text-foreground transition-colors duration-200',
                 selected
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-slate-200 bg-white hover:border-slate-300',
+                  ? 'border-accent bg-accent-subtle'
+                  : 'border-border bg-surface hover:border-border-strong',
               ].join(' ')}
             >
-              <span className="font-medium text-slate-900">{source}</span>
-              <span className="text-slate-400"> → </span>
+              <span className="font-medium text-foreground">{source}</span>
+              <span className="text-muted-foreground"> → </span>
               <span className="italic">{label}</span>
-              <span className="text-slate-400"> → </span>
-              <span className="font-medium text-slate-900">{target}</span>
+              <span className="text-muted-foreground"> → </span>
+              <span className="font-medium text-foreground">{target}</span>
             </button>
           </li>
         )

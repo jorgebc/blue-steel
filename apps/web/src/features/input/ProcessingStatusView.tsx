@@ -11,14 +11,14 @@ interface Props {
 /** Skeleton mirroring the eventual diff-review header while extraction runs. */
 function ProcessingSkeleton() {
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
-      <div className="mb-6 h-6 w-1/3 rounded bg-slate-200 animate-pulse" />
+    <div className="rounded-2xl bg-surface p-6 shadow-sm">
+      <div className="mb-6 h-6 w-1/3 rounded bg-muted animate-pulse" />
       <div className="space-y-3">
-        <div className="h-4 w-3/4 rounded bg-slate-200 animate-pulse" />
-        <div className="h-3 w-1/2 rounded bg-slate-200 animate-pulse" />
-        <div className="h-3 w-2/3 rounded bg-slate-200 animate-pulse" />
+        <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
+        <div className="h-3 w-1/2 rounded bg-muted animate-pulse" />
+        <div className="h-3 w-2/3 rounded bg-muted animate-pulse" />
       </div>
-      <p aria-live="polite" className="mt-6 text-sm text-slate-500">
+      <p aria-live="polite" className="mt-6 text-sm text-muted-foreground">
         Processing your session…
       </p>
     </div>

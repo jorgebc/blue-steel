@@ -72,7 +72,7 @@ export function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={t('userMenu.accountMenu')}
-        className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+        className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <InitialsAvatar
           displayName={displayName}
@@ -84,7 +84,7 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="text-popover-foreground">
           <span className="block truncate text-sm font-semibold">{name}</span>
-          <span className="block truncate text-xs font-normal text-slate-500">{email}</span>
+          <span className="block truncate text-xs font-normal text-muted-foreground">{email}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>

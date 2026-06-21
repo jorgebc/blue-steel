@@ -34,17 +34,17 @@ This register consolidates everything that exists in the repository only as sche
 
 ---
 
-- **Use Case / Action:** User settings & personalization — 🚧 Planned (v2, D-100/D-101/D-102, Phase 8 F8.1–F8.7)
+- **Use Case / Action:** User settings & personalization — ✅ Implemented (v2, Phase 8)
 - **Actor:** Authenticated User
-- **Functional Description:** A persistent user identity and preferences: a cosmetic **display name** (non-unique; email stays the login identifier) shown in place of the raw email, an **initials + accent-color avatar** (no uploaded images, no object storage), a **UI locale** (EN/ES), and a **theme** (light/dark/system). These are stored as columns on `users` and reached through a new **top-right account menu** (avatar dropdown: name + email, Settings link, inline theme + language toggles, Log out) plus a global `/settings` route — **replacing** the campaign sidebar's disabled "Settings — Coming soon" stub, which is removed. Preferences persist server-side (source of truth) and are mirrored to `localStorage` to avoid a theme/language flash on first paint.
-- **Technical Reference / Source Files:** Today: disabled stub in `apps/web/src/components/domain/Sidebar.tsx` (ComingSoonItem) — to be removed; raw email in `apps/web/src/components/domain/AppBar.tsx`. Planned: `users` columns (migration `0026`), `PATCH /api/v1/users/me`, `components/domain/UserMenu.tsx`, `/settings` route.
+- **Functional Description:** Shipped in Phase 8 (F8.1–F8.7). A persistent user identity and preferences: a cosmetic **display name** (non-unique; email stays the login identifier), an **initials + accent-color avatar** (no uploaded images), a **UI locale** (EN/ES), and a **theme** (light/dark/system) — stored as columns on `users`, exposed on `GET /me`, and edited via `PATCH /me`. Reached through a **top-right account menu** (avatar dropdown: name + email, Settings link, inline theme + language toggles, Log out) plus a global `/settings` route — the campaign sidebar's disabled "Settings — Coming soon" stub was removed. Preferences persist server-side (source of truth) and are mirrored to `localStorage` so the theme is applied on first paint with no flash. See [user_management.md](user_management.md) for the capability inventory.
+- **Technical Reference / Source Files:** [user_management.md](user_management.md); schema `apps/api/src/main/resources/db/changelog/0029_add_user_profile_settings.xml`; `PATCH /api/v1/users/me` (`UserController.java`); `apps/web/src/components/domain/UserMenu.tsx`, `InitialsAvatar.tsx`, `apps/web/src/features/settings/UserSettingsPage.tsx`, `apps/web/src/store/settingsStore.ts`, `apps/web/src/hooks/useApplyTheme.ts`
 
 ---
 
-- **Use Case / Action:** UI internationalization (EN/ES locale selection) — 🚧 Planned (v2, D-099/D-101, Phase 8 F8.6)
+- **Use Case / Action:** UI internationalization (EN/ES locale selection) — ✅ Implemented (v2, Phase 8)
 - **Actor:** Authenticated User
-- **Functional Description:** All UI strings are currently hardcoded English with no i18n library. Planned: an `i18next`/`react-i18next` setup with English and Spanish catalogs, driven by the user's UI locale preference (the per-*user* language axis — distinct from a campaign's content language, D-099). Switchable any time from the account menu or Settings page.
-- **Technical Reference / Source Files:** None yet (no i18n library); strings live inline across `apps/web/src/components` and feature pages.
+- **Functional Description:** Shipped in Phase 8 (F8.6). An `i18next`/`react-i18next` runtime with English and Spanish catalogs, driven by the user's UI locale preference (the per-*user* language axis — distinct from a campaign's content language, D-099), switchable any time from the account menu or Settings page and applied without a reload. Phase 8 scope covered the mechanism plus nav-chrome extraction (Sidebar/AppBar/UserMenu); per-page string extraction continues as incremental follow-on work. See [system_platform.md](system_platform.md) for the capability inventory.
+- **Technical Reference / Source Files:** [system_platform.md](system_platform.md); `apps/web/src/i18n/index.ts`, `apps/web/src/i18n/locales/en.json`, `es.json`
 
 ---
 

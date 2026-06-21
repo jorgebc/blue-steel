@@ -53,6 +53,46 @@
 }
 
 /*
+ * Dark theme — overrides the @theme colour tokens for elements under `.dark`
+ * (toggled on <html> by useApplyTheme / the pre-paint script). Because the
+ * @theme tokens are emitted to :root and consumed via var() in utilities, this
+ * later rule of equal specificity recolours every semantic-token surface
+ * (shadcn `bg-card`, `text-foreground`, etc.). Slate-based brushed-metal
+ * palette; all foreground/background pairs meet WCAG AA (≥4.5:1).
+ */
+.dark {
+  --color-surface: #0f172a;        /* slate-900 */
+  --color-background: #020617;     /* slate-950 */
+  --color-border: #1e293b;         /* slate-800 */
+  --color-border-strong: #334155;  /* slate-700 */
+
+  --color-accent: #3b82f6;         /* blue-500 — accent stays electric blue */
+  --color-accent-hover: #60a5fa;   /* blue-400 — lighter on dark */
+  --color-accent-pressed: #93c5fd; /* blue-300 */
+  --color-accent-subtle: #172554;  /* blue-950 — subtle accent bg */
+  --color-accent-foreground: #ffffff;
+
+  --color-foreground: #f8fafc;     /* slate-50 — primary text */
+  --color-card: #0f172a;
+  --color-card-foreground: #f8fafc;
+  --color-popover: #0f172a;
+  --color-popover-foreground: #f8fafc;
+
+  --color-primary: #3b82f6;        /* blue-500 (matches accent) */
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #1e293b;      /* slate-800 */
+  --color-secondary-foreground: #f8fafc;
+  --color-muted: #1e293b;          /* slate-800 */
+  --color-muted-foreground: #94a3b8; /* slate-400 — secondary text */
+
+  --color-destructive: #ef4444;    /* red-500 */
+  --color-destructive-foreground: #ffffff;
+
+  --color-input: #334155;          /* slate-700 (matches border-strong) */
+  --color-ring: #3b82f6;           /* blue-500 focus ring */
+}
+
+/*
  * React Flow (Relations graph) theming — aligns the library's chrome with the Blue Steel palette.
  * Styling lives here (not inline) per UX Constitution rule #11. Slate tones only; blue is reserved
  * for the selected-state emphasis applied in the node/edge components.

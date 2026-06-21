@@ -21,12 +21,12 @@ const STATUS_LABEL: Record<SessionSummary['status'], string> = {
 }
 
 const STATUS_CLASS: Record<SessionSummary['status'], string> = {
-  PENDING: 'bg-slate-100 text-slate-600',
+  PENDING: 'bg-muted text-muted-foreground',
   PROCESSING: 'bg-blue-50 text-blue-600',
   DRAFT: 'bg-amber-50 text-amber-700',
   COMMITTED: 'bg-green-50 text-green-700',
   FAILED: 'bg-red-50 text-red-700',
-  DISCARDED: 'bg-slate-100 text-slate-400',
+  DISCARDED: 'bg-muted text-muted-foreground',
 }
 
 function StatusBadge({ status }: { status: SessionSummary['status'] }) {
@@ -41,17 +41,17 @@ function StatusBadge({ status }: { status: SessionSummary['status'] }) {
 
 function SessionRowSkeleton() {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 shadow-sm">
       {/* sequence number */}
-      <div className="h-4 w-6 rounded bg-slate-200 animate-pulse shrink-0" />
+      <div className="h-4 w-6 rounded bg-muted animate-pulse shrink-0" />
       <div className="flex-1 space-y-2">
         {/* status badge */}
-        <div className="h-5 w-20 rounded-full bg-slate-200 animate-pulse" />
+        <div className="h-5 w-20 rounded-full bg-muted animate-pulse" />
         {/* date */}
-        <div className="h-3 w-32 rounded bg-slate-200 animate-pulse" />
+        <div className="h-3 w-32 rounded bg-muted animate-pulse" />
       </div>
       {/* action placeholder */}
-      <div className="h-9 w-24 rounded-lg bg-slate-200 animate-pulse" />
+      <div className="h-9 w-24 rounded-lg bg-muted animate-pulse" />
     </div>
   )
 }
@@ -77,24 +77,24 @@ function SessionRow({ session, campaignId, activeRole, onDiscard }: RowProps) {
   const canDiscard = canEditDraft
 
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md">
+    <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 shadow-sm transition-shadow duration-200 hover:shadow-md">
       <Link
         to={`/campaigns/${campaignId}/sessions/${session.sessionId}`}
-        className="flex flex-1 items-center gap-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="flex flex-1 items-center gap-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <span className="w-6 shrink-0 text-center text-sm font-medium text-slate-500">
+        <span className="w-6 shrink-0 text-center text-sm font-medium text-muted-foreground">
           #{session.sequenceNumber}
         </span>
         <div className="flex flex-1 flex-col gap-1">
           <StatusBadge status={session.status} />
-          <span className="text-xs text-slate-500">{formatted}</span>
+          <span className="text-xs text-muted-foreground">{formatted}</span>
         </div>
       </Link>
       <div className="flex shrink-0 gap-2">
         {canEditDraft && (
           <Link
             to={`/campaigns/${campaignId}/sessions/${session.sessionId}/diff`}
-            className="inline-flex h-9 items-center rounded-lg bg-blue-500 px-4 text-sm font-medium text-white hover:bg-blue-600 transition-colors duration-200"
+            className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-accent-hover transition-colors duration-200"
           >
             Resume
           </Link>
@@ -150,19 +150,19 @@ export function SessionsListPage() {
     <main className="mx-auto max-w-3xl p-8">
       <Link
         to={`/campaigns/${campaignId}`}
-        className="mb-6 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 transition-colors duration-200"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
         Campaign home
       </Link>
 
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-subtle text-accent">
           <History className="h-5 w-5" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Session history</h1>
-          <p className="text-sm text-slate-500">All sessions for this campaign.</p>
+          <h1 className="text-2xl font-semibold text-foreground">Session history</h1>
+          <p className="text-sm text-muted-foreground">All sessions for this campaign.</p>
         </div>
       </div>
 
@@ -195,7 +195,7 @@ export function SessionsListPage() {
       )}
 
       {!isLoading && !isError && sessions?.length === 0 && (
-        <p className="text-sm text-slate-500">No sessions yet.</p>
+        <p className="text-sm text-muted-foreground">No sessions yet.</p>
       )}
 
       {!isLoading && !isError && sessions && sessions.length > 0 && (

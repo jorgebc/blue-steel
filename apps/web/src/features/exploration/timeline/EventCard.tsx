@@ -16,11 +16,11 @@ export function EventCard({ event }: Props) {
   return (
     <Link
       to={`/campaigns/${campaignId}/explore/events/${event.eventId}`}
-      className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
+      className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 shadow-sm transition-shadow duration-200 hover:shadow-md"
     >
       <div className="min-w-0 flex-1 space-y-1">
-        <span className="block truncate font-medium text-slate-900">{event.name}</span>
-        <p className="truncate text-sm text-slate-500">
+        <span className="block truncate font-medium text-foreground">{event.name}</span>
+        <p className="truncate text-sm text-muted-foreground">
           {event.involvedActorNames.length > 0 && (
             <span>{event.involvedActorNames.join(', ')}</span>
           )}
@@ -35,7 +35,7 @@ export function EventCard({ event }: Props) {
         </p>
       </div>
       {event.eventType && (
-        <Badge variant="outline" className="shrink-0 bg-slate-100 capitalize text-slate-600">
+        <Badge variant="outline" className="shrink-0 bg-muted capitalize text-muted-foreground">
           {event.eventType}
         </Badge>
       )}

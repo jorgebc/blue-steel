@@ -24,8 +24,8 @@ function DeltaList({ delta }: { delta: Record<string, unknown> }) {
     <dl className="space-y-1 text-sm">
       {entries.map(([key, value]) => (
         <div key={key} className="flex gap-3">
-          <dt className="w-32 shrink-0 font-medium text-slate-500">{key}</dt>
-          <dd className="text-slate-900">{String(value)}</dd>
+          <dt className="w-32 shrink-0 font-medium text-muted-foreground">{key}</dt>
+          <dd className="text-foreground">{String(value)}</dd>
         </div>
       ))}
     </dl>
@@ -43,11 +43,7 @@ export function ProposalThread({ targetType, targetId }: Props) {
   const activeRole = useCampaignStore((s) => s.activeRole)
   const currentUserId = useAuthStore((s) => s.currentUser?.id)
 
-  const { data, isLoading, isError } = useProposalsForTarget(
-    campaignId ?? '',
-    targetType,
-    targetId
-  )
+  const { data, isLoading, isError } = useProposalsForTarget(campaignId ?? '', targetType, targetId)
   const coSign = useCoSignProposal(campaignId ?? '')
 
   const [feedback, setFeedback] = useState<Feedback>(null)
@@ -56,11 +52,7 @@ export function ProposalThread({ targetType, targetId }: Props) {
 
   function canCoSign(proposal: Proposal): boolean {
     // The GM decides proposals and cannot co-sign them (D-017); the author cannot co-sign their own.
-    return (
-      proposal.status === 'OPEN' &&
-      activeRole !== 'gm' &&
-      currentUserId !== proposal.ownerId
-    )
+    return proposal.status === 'OPEN' && activeRole !== 'gm' && currentUserId !== proposal.ownerId
   }
 
   function handleCoSign(proposalId: string) {
@@ -109,16 +101,18 @@ export function ProposalThread({ targetType, targetId }: Props) {
       {!isLoading && !isError && (
         <div className="space-y-3">
           {proposals.length === 0 ? (
-            <p className="text-sm text-slate-500">No proposals yet for this {targetType.toLowerCase()}.</p>
+            <p className="text-sm text-muted-foreground">
+              No proposals yet for this {targetType.toLowerCase()}.
+            </p>
           ) : (
             proposals.map((proposal) => (
               <div
                 key={proposal.proposalId}
-                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                className="rounded-xl border border-border bg-surface p-4 shadow-sm"
               >
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <ProposalStatusBadge status={proposal.status} />
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-muted-foreground">
                     Expires {new Date(proposal.expiresAt).toLocaleDateString()}
                   </span>
                 </div>

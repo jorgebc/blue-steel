@@ -110,7 +110,7 @@ export function CreateCampaignPage() {
           <div className="space-y-2">
             <Label htmlFor="gm-search">Game master</Label>
             {selectedGmEmail ? (
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3 text-sm">
+              <div className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
                 <span>{selectedGmEmail}</span>
                 <button
                   type="button"
@@ -118,7 +118,7 @@ export function CreateCampaignPage() {
                     form.setValue('gmUserId', '', { shouldValidate: true })
                     setSelectedGmEmail(null)
                   }}
-                  className="text-xs text-blue-500 underline-offset-4 hover:underline"
+                  className="text-xs text-accent underline-offset-4 hover:underline"
                 >
                   Change
                 </button>
@@ -135,13 +135,13 @@ export function CreateCampaignPage() {
                   onChange={(e) => setGmQuery(e.target.value)}
                 />
                 {gmResults.length > 0 && (
-                  <ul className="rounded-lg border border-slate-200">
+                  <ul className="rounded-lg border border-border">
                     {gmResults.map((user) => (
                       <li key={user.id}>
                         <button
                           type="button"
                           onClick={() => selectGm(user)}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
                         >
                           {user.email}
                         </button>
@@ -150,7 +150,9 @@ export function CreateCampaignPage() {
                   </ul>
                 )}
                 {searchActive && !isSearching && gmResults.length === 0 && (
-                  <p className="text-sm text-slate-500">No users found for “{debouncedGmQuery}”.</p>
+                  <p className="text-sm text-muted-foreground">
+                    No users found for “{debouncedGmQuery}”.
+                  </p>
                 )}
               </>
             )}

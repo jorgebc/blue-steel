@@ -15,7 +15,7 @@ export function AppBar() {
   const isAdmin = useAuthStore((s) => s.currentUser?.isAdmin)
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 shadow-sm">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-6 shadow-sm">
       <Link to="/" aria-label={t('appBar.homeAriaLabel')} className="rounded-lg">
         <Brand size="sm" />
       </Link>

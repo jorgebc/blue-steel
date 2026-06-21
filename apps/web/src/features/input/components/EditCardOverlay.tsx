@@ -50,8 +50,8 @@ export function EditCardOverlay({ card, open, onClose, onSave }: Props) {
 
   return (
     <FocusedOverlay open={open} onClose={onClose} ariaLabel={`Edit ${card.name}`}>
-      <div className="w-[28rem] max-w-[90vw] bg-white p-6">
-        <h3 className="mb-4 text-base font-medium text-slate-900">Edit {card.name}</h3>
+      <div className="w-[28rem] max-w-[90vw] bg-surface p-6">
+        <h3 className="mb-4 text-base font-medium text-foreground">Edit {card.name}</h3>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           {keys.map((key) => {
             const control = fieldControl(key, fields[key])
@@ -64,7 +64,7 @@ export function EditCardOverlay({ card, open, onClose, onSave }: Props) {
                   <Input id={`edit-${key}`} {...register(key)} />
                 )}
                 {control === 'array' && (
-                  <p className="text-xs text-slate-500">Separate values with commas</p>
+                  <p className="text-xs text-muted-foreground">Separate values with commas</p>
                 )}
               </div>
             )

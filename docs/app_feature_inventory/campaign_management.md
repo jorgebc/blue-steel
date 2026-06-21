@@ -57,7 +57,7 @@ A campaign is the top-level container of Blue Steel: all sessions, world state, 
 
 - **Use Case / Action:** Role-gated navigation inside a campaign — ✅ Implemented
 - **Actor:** System (frontend)
-- **Functional Description:** The sidebar exposes the three modes (Input / Query / Exploration) according to the caller's role: Players do not see Input Mode and are redirected away from its routes; member management appears only for the GM; campaign deletion only for the Admin. A "Settings" sidebar item exists as a disabled "Coming soon" stub — 🚧 Planned.
+- **Functional Description:** The sidebar exposes the three modes (Input / Query / Exploration) according to the caller's role: Players do not see Input Mode and are redirected away from its routes; member management appears only for the GM; campaign deletion only for the Admin. (The former disabled "Settings — Coming soon" sidebar stub was removed in Phase 8; user settings now live on the global `/settings` route reached from the top-right account menu — see [user_management.md](user_management.md).)
 - **Technical Reference / Source Files:** `apps/web/src/components/domain/Sidebar.tsx`, `apps/web/src/store/campaignStore.ts`, `apps/web/src/main.tsx` (route guards)
 
 ## 3. Core User Journeys (Workflows)

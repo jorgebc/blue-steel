@@ -16,9 +16,9 @@ interface Props {
 export function DiscardConfirmOverlay({ open, onConfirm, onClose, isPending }: Props) {
   return (
     <FocusedOverlay open={open} onClose={onClose} ariaLabel="Discard draft">
-      <div className="w-[24rem] max-w-[90vw] bg-white p-6">
-        <h3 className="mb-2 text-base font-medium text-slate-900">Discard this draft?</h3>
-        <p className="mb-6 text-sm text-slate-500">
+      <div className="w-[24rem] max-w-[90vw] bg-surface p-6">
+        <h3 className="mb-2 text-base font-medium text-foreground">Discard this draft?</h3>
+        <p className="mb-6 text-sm text-muted-foreground">
           This cannot be undone. The session review will be lost and the campaign unblocked for a
           new submission.
         </p>

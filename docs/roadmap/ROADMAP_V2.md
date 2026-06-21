@@ -1231,10 +1231,11 @@ settled at sub-task decomposition.)
 | F8.6-SETUP | Human: `npm install i18next react-i18next` | 👤 |
 | F8.6.1 | Frontend: i18next init + provider driven by `useSettingsStore.uiLocale` | ✅ |
 | F8.6.2 | Frontend: EN/ES catalogs + extract Sidebar/AppBar/UserMenu strings | ✅ |
-| F8.7 | Frontend: dark-mode theme system (umbrella) | 🔲 |
-| F8.7.1 | Frontend: `.dark` CSS-variable overrides in `index.css` | 🔲 |
-| F8.7.2 | Frontend: theme-apply hook (toggle `<html class="dark">`, `system` via matchMedia) | 🔲 |
-| F8.7.3 | Frontend: no-flash pre-paint script in `index.html` | 🔲 |
+| F8.7 | Frontend: dark-mode theme system (umbrella) | ✅ |
+| F8.7.1 | Frontend: `.dark` CSS-variable overrides in `index.css` | ✅ |
+| F8.7.2 | Frontend: theme-apply hook (toggle `<html class="dark">`, `system` via matchMedia) | ✅ |
+| F8.7.3 | Frontend: no-flash pre-paint script in `index.html` | ✅ |
+| F8.8 | Frontend: migrate raw color utilities → semantic tokens for full dark-mode coverage (non-blocking follow-on) | ✅ |
 
 #### F8.1 — Backend: user profile/settings persistence + domain
 
@@ -1555,9 +1556,15 @@ dark palette (F8.7.1), the reactive theme-apply hook (F8.7.2), and the first-pai
 authority here.
 
 **Acceptance (whole task):**
-- Selecting Dark applies the dark palette across the app; Light restores it; System follows the OS preference and reacts to OS changes live.
+- Selecting Dark applies the dark palette to semantic-token surfaces (shadcn components and any component using the design tokens); Light restores it; System follows the OS preference and reacts to OS changes live.
 - On reload the correct theme is applied on first paint — no flash of the wrong theme.
 - shadcn components render in the active theme.
+
+> *Coverage note (post-implementation):* the `.dark` overrides only recolour components that use the
+> semantic design tokens (`bg-background`, `bg-card`, `text-foreground`, `border-border`, …). Most of
+> the app and the always-visible chrome (`AuthenticatedLayout`, `AppBar`, `Sidebar`) still hardcode
+> raw `slate-*` utilities and therefore stay light in Dark mode. Full app-wide coverage is the
+> non-blocking follow-on **F8.8** below (it does not reopen the Phase 8 milestone).
 
 #### F8.7.1 — `.dark` CSS-variable overrides in `index.css`
 
@@ -1593,6 +1600,30 @@ authority here.
 **Scope (out):** Reactive toggling (F8.7.2).
 
 **Skills:** design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-101, D-087  **Dependencies:** F8.7.2
+
+#### F8.8 — Frontend: migrate raw color utilities → semantic tokens for full dark-mode coverage
+
+> **Non-blocking follow-on.** Discovered while shipping F8.7: the `.dark` overrides only recolour the
+> semantic design tokens, so the dark palette currently applies to the shadcn `components/ui/`
+> primitives but **not** to the ~155 files that hardcode raw `slate-*`/`white`/`blue-*` utilities
+> (~489 occurrences vs ~15 semantic-token usages), including the always-visible chrome. This task does
+> **not** reopen the Phase 8 milestone (same status as F8.6's deferred per-page i18n extraction);
+> tackle it incrementally.
+
+**Goal:** Dark mode visibly applies across the whole UI, not just shadcn primitives.
+
+**Scope (in):**
+- Replace raw color utilities with the existing semantic tokens defined in `apps/web/src/index.css`
+  (`bg-white`/`bg-slate-50` → `bg-surface`/`bg-background`/`bg-card`; `text-slate-900`/`text-slate-500`
+  → `text-foreground`/`text-muted-foreground`; `border-slate-200` → `border-border`;
+  `hover:bg-slate-100` → `hover:bg-muted`; etc.), preserving the light-mode appearance.
+- Highest-value first slice — the chrome: `apps/web/src/components/domain/AuthenticatedLayout.tsx`,
+  `AppBar.tsx`, `Sidebar.tsx` (then feature pages under `apps/web/src/features/`).
+- Keep accent semantics intact (`blue-*` active/primary states map to `--color-primary`/`--color-accent*`).
+
+**Scope (out):** New tokens or palette changes (the dark palette already exists); per-feature redesign.
+
+**Skills:** design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-101, D-087  **Dependencies:** F8.7
 
 > ⚠️ **On Phase 8 completion (after the last F8.x.N is ✅):**
 > 1. **Update `docs/app_feature_inventory/` if needed** — the new user profile/settings, account menu,

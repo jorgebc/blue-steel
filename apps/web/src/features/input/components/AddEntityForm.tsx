@@ -72,9 +72,9 @@ export function AddEntityForm({ onAdd, onCancel }: Props) {
   }
 
   return (
-    <div className="max-h-[80vh] w-[32rem] max-w-[90vw] overflow-y-auto bg-white p-6">
-      <h3 className="mb-1 text-base font-medium text-slate-900">Add an entity</h3>
-      <p className="mb-4 text-sm text-slate-500">
+    <div className="max-h-[80vh] w-[32rem] max-w-[90vw] overflow-y-auto bg-surface p-6">
+      <h3 className="mb-1 text-base font-medium text-foreground">Add an entity</h3>
+      <p className="mb-4 text-sm text-muted-foreground">
         Add an entity the extraction missed. It will be created when you commit this review.
       </p>
 
@@ -126,10 +126,10 @@ export function AddEntityForm({ onAdd, onCancel }: Props) {
           />
 
           <div>
-            <p className="mb-2 text-sm font-medium text-slate-700">Fields</p>
+            <p className="mb-2 text-sm font-medium text-foreground">Fields</p>
             <div className="space-y-2">
               {fields.length === 0 ? (
-                <p className="text-sm text-slate-500">No fields yet.</p>
+                <p className="text-sm text-muted-foreground">No fields yet.</p>
               ) : (
                 fields.map((row, index) => (
                   <div key={row.id} className="flex items-center gap-2">

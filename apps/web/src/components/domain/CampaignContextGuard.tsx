@@ -8,12 +8,12 @@ import { InlineBanner } from '@/components/domain/InlineBanner'
 function CampaignContextSkeleton() {
   return (
     <main className="mx-auto max-w-3xl p-6" aria-hidden="true">
-      <div className="mb-2 h-8 w-1/2 animate-pulse rounded bg-slate-200" />
-      <div className="mb-8 h-4 w-1/3 animate-pulse rounded bg-slate-200" />
+      <div className="mb-2 h-8 w-1/2 animate-pulse rounded bg-muted" />
+      <div className="mb-8 h-4 w-1/3 animate-pulse rounded bg-muted" />
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="h-28 animate-pulse rounded-2xl bg-slate-200" />
-        <div className="h-28 animate-pulse rounded-2xl bg-slate-200" />
-        <div className="h-28 animate-pulse rounded-2xl bg-slate-200" />
+        <div className="h-28 animate-pulse rounded-2xl bg-muted" />
+        <div className="h-28 animate-pulse rounded-2xl bg-muted" />
+        <div className="h-28 animate-pulse rounded-2xl bg-muted" />
       </div>
     </main>
   )
@@ -50,7 +50,7 @@ export function CampaignContextGuard() {
             onDismiss={() => setDismissed(true)}
           />
         )}
-        <Link to="/" className="text-sm text-blue-500 underline-offset-4 hover:underline">
+        <Link to="/" className="text-sm text-accent underline-offset-4 hover:underline">
           Back to campaigns
         </Link>
       </main>

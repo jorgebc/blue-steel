@@ -93,8 +93,8 @@ export function SubmitSessionPage() {
 
   return (
     <div className="mx-auto max-w-2xl p-8">
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h1 className="mb-6 text-2xl font-semibold text-slate-900">New session</h1>
+      <div className="rounded-2xl bg-surface p-6 shadow-sm">
+        <h1 className="mb-6 text-2xl font-semibold text-foreground">New session</h1>
         {recoverySessionId && (
           <div
             role="alert"

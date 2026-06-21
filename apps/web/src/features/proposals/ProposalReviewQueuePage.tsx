@@ -31,10 +31,10 @@ export function ProposalReviewQueuePage() {
 
   return (
     <section aria-labelledby="review-queue-heading" className="mx-auto max-w-3xl">
-      <h1 id="review-queue-heading" className="mb-1 text-2xl font-semibold text-slate-900">
+      <h1 id="review-queue-heading" className="mb-1 text-2xl font-semibold text-foreground">
         Proposal review queue
       </h1>
-      <p className="mb-6 text-sm text-slate-500">
+      <p className="mb-6 text-sm text-muted-foreground">
         Co-signed proposals awaiting your decision. Approve (optionally editing the change) or veto.
       </p>
 
@@ -52,7 +52,7 @@ export function ProposalReviewQueuePage() {
           {outcome.resultingEntityVersionId && campaignId && (
             <Link
               to={targetProfilePath(campaignId, outcome)}
-              className="mt-2 inline-block text-sm text-blue-500 underline-offset-4 hover:underline"
+              className="mt-2 inline-block text-sm text-accent underline-offset-4 hover:underline"
             >
               View the updated {outcome.proposal.targetType.toLowerCase()} profile
             </Link>
@@ -73,7 +73,7 @@ export function ProposalReviewQueuePage() {
       {!isLoading && !isError && (
         <div className="space-y-4">
           {proposals.length === 0 ? (
-            <p className="text-sm text-slate-500">No proposals are awaiting review.</p>
+            <p className="text-sm text-muted-foreground">No proposals are awaiting review.</p>
           ) : (
             proposals.map((proposal) => (
               <ProposalReviewCard

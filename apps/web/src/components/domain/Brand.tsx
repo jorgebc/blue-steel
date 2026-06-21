@@ -19,8 +19,8 @@ export function Brand({ size = 'sm', className }: Props) {
   const s = SIZES[size]
   return (
     <span className={['inline-flex items-center gap-2', className].filter(Boolean).join(' ')}>
-      <Hexagon className={`${s.icon} shrink-0 text-blue-500`} aria-hidden />
-      <span className={`${s.text} font-semibold tracking-tight text-slate-900`}>Blue Steel</span>
+      <Hexagon className={`${s.icon} shrink-0 text-accent`} aria-hidden />
+      <span className={`${s.text} font-semibold tracking-tight text-foreground`}>Blue Steel</span>
     </span>
   )
 }

@@ -10,7 +10,14 @@ import { useCampaignStore } from '@/store/campaignStore'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { DeltaFieldsEditor } from '@/components/domain/DeltaFieldsEditor'
 import { Button } from '@/components/ui/button'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 import {
   Select,
   SelectContent,
@@ -85,9 +92,9 @@ export function ProposalSubmitForm({
   }
 
   return (
-    <div className="max-h-[80vh] w-[32rem] max-w-[90vw] overflow-y-auto bg-white p-6">
-      <h3 className="mb-1 text-base font-medium text-slate-900">Propose a change</h3>
-      <p className="mb-4 text-sm text-slate-500">
+    <div className="max-h-[80vh] w-[32rem] max-w-[90vw] overflow-y-auto bg-surface p-6">
+      <h3 className="mb-1 text-base font-medium text-foreground">Propose a change</h3>
+      <p className="mb-4 text-sm text-muted-foreground">
         Suggest edits to this {targetType.toLowerCase()}. Other members can co-sign, then the GM
         decides.
       </p>
@@ -126,7 +133,7 @@ export function ProposalSubmitForm({
           />
 
           <div>
-            <p className="mb-2 text-sm font-medium text-slate-700">Proposed fields</p>
+            <p className="mb-2 text-sm font-medium text-foreground">Proposed fields</p>
             <DeltaFieldsEditor
               baseline={currentSnapshot}
               values={values}

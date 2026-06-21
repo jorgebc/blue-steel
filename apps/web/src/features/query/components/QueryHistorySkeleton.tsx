@@ -8,9 +8,9 @@ export function QueryHistorySkeleton() {
   return (
     <div role="status" aria-label="Loading question history" className="space-y-3">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="space-y-2 rounded-lg border border-slate-200 p-4">
-          <div className="h-4 w-3/4 animate-pulse rounded bg-slate-200" />
-          <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
+        <div key={i} className="space-y-2 rounded-lg border border-border p-4">
+          <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-24 animate-pulse rounded bg-muted" />
         </div>
       ))}
     </div>

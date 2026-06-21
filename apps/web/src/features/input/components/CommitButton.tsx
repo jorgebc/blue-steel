@@ -39,7 +39,7 @@ export function CommitButton({
 
   return (
     <div className="space-y-2">
-      {note && <p className="text-sm text-slate-500">{note}</p>}
+      {note && <p className="text-sm text-muted-foreground">{note}</p>}
       <Button
         type="button"
         onClick={onCommit}

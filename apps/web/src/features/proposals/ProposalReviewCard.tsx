@@ -73,13 +73,13 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-slate-900">
+          <p className="text-sm font-semibold text-foreground">
             {proposal.targetType === 'ACTOR' ? 'Actor' : 'Space'} change
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             Submitted {new Date(proposal.createdAt).toLocaleDateString()}
           </p>
         </div>
@@ -95,8 +95,8 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
       <dl className="mb-4 space-y-1 text-sm">
         {Object.entries(proposal.proposedDelta).map(([key, value]) => (
           <div key={key} className="flex gap-3">
-            <dt className="w-32 shrink-0 font-medium text-slate-500">{key}</dt>
-            <dd className="text-slate-900">{String(value)}</dd>
+            <dt className="w-32 shrink-0 font-medium text-muted-foreground">{key}</dt>
+            <dd className="text-foreground">{String(value)}</dd>
           </div>
         ))}
       </dl>
@@ -115,9 +115,9 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
         onClose={() => setMode(null)}
         ariaLabel="Approve proposal"
       >
-        <div className="max-h-[80vh] w-[32rem] max-w-[90vw] overflow-y-auto bg-white p-6">
-          <h3 className="mb-1 text-base font-medium text-slate-900">Approve change</h3>
-          <p className="mb-4 text-sm text-slate-500">
+        <div className="max-h-[80vh] w-[32rem] max-w-[90vw] overflow-y-auto bg-surface p-6">
+          <h3 className="mb-1 text-base font-medium text-foreground">Approve change</h3>
+          <p className="mb-4 text-sm text-muted-foreground">
             Edit any field before approving; your edits replace the proposed values. The change is
             written as a new version.
           </p>
@@ -128,10 +128,20 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
             idPrefix={`approve-${proposal.proposalId}`}
           />
           <div className="mt-6 flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => setMode(null)} disabled={isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMode(null)}
+              disabled={isPending}
+            >
               Cancel
             </Button>
-            <Button type="button" onClick={handleApprove} disabled={isPending} aria-disabled={isPending}>
+            <Button
+              type="button"
+              onClick={handleApprove}
+              disabled={isPending}
+              aria-disabled={isPending}
+            >
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
               Approve &amp; write version
             </Button>
@@ -139,14 +149,23 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
         </div>
       </FocusedOverlay>
 
-      <FocusedOverlay open={mode === 'veto'} onClose={() => setMode(null)} ariaLabel="Veto proposal">
-        <div className="w-[24rem] max-w-[90vw] bg-white p-6">
-          <h3 className="mb-2 text-base font-medium text-slate-900">Veto this proposal?</h3>
-          <p className="mb-6 text-sm text-slate-500">
+      <FocusedOverlay
+        open={mode === 'veto'}
+        onClose={() => setMode(null)}
+        ariaLabel="Veto proposal"
+      >
+        <div className="w-[24rem] max-w-[90vw] bg-surface p-6">
+          <h3 className="mb-2 text-base font-medium text-foreground">Veto this proposal?</h3>
+          <p className="mb-6 text-sm text-muted-foreground">
             The proposal is rejected and no version is written. This cannot be undone.
           </p>
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => setMode(null)} disabled={isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMode(null)}
+              disabled={isPending}
+            >
               Cancel
             </Button>
             <Button

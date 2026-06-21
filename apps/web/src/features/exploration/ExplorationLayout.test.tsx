@@ -37,7 +37,7 @@ describe('ExplorationLayout', () => {
   it('marks the Entities tab as current when on the entities route', () => {
     renderLayout()
 
-    expect(screen.getByRole('link', { name: /entities/i })).toHaveClass('text-blue-600')
+    expect(screen.getByRole('link', { name: /entities/i })).toHaveClass('text-accent')
   })
 
   it('has no accessibility violations', async () => {

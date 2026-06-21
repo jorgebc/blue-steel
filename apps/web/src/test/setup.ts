@@ -33,3 +33,20 @@ if (!('ResizeObserver' in globalThis)) {
     disconnect() {}
   }
 }
+
+// jsdom has no matchMedia, which useApplyTheme calls to resolve the `system`
+// colour scheme. Default to "light" (matches: false); tests that exercise the
+// system-follow path replace this with a controllable stub.
+if (!window.matchMedia) {
+  window.matchMedia = (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList
+}

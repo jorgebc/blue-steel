@@ -9,7 +9,7 @@ import { AppBar } from './AppBar'
  */
 export function AuthenticatedLayout() {
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-background">
       <AppBar />
       <div className="flex flex-1 flex-col">
         <Outlet />

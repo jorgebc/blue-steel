@@ -113,8 +113,8 @@ export function RelationsPage() {
   return (
     <section>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Relations</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold text-foreground">Relations</h1>
+        <p className="text-sm text-muted-foreground">
           How this campaign&apos;s actors and spaces are connected.
         </p>
       </div>
@@ -136,7 +136,7 @@ export function RelationsPage() {
           <div
             role="group"
             aria-label="Relations graph"
-            className="h-[70vh] min-h-[520px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+            className="h-[70vh] min-h-[520px] w-full overflow-hidden rounded-2xl border border-border bg-background"
           >
             <ReactFlow
               nodes={displayNodes}
@@ -162,21 +162,21 @@ export function RelationsPage() {
             </ReactFlow>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="rounded-2xl border border-border bg-surface shadow-sm">
             <button
               type="button"
               aria-expanded={listOpen}
               aria-controls="relations-list-panel"
               onClick={() => setListOpen((open) => !open)}
-              className="flex w-full items-center gap-2 rounded-2xl px-4 py-3 text-left text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-slate-50"
+              className="flex w-full items-center gap-2 rounded-2xl px-4 py-3 text-left text-sm font-medium text-foreground transition-colors duration-200 hover:bg-muted"
             >
               {listOpen ? (
-                <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden />
+                <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden />
               ) : (
-                <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
               )}
               All relations
-              <span className="text-slate-400">({relations.length})</span>
+              <span className="text-muted-foreground">({relations.length})</span>
             </button>
             {listOpen && (
               <div id="relations-list-panel" className="px-4 pb-4">
@@ -193,9 +193,9 @@ export function RelationsPage() {
       )}
 
       {!isLoading && !isError && selectedRelationId !== null && (
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mt-6 rounded-2xl border border-border bg-surface p-6 shadow-sm">
           <div className="mb-4">
-            <h2 className="text-sm font-semibold text-slate-700">{selectedRelationLabel}</h2>
+            <h2 className="text-sm font-semibold text-foreground">{selectedRelationLabel}</h2>
           </div>
           <AnnotationThread entityType="relation" entityId={selectedRelationId} />
         </div>

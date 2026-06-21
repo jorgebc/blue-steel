@@ -30,4 +30,13 @@ useSettingsStore.subscribe((state) => {
   }
 })
 
+// Mirror the active language onto <html lang> so assistive tech, the browser
+// spell-checker, and translation tooling see the real page language (WCAG 3.1).
+// The store subscription above drives this via languageChanged; the explicit
+// assignment covers the initial language set at init.
+i18n.on('languageChanged', (lng) => {
+  document.documentElement.lang = lng
+})
+document.documentElement.lang = i18n.language
+
 export default i18n

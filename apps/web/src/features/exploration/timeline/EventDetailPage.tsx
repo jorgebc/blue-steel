@@ -30,7 +30,7 @@ export function EventDetailPage() {
     <section>
       <Link
         to={`/campaigns/${campaignId}/explore/timeline`}
-        className="mb-6 inline-flex items-center gap-1 text-sm text-slate-500 transition-colors duration-200 hover:text-slate-900"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
         Back to timeline
@@ -52,8 +52,8 @@ export function EventDetailPage() {
         <div className="space-y-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-semibold text-slate-900">{data.name}</h1>
-              <p className="text-sm capitalize text-slate-500">{data.entityType}</p>
+              <h1 className="text-2xl font-semibold text-foreground">{data.name}</h1>
+              <p className="text-sm capitalize text-muted-foreground">{data.entityType}</p>
             </div>
             {/* Propose-change affordance — disabled stub in v1 (D-012). */}
             <Button
@@ -66,24 +66,24 @@ export function EventDetailPage() {
             </Button>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-3 text-sm font-semibold text-slate-700">Current state</h2>
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+            <h2 className="mb-3 text-sm font-semibold text-foreground">Current state</h2>
             {latest && Object.keys(latest.fullSnapshot).length > 0 ? (
               <dl className="space-y-2 text-sm">
                 {Object.entries(latest.fullSnapshot).map(([key, value]) => (
                   <div key={key} className="flex gap-4">
-                    <dt className="w-40 shrink-0 font-medium text-slate-500">{key}</dt>
-                    <dd className="text-slate-900">{String(value)}</dd>
+                    <dt className="w-40 shrink-0 font-medium text-muted-foreground">{key}</dt>
+                    <dd className="text-foreground">{String(value)}</dd>
                   </div>
                 ))}
               </dl>
             ) : (
-              <p className="text-sm text-slate-500">No recorded state.</p>
+              <p className="text-sm text-muted-foreground">No recorded state.</p>
             )}
           </div>
 
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-slate-700">Version history</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">Version history</h2>
             <EntityVersionHistory versions={data.versions} />
           </div>
 
