@@ -53,14 +53,19 @@ export function UserMenu() {
   const { displayName, email, avatarAccentColor } = currentUser
   const name = displayName?.trim() || email
 
+  // The quick toggles update the store optimistically so the theme/language applies instantly. If
+  // the PATCH fails, roll the store back to the previous value rather than leave it diverged from
+  // the server — the toggle visibly snaps back, which is the (no-toast) signal that it did not save.
   function handleTheme(next: string) {
+    const previous = theme
     setTheme(next as Theme)
-    updateProfile.mutate({ theme: next as Theme })
+    updateProfile.mutate({ theme: next as Theme }, { onError: () => setTheme(previous) })
   }
 
   function handleLocale(next: string) {
+    const previous = uiLocale
     setUiLocale(next as UiLocale)
-    updateProfile.mutate({ uiLocale: next as UiLocale })
+    updateProfile.mutate({ uiLocale: next as UiLocale }, { onError: () => setUiLocale(previous) })
   }
 
   function handleLogout() {
