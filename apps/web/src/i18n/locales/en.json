@@ -29,5 +29,21 @@
     "themeSystem": "System",
     "language": "Language",
     "logOut": "Log out"
+  },
+  "exploration": {
+    "entitiesTitle": "Entities",
+    "entitiesDescription": "Actors recorded across this campaign's sessions.",
+    "spacesTitle": "Spaces",
+    "spacesDescription": "Locations recorded across this campaign's sessions.",
+    "backToEntities": "Back to entities",
+    "backToSpaces": "Back to spaces",
+    "backToRelations": "Back to relations",
+    "relation": "Relation",
+    "endpoints": "Endpoints",
+    "source": "Source",
+    "target": "Target",
+    "versionHistory": "Version history",
+    "unresolved": "Unresolved",
+    "relationLoadError": "Could not load this relation. Please refresh the page."
   }
 }

@@ -98,7 +98,7 @@ export function SubmitSessionPage() {
         {recoverySessionId && (
           <div
             role="alert"
-            className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+            className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
           >
             <p>You already have an unfinished session review for this campaign.</p>
             <Link

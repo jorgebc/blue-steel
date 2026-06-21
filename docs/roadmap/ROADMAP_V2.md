@@ -1236,6 +1236,8 @@ settled at sub-task decomposition.)
 | F8.7.2 | Frontend: theme-apply hook (toggle `<html class="dark">`, `system` via matchMedia) | ✅ |
 | F8.7.3 | Frontend: no-flash pre-paint script in `index.html` | ✅ |
 | F8.8 | Frontend: migrate raw color utilities → semantic tokens for full dark-mode coverage (non-blocking follow-on) | ✅ |
+| F8.9 | Frontend: i18n per-page string extraction — remaining write/admin/overlay surfaces (F8.6 follow-on) | 🔲 |
+| F8.10 | Repo: decide + enforce repo-wide Prettier formatting (CI `--check`) | 🔲 |
 
 #### F8.1 — Backend: user profile/settings persistence + domain
 
@@ -1624,6 +1626,53 @@ authority here.
 **Scope (out):** New tokens or palette changes (the dark palette already exists); per-feature redesign.
 
 **Skills:** design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-101, D-087  **Dependencies:** F8.7
+
+#### F8.9 — Frontend: i18n per-page string extraction (remaining surfaces)
+
+> **Non-blocking follow-on, surfaced by the F8 coherence review (2026-06-21).** F8.6 shipped the i18n
+> mechanism + nav chrome; a later pass extracted the all-member-facing **Exploration** read surfaces
+> (Entities/Spaces lists, entity/space profiles, relation detail) under the `exploration` namespace.
+> The remaining feature strings are still hardcoded English. Do this in a focused future session.
+
+**Goal:** All user-facing strings switch with the UI locale, with English fallback for missing keys.
+
+**Scope (in):**
+- Add namespaces to `apps/web/src/i18n/locales/en.json` + `es.json` (e.g. `input`, `campaigns`,
+  `proposals`, `auth`, plus a shared `common`) and replace hardcoded strings with `t(...)` across the
+  audit-flagged files: `features/input/SubmitSessionPage.tsx`, `components/ConflictWarningCard.tsx`,
+  `components/AddEntityForm.tsx`, `DiffReviewPage.tsx` ("Added"), `components/DiscardConfirmOverlay.tsx`;
+  `features/campaigns/components/DeleteCampaignConfirmOverlay.tsx`, `RemoveMemberConfirmOverlay.tsx`;
+  `features/proposals/ProposalReviewCard.tsx` (approve/veto aria-labels); plus the auth/admin pages.
+- Overlay/notice bodies that embed inline markup (bolded `{campaignName}`/`{memberEmail}` mid-sentence)
+  need i18next `<Trans>` rather than a flat `t(...)` string.
+- Keep English catalog values identical to the prior hardcoded text so existing English-text test
+  assertions stay green; add ES-locale assertions where useful (pattern: `EntitiesPage.test.tsx`).
+
+**Scope (out):** New i18n infrastructure (exists, F8.6.1); per-campaign content language (Phase 9, D-099).
+
+**Skills:** `frontend-testing`; design authority `docs/UX_CONSTITUTION.md`  **Decisions:** D-099, D-101, D-087  **Dependencies:** F8.6
+
+#### F8.10 — Repo: decide + enforce repo-wide Prettier formatting
+
+> **Process follow-on, surfaced by the F8 coherence review (2026-06-21).** Running `prettier --write
+> src/` reformats ~190 files in `apps/web`, i.e. the committed tree is **not** Prettier-clean under the
+> current config (quote/whitespace/line-ending drift), because formatting is "keep clean locally, not
+> in CI" (`apps/web/CLAUDE.md`). Until resolved, contributors must avoid `prettier --write src/`
+> (format only changed files) to prevent mass churn burying real diffs in review.
+
+**Goal:** Either the repo is Prettier-clean and kept so by CI, or the drift is an accepted, documented decision.
+
+**Scope (in):**
+- Decide direction. If enforcing: one isolated repo-wide format commit (`chore(web): prettier --write`),
+  **its own PR** with no feature changes, then wire `npx prettier --check src/` into
+  `.github/workflows/frontend.yml` (before/with lint). If accepting drift: document it explicitly in
+  `apps/web/CLAUDE.md` and drop the "keep code clean locally" expectation.
+- Confirm `endOfLine` config vs the repo's line-ending normalization so the format commit doesn't
+  introduce CRLF/LF churn.
+
+**Scope (out):** Backend formatting (already enforced via Spotless in CI).
+
+**Skills:** `ci-cd`  **Decisions:** —  **Dependencies:** —
 
 > ⚠️ **On Phase 8 completion (after the last F8.x.N is ✅):**
 > 1. **Update `docs/app_feature_inventory/` if needed** — the new user profile/settings, account menu,

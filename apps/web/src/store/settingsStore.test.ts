@@ -46,4 +46,17 @@ describe('settingsStore', () => {
     expect(persisted.state.theme).toBe('dark')
     expect(persisted.state.uiLocale).toBe('es')
   })
+
+  // index.html runs a pre-paint inline script that reads this same localStorage key to apply the
+  // theme/lang before React mounts (no flash). jsdom never executes that inline script, so this test
+  // replicates its parsing against the real persisted envelope to guard the two from drifting.
+  it('exposes a shape the no-flash pre-paint script can read', () => {
+    useSettingsStore.getState().hydrateFromUser(user)
+
+    // Mirrors the index.html parse: JSON.parse(localStorage.getItem('blue-steel-settings')).state
+    const s = JSON.parse(localStorage.getItem('blue-steel-settings') as string).state
+    expect(s.uiLocale).toBe('es')
+    const dark = s.theme === 'dark' || (s.theme === 'system' && false)
+    expect(dark).toBe(true)
+  })
 })

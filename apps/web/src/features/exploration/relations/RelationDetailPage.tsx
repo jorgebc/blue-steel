@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft } from 'lucide-react'
 import { useRelationDetail } from '@/api/relations'
 import { EntityVersionHistory } from '@/components/domain/EntityVersionHistory'
@@ -24,12 +25,14 @@ interface EndpointProps {
  * be name-matched at commit (D-095) renders as a non-navigable "Unresolved" row.
  */
 function Endpoint({ role, campaignId, entityId, entityType }: EndpointProps) {
+  const { t } = useTranslation()
   const segment = entityType ? PROFILE_SEGMENT[entityType] : undefined
+  const roleLabel = role === 'Source' ? t('exploration.source') : t('exploration.target')
 
   return (
     <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
       <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {role}
+        {roleLabel}
       </p>
       {entityId && segment ? (
         <Link
@@ -39,7 +42,7 @@ function Endpoint({ role, campaignId, entityId, entityType }: EndpointProps) {
           <span className="capitalize">{entityType}</span>
         </Link>
       ) : (
-        <span className="text-sm text-muted-foreground">Unresolved</span>
+        <span className="text-sm text-muted-foreground">{t('exploration.unresolved')}</span>
       )}
     </div>
   )
@@ -54,6 +57,7 @@ function Endpoint({ role, campaignId, entityId, entityType }: EndpointProps) {
 export function RelationDetailPage() {
   const { campaignId, relationId } = useParams<{ campaignId: string; relationId: string }>()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { data, isLoading, isError } = useRelationDetail(relationId ?? '')
 
   return (
@@ -63,14 +67,14 @@ export function RelationDetailPage() {
         className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
-        Back to relations
+        {t('exploration.backToRelations')}
       </Link>
 
       {isError && (
         <div className="mb-4">
           <InlineBanner
             variant="error"
-            message="Could not load this relation. Please refresh the page."
+            message={t('exploration.relationLoadError')}
             onDismiss={() => navigate(0)}
           />
         </div>
@@ -83,7 +87,7 @@ export function RelationDetailPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-semibold text-foreground">{data.name}</h1>
-              <p className="text-sm text-muted-foreground">Relation</p>
+              <p className="text-sm text-muted-foreground">{t('exploration.relation')}</p>
             </div>
             {data.kind && (
               <Badge
@@ -96,7 +100,9 @@ export function RelationDetailPage() {
           </div>
 
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-foreground">Endpoints</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">
+              {t('exploration.endpoints')}
+            </h2>
             <div className="grid gap-2 sm:grid-cols-2">
               <Endpoint
                 role="Source"
@@ -114,7 +120,9 @@ export function RelationDetailPage() {
           </div>
 
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-foreground">Version history</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">
+              {t('exploration.versionHistory')}
+            </h2>
             <EntityVersionHistory versions={data.versions} />
           </div>
         </div>

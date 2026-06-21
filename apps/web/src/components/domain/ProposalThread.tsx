@@ -70,10 +70,13 @@ export function ProposalThread({ targetType, targetId }: Props) {
   }
 
   return (
-    <section aria-label="Proposals" className="mt-8 border-t-2 border-dashed border-blue-300 pt-6">
+    <section
+      aria-label="Proposals"
+      className="mt-8 border-t-2 border-dashed border-blue-300 pt-6 dark:border-blue-800"
+    >
       <header className="mb-4">
-        <h2 className="text-sm font-semibold text-blue-900">Proposed changes</h2>
-        <p className="text-xs text-blue-700">
+        <h2 className="text-sm font-semibold text-blue-900 dark:text-blue-200">Proposed changes</h2>
+        <p className="text-xs text-blue-700 dark:text-blue-300">
           Member-submitted edits awaiting co-sign and GM review — not yet canonical world state.
         </p>
       </header>

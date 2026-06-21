@@ -10,7 +10,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Replaces the caller's profile/settings fields, leaving identity/credentials untouched. */
+/**
+ * Updates the caller's profile/settings fields, leaving identity/credentials untouched.
+ *
+ * <p>{@code PATCH} is a partial merge: a {@code null} command field means "leave unchanged", so a
+ * client may send only the fields it is changing (the account-menu quick toggles send a single
+ * field). The display name is the one field that can be cleared back to {@code null}: an empty
+ * string is the explicit "clear" sentinel (records cannot distinguish absent from explicit-null
+ * without a nullable wrapper type), whereas {@code null} preserves the current value.
+ */
 @Service
 public class UpdateCurrentUserProfileService implements UpdateCurrentUserProfileUseCase {
 
@@ -32,10 +40,21 @@ public class UpdateCurrentUserProfileService implements UpdateCurrentUserProfile
 
     userRepository.save(
         user.withUpdatedProfile(
-            command.displayName(),
-            command.avatarAccentColor(),
-            command.uiLocale(),
-            command.theme()));
+            mergeDisplayName(command.displayName(), user.displayName()),
+            merge(command.avatarAccentColor(), user.avatarAccentColor()),
+            merge(command.uiLocale(), user.uiLocale()),
+            merge(command.theme(), user.theme())));
     log.info("Profile updated for userId={}", command.callerId());
+  }
+
+  /** Returns the requested value, or the current one when the request omits the field (null). */
+  private static String merge(String requested, String current) {
+    return requested != null ? requested : current;
+  }
+
+  /** As {@link #merge}, but an empty requested string clears the display name to {@code null}. */
+  private static String mergeDisplayName(String requested, String current) {
+    if (requested == null) return current;
+    return requested.isEmpty() ? null : requested;
   }
 }

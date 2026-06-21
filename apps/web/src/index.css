@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
+/*
+ * Class-based dark mode. The app toggles a `.dark` class on <html> (useApplyTheme / the pre-paint
+ * script); without this variant Tailwind v4's `dark:` utilities default to `prefers-color-scheme`
+ * and would track the OS instead of the user's chosen theme. Registering it makes every `dark:`
+ * utility (including the shadcn primitives') follow the same `.dark` class as the token overrides.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Typography */
   --font-sans: ui-sans-serif, system-ui, Inter, sans-serif;
@@ -135,4 +143,27 @@
 
 .react-flow__controls-button svg {
   fill: currentColor;
+}
+
+/*
+ * Dark-mode recolour for the React Flow chrome. The library's CSS variables and control button
+ * colours are hardcoded above (not driven by the semantic tokens), so they need their own `.dark`
+ * overrides to follow the theme toggle — mirrors the slate values used in the .dark token block.
+ */
+.dark .react-flow {
+  --xy-edge-stroke-default: #334155; /* slate-700 */
+}
+
+.dark .react-flow__controls {
+  border-color: #1e293b; /* slate-800 */
+}
+
+.dark .react-flow__controls-button {
+  border-bottom-color: #1e293b; /* slate-800 */
+  background: #0f172a; /* slate-900 */
+  color: #94a3b8; /* slate-400 */
+}
+
+.dark .react-flow__controls-button:hover {
+  background: #1e293b; /* slate-800 */
 }

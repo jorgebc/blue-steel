@@ -20,10 +20,10 @@ This register consolidates everything that exists in the repository only as sche
 
 ---
 
-- **Use Case / Action:** Manually add a missed entity during diff review (`add` action) — 🚧 Planned (v2, D-053)
+- **Use Case / Action:** Manually add a missed entity during diff review (`add` action) — ✅ Implemented (v2, Phase 6)
 - **Actor:** GM, Editor
-- **Functional Description:** The commit payload supports only accept/edit/delete decisions; `add` is explicitly rejected with 422 `UNSUPPORTED_ACTION`. v1 workaround: resubmit a corrected summary.
-- **Technical Reference / Source Files:** Rejection in `apps/api/src/main/java/com/bluesteel/application/service/session/CommitPayloadValidator.java`
+- **Functional Description:** Shipped in Phase 6 (F6.1–F6.2). The diff-review screen has an "Add entity" affordance (a `FocusedOverlay` form) for actors/spaces the extraction missed; added entities ride the commit payload's `addedEntities` list and are created as new entities + first versions at commit, with the same session traceability and async embedding path as extracted ones. The former `422 UNSUPPORTED_ACTION` rejection became positive validation (`422 INVALID_ADDED_ENTITY` / `ADDED_ENTITY_NAME_COLLISION`). Events/relations remain out (they need structured links the form can't supply, D-053).
+- **Technical Reference / Source Files:** `apps/api/src/main/java/com/bluesteel/application/service/session/CommitPayloadValidator.java`, `CommitService.java`; `apps/web/src/features/input/components/AddEntityForm.tsx`, `AddedEntityCard.tsx`
 
 ---
 

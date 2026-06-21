@@ -78,7 +78,20 @@ describe('UserMenu', () => {
     await user.click(screen.getByRole('menuitemradio', { name: 'Dark' }))
 
     expect(useSettingsStore.getState().theme).toBe('dark')
-    expect(mockMutate).toHaveBeenCalledWith({ theme: 'dark' })
+    expect(mockMutate).toHaveBeenCalledWith({ theme: 'dark' }, expect.anything())
+  })
+
+  it('rolls the theme back in the store when the server rejects the toggle', async () => {
+    mockMutate.mockImplementationOnce(
+      (_payload: { theme?: string }, opts?: { onError?: () => void }) => opts?.onError?.()
+    )
+    const user = userEvent.setup()
+    setup()
+    await user.click(screen.getByRole('button', { name: /account menu/i }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Dark' }))
+
+    // Optimistically set to dark, then rolled back to the prior value on the failed PATCH.
+    expect(useSettingsStore.getState().theme).toBe('system')
   })
 
   it('persists the locale to the store and the server when a language is chosen', async () => {
@@ -88,7 +101,19 @@ describe('UserMenu', () => {
     await user.click(screen.getByRole('menuitemradio', { name: 'Español' }))
 
     expect(useSettingsStore.getState().uiLocale).toBe('es')
-    expect(mockMutate).toHaveBeenCalledWith({ uiLocale: 'es' })
+    expect(mockMutate).toHaveBeenCalledWith({ uiLocale: 'es' }, expect.anything())
+  })
+
+  it('rolls the locale back in the store when the server rejects the toggle', async () => {
+    mockMutate.mockImplementationOnce(
+      (_payload: { uiLocale?: string }, opts?: { onError?: () => void }) => opts?.onError?.()
+    )
+    const user = userEvent.setup()
+    setup()
+    await user.click(screen.getByRole('button', { name: /account menu/i }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Español' }))
+
+    expect(useSettingsStore.getState().uiLocale).toBe('en')
   })
 
   it('falls back to the email as the menu name when no display name is set', async () => {
