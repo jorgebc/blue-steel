@@ -1,4 +1,5 @@
 import { useNavigate, NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { LogOut, Settings } from 'lucide-react'
 import {
   DropdownMenu,
@@ -16,12 +17,14 @@ import { useUpdateProfile } from '@/api/users'
 import type { Theme, UiLocale } from '@/types/auth'
 import { InitialsAvatar } from './InitialsAvatar'
 
-const THEME_OPTIONS: { value: Theme; label: string }[] = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
+const THEME_OPTIONS: { value: Theme; labelKey: string }[] = [
+  { value: 'light', labelKey: 'userMenu.themeLight' },
+  { value: 'dark', labelKey: 'userMenu.themeDark' },
+  { value: 'system', labelKey: 'userMenu.themeSystem' },
 ]
 
+// Language names are conventionally shown in their own language regardless of the
+// active UI locale, so these labels stay literal (not translated).
 const LOCALE_OPTIONS: { value: UiLocale; label: string }[] = [
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Español' },
@@ -37,6 +40,7 @@ const keepOpen = (e: Event) => e.preventDefault()
  * preference here; applying the theme visually lands later (F8.7).
  */
 export function UserMenu() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.currentUser)
   const theme = useSettingsStore((s) => s.theme)
@@ -67,7 +71,7 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label="Account menu"
+        aria-label={t('userMenu.accountMenu')}
         className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
       >
         <InitialsAvatar
@@ -86,20 +90,20 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <NavLink to="/settings">
             <Settings aria-hidden />
-            Settings
+            {t('userMenu.settings')}
           </NavLink>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Theme</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('userMenu.theme')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={theme} onValueChange={handleTheme}>
           {THEME_OPTIONS.map((option) => (
             <DropdownMenuRadioItem key={option.value} value={option.value} onSelect={keepOpen}>
-              {option.label}
+              {t(option.labelKey)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Language</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('userMenu.language')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={uiLocale} onValueChange={handleLocale}>
           {LOCALE_OPTIONS.map((option) => (
             <DropdownMenuRadioItem key={option.value} value={option.value} onSelect={keepOpen}>
@@ -110,7 +114,7 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={handleLogout}>
           <LogOut aria-hidden />
-          Log out
+          {t('userMenu.logOut')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

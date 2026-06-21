@@ -1,0 +1,33 @@
+{
+  "sidebar": {
+    "navAriaLabel": "Navegación de campaña",
+    "campaignFallback": "Campaña",
+    "switchCampaign": "Cambiar de campaña",
+    "role": {
+      "gm": "GM",
+      "editor": "Editor",
+      "player": "Jugador"
+    },
+    "home": "Inicio",
+    "input": "Entrada",
+    "query": "Consulta",
+    "exploration": "Exploración",
+    "reviewQueue": "Cola de revisión",
+    "collapse": "Contraer barra lateral",
+    "expand": "Expandir barra lateral"
+  },
+  "appBar": {
+    "homeAriaLabel": "Inicio de Blue Steel",
+    "admin": "Administrador"
+  },
+  "userMenu": {
+    "accountMenu": "Menú de cuenta",
+    "settings": "Configuración",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro",
+    "themeSystem": "Sistema",
+    "language": "Idioma",
+    "logOut": "Cerrar sesión"
+  }
+}

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { axe } from 'vitest-axe'
 import { Sidebar } from './Sidebar'
+import i18n from '@/i18n'
 import { useCampaignStore } from '@/store/campaignStore'
 import { useUiStore } from '@/store/uiStore'
 import type { CampaignRole } from '@/types/campaign'
@@ -134,6 +135,16 @@ describe('Sidebar', () => {
     setup('gm', false)
     expect(screen.queryByText('Curse of Strahd')).not.toBeInTheDocument()
     expect(screen.queryByText('Input')).not.toBeInTheDocument()
+    expect(screen.queryByText('Home')).not.toBeInTheDocument()
+  })
+
+  it('renders the nav labels and role in Spanish when the locale is es', async () => {
+    await i18n.changeLanguage('es')
+    setup('player')
+    expect(screen.getByText('Inicio')).toBeInTheDocument()
+    expect(screen.getByText('Consulta')).toBeInTheDocument()
+    expect(screen.getByText('Exploración')).toBeInTheDocument()
+    expect(screen.getByText('Jugador')).toBeInTheDocument()
     expect(screen.queryByText('Home')).not.toBeInTheDocument()
   })
 

@@ -1227,10 +1227,10 @@ settled at sub-task decomposition.)
 | F8.5.1 | Frontend: accent palette + `AccentColorPicker` | ✅ |
 | F8.5.2 | Frontend: `UserSettingsPage` (form + live preview + InlineBanner) | ✅ |
 | F8.5.3 | Frontend: global `/settings` route wiring | ✅ |
-| F8.6 | Frontend: i18n infrastructure + EN/ES catalogs (umbrella) | 🔲 |
+| F8.6 | Frontend: i18n infrastructure + EN/ES catalogs (umbrella) | ✅ |
 | F8.6-SETUP | Human: `npm install i18next react-i18next` | 👤 |
-| F8.6.1 | Frontend: i18next init + provider driven by `useSettingsStore.uiLocale` | 🔲 |
-| F8.6.2 | Frontend: EN/ES catalogs + extract Sidebar/AppBar/UserMenu strings | 🔲 |
+| F8.6.1 | Frontend: i18next init + provider driven by `useSettingsStore.uiLocale` | ✅ |
+| F8.6.2 | Frontend: EN/ES catalogs + extract Sidebar/AppBar/UserMenu strings | ✅ |
 | F8.7 | Frontend: dark-mode theme system (umbrella) | 🔲 |
 | F8.7.1 | Frontend: `.dark` CSS-variable overrides in `index.css` | 🔲 |
 | F8.7.2 | Frontend: theme-apply hook (toggle `<html class="dark">`, `system` via matchMedia) | 🔲 |
