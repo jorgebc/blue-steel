@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { extractExistingSessionId, useSubmitSession } from '@/api/sessions'
 import { ApiClientError } from '@/api/client'
@@ -20,11 +21,7 @@ import {
 } from '@/components/ui/form'
 import { Textarea } from '@/components/ui/textarea'
 
-const schema = z.object({
-  summaryText: z.string().min(1, 'A session summary is required'),
-})
-
-type FormValues = z.infer<typeof schema>
+type FormValues = { summaryText: string }
 
 /**
  * Submission form for a raw session summary. Editors and GMs only — a `player`
@@ -32,6 +29,7 @@ type FormValues = z.infer<typeof schema>
  * the {@link ProcessingStatusView} for the accepted session.
  */
 export function SubmitSessionPage() {
+  const { t } = useTranslation()
   const { campaignId } = useParams<{ campaignId: string }>()
   const activeRole = useCampaignStore((s) => s.activeRole)
   const { mutate: submit, isPending } = useSubmitSession(campaignId ?? '')
@@ -43,7 +41,7 @@ export function SubmitSessionPage() {
   const [recoverySessionId, setRecoverySessionId] = useState<string | null>(null)
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(z.object({ summaryText: z.string().min(1, t('input.summaryRequired')) })),
     defaultValues: { summaryText: '' },
   })
 
@@ -60,7 +58,7 @@ export function SubmitSessionPage() {
       },
       onError(err) {
         if (!(err instanceof ApiClientError)) {
-          setErrorMessage('An unexpected error occurred. Please try again.')
+          setErrorMessage(t('common.unexpectedError'))
           return
         }
         const validation = err.errors.find((e) => e.code === 'VALIDATION_ERROR')
@@ -78,7 +76,7 @@ export function SubmitSessionPage() {
           setRecoverySessionId(existingSessionId)
           return
         }
-        setErrorMessage(err.errors[0]?.message ?? 'Submission failed.')
+        setErrorMessage(err.errors[0]?.message ?? t('input.submissionFailed'))
       },
     })
   }
@@ -94,18 +92,18 @@ export function SubmitSessionPage() {
   return (
     <div className="mx-auto max-w-2xl p-8">
       <div className="rounded-2xl bg-surface p-6 shadow-sm">
-        <h1 className="mb-6 text-2xl font-semibold text-foreground">New session</h1>
+        <h1 className="mb-6 text-2xl font-semibold text-foreground">{t('input.newSession')}</h1>
         {recoverySessionId && (
           <div
             role="alert"
             className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
           >
-            <p>You already have an unfinished session review for this campaign.</p>
+            <p>{t('input.recoveryNotice')}</p>
             <Link
               to={`/campaigns/${campaignId}/sessions/${recoverySessionId}/diff`}
               className="mt-2 inline-block font-medium underline underline-offset-4"
             >
-              Resume your unfinished review
+              {t('input.resumeReview')}
             </Link>
           </div>
         )}
@@ -125,11 +123,11 @@ export function SubmitSessionPage() {
               name="summaryText"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Session summary</FormLabel>
+                  <FormLabel>{t('input.sessionSummary')}</FormLabel>
                   <FormControl>
                     <Textarea
                       rows={12}
-                      placeholder="Paste your raw session notes here…"
+                      placeholder={t('input.summaryPlaceholder')}
                       {...field}
                     />
                   </FormControl>
@@ -139,7 +137,7 @@ export function SubmitSessionPage() {
             />
             <Button type="submit" disabled={isPending} aria-disabled={isPending}>
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-              Submit session
+              {t('input.submitSession')}
             </Button>
           </form>
         </Form>

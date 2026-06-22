@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, UserPlus } from 'lucide-react'
 import {
   useCampaignMembers,
@@ -40,6 +41,7 @@ function RosterSkeleton() {
  * modals, D-082). Render this only for a GM caller.
  */
 export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
+  const { t } = useTranslation()
   const { data: members, isLoading, isError } = useCampaignMembers(campaignId)
   const invite = useInviteCampaignMember(campaignId)
   const changeRole = useChangeMemberRole(campaignId)
@@ -55,20 +57,23 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
     setBanner(null)
     const trimmed = email.trim()
     if (!trimmed) {
-      setBanner({ variant: 'error', message: 'Enter an email address to invite.' })
+      setBanner({ variant: 'error', message: t('campaigns.enterEmail') })
       return
     }
     invite.mutate(
       { email: trimmed, role: inviteRole },
       {
         onSuccess: () => {
-          setBanner({ variant: 'success', message: `Invitation sent to ${trimmed}.` })
+          setBanner({
+            variant: 'success',
+            message: t('campaigns.invitationSent', { email: trimmed }),
+          })
           setEmail('')
         },
         onError: (err) =>
           setBanner({
             variant: 'error',
-            message: messageOf(err, 'Could not invite that user. Please try again.'),
+            message: messageOf(err, t('campaigns.inviteError')),
           }),
       }
     )
@@ -80,11 +85,14 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
       { userId: member.userId, role },
       {
         onSuccess: () =>
-          setBanner({ variant: 'success', message: `${member.email} is now ${role}.` }),
+          setBanner({
+            variant: 'success',
+            message: t('campaigns.roleChanged', { email: member.email, role }),
+          }),
         onError: (err) =>
           setBanner({
             variant: 'error',
-            message: messageOf(err, 'Could not change the role. Please try again.'),
+            message: messageOf(err, t('campaigns.roleChangeError')),
           }),
       }
     )
@@ -95,13 +103,13 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
     const target = removeTarget
     remove.mutate(target.userId, {
       onSuccess: () => {
-        setBanner({ variant: 'success', message: `${target.email} was removed.` })
+        setBanner({ variant: 'success', message: t('campaigns.memberRemoved', { email: target.email }) })
         setRemoveTarget(null)
       },
       onError: (err) => {
         setBanner({
           variant: 'error',
-          message: messageOf(err, 'Could not remove that member. Please try again.'),
+          message: messageOf(err, t('campaigns.removeError')),
         })
         setRemoveTarget(null)
       },
@@ -111,11 +119,9 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
   return (
     <section className="mt-10" aria-labelledby="members-heading">
       <h2 id="members-heading" className="text-lg font-semibold text-foreground">
-        Members
+        {t('campaigns.members')}
       </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Invite players and editors, change roles, or remove members.
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{t('campaigns.membersDescription')}</p>
 
       {banner && (
         <div className="mt-4">
@@ -129,18 +135,18 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
 
       <form onSubmit={handleInvite} className="mt-4 flex flex-wrap items-end gap-3" noValidate>
         <div className="flex-1 space-y-1">
-          <Label htmlFor="invite-email">Invite by email</Label>
+          <Label htmlFor="invite-email">{t('campaigns.inviteByEmail')}</Label>
           <Input
             id="invite-email"
             type="email"
-            placeholder="player@example.com"
+            placeholder={t('campaigns.emailPlaceholder')}
             autoComplete="off"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="invite-role">Role</Label>
+          <Label htmlFor="invite-role">{t('campaigns.roleLabel')}</Label>
           <select
             id="invite-role"
             value={inviteRole}
@@ -160,7 +166,7 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
           ) : (
             <UserPlus className="mr-2 h-4 w-4" aria-hidden />
           )}
-          Invite
+          {t('campaigns.invite')}
         </Button>
       </form>
 
@@ -170,7 +176,7 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
         ) : isError ? (
           <InlineBanner
             variant="error"
-            message="We couldn't load the member list. Please try again."
+            message={t('campaigns.loadMembersError')}
             onDismiss={() => undefined}
           />
         ) : (
@@ -183,12 +189,12 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
                 <span className="text-sm text-foreground">{member.email}</span>
                 {member.role === 'gm' ? (
                   <span className="rounded-full bg-accent-subtle px-3 py-1 text-xs font-medium uppercase text-accent">
-                    GM
+                    {t('campaigns.gm')}
                   </span>
                 ) : (
                   <div className="flex items-center gap-2">
                     <label className="sr-only" htmlFor={`role-${member.userId}`}>
-                      Role for {member.email}
+                      {t('campaigns.roleForMember', { email: member.email })}
                     </label>
                     <select
                       id={`role-${member.userId}`}
@@ -208,7 +214,7 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
                       onClick={() => setRemoveTarget(member)}
                       className="rounded-lg px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-50"
                     >
-                      Remove
+                      {t('common.remove')}
                     </button>
                   </div>
                 )}

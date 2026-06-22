@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 
 interface Props {
@@ -22,20 +23,21 @@ export function CommitButton({
   hasCommittableCards = true,
   onCommit,
 }: Props) {
+  const { t } = useTranslation()
   const pending = unresolvedUncertainCount + unacknowledgedConflictCount
   const disabled = pending > 0 || isPending || !hasCommittableCards
 
   const note = !hasCommittableCards
-    ? 'No entities to commit.'
+    ? t('input.commitNoEntities')
     : pending > 0
-      ? `${pending} item${pending !== 1 ? 's' : ''} require your decision`
+      ? t('input.commitNote', { count: pending })
       : null
 
   const ariaLabel = !hasCommittableCards
-    ? 'Commit to world state — no entities to commit'
+    ? t('input.commitAriaNoEntities')
     : pending > 0
-      ? `Commit to world state — ${pending} item${pending !== 1 ? 's' : ''} require your decision first`
-      : 'Commit to world state'
+      ? t('input.commitAriaPending', { count: pending })
+      : t('input.commitLabel')
 
   return (
     <div className="space-y-2">
@@ -48,7 +50,7 @@ export function CommitButton({
         aria-label={ariaLabel}
       >
         {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-        Commit to world state
+        {t('input.commitLabel')}
       </Button>
     </div>
   )

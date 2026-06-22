@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { useChangePassword } from '@/api/users'
 import { ApiClientError } from '@/api/client'
@@ -20,20 +21,21 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 
-const schema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(12, 'New password must be at least 12 characters'),
-})
-
-type FormValues = z.infer<typeof schema>
+type FormValues = { currentPassword: string; newPassword: string }
 
 export function ChangePasswordPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { mutate: changePassword, isPending } = useChangePassword()
   const [banner, setBanner] = useState<string | null>(null)
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(
+      z.object({
+        currentPassword: z.string().min(1, t('auth.currentPasswordRequired')),
+        newPassword: z.string().min(12, t('auth.newPasswordMinLength')),
+      })
+    ),
     defaultValues: { currentPassword: '', newPassword: '' },
   })
 
@@ -57,10 +59,10 @@ export function ChangePasswordPage() {
             }
           }
           if (!hasFieldError) {
-            setBanner(err.errors[0]?.message ?? 'Password change failed. Please try again.')
+            setBanner(err.errors[0]?.message ?? t('auth.passwordChangeFailed'))
           }
         } else {
-          setBanner('An unexpected error occurred. Please try again.')
+          setBanner(t('common.unexpectedError'))
         }
       },
     })
@@ -73,7 +75,7 @@ export function ChangePasswordPage() {
           <Brand size="lg" />
         </div>
         <div className="rounded-2xl bg-surface p-8 shadow-sm">
-          <h1 className="mb-6 text-2xl font-semibold text-foreground">Change password</h1>
+          <h1 className="mb-6 text-2xl font-semibold text-foreground">{t('auth.changePassword')}</h1>
           {banner && (
             <div className="mb-4">
               <InlineBanner variant="error" message={banner} onDismiss={() => setBanner(null)} />
@@ -86,11 +88,11 @@ export function ChangePasswordPage() {
                 name="currentPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Current password</FormLabel>
+                    <FormLabel>{t('auth.currentPassword')}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
-                        placeholder="••••••••"
+                        placeholder={t('auth.passwordPlaceholder')}
                         autoComplete="current-password"
                         {...field}
                       />
@@ -104,11 +106,11 @@ export function ChangePasswordPage() {
                 name="newPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>New password</FormLabel>
+                    <FormLabel>{t('auth.newPassword')}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
-                        placeholder="••••••••••••"
+                        placeholder={t('auth.newPasswordPlaceholder')}
                         autoComplete="new-password"
                         {...field}
                       />
@@ -124,7 +126,7 @@ export function ChangePasswordPage() {
                 aria-disabled={isPending}
               >
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-                Change password
+                {t('auth.changePassword')}
               </Button>
             </form>
           </Form>

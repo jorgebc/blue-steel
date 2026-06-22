@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import { FocusedOverlay } from '@/components/domain/FocusedOverlay'
 import { Button } from '@/components/ui/button'
 
@@ -21,18 +22,23 @@ export function DeleteCampaignConfirmOverlay({
   onClose,
   isPending,
 }: Props) {
+  const { t } = useTranslation()
   return (
-    <FocusedOverlay open={open} onClose={onClose} ariaLabel="Delete campaign">
+    <FocusedOverlay open={open} onClose={onClose} ariaLabel={t('campaigns.deleteCampaign')}>
       <div className="w-[28rem] max-w-[90vw] bg-surface p-6">
-        <h3 className="mb-2 text-base font-medium text-foreground">Delete this campaign?</h3>
+        <h3 className="mb-2 text-base font-medium text-foreground">
+          {t('campaigns.deleteConfirmTitle')}
+        </h3>
         <p className="mb-6 text-sm text-muted-foreground">
-          <span className="font-medium">{campaignName}</span> and all its data — sessions, actors,
-          spaces, events, relations, and annotations — will be permanently deleted. This cannot be
-          undone.
+          <Trans
+            i18nKey="campaigns.deleteConfirmBody"
+            values={{ campaignName }}
+            components={{ strong: <span className="font-medium" /> }}
+          />
         </p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -42,7 +48,7 @@ export function DeleteCampaignConfirmOverlay({
             className="bg-red-600 text-white hover:bg-red-700"
           >
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-            Delete campaign
+            {t('campaigns.deleteCampaign')}
           </Button>
         </div>
       </div>

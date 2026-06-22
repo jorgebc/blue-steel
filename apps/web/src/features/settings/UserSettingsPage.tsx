@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { useUpdateProfile } from '@/api/users'
 import { ApiClientError } from '@/api/client'
@@ -31,25 +32,24 @@ import type { Theme, UiLocale } from '@/types/auth'
 import { AccentColorPicker } from './components/AccentColorPicker'
 import { DEFAULT_ACCENT } from './accentPalette'
 
-const THEME_OPTIONS: { value: Theme; label: string }[] = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
+const THEME_OPTIONS: { value: Theme; labelKey: string }[] = [
+  { value: 'light', labelKey: 'userMenu.themeLight' },
+  { value: 'dark', labelKey: 'userMenu.themeDark' },
+  { value: 'system', labelKey: 'userMenu.themeSystem' },
 ]
 
+// Language names are intentionally shown in their own language, never translated (matches UserMenu).
 const LOCALE_OPTIONS: { value: UiLocale; label: string }[] = [
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Español' },
 ]
 
-const schema = z.object({
-  displayName: z.string().trim().max(80, 'Display name must be 80 characters or fewer'),
-  avatarAccentColor: z.string(),
-  uiLocale: z.enum(['en', 'es']),
-  theme: z.enum(['light', 'dark', 'system']),
-})
-
-type FormValues = z.infer<typeof schema>
+type FormValues = {
+  displayName: string
+  avatarAccentColor: string
+  uiLocale: UiLocale
+  theme: Theme
+}
 
 type Banner = { variant: 'success' | 'error'; message: string }
 
@@ -61,6 +61,7 @@ type Banner = { variant: 'success' | 'error'; message: string }
  * the theme visually lands later (F8.7).
  */
 export function UserSettingsPage() {
+  const { t } = useTranslation()
   const currentUser = useAuthStore((s) => s.currentUser)
   const theme = useSettingsStore((s) => s.theme)
   const uiLocale = useSettingsStore((s) => s.uiLocale)
@@ -68,7 +69,14 @@ export function UserSettingsPage() {
   const [banner, setBanner] = useState<Banner | null>(null)
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(
+      z.object({
+        displayName: z.string().trim().max(80, t('settings.displayNameMax')),
+        avatarAccentColor: z.string(),
+        uiLocale: z.enum(['en', 'es']),
+        theme: z.enum(['light', 'dark', 'system']),
+      })
+    ),
     defaultValues: {
       displayName: currentUser?.displayName ?? '',
       avatarAccentColor: currentUser?.avatarAccentColor ?? DEFAULT_ACCENT,
@@ -101,7 +109,7 @@ export function UserSettingsPage() {
       },
       {
         onSuccess() {
-          setBanner({ variant: 'success', message: 'Settings saved.' })
+          setBanner({ variant: 'success', message: t('settings.settingsSaved') })
         },
         onError(err) {
           if (err instanceof ApiClientError) {
@@ -115,13 +123,13 @@ export function UserSettingsPage() {
             if (!hasFieldError) {
               setBanner({
                 variant: 'error',
-                message: err.errors[0]?.message ?? 'Could not save settings. Please try again.',
+                message: err.errors[0]?.message ?? t('settings.saveError'),
               })
             }
           } else {
             setBanner({
               variant: 'error',
-              message: 'An unexpected error occurred. Please try again.',
+              message: t('common.unexpectedError'),
             })
           }
         },
@@ -139,7 +147,7 @@ export function UserSettingsPage() {
           size="lg"
         />
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+          <h1 className="text-2xl font-semibold text-foreground">{t('settings.title')}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{currentUser.email}</p>
         </div>
       </div>
@@ -165,7 +173,7 @@ export function UserSettingsPage() {
             name="displayName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Display name</FormLabel>
+                <FormLabel>{t('settings.displayName')}</FormLabel>
                 <FormControl>
                   <Input placeholder={currentUser.email} {...field} />
                 </FormControl>
@@ -179,7 +187,7 @@ export function UserSettingsPage() {
             name="avatarAccentColor"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Avatar accent color</FormLabel>
+                <FormLabel>{t('settings.avatarAccentColor')}</FormLabel>
                 <FormControl>
                   <AccentColorPicker value={field.value} onChange={field.onChange} />
                 </FormControl>
@@ -193,7 +201,7 @@ export function UserSettingsPage() {
             name="uiLocale"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Language</FormLabel>
+                <FormLabel>{t('settings.language')}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger className="w-48">
@@ -218,7 +226,7 @@ export function UserSettingsPage() {
             name="theme"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Theme</FormLabel>
+                <FormLabel>{t('settings.theme')}</FormLabel>
                 <FormControl>
                   <RadioGroup
                     value={field.value}
@@ -231,7 +239,7 @@ export function UserSettingsPage() {
                         className="flex items-center gap-2 text-sm text-foreground"
                       >
                         <RadioGroupItem value={option.value} />
-                        {option.label}
+                        {t(option.labelKey)}
                       </label>
                     ))}
                   </RadioGroup>
@@ -243,7 +251,7 @@ export function UserSettingsPage() {
 
           <Button type="submit" disabled={isPending} aria-disabled={isPending}>
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-            Save changes
+            {t('settings.saveChanges')}
           </Button>
         </form>
       </Form>

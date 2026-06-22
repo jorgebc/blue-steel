@@ -1236,7 +1236,7 @@ settled at sub-task decomposition.)
 | F8.7.2 | Frontend: theme-apply hook (toggle `<html class="dark">`, `system` via matchMedia) | ✅ |
 | F8.7.3 | Frontend: no-flash pre-paint script in `index.html` | ✅ |
 | F8.8 | Frontend: migrate raw color utilities → semantic tokens for full dark-mode coverage (non-blocking follow-on) | ✅ |
-| F8.9 | Frontend: i18n per-page string extraction — remaining write/admin/overlay surfaces (F8.6 follow-on) | 🔲 |
+| F8.9 | Frontend: i18n per-page string extraction — remaining write/admin/overlay surfaces (F8.6 follow-on) | ✅ |
 | F8.10 | Repo: decide + enforce repo-wide Prettier formatting (CI `--check`) | 🔲 |
 
 #### F8.1 — Backend: user profile/settings persistence + domain

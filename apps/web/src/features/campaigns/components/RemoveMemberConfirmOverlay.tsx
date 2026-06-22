@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import { FocusedOverlay } from '@/components/domain/FocusedOverlay'
 import { Button } from '@/components/ui/button'
 
@@ -21,17 +22,27 @@ export function RemoveMemberConfirmOverlay({
   onClose,
   isPending,
 }: Props) {
+  const { t } = useTranslation()
   return (
-    <FocusedOverlay open={open} onClose={onClose} ariaLabel="Remove member">
+    <FocusedOverlay open={open} onClose={onClose} ariaLabel={t('campaigns.removeMember')}>
       <div className="w-[24rem] max-w-[90vw] bg-surface p-6">
-        <h3 className="mb-2 text-base font-medium text-foreground">Remove this member?</h3>
+        <h3 className="mb-2 text-base font-medium text-foreground">
+          {t('campaigns.removeMemberTitle')}
+        </h3>
         <p className="mb-6 text-sm text-muted-foreground">
-          {memberEmail ? <span className="font-medium">{memberEmail}</span> : 'This member'} will
-          lose access to the campaign. They can be invited again later.
+          {memberEmail ? (
+            <Trans
+              i18nKey="campaigns.removeMemberBody"
+              values={{ email: memberEmail }}
+              components={{ strong: <span className="font-medium" /> }}
+            />
+          ) : (
+            t('campaigns.removeMemberBodyFallback')
+          )}
         </p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -41,7 +52,7 @@ export function RemoveMemberConfirmOverlay({
             className="bg-red-600 text-white hover:bg-red-700"
           >
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-            Remove member
+            {t('campaigns.removeMember')}
           </Button>
         </div>
       </div>

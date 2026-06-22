@@ -9,6 +9,7 @@ import { ApiClientError } from '@/api/client'
 import { useSubmitQuery, useQueryUsage, useQueryHistory } from '@/api/queries'
 import { useCampaignStore } from '@/store/campaignStore'
 import { createTestQueryClient } from '@/test/createTestQueryClient'
+import i18n from '@/i18n'
 import type { QueryResponse, QueryUsage } from '@/types/query'
 
 vi.mock('@/api/queries', async () => {
@@ -274,6 +275,15 @@ describe('QueryPage', () => {
     renderPage()
     expect(screen.getByRole('heading', { name: /question history/i })).toBeInTheDocument()
     expect(screen.getByText(/no questions have been asked yet/i)).toBeInTheDocument()
+  })
+
+  it('localizes the timeout message to Spanish when the UI locale is es', async () => {
+    await i18n.changeLanguage('es')
+    stubMutation({ rejectWith: new ApiClientError('timeout', 504, []) })
+    renderPage()
+    await ask()
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/tardó demasiado en responderse/i)
   })
 
   it('has no accessibility violations', async () => {

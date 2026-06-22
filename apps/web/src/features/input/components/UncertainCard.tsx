@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -15,6 +16,7 @@ interface Props {
  * (MATCH) or create a new entity (NEW). No defer/skip option (D-042).
  */
 export function UncertainCard({ card, resolution, onResolve }: Props) {
+  const { t } = useTranslation()
   const matchId = `${card.cardId}-match`
   const newId = `${card.cardId}-new`
 
@@ -34,27 +36,29 @@ export function UncertainCard({ card, resolution, onResolve }: Props) {
     <article className="rounded-2xl border border-amber-200 bg-surface p-6 shadow-sm">
       <header className="mb-3">
         <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">
-          Requires Resolution
+          {t('input.requiresResolution')}
         </Badge>
       </header>
       <p className="text-sm text-foreground">
-        Extracted mention: <strong>{card.extractedMention}</strong>
+        {t('input.extractedMention')} <strong>{card.extractedMention}</strong>
       </p>
       <p className="mb-4 text-sm text-foreground">
-        Possible match: <strong>{card.candidateEntityName}</strong>
+        {t('input.possibleMatch')} <strong>{card.candidateEntityName}</strong>
       </p>
       <RadioGroup
         value={resolution?.resolution ?? ''}
         onValueChange={handleChange}
-        aria-label="Is this the same entity?"
+        aria-label={t('input.sameEntityQuestion')}
       >
         <div className="flex items-center gap-2">
           <RadioGroupItem value="MATCH" id={matchId} />
-          <Label htmlFor={matchId}>Same entity — link to {card.candidateEntityName}</Label>
+          <Label htmlFor={matchId}>
+            {t('input.sameEntity', { name: card.candidateEntityName })}
+          </Label>
         </div>
         <div className="flex items-center gap-2">
           <RadioGroupItem value="NEW" id={newId} />
-          <Label htmlFor={newId}>Different entity — create new</Label>
+          <Label htmlFor={newId}>{t('input.differentEntity')}</Label>
         </div>
       </RadioGroup>
     </article>

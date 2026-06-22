@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { useLogin } from '@/api/auth'
 import { ApiClientError } from '@/api/client'
@@ -19,20 +20,21 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 
-const schema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(1, 'Password is required'),
-})
-
-type FormValues = z.infer<typeof schema>
+type FormValues = { email: string; password: string }
 
 export function LoginPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { mutate: login, isPending } = useLogin()
   const [banner, setBanner] = useState<string | null>(null)
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(
+      z.object({
+        email: z.string().email(t('auth.invalidEmail')),
+        password: z.string().min(1, t('auth.passwordRequired')),
+      })
+    ),
     defaultValues: { email: '', password: '' },
   })
 
@@ -56,10 +58,10 @@ export function LoginPage() {
             }
           }
           if (!hasFieldError) {
-            setBanner(err.errors[0]?.message ?? 'Invalid email or password.')
+            setBanner(err.errors[0]?.message ?? t('auth.invalidCredentials'))
           }
         } else {
-          setBanner('An unexpected error occurred. Please try again.')
+          setBanner(t('common.unexpectedError'))
         }
       },
     })
@@ -72,7 +74,7 @@ export function LoginPage() {
           <Brand size="lg" />
         </div>
         <div className="rounded-2xl bg-surface p-8 shadow-sm">
-          <h1 className="mb-6 text-2xl font-semibold text-foreground">Sign in</h1>
+          <h1 className="mb-6 text-2xl font-semibold text-foreground">{t('auth.signIn')}</h1>
           {banner && (
             <div className="mb-4">
               <InlineBanner variant="error" message={banner} onDismiss={() => setBanner(null)} />
@@ -85,11 +87,11 @@ export function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t('auth.email')}</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="you@example.com"
+                        placeholder={t('auth.emailPlaceholder')}
                         autoComplete="email"
                         {...field}
                       />
@@ -103,11 +105,11 @@ export function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t('auth.password')}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
-                        placeholder="••••••••"
+                        placeholder={t('auth.passwordPlaceholder')}
                         autoComplete="current-password"
                         {...field}
                       />
@@ -123,7 +125,7 @@ export function LoginPage() {
                 aria-disabled={isPending}
               >
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-                Sign in
+                {t('auth.signIn')}
               </Button>
             </form>
           </Form>

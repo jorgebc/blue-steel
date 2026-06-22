@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { useCreateCampaign } from '@/api/campaigns'
 import { useUserSearch, USER_SEARCH_MIN_LENGTH } from '@/api/users'
@@ -22,18 +23,14 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-const schema = z.object({
-  name: z.string().min(1, 'Campaign name is required'),
-  gmUserId: z.string().min(1, 'Select a GM for this campaign'),
-})
-
-type FormValues = z.infer<typeof schema>
+type FormValues = { name: string; gmUserId: string }
 
 /**
  * Admin-only campaign creation: name the campaign, pick its GM by email, and
  * create it. Non-admins are redirected to the campaign list (D-024, D-051).
  */
 export function CreateCampaignPage() {
+  const { t } = useTranslation()
   const isAdmin = useAuthStore((s) => s.currentUser?.isAdmin)
   const navigate = useNavigate()
   const { mutate: createCampaign, isPending } = useCreateCampaign()
@@ -42,7 +39,12 @@ export function CreateCampaignPage() {
   const [selectedGmEmail, setSelectedGmEmail] = useState<string | null>(null)
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(
+      z.object({
+        name: z.string().min(1, t('campaigns.nameRequired')),
+        gmUserId: z.string().min(1, t('campaigns.gmRequired')),
+      })
+    ),
     defaultValues: { name: '', gmUserId: '' },
   })
 
@@ -74,10 +76,10 @@ export function CreateCampaignPage() {
             }
           }
           if (!hasFieldError) {
-            setBanner(err.errors[0]?.message ?? 'Could not create the campaign. Please try again.')
+            setBanner(err.errors[0]?.message ?? t('campaigns.createError'))
           }
         } else {
-          setBanner('An unexpected error occurred. Please try again.')
+          setBanner(t('common.unexpectedError'))
         }
       },
     })
@@ -85,7 +87,7 @@ export function CreateCampaignPage() {
 
   return (
     <main className="mx-auto max-w-lg p-6">
-      <h1 className="mb-6 text-2xl font-semibold">New campaign</h1>
+      <h1 className="mb-6 text-2xl font-semibold">{t('campaigns.newCampaign')}</h1>
       {banner && (
         <div className="mb-4">
           <InlineBanner variant="error" message={banner} onDismiss={() => setBanner(null)} />
@@ -98,9 +100,9 @@ export function CreateCampaignPage() {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Campaign name</FormLabel>
+                <FormLabel>{t('campaigns.nameLabel')}</FormLabel>
                 <FormControl>
-                  <Input placeholder="Curse of Strahd" {...field} />
+                  <Input placeholder={t('campaigns.namePlaceholder')} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -108,7 +110,7 @@ export function CreateCampaignPage() {
           />
 
           <div className="space-y-2">
-            <Label htmlFor="gm-search">Game master</Label>
+            <Label htmlFor="gm-search">{t('campaigns.gameMaster')}</Label>
             {selectedGmEmail ? (
               <div className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
                 <span>{selectedGmEmail}</span>
@@ -120,7 +122,7 @@ export function CreateCampaignPage() {
                   }}
                   className="text-xs text-accent underline-offset-4 hover:underline"
                 >
-                  Change
+                  {t('campaigns.change')}
                 </button>
               </div>
             ) : (
@@ -129,7 +131,7 @@ export function CreateCampaignPage() {
                   id="gm-search"
                   type="text"
                   inputMode="email"
-                  placeholder="Search users by email"
+                  placeholder={t('campaigns.searchUsers')}
                   autoComplete="off"
                   value={gmQuery}
                   onChange={(e) => setGmQuery(e.target.value)}
@@ -151,7 +153,7 @@ export function CreateCampaignPage() {
                 )}
                 {searchActive && !isSearching && gmResults.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    No users found for “{debouncedGmQuery}”.
+                    {t('campaigns.noUsersFound', { query: debouncedGmQuery })}
                   </p>
                 )}
               </>
@@ -163,7 +165,7 @@ export function CreateCampaignPage() {
 
           <Button type="submit" className="w-full" disabled={isPending} aria-disabled={isPending}>
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-            Create campaign
+            {t('campaigns.createCampaign')}
           </Button>
         </form>
       </Form>
