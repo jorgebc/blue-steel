@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -14,6 +15,7 @@ interface Props {
  * it before commit (D-033).
  */
 export function ConflictWarningCard({ conflict, acknowledged, onAcknowledge }: Props) {
+  const { t } = useTranslation()
   const ackId = `${conflict.conflictId}-ack`
   return (
     <div
@@ -25,17 +27,17 @@ export function ConflictWarningCard({ conflict, acknowledged, onAcknowledge }: P
           variant="outline"
           className="border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-900 dark:text-amber-200"
         >
-          Conflict
+          {t('input.conflict')}
         </Badge>
       </header>
       <p className="mb-3 text-sm text-amber-900 dark:text-amber-100">{conflict.description}</p>
       <dl className="mb-4 space-y-1 text-sm">
         <div className="flex gap-2">
-          <dt className="text-amber-700 dark:text-amber-300">This session</dt>
+          <dt className="text-amber-700 dark:text-amber-300">{t('input.thisSession')}</dt>
           <dd className="text-amber-900 dark:text-amber-100">{conflict.extractedFact}</dd>
         </div>
         <div className="flex gap-2">
-          <dt className="text-amber-700 dark:text-amber-300">World state</dt>
+          <dt className="text-amber-700 dark:text-amber-300">{t('input.worldState')}</dt>
           <dd className="text-amber-900 dark:text-amber-100">{conflict.existingFact}</dd>
         </div>
       </dl>
@@ -48,7 +50,7 @@ export function ConflictWarningCard({ conflict, acknowledged, onAcknowledge }: P
           }}
         />
         <Label htmlFor={ackId} className="text-amber-900 dark:text-amber-100">
-          I acknowledge this conflict
+          {t('input.acknowledgeConflict')}
         </Label>
       </div>
     </div>

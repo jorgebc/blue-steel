@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { History, Sparkles } from 'lucide-react'
 import { useCampaign, useDeleteCampaign } from '@/api/campaigns'
 import { useAuthStore } from '@/store/authStore'
@@ -15,6 +16,7 @@ import { DeleteCampaignConfirmOverlay } from './components/DeleteCampaignConfirm
  * page is the campaign's welcome surface.
  */
 export function CampaignHomePage() {
+  const { t } = useTranslation()
   const { campaignId } = useParams<{ campaignId: string }>()
   const { data: campaign } = useCampaign(campaignId)
   const navigate = useNavigate()
@@ -45,9 +47,11 @@ export function CampaignHomePage() {
           <Sparkles className="h-6 w-6" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">{campaign?.name ?? 'Campaign'}</h1>
+          <h1 className="text-2xl font-semibold text-foreground">
+            {campaign?.name ?? t('campaigns.campaignFallback')}
+          </h1>
           <p className="mt-2 max-w-prose text-sm text-muted-foreground">
-            Welcome back. Use the sidebar to add a session or explore your world as it grows.
+            {t('campaigns.welcomeBack')}
           </p>
         </div>
       </div>
@@ -62,8 +66,10 @@ export function CampaignHomePage() {
               <History className="h-5 w-5" aria-hidden />
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">Session history</p>
-              <p className="text-xs text-muted-foreground">Browse past and in-progress sessions.</p>
+              <p className="text-sm font-medium text-foreground">{t('campaigns.sessionHistory')}</p>
+              <p className="text-xs text-muted-foreground">
+                {t('campaigns.sessionHistoryDescription')}
+              </p>
             </div>
           </Link>
         </div>
@@ -73,15 +79,13 @@ export function CampaignHomePage() {
 
       {isAdmin && campaignId && (
         <div className="mt-10 border-t border-red-100 pt-6">
-          <h2 className="mb-1 text-sm font-medium text-red-700">Danger zone</h2>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Permanently delete this campaign and all its data. This cannot be undone.
-          </p>
+          <h2 className="mb-1 text-sm font-medium text-red-700">{t('campaigns.dangerZone')}</h2>
+          <p className="mb-4 text-sm text-muted-foreground">{t('campaigns.deleteDescription')}</p>
           {deleteError && (
             <div className="mb-4">
               <InlineBanner
                 variant="error"
-                message="Failed to delete the campaign. Please try again."
+                message={t('campaigns.deleteError')}
                 onDismiss={() => setDeleteError(false)}
               />
             </div>
@@ -92,7 +96,7 @@ export function CampaignHomePage() {
             className="border-red-300 text-red-700 hover:bg-red-50"
             onClick={() => setDeleteOpen(true)}
           >
-            Delete campaign
+            {t('campaigns.deleteCampaign')}
           </Button>
           <DeleteCampaignConfirmOverlay
             open={deleteOpen}

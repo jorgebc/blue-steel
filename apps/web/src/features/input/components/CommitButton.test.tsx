@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import { CommitButton } from './CommitButton'
+import i18n from '@/i18n'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -82,6 +83,23 @@ describe('CommitButton', () => {
     )
 
     expect(screen.getByRole('button', { name: /commit to world state/i })).toBeDisabled()
+  })
+
+  it('localizes the pluralized pending note when the UI locale is es', async () => {
+    await i18n.changeLanguage('es')
+    render(
+      <CommitButton
+        unresolvedUncertainCount={2}
+        unacknowledgedConflictCount={0}
+        isPending={false}
+        onCommit={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('2 elementos requieren tu decisión')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /confirmar al estado del mundo/i })
+    ).toBeInTheDocument()
   })
 
   it('has no accessibility violations when disabled', async () => {

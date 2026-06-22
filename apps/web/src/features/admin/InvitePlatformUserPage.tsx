@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { useInvitePlatformUser } from '@/api/invitations'
 import { ApiClientError } from '@/api/client'
@@ -17,6 +18,7 @@ type Banner = { variant: 'success' | 'error'; message: string } | null
  * list. The invited user receives a temporary password by email.
  */
 export function InvitePlatformUserPage() {
+  const { t } = useTranslation()
   const isAdmin = useAuthStore((s) => s.currentUser?.isAdmin)
   const { mutate: invite, isPending } = useInvitePlatformUser()
   const [email, setEmail] = useState('')
@@ -29,14 +31,14 @@ export function InvitePlatformUserPage() {
     setBanner(null)
     const trimmed = email.trim()
     if (!trimmed) {
-      setBanner({ variant: 'error', message: 'Enter an email address to invite.' })
+      setBanner({ variant: 'error', message: t('admin.enterEmail') })
       return
     }
     invite(trimmed, {
       onSuccess: () => {
         setBanner({
           variant: 'success',
-          message: `Invitation sent to ${trimmed}. They can now be assigned as a GM.`,
+          message: t('admin.invitationSent', { email: trimmed }),
         })
         setEmail('')
       },
@@ -46,18 +48,15 @@ export function InvitePlatformUserPage() {
           message:
             err instanceof ApiClientError
               ? (err.errors[0]?.message ?? err.message)
-              : 'Could not send the invitation. Please try again.',
+              : t('admin.invitationError'),
         }),
     })
   }
 
   return (
     <main className="mx-auto max-w-lg p-6">
-      <h1 className="mb-2 text-2xl font-semibold">Invite a user</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        Create a platform account so you can assign the user as a campaign GM. They receive a
-        temporary password by email and set their own on first login.
-      </p>
+      <h1 className="mb-2 text-2xl font-semibold">{t('admin.inviteUser')}</h1>
+      <p className="mb-6 text-sm text-muted-foreground">{t('admin.inviteDescription')}</p>
 
       {banner && (
         <div className="mb-4">
@@ -71,11 +70,11 @@ export function InvitePlatformUserPage() {
 
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <div className="space-y-1">
-          <Label htmlFor="invite-email">Email</Label>
+          <Label htmlFor="invite-email">{t('admin.emailLabel')}</Label>
           <Input
             id="invite-email"
             type="email"
-            placeholder="new-user@example.com"
+            placeholder={t('admin.emailPlaceholder')}
             autoComplete="off"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -83,7 +82,7 @@ export function InvitePlatformUserPage() {
         </div>
         <Button type="submit" className="w-full" disabled={isPending} aria-disabled={isPending}>
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-          Send invitation
+          {t('admin.sendInvitation')}
         </Button>
       </form>
     </main>

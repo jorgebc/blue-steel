@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { FocusedOverlay } from '@/components/domain/FocusedOverlay'
 import { Button } from '@/components/ui/button'
 
@@ -14,17 +15,15 @@ interface Props {
  * (modals forbidden, D-082). ESC/backdrop cancel via the overlay.
  */
 export function DiscardConfirmOverlay({ open, onConfirm, onClose, isPending }: Props) {
+  const { t } = useTranslation()
   return (
-    <FocusedOverlay open={open} onClose={onClose} ariaLabel="Discard draft">
+    <FocusedOverlay open={open} onClose={onClose} ariaLabel={t('input.discardDraft')}>
       <div className="w-[24rem] max-w-[90vw] bg-surface p-6">
-        <h3 className="mb-2 text-base font-medium text-foreground">Discard this draft?</h3>
-        <p className="mb-6 text-sm text-muted-foreground">
-          This cannot be undone. The session review will be lost and the campaign unblocked for a
-          new submission.
-        </p>
+        <h3 className="mb-2 text-base font-medium text-foreground">{t('input.discardTitle')}</h3>
+        <p className="mb-6 text-sm text-muted-foreground">{t('input.discardBody')}</p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -34,7 +33,7 @@ export function DiscardConfirmOverlay({ open, onConfirm, onClose, isPending }: P
             className="bg-red-600 text-white hover:bg-red-700"
           >
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-            Discard draft
+            {t('input.discardDraft')}
           </Button>
         </div>
       </div>

@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { ApiClientError } from '@/api/client'
 import { queryHistoryKeyPrefix, queryUsageKey, useQueryUsage, useSubmitQuery } from '@/api/queries'
@@ -16,28 +18,20 @@ interface Banner {
   message: string
 }
 
-const TIMEOUT_MESSAGE =
-  'That query took too long to answer. Try rephrasing it or narrowing the scope, then ask again.'
-const RATE_LIMIT_MESSAGE =
-  "You're sending questions too quickly. Wait a few seconds, then ask again."
-const COST_CAP_MESSAGE =
-  'The daily question limit for this service has been reached. Please try again tomorrow.'
-const GENERIC_MESSAGE = 'Something went wrong answering that question. Please try again.'
-
 /**
  * Maps a failed query to a banner. The synchronous-deadline (504), rate-limit (429), and daily
  * cost-cap (503) guards (D-052, D-096) get tailored, retry-oriented copy; any other coded backend
  * error surfaces its own envelope message; anything else falls back to a generic message.
  */
-function toBanner(err: unknown): Banner {
+function toBanner(err: unknown, t: TFunction): Banner {
   if (err instanceof ApiClientError) {
-    if (err.status === 504) return { variant: 'warning', message: TIMEOUT_MESSAGE }
-    if (err.status === 429) return { variant: 'warning', message: RATE_LIMIT_MESSAGE }
-    if (err.status === 503) return { variant: 'warning', message: COST_CAP_MESSAGE }
+    if (err.status === 504) return { variant: 'warning', message: t('query.timeoutMessage') }
+    if (err.status === 429) return { variant: 'warning', message: t('query.rateLimitMessage') }
+    if (err.status === 503) return { variant: 'warning', message: t('query.costCapMessage') }
     const backendMessage = err.errors[0]?.message
     if (backendMessage) return { variant: 'error', message: backendMessage }
   }
-  return { variant: 'error', message: GENERIC_MESSAGE }
+  return { variant: 'error', message: t('query.genericMessage') }
 }
 
 /**
@@ -48,6 +42,7 @@ function toBanner(err: unknown): Banner {
  * skeleton, never a spinner (D-086).
  */
 export function QueryPage() {
+  const { t } = useTranslation()
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
   const [answer, setAnswer] = useState<QueryResponse | null>(null)
   const [banner, setBanner] = useState<Banner | null>(null)
@@ -68,7 +63,7 @@ export function QueryPage() {
         queryClient.invalidateQueries({ queryKey: queryHistoryKeyPrefix(campaignId ?? '') })
         setHistoryRefreshSignal((n) => n + 1)
       },
-      onError: (err) => setBanner(toBanner(err)),
+      onError: (err) => setBanner(toBanner(err, t)),
       // A submission moves the shared budget and the per-minute window — refresh the figure.
       onSettled: () => queryClient.invalidateQueries({ queryKey: queryUsageKey(campaignId ?? '') }),
     })
@@ -77,7 +72,7 @@ export function QueryPage() {
   return (
     <section aria-labelledby="query-mode-heading" className="mx-auto max-w-3xl space-y-6 p-8">
       <h1 id="query-mode-heading" className="text-2xl font-semibold text-foreground">
-        Ask the World
+        {t('query.askTheWorld')}
       </h1>
 
       <QueryUsageNotice usage={usage} />
@@ -95,9 +90,7 @@ export function QueryPage() {
       {isPending && <QueryAnswerSkeleton />}
 
       {!isPending && !answer && !banner && (
-        <p className="text-sm text-muted-foreground">
-          Submit a question to see the answer and its sources here.
-        </p>
+        <p className="text-sm text-muted-foreground">{t('query.submitPrompt')}</p>
       )}
 
       {!isPending && answer && <AnswerDisplay response={answer} campaignId={campaignId ?? ''} />}
@@ -107,7 +100,7 @@ export function QueryPage() {
         className="space-y-4 border-t border-border pt-6"
       >
         <h2 id="query-history-heading" className="text-lg font-semibold text-foreground">
-          Question history
+          {t('query.questionHistory')}
         </h2>
         <QueryHistoryPanel campaignId={campaignId ?? ''} refreshSignal={historyRefreshSignal} />
       </section>

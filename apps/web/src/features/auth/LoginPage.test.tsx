@@ -6,6 +6,7 @@ import { axe } from 'vitest-axe'
 import { LoginPage } from './LoginPage'
 import { useLogin } from '@/api/auth'
 import { ApiClientError } from '@/api/client'
+import i18n from '@/i18n'
 
 vi.mock('@/api/auth')
 
@@ -105,6 +106,20 @@ describe('LoginPage', () => {
       expect(screen.getByRole('alert')).toBeInTheDocument()
       expect(screen.getByText('Invalid email or password.')).toBeInTheDocument()
     })
+  })
+
+  it('renders the heading and field labels in Spanish when the UI locale is es', async () => {
+    await i18n.changeLanguage('es')
+    mockUseLogin.mockReturnValue({ mutate: vi.fn(), isPending: false } as unknown as ReturnType<
+      typeof useLogin
+    >)
+
+    renderPage()
+
+    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Correo electrónico')).toBeInTheDocument()
+    expect(screen.getByLabelText('Contraseña')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
   })
 
   it('disables the submit button with a spinner while the mutation is pending', () => {

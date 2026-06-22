@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { useDecideProposal } from '@/api/proposals'
 import { ApiClientError } from '@/api/client'
@@ -28,6 +29,7 @@ interface Props {
  * is inline; the resulting-version link is raised to the page via {@link Props.onDecided}.
  */
 export function ProposalReviewCard({ proposal, onDecided }: Props) {
+  const { t } = useTranslation()
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
   const { mutate, isPending } = useDecideProposal(campaignId ?? '')
 
@@ -40,8 +42,8 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
   function onError(err: unknown) {
     const message =
       err instanceof ApiClientError
-        ? (err.errors[0]?.message ?? 'Could not record the decision. Try again.')
-        : 'An unexpected error occurred. Please try again.'
+        ? (err.errors[0]?.message ?? t('proposals.decisionError'))
+        : t('common.unexpectedError')
     setBanner(message)
     setMode(null)
   }
@@ -77,10 +79,12 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-foreground">
-            {proposal.targetType === 'ACTOR' ? 'Actor' : 'Space'} change
+            {proposal.targetType === 'ACTOR'
+              ? t('proposals.actorChange')
+              : t('proposals.spaceChange')}
           </p>
           <p className="text-xs text-muted-foreground">
-            Submitted {new Date(proposal.createdAt).toLocaleDateString()}
+            {t('proposals.submitted', { date: new Date(proposal.createdAt).toLocaleDateString() })}
           </p>
         </div>
         <ProposalStatusBadge status={proposal.status} />
@@ -103,24 +107,23 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
 
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={() => setMode('veto')}>
-          Veto
+          {t('proposals.veto')}
         </Button>
         <Button type="button" onClick={() => setMode('approve')}>
-          Approve…
+          {t('proposals.approveEllipsis')}
         </Button>
       </div>
 
       <FocusedOverlay
         open={mode === 'approve'}
         onClose={() => setMode(null)}
-        ariaLabel="Approve proposal"
+        ariaLabel={t('proposals.approveProposalAria')}
       >
         <div className="max-h-[80vh] w-[32rem] max-w-[90vw] overflow-y-auto bg-surface p-6">
-          <h3 className="mb-1 text-base font-medium text-foreground">Approve change</h3>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Edit any field before approving; your edits replace the proposed values. The change is
-            written as a new version.
-          </p>
+          <h3 className="mb-1 text-base font-medium text-foreground">
+            {t('proposals.approveChange')}
+          </h3>
+          <p className="mb-4 text-sm text-muted-foreground">{t('proposals.approveDescription')}</p>
           <DeltaFieldsEditor
             baseline={proposal.proposedDelta}
             values={values}
@@ -134,7 +137,7 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
               onClick={() => setMode(null)}
               disabled={isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="button"
@@ -143,7 +146,7 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
               aria-disabled={isPending}
             >
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-              Approve &amp; write version
+              {t('proposals.approveWriteVersion')}
             </Button>
           </div>
         </div>
@@ -152,13 +155,11 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
       <FocusedOverlay
         open={mode === 'veto'}
         onClose={() => setMode(null)}
-        ariaLabel="Veto proposal"
+        ariaLabel={t('proposals.vetoProposalAria')}
       >
         <div className="w-[24rem] max-w-[90vw] bg-surface p-6">
-          <h3 className="mb-2 text-base font-medium text-foreground">Veto this proposal?</h3>
-          <p className="mb-6 text-sm text-muted-foreground">
-            The proposal is rejected and no version is written. This cannot be undone.
-          </p>
+          <h3 className="mb-2 text-base font-medium text-foreground">{t('proposals.vetoTitle')}</h3>
+          <p className="mb-6 text-sm text-muted-foreground">{t('proposals.vetoBody')}</p>
           <div className="flex justify-end gap-3">
             <Button
               type="button"
@@ -166,7 +167,7 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
               onClick={() => setMode(null)}
               disabled={isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="button"
@@ -176,7 +177,7 @@ export function ProposalReviewCard({ proposal, onDecided }: Props) {
               aria-disabled={isPending}
             >
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-              Veto
+              {t('proposals.veto')}
             </Button>
           </div>
         </div>

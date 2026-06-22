@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCommitSession, useDiscardSession, useSessionDiff } from '@/api/sessions'
 import { campaignKeys } from '@/api/campaigns'
@@ -26,8 +27,9 @@ import { UncertainCard } from './components/UncertainCard'
 type EditableCard = ExistingDiffCard | NewDiffCard
 
 function DiffReviewSkeleton() {
+  const { t } = useTranslation()
   return (
-    <div role="status" aria-label="Loading session diff" className="space-y-6">
+    <div role="status" aria-label={t('input.loadingDiff')} className="space-y-6">
       <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
         <div className="mb-2 h-6 w-1/3 rounded bg-muted animate-pulse" />
         <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
@@ -49,6 +51,7 @@ interface ContentProps {
 
 /** Inner content rendered only once the diff is loaded, so `useDiffState` gets a defined payload. */
 function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const activeRole = useCampaignStore((s) => s.activeRole)
@@ -75,11 +78,11 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
   const { mutate: commit, isPending: isCommitting } = useCommitSession(campaignId, sessionId)
   const { mutate: discard, isPending: isDiscarding } = useDiscardSession(campaignId, sessionId)
 
-  const categories: { title: string; cards: DiffCard[] }[] = [
-    { title: 'Actors', cards: diff.actors },
-    { title: 'Spaces', cards: diff.spaces },
-    { title: 'Events', cards: diff.events },
-    { title: 'Relations', cards: diff.relations },
+  const categories: { key: string; title: string; cards: DiffCard[] }[] = [
+    { key: 'actors', title: t('input.categoryActors'), cards: diff.actors },
+    { key: 'spaces', title: t('input.categorySpaces'), cards: diff.spaces },
+    { key: 'events', title: t('input.categoryEvents'), cards: diff.events },
+    { key: 'relations', title: t('input.categoryRelations'), cards: diff.relations },
   ]
   // Backend rejects an empty cardDecisions (@NotEmpty) — only reachable with an all-UNCERTAIN diff.
   const hasCommittableCards = categories.some((c) =>
@@ -132,7 +135,7 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
       onError(err) {
         // The disabled button should have prevented any 422 — treat it as a UI bug.
         console.error('Commit failed', err)
-        setCommitError('Something went wrong committing this review. Please try again.')
+        setCommitError(t('input.commitErrorGeneric'))
       },
     })
   }
@@ -146,7 +149,7 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
       onError(err) {
         console.error('Discard failed', err)
         setDiscardOpen(false)
-        setDiscardError("We couldn't discard this draft. Please try again.")
+        setDiscardError(t('input.discardError'))
       },
     })
   }
@@ -156,7 +159,7 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
       <NarrativeSummaryHeader summary={diff.narrativeSummaryHeader} />
 
       {diff.detectedConflicts.length > 0 && (
-        <section aria-label="Detected conflicts" className="space-y-3">
+        <section aria-label={t('input.detectedConflicts')} className="space-y-3">
           {diff.detectedConflicts.map((conflict) => (
             <ConflictWarningCard
               key={conflict.conflictId}
@@ -171,13 +174,13 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
       {categories
         .filter((c) => c.cards.length > 0)
         .map((c) => (
-          <DiffCategorySection key={c.title} title={c.title} count={c.cards.length}>
+          <DiffCategorySection key={c.key} title={c.title} count={c.cards.length}>
             {c.cards.map(renderCard)}
           </DiffCategorySection>
         ))}
 
       {addedEntities.size > 0 && (
-        <DiffCategorySection title="Added" count={addedEntities.size}>
+        <DiffCategorySection title={t('input.categoryAdded')} count={addedEntities.size}>
           {[...addedEntities].map(([id, entity]) => (
             <AddedEntityCard key={id} entity={entity} onRemove={() => removeAddedEntity(id)} />
           ))}
@@ -186,11 +189,11 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
 
       <div>
         <Button type="button" variant="outline" onClick={() => setAddOpen(true)}>
-          Add entity
+          {t('input.addEntity')}
         </Button>
       </div>
 
-      <FocusedOverlay open={addOpen} onClose={() => setAddOpen(false)} ariaLabel="Add entity">
+      <FocusedOverlay open={addOpen} onClose={() => setAddOpen(false)} ariaLabel={t('input.addEntity')}>
         <AddEntityForm
           onAdd={(entity) => {
             addEntity(entity)
@@ -246,7 +249,7 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
             onClick={() => setDiscardOpen(true)}
             className="border-red-200 text-red-600 hover:bg-red-50"
           >
-            Discard draft
+            {t('input.discardDraft')}
           </Button>
         )}
       </div>
@@ -267,6 +270,7 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
  * per-category decision cards with the commit guard, commit wiring, and GM discard.
  */
 export function DiffReviewPage() {
+  const { t } = useTranslation()
   const { campaignId, sessionId } = useParams<{ campaignId: string; sessionId: string }>()
   const { data: diff, isLoading, isError } = useSessionDiff(campaignId ?? '', sessionId ?? '')
   const [errorDismissed, setErrorDismissed] = useState(false)
@@ -277,7 +281,7 @@ export function DiffReviewPage() {
       {isError && !errorDismissed && (
         <InlineBanner
           variant="error"
-          message="We couldn't load this session's review. It may no longer be a draft."
+          message={t('input.loadError')}
           onDismiss={() => setErrorDismissed(true)}
         />
       )}

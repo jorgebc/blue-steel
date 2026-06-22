@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Button } from '@/components/ui/button'
@@ -28,13 +29,11 @@ import type { AddedEntityPayload, EntityType } from '@/types/session'
 // excluded here and rejected by the backend (F6.1, D-053).
 const ENTITY_TYPES: EntityType[] = ['actor', 'space']
 
-const schema = z.object({
-  entityType: z.enum(['actor', 'space']),
-  name: z.string().trim().min(1, 'Name is required'),
-  fields: z.array(z.object({ key: z.string(), value: z.string() })),
-})
-
-type FormValues = z.infer<typeof schema>
+type FormValues = {
+  entityType: 'actor' | 'space'
+  name: string
+  fields: { key: string; value: string }[]
+}
 
 interface Props {
   onAdd: (entity: AddedEntityPayload) => void
@@ -47,10 +46,17 @@ interface Props {
  * for the diff-review commit payload — it is never submitted directly here.
  */
 export function AddEntityForm({ onAdd, onCancel }: Props) {
+  const { t } = useTranslation()
   const [banner, setBanner] = useState<string | null>(null)
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(
+      z.object({
+        entityType: z.enum(['actor', 'space']),
+        name: z.string().trim().min(1, t('input.nameRequired')),
+        fields: z.array(z.object({ key: z.string(), value: z.string() })),
+      })
+    ),
     defaultValues: { entityType: 'actor', name: '', fields: [] },
   })
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'fields' })
@@ -63,7 +69,7 @@ export function AddEntityForm({ onAdd, onCancel }: Props) {
       if (trimmedKey.length === 0) continue
       // A duplicate key would silently overwrite an earlier row — surface it instead of guessing.
       if (trimmedKey in entityFields) {
-        setBanner(`Duplicate field "${trimmedKey}". Field names must be unique.`)
+        setBanner(t('input.duplicateField', { name: trimmedKey }))
         return
       }
       entityFields[trimmedKey] = value
@@ -73,10 +79,8 @@ export function AddEntityForm({ onAdd, onCancel }: Props) {
 
   return (
     <div className="max-h-[80vh] w-[32rem] max-w-[90vw] overflow-y-auto bg-surface p-6">
-      <h3 className="mb-1 text-base font-medium text-foreground">Add an entity</h3>
-      <p className="mb-4 text-sm text-muted-foreground">
-        Add an entity the extraction missed. It will be created when you commit this review.
-      </p>
+      <h3 className="mb-1 text-base font-medium text-foreground">{t('input.addEntityTitle')}</h3>
+      <p className="mb-4 text-sm text-muted-foreground">{t('input.addEntityDescription')}</p>
 
       {banner && (
         <div className="mb-4">
@@ -91,17 +95,17 @@ export function AddEntityForm({ onAdd, onCancel }: Props) {
             name="entityType"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Type</FormLabel>
+                <FormLabel>{t('input.typeLabel')}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select an entity type" />
+                      <SelectValue placeholder={t('input.selectEntityType')} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     {ENTITY_TYPES.map((type) => (
                       <SelectItem key={type} value={type}>
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                        {t(`input.entityType_${type}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -116,9 +120,9 @@ export function AddEntityForm({ onAdd, onCancel }: Props) {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name</FormLabel>
+                <FormLabel>{t('input.nameLabel')}</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. Madam Eva" {...field} />
+                  <Input placeholder={t('input.namePlaceholder')} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -126,28 +130,28 @@ export function AddEntityForm({ onAdd, onCancel }: Props) {
           />
 
           <div>
-            <p className="mb-2 text-sm font-medium text-foreground">Fields</p>
+            <p className="mb-2 text-sm font-medium text-foreground">{t('input.fields')}</p>
             <div className="space-y-2">
               {fields.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No fields yet.</p>
+                <p className="text-sm text-muted-foreground">{t('input.noFieldsYet')}</p>
               ) : (
                 fields.map((row, index) => (
                   <div key={row.id} className="flex items-center gap-2">
                     <Input
-                      aria-label={`Field ${index + 1} name`}
-                      placeholder="Field"
+                      aria-label={t('input.fieldNameAria', { index: index + 1 })}
+                      placeholder={t('input.fieldPlaceholder')}
                       {...form.register(`fields.${index}.key`)}
                     />
                     <Input
-                      aria-label={`Field ${index + 1} value`}
-                      placeholder="Value"
+                      aria-label={t('input.fieldValueAria', { index: index + 1 })}
+                      placeholder={t('input.valuePlaceholder')}
                       {...form.register(`fields.${index}.value`)}
                     />
                     <Button
                       type="button"
                       variant="outline"
                       size="icon"
-                      aria-label={`Remove field ${index + 1}`}
+                      aria-label={t('input.removeFieldAria', { index: index + 1 })}
                       onClick={() => remove(index)}
                     >
                       <Trash2 className="h-4 w-4" aria-hidden />
@@ -164,15 +168,15 @@ export function AddEntityForm({ onAdd, onCancel }: Props) {
               onClick={() => append({ key: '', value: '' })}
             >
               <Plus className="mr-2 h-4 w-4" aria-hidden />
-              Add field
+              {t('common.addField')}
             </Button>
           </div>
 
           <div className="flex justify-end gap-3">
             <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
+              {t('common.cancel')}
             </Button>
-            <Button type="submit">Add entity</Button>
+            <Button type="submit">{t('input.addEntity')}</Button>
           </div>
         </form>
       </Form>

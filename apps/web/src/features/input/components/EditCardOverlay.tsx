@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { FocusedOverlay } from '@/components/domain/FocusedOverlay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,7 @@ function editableFields(card: ExistingDiffCard | NewDiffCard): Record<string, un
  * editable fields are shown — not a full entity form (D-006/D-007).
  */
 export function EditCardOverlay({ card, open, onClose, onSave }: Props) {
+  const { t } = useTranslation()
   const fields = editableFields(card)
   const keys = useMemo(() => Object.keys(fields), [fields])
 
@@ -49,9 +51,11 @@ export function EditCardOverlay({ card, open, onClose, onSave }: Props) {
   }
 
   return (
-    <FocusedOverlay open={open} onClose={onClose} ariaLabel={`Edit ${card.name}`}>
+    <FocusedOverlay open={open} onClose={onClose} ariaLabel={t('input.editCard', { name: card.name })}>
       <div className="w-[28rem] max-w-[90vw] bg-surface p-6">
-        <h3 className="mb-4 text-base font-medium text-foreground">Edit {card.name}</h3>
+        <h3 className="mb-4 text-base font-medium text-foreground">
+          {t('input.editCard', { name: card.name })}
+        </h3>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           {keys.map((key) => {
             const control = fieldControl(key, fields[key])
@@ -64,16 +68,16 @@ export function EditCardOverlay({ card, open, onClose, onSave }: Props) {
                   <Input id={`edit-${key}`} {...register(key)} />
                 )}
                 {control === 'array' && (
-                  <p className="text-xs text-muted-foreground">Separate values with commas</p>
+                  <p className="text-xs text-muted-foreground">{t('input.separateValues')}</p>
                 )}
               </div>
             )
           })}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {t('common.cancel')}
             </Button>
-            <Button type="submit">Save</Button>
+            <Button type="submit">{t('common.save')}</Button>
           </div>
         </form>
       </div>
