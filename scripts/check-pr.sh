@@ -90,27 +90,32 @@ run_frontend() {
   header "Frontend CI checks (apps/web)"
   cd "$REPO_ROOT/apps/web"
 
-  echo "  [1/5] npm audit"
+  echo "  [1/6] npm audit"
   npm audit --audit-level=high --production \
     || { fail "npm audit: high/critical vulnerability found"; return 1; }
   pass "npm audit"
 
-  echo "  [2/5] type-check"
+  echo "  [2/6] type-check"
   npm run type-check \
     || { fail "TypeScript type errors"; return 1; }
   pass "type-check"
 
-  echo "  [3/5] lint"
+  echo "  [3/6] format:check"
+  npm run format:check \
+    || { fail "Prettier format check failed — run: npm run format (from apps/web)"; return 1; }
+  pass "format:check"
+
+  echo "  [4/6] lint"
   npm run lint \
     || { fail "ESLint errors"; return 1; }
   pass "lint"
 
-  echo "  [4/5] test"
+  echo "  [5/6] test"
   npm test \
     || { fail "Vitest tests failed"; return 1; }
   pass "test"
 
-  echo "  [5/5] build"
+  echo "  [6/6] build"
   VITE_API_BASE_URL=https://placeholder.for.build.check npm run build \
     || { fail "Vite build failed"; return 1; }
   pass "build"
