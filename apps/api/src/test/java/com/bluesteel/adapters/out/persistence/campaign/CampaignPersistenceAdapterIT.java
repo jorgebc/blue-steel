@@ -40,6 +40,38 @@ class CampaignPersistenceAdapterIT extends TestcontainersPostgresBaseIT {
   }
 
   @Test
+  @DisplayName("should round-trip an explicit content language")
+  void saveAndFindById_explicitContentLanguage_roundTrips() {
+    User creator = savedUser();
+    Campaign campaign =
+        Campaign.create(
+            UUID.randomUUID(),
+            "Campaign-" + UUID.randomUUID(),
+            creator.id(),
+            Instant.now().truncatedTo(ChronoUnit.MICROS),
+            "es");
+
+    adapter.save(campaign);
+    Optional<Campaign> found = adapter.findById(campaign.id());
+
+    assertThat(found).isPresent();
+    assertThat(found.get().contentLanguage()).isEqualTo("es");
+  }
+
+  @Test
+  @DisplayName("should read back en for a campaign saved without an explicit content language")
+  void saveAndFindById_defaultContentLanguage_readsBackEn() {
+    User creator = savedUser();
+    Campaign campaign = campaign(creator.id());
+
+    adapter.save(campaign);
+    Optional<Campaign> found = adapter.findById(campaign.id());
+
+    assertThat(found).isPresent();
+    assertThat(found.get().contentLanguage()).isEqualTo("en");
+  }
+
+  @Test
   @DisplayName("should return empty when campaign is not found by id")
   void findById_notFound_returnsEmpty() {
     assertThat(adapter.findById(UUID.randomUUID())).isEmpty();

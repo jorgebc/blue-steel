@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+    F9.1: per-campaign content language fixed at creation (immutable, D-103). The narrative
+    extraction, conflict-detection, and query-answering prompts are later instructed to produce
+    output in this language (F9.2/F9.3); embeddings are unchanged. defaultValue="en" applies to
+    pre-existing campaigns so they read back as English. Append-only (DB-02).
+  -->
+  <changeSet id="0030-add-campaign-content-language" author="jorge">
+
+    <addColumn tableName="campaigns">
+      <column name="content_language" type="TEXT" defaultValue="en">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+
+    <rollback>
+      <dropColumn tableName="campaigns" columnName="content_language"/>
+    </rollback>
+
+  </changeSet>
+
+</databaseChangeLog>

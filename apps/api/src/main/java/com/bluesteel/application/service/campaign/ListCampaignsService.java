@@ -40,6 +40,7 @@ public class ListCampaignsService implements ListCampaignsUseCase {
                     c.name(),
                     c.createdBy(),
                     c.createdAt(),
+                    c.contentLanguage(),
                     membershipPort.resolveRole(c.id(), callerId).orElse(null)))
         .toList();
   }

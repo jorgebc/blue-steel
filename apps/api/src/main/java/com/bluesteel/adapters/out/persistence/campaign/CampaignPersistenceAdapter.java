@@ -44,10 +44,12 @@ public class CampaignPersistenceAdapter implements CampaignRepository {
   }
 
   private Campaign toDomain(CampaignJpaEntity e) {
-    return Campaign.create(e.getId(), e.getName(), e.getCreatedBy(), e.getCreatedAt());
+    return Campaign.create(
+        e.getId(), e.getName(), e.getCreatedBy(), e.getCreatedAt(), e.getContentLanguage());
   }
 
   private CampaignJpaEntity toEntity(Campaign c) {
-    return new CampaignJpaEntity(c.id(), c.name(), c.createdBy(), c.createdAt());
+    return new CampaignJpaEntity(
+        c.id(), c.name(), c.createdBy(), c.createdAt(), c.contentLanguage());
   }
 }

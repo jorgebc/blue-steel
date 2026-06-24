@@ -85,9 +85,9 @@ class CampaignControllerTest {
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "ADMIN")
   void create_adminUser_returns201() throws Exception {
     CampaignView view =
-        new CampaignView(CAMPAIGN_ID, "Dragon Keep", CALLER_ID, NOW, CampaignRole.GM);
+        new CampaignView(CAMPAIGN_ID, "Dragon Keep", CALLER_ID, NOW, "en", CampaignRole.GM);
     when(createCampaignUseCase.create(
-            new CreateCampaignCommand(CALLER_ID, true, "Dragon Keep", GM_USER_ID)))
+            new CreateCampaignCommand(CALLER_ID, true, "Dragon Keep", GM_USER_ID, null)))
         .thenReturn(view);
 
     mockMvc
@@ -100,7 +100,47 @@ class CampaignControllerTest {
                     """))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.data.name").value("Dragon Keep"))
+        .andExpect(jsonPath("$.data.contentLanguage").value("en"))
         .andExpect(jsonPath("$.data.role").value("gm"));
+  }
+
+  @Test
+  @DisplayName("should pass the requested content language through and return it")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "ADMIN")
+  void create_withContentLanguage_returnsIt() throws Exception {
+    CampaignView view =
+        new CampaignView(CAMPAIGN_ID, "Dragon Keep", CALLER_ID, NOW, "es", CampaignRole.GM);
+    when(createCampaignUseCase.create(
+            new CreateCampaignCommand(CALLER_ID, true, "Dragon Keep", GM_USER_ID, "es")))
+        .thenReturn(view);
+
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "name": "Dragon Keep", "gmUserId": "22222222-2222-2222-2222-222222222222", \
+                      "contentLanguage": "es" }
+                    """))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.data.contentLanguage").value("es"));
+  }
+
+  @Test
+  @DisplayName("should return 400 when content language is not a supported value")
+  @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "ADMIN")
+  void create_invalidContentLanguage_returns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/campaigns")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "name": "Dragon Keep", "gmUserId": "22222222-2222-2222-2222-222222222222", \
+                      "contentLanguage": "fr" }
+                    """))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -153,7 +193,7 @@ class CampaignControllerTest {
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
   void list_authenticatedUser_returns200() throws Exception {
     CampaignView view =
-        new CampaignView(CAMPAIGN_ID, "Dragon Keep", CALLER_ID, NOW, CampaignRole.PLAYER);
+        new CampaignView(CAMPAIGN_ID, "Dragon Keep", CALLER_ID, NOW, "en", CampaignRole.PLAYER);
     when(listCampaignsUseCase.list(CALLER_ID, false)).thenReturn(List.of(view));
 
     mockMvc
@@ -168,13 +208,14 @@ class CampaignControllerTest {
   @WithMockUser(username = "00000000-0000-0000-0000-000000000001", roles = "USER")
   void get_member_returns200() throws Exception {
     CampaignView view =
-        new CampaignView(CAMPAIGN_ID, "Dragon Keep", CALLER_ID, NOW, CampaignRole.GM);
+        new CampaignView(CAMPAIGN_ID, "Dragon Keep", CALLER_ID, NOW, "es", CampaignRole.GM);
     when(getCampaignUseCase.get(CAMPAIGN_ID, CALLER_ID, false)).thenReturn(view);
 
     mockMvc
         .perform(get("/api/v1/campaigns/{id}", CAMPAIGN_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.id").value(CAMPAIGN_ID.toString()))
+        .andExpect(jsonPath("$.data.contentLanguage").value("es"))
         .andExpect(jsonPath("$.data.role").value("gm"));
   }
 

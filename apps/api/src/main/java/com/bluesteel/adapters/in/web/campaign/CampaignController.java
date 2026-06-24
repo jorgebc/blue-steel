@@ -52,7 +52,12 @@ public class CampaignController {
     CampaignResponse response =
         CampaignResponse.from(
             createCampaignUseCase.create(
-                new CreateCampaignCommand(callerId, true, request.name(), request.gmUserId())));
+                new CreateCampaignCommand(
+                    callerId,
+                    true,
+                    request.name(),
+                    request.gmUserId(),
+                    request.contentLanguage())));
     return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
   }
 

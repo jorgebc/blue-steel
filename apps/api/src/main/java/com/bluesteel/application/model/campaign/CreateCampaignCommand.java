@@ -4,4 +4,4 @@ import java.util.UUID;
 
 /** Command to create a new campaign — admin-only operation. */
 public record CreateCampaignCommand(
-    UUID callerId, boolean callerIsAdmin, String name, UUID gmUserId) {}
+    UUID callerId, boolean callerIsAdmin, String name, UUID gmUserId, String contentLanguage) {}

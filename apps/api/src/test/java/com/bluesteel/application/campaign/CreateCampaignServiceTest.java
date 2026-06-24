@@ -54,7 +54,7 @@ class CreateCampaignServiceTest {
   @DisplayName("should throw UnauthorizedException when caller is not admin")
   void create_nonAdmin_throwsUnauthorized() {
     CreateCampaignCommand cmd =
-        new CreateCampaignCommand(CALLER_ID, false, "Dragon Keep", GM_USER_ID);
+        new CreateCampaignCommand(CALLER_ID, false, "Dragon Keep", GM_USER_ID, "en");
 
     assertThatThrownBy(() -> sut.create(cmd)).isInstanceOf(UnauthorizedException.class);
 
@@ -67,7 +67,7 @@ class CreateCampaignServiceTest {
   void create_gmUserNotFound_throwsUserNotFound() {
     when(userRepository.findById(GM_USER_ID)).thenReturn(Optional.empty());
     CreateCampaignCommand cmd =
-        new CreateCampaignCommand(CALLER_ID, true, "Dragon Keep", GM_USER_ID);
+        new CreateCampaignCommand(CALLER_ID, true, "Dragon Keep", GM_USER_ID, "en");
 
     assertThatThrownBy(() -> sut.create(cmd)).isInstanceOf(UserNotFoundException.class);
 
@@ -80,7 +80,7 @@ class CreateCampaignServiceTest {
   void create_validAdminCommand_createsCampaignAndGmMembership() {
     when(userRepository.findById(GM_USER_ID)).thenReturn(Optional.of(GM_USER));
     CreateCampaignCommand cmd =
-        new CreateCampaignCommand(CALLER_ID, true, "Dragon Keep", GM_USER_ID);
+        new CreateCampaignCommand(CALLER_ID, true, "Dragon Keep", GM_USER_ID, "en");
 
     CampaignView view = sut.create(cmd);
 
@@ -99,5 +99,37 @@ class CreateCampaignServiceTest {
     verify(membershipRepository).save(memberCaptor.capture());
     assertThat(memberCaptor.getValue().userId()).isEqualTo(GM_USER_ID);
     assertThat(memberCaptor.getValue().role()).isEqualTo(CampaignRole.GM);
+  }
+
+  @Test
+  @DisplayName("should persist and return the requested content language")
+  void create_explicitContentLanguage_persistedAndReturned() {
+    when(userRepository.findById(GM_USER_ID)).thenReturn(Optional.of(GM_USER));
+    CreateCampaignCommand cmd =
+        new CreateCampaignCommand(CALLER_ID, true, "Dragon Keep", GM_USER_ID, "es");
+
+    CampaignView view = sut.create(cmd);
+
+    assertThat(view.contentLanguage()).isEqualTo("es");
+
+    ArgumentCaptor<Campaign> campaignCaptor = ArgumentCaptor.forClass(Campaign.class);
+    verify(campaignRepository).save(campaignCaptor.capture());
+    assertThat(campaignCaptor.getValue().contentLanguage()).isEqualTo("es");
+  }
+
+  @Test
+  @DisplayName("should default the content language to en when the command omits it")
+  void create_nullContentLanguage_defaultsToEn() {
+    when(userRepository.findById(GM_USER_ID)).thenReturn(Optional.of(GM_USER));
+    CreateCampaignCommand cmd =
+        new CreateCampaignCommand(CALLER_ID, true, "Dragon Keep", GM_USER_ID, null);
+
+    CampaignView view = sut.create(cmd);
+
+    assertThat(view.contentLanguage()).isEqualTo("en");
+
+    ArgumentCaptor<Campaign> campaignCaptor = ArgumentCaptor.forClass(Campaign.class);
+    verify(campaignRepository).save(campaignCaptor.capture());
+    assertThat(campaignCaptor.getValue().contentLanguage()).isEqualTo("en");
   }
 }
