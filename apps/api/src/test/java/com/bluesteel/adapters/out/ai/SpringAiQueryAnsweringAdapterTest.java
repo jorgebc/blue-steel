@@ -60,7 +60,7 @@ class SpringAiQueryAnsweringAdapterTest {
         new QueryResponse(
             "Aragorn is a ranger.", List.of(new Citation(SESSION_ID, 3, "the ranger")));
 
-    when(promptAssembler.assemble(question, context)).thenReturn(systemPrompt);
+    when(promptAssembler.assemble(question, context, "es")).thenReturn(systemPrompt);
 
     ChatClientRequestSpec requestSpec = mock(ChatClientRequestSpec.class, Answers.RETURNS_SELF);
     CallResponseSpec callSpec = mock(CallResponseSpec.class);
@@ -74,9 +74,10 @@ class SpringAiQueryAnsweringAdapterTest {
     when(callSpec.chatResponse()).thenReturn(chatResponse);
     when(responseParser.parse(llmJson)).thenReturn(expected);
 
-    QueryResponse result = adapter.answer(question, context);
+    QueryResponse result = adapter.answer(question, context, "es");
 
     assertThat(result).isEqualTo(expected);
+    verify(promptAssembler).assemble(question, context, "es");
     verify(requestSpec).system(systemPrompt);
     verify(requestSpec).user(question);
 
@@ -101,10 +102,10 @@ class SpringAiQueryAnsweringAdapterTest {
   void answer_overBudget_propagatesAndSkipsLlmCall() {
     String question = "Who is Aragorn?";
     List<EntityContext> context = List.of();
-    when(promptAssembler.assemble(question, context))
+    when(promptAssembler.assemble(question, context, "en"))
         .thenThrow(new TokenBudgetExceededException(9000, 6000));
 
-    assertThatThrownBy(() -> adapter.answer(question, context))
+    assertThatThrownBy(() -> adapter.answer(question, context, "en"))
         .isInstanceOf(TokenBudgetExceededException.class);
 
     verify(chatClient, never()).prompt();

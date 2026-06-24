@@ -51,13 +51,13 @@ public class QueryPromptAssembler {
   }
 
   /**
-   * Assembles the system prompt for {@code question} over the retrieved {@code context}. The
-   * question itself is sent as the user message; it is included here only in the token-budget
-   * accounting.
+   * Assembles the system prompt for {@code question} over the retrieved {@code context},
+   * instructing the model to answer in the campaign's {@code contentLanguage} (D-103). The question
+   * itself is sent as the user message; it is included here only in the token-budget accounting.
    *
    * @throws TokenBudgetExceededException if the prompt plus question exceeds the configured budget
    */
-  public String assemble(String question, List<EntityContext> context) {
+  public String assemble(String question, List<EntityContext> context, String contentLanguage) {
     StringBuilder sb = new StringBuilder(INSTRUCTIONS);
     if (context.isEmpty()) {
       sb.append("(no world-state context is available)\n");
@@ -79,6 +79,7 @@ public class QueryPromptAssembler {
             .append("\n</context_item>\n");
       }
     }
+    sb.append("\nRespond in ").append(PromptLanguage.displayName(contentLanguage)).append(".\n");
     String systemPrompt = sb.toString();
 
     int estimated = TokenEstimator.estimate(systemPrompt) + TokenEstimator.estimate(question);

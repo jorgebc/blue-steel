@@ -29,7 +29,8 @@ class QueryPromptAssemblerTest {
     String prompt =
         assembler.assemble(
             "Who is Aragorn?",
-            List.of(context(SESSION_1, "Aragorn", 3), context(SESSION_2, "Legolas", 1)));
+            List.of(context(SESSION_1, "Aragorn", 3), context(SESSION_2, "Legolas", 1)),
+            "en");
 
     assertThat(prompt)
         .contains(
@@ -55,7 +56,7 @@ class QueryPromptAssemblerTest {
     EntityContext poisoned =
         new EntityContext(UUID.randomUUID(), "actor", "Saruman", injection, SESSION_1, 2);
 
-    String prompt = assembler.assemble("Who is Saruman?", List.of(poisoned));
+    String prompt = assembler.assemble("Who is Saruman?", List.of(poisoned), "en");
 
     assertThat(prompt)
         .contains("untrusted campaign data")
@@ -71,7 +72,7 @@ class QueryPromptAssemblerTest {
     QueryPromptAssembler assembler = new QueryPromptAssembler(6000);
 
     String prompt =
-        assembler.assemble("Who is Aragorn?", List.of(context(SESSION_1, "Aragorn", 1)));
+        assembler.assemble("Who is Aragorn?", List.of(context(SESSION_1, "Aragorn", 1)), "en");
 
     assertThat(prompt)
         .contains("ONLY")
@@ -86,7 +87,7 @@ class QueryPromptAssemblerTest {
   void assemble_emptyContext_rendersMarker() {
     QueryPromptAssembler assembler = new QueryPromptAssembler(6000);
 
-    String prompt = assembler.assemble("Who is Aragorn?", List.of());
+    String prompt = assembler.assemble("Who is Aragorn?", List.of(), "en");
 
     assertThat(prompt).contains("(no world-state context is available)");
   }
@@ -97,8 +98,34 @@ class QueryPromptAssemblerTest {
     QueryPromptAssembler assembler = new QueryPromptAssembler(10);
 
     assertThatThrownBy(
-            () -> assembler.assemble("Who is Aragorn?", List.of(context(SESSION_1, "Aragorn", 1))))
+            () ->
+                assembler.assemble(
+                    "Who is Aragorn?", List.of(context(SESSION_1, "Aragorn", 1)), "en"))
         .isInstanceOf(TokenBudgetExceededException.class)
         .hasMessageContaining("tokens");
+  }
+
+  @Test
+  @DisplayName(
+      "should instruct the model to respond in Spanish for the es content language (D-103)")
+  void assemble_esLanguage_appendsSpanishInstruction() {
+    QueryPromptAssembler assembler = new QueryPromptAssembler(6000);
+
+    String prompt =
+        assembler.assemble("Who is Aragorn?", List.of(context(SESSION_1, "Aragorn", 1)), "es");
+
+    assertThat(prompt).contains("Respond in Spanish.");
+  }
+
+  @Test
+  @DisplayName(
+      "should instruct the model to respond in English for the en language and unknown/null (D-103)")
+  void assemble_enOrUnknownLanguage_appendsEnglishInstruction() {
+    QueryPromptAssembler assembler = new QueryPromptAssembler(6000);
+
+    assertThat(assembler.assemble("Who is Aragorn?", List.of(), "en"))
+        .contains("Respond in English.");
+    assertThat(assembler.assemble("Who is Aragorn?", List.of(), null))
+        .contains("Respond in English.");
   }
 }

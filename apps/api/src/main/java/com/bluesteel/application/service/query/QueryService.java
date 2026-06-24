@@ -6,11 +6,13 @@ import com.bluesteel.application.model.query.QueryLogEntry;
 import com.bluesteel.application.model.query.QueryResponse;
 import com.bluesteel.application.port.in.query.AnswerQueryUseCase;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
+import com.bluesteel.application.port.out.campaign.CampaignRepository;
 import com.bluesteel.application.port.out.cost.LlmCostAccountingPort;
 import com.bluesteel.application.port.out.embedding.EmbeddingPort;
 import com.bluesteel.application.port.out.query.QueryAnsweringPort;
 import com.bluesteel.application.port.out.query.QueryContextRetrievalPort;
 import com.bluesteel.application.port.out.query.QueryLogRepository;
+import com.bluesteel.domain.campaign.Campaign;
 import com.bluesteel.domain.exception.CostCapExceededException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.UnauthorizedException;
@@ -51,6 +53,7 @@ public class QueryService implements AnswerQueryUseCase {
   private static final Logger log = LoggerFactory.getLogger(QueryService.class);
 
   private final CampaignMembershipPort membershipPort;
+  private final CampaignRepository campaignRepository;
   private final EmbeddingPort embeddingPort;
   private final QueryContextRetrievalPort retrievalPort;
   private final QueryAnsweringPort queryAnsweringPort;
@@ -63,6 +66,7 @@ public class QueryService implements AnswerQueryUseCase {
 
   public QueryService(
       CampaignMembershipPort membershipPort,
+      CampaignRepository campaignRepository,
       EmbeddingPort embeddingPort,
       QueryContextRetrievalPort retrievalPort,
       QueryAnsweringPort queryAnsweringPort,
@@ -73,6 +77,7 @@ public class QueryService implements AnswerQueryUseCase {
       @Value("${query.retrieval.top-n:8}") int topN,
       @Value("${query.cost-cap.daily-usd:1.00}") double dailyCapUsd) {
     this.membershipPort = membershipPort;
+    this.campaignRepository = campaignRepository;
     this.embeddingPort = embeddingPort;
     this.retrievalPort = retrievalPort;
     this.queryAnsweringPort = queryAnsweringPort;
@@ -110,6 +115,13 @@ public class QueryService implements AnswerQueryUseCase {
       List<EntityContext> context =
           retrievalPort.retrieveRelevantContext(campaignId, questionEmbedding, topN);
 
+      // Answers are produced in the campaign's content language (D-103); retrieval is unaffected.
+      Campaign campaign =
+          campaignRepository
+              .findById(campaignId)
+              .orElseThrow(() -> new IllegalStateException("Campaign not found: " + campaignId));
+      String contentLanguage = campaign.contentLanguage();
+
       // MDC is thread-local: hand the caller's context map to the pool thread so the
       // query_answering cost-log line stays attributable (LOG-01).
       Map<String, String> mdc = MDC.getCopyOfContextMap();
@@ -120,7 +132,7 @@ public class QueryService implements AnswerQueryUseCase {
                   MDC.setContextMap(mdc);
                 }
                 try {
-                  return queryAnsweringPort.answer(question, context);
+                  return queryAnsweringPort.answer(question, context, contentLanguage);
                 } finally {
                   MDC.clear();
                 }
