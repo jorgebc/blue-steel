@@ -34,7 +34,7 @@ describe('InlineBanner', () => {
         render(<InlineBanner variant={variant} message="msg" onDismiss={onDismiss} />)
         act(() => vi.advanceTimersByTime(8000))
         expect(onDismiss).toHaveBeenCalledOnce()
-      },
+      }
     )
 
     it('error variant does not auto-clear after 8 seconds', () => {
@@ -47,7 +47,7 @@ describe('InlineBanner', () => {
 
   it('has no accessibility violations', async () => {
     const { container } = render(
-      <InlineBanner variant="info" message="Accessibility check" onDismiss={vi.fn()} />,
+      <InlineBanner variant="info" message="Accessibility check" onDismiss={vi.fn()} />
     )
     expect(await axe(container)).toHaveNoViolations()
   })

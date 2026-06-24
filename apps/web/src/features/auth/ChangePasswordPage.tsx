@@ -75,7 +75,9 @@ export function ChangePasswordPage() {
           <Brand size="lg" />
         </div>
         <div className="rounded-2xl bg-surface p-8 shadow-sm">
-          <h1 className="mb-6 text-2xl font-semibold text-foreground">{t('auth.changePassword')}</h1>
+          <h1 className="mb-6 text-2xl font-semibold text-foreground">
+            {t('auth.changePassword')}
+          </h1>
           {banner && (
             <div className="mb-4">
               <InlineBanner variant="error" message={banner} onDismiss={() => setBanner(null)} />

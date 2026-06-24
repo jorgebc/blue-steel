@@ -10,6 +10,7 @@
     "type-check": "tsc -b --noEmit",
     "lint": "eslint .",
     "format": "prettier --write src/",
+    "format:check": "prettier --check src/",
     "test": "vitest run --passWithNoTests",
     "sbom": "cyclonedx-npm --output-format JSON --output-file sbom-frontend.json"
   },

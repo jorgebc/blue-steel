@@ -1,0 +1,5 @@
+# shadcn/ui primitives are auto-generated and must never be hand-edited
+# (root CLAUDE.md guardrail). Excluding them keeps `prettier --check` green
+# regardless of the upstream generator's formatting, so `shadcn add` does not
+# break CI.
+src/components/ui/

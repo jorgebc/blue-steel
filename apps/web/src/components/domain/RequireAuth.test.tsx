@@ -38,7 +38,7 @@ describe('RequireAuth', () => {
             }
           />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     )
 
     expect(container.firstChild).toBeNull()
@@ -60,7 +60,7 @@ describe('RequireAuth', () => {
             }
           />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     )
 
     expect(screen.getByText('Login Page')).toBeInTheDocument()
@@ -82,7 +82,7 @@ describe('RequireAuth', () => {
             }
           />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     )
 
     expect(screen.getByText('Protected Content')).toBeInTheDocument()
@@ -107,7 +107,7 @@ describe('RequireAuth', () => {
             }
           />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     )
 
     expect(screen.getByText('Change Password Page')).toBeInTheDocument()
@@ -132,7 +132,7 @@ describe('RequireAuth', () => {
             }
           />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     )
 
     expect(screen.getByText('Change Password Form')).toBeInTheDocument()
@@ -155,7 +155,7 @@ describe('RequireAuth', () => {
             }
           />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     )
 
     expect(await axe(container)).toHaveNoViolations()

@@ -57,13 +57,19 @@ npm run dev                             # dev server
 
 npm audit --audit-level=high --production  # dependency vulnerability check
 npm run type-check                      # TypeScript (tsc --noEmit)
+npm run format:check                    # Prettier check — CI gate (excludes components/ui/ via .prettierignore)
+npm run format                          # Prettier auto-format (run before committing)
 npm run lint                            # ESLint
-npx prettier --write src/              # auto-format (not in CI — keep code clean locally)
 npm test                                # Vitest in CI mode (same as npx vitest run)
 npm run build                           # production build
 ```
 
-**CI step order** (mirrors `frontend.yml`): `npm audit → type-check → lint → test → build`
+**Formatting is CI-enforced (F8.10).** `prettier --check src/` runs in `frontend.yml`; a tree that
+isn't Prettier-clean fails CI. Run `npm run format` before committing. Line endings are pinned to LF
+via `.prettierrc` (`endOfLine: "lf"`) and `apps/web/.gitattributes`, so checks are deterministic on
+Windows and the Linux runner. `src/components/ui/` (shadcn-generated) is excluded via `.prettierignore`.
+
+**CI step order** (mirrors `frontend.yml`): `npm audit → type-check → format-check → lint → test → build`
 
 ### Adding shadcn/ui components
 

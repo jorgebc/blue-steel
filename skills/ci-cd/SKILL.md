@@ -124,10 +124,16 @@ architecture. An `amd64` image will not run on them without emulation overhead.
 
 ```
 type check (tsc --noEmit)
-  → lint
-    → Vitest (unit + component tests)
-      → vite build (production build verification)
+  → format check (prettier --check src/)
+    → lint
+      → Vitest (unit + component tests)
+        → vite build (production build verification)
 ```
+
+Formatting is CI-enforced (F8.10): `prettier --check src/` fails the build if the tree is not
+Prettier-clean. `apps/web/.prettierrc` pins `endOfLine: "lf"` and `apps/web/.gitattributes`
+normalizes line endings to LF, so the check is deterministic on Windows and the Linux runner.
+`src/components/ui/` (shadcn-generated) is excluded via `apps/web/.prettierignore`.
 
 The build step is run in CI to catch build-time errors (Vite config issues, import errors, etc.)
 even though Vercel also runs a build. Failing early in CI is faster than waiting for a Vercel
@@ -160,6 +166,10 @@ jobs:
 
       - name: Type check
         run: npm run type-check
+        working-directory: apps/web
+
+      - name: Format check
+        run: npx prettier --check src/
         working-directory: apps/web
 
       - name: Lint

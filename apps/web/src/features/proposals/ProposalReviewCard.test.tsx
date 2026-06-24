@@ -62,7 +62,10 @@ describe('ProposalReviewCard', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: /approve & write version/i }))
 
     expect(decideMutate).toHaveBeenCalledWith(
-      { proposalId: 'p1', body: { decision: 'APPROVE', editedDelta: { description: 'A retired thief.' } } },
+      {
+        proposalId: 'p1',
+        body: { decision: 'APPROVE', editedDelta: { description: 'A retired thief.' } },
+      },
       expect.anything()
     )
   })

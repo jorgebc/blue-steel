@@ -1,0 +1,14 @@
+# Normalize all text files to LF in the repository and on checkout, so line
+# endings are deterministic across Windows developers and the Linux CI runner
+# (Prettier runs with endOfLine: "lf"). The index is already LF, so this adds
+# no churn; it removes the reliance on each contributor's core.autocrlf setting.
+* text=auto eol=lf
+
+# Binary assets — never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

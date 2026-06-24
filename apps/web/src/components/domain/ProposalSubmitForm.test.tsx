@@ -19,7 +19,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   useCampaignStore.getState().setCampaign('c1', 'player')
   mockUseSessions.mockReturnValue({
-    data: [{ sessionId: 's1', status: 'COMMITTED', sequenceNumber: 1, committedAt: null, createdAt: '' }],
+    data: [
+      { sessionId: 's1', status: 'COMMITTED', sequenceNumber: 1, committedAt: null, createdAt: '' },
+    ],
   } as unknown as ReturnType<typeof useSessions>)
   mockUseCreate.mockReturnValue({
     mutate: createMutate,

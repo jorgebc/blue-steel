@@ -29,16 +29,25 @@ beforeEach(() => {
 
 describe('LoginPage', () => {
   it('has no accessibility violations', async () => {
-    mockUseLogin.mockReturnValue({ mutate: vi.fn(), isPending: false } as unknown as ReturnType<typeof useLogin>)
+    mockUseLogin.mockReturnValue({ mutate: vi.fn(), isPending: false } as unknown as ReturnType<
+      typeof useLogin
+    >)
     const { container } = renderPage()
     expect(await axe(container)).toHaveNoViolations()
   })
 
   it('navigates to / on successful login without forcePasswordChange', async () => {
-    const mutate = vi.fn((_vars: unknown, opts?: { onSuccess?: (data: { accessToken: string; forcePasswordChange: boolean }) => void }) => {
-      opts?.onSuccess?.({ accessToken: 'tok', forcePasswordChange: false })
-    })
-    mockUseLogin.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<typeof useLogin>)
+    const mutate = vi.fn(
+      (
+        _vars: unknown,
+        opts?: { onSuccess?: (data: { accessToken: string; forcePasswordChange: boolean }) => void }
+      ) => {
+        opts?.onSuccess?.({ accessToken: 'tok', forcePasswordChange: false })
+      }
+    )
+    mockUseLogin.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<
+      typeof useLogin
+    >)
 
     renderPage()
     await userEvent.type(screen.getByLabelText('Email'), 'user@example.com')
@@ -51,10 +60,17 @@ describe('LoginPage', () => {
   })
 
   it('navigates to /change-password when forcePasswordChange is true', async () => {
-    const mutate = vi.fn((_vars: unknown, opts?: { onSuccess?: (data: { accessToken: string; forcePasswordChange: boolean }) => void }) => {
-      opts?.onSuccess?.({ accessToken: 'tok', forcePasswordChange: true })
-    })
-    mockUseLogin.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<typeof useLogin>)
+    const mutate = vi.fn(
+      (
+        _vars: unknown,
+        opts?: { onSuccess?: (data: { accessToken: string; forcePasswordChange: boolean }) => void }
+      ) => {
+        opts?.onSuccess?.({ accessToken: 'tok', forcePasswordChange: true })
+      }
+    )
+    mockUseLogin.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<
+      typeof useLogin
+    >)
 
     renderPage()
     await userEvent.type(screen.getByLabelText('Email'), 'user@example.com')
@@ -71,10 +87,12 @@ describe('LoginPage', () => {
       opts?.onError?.(
         new ApiClientError('Validation failed', 400, [
           { code: 'INVALID', message: 'Email not found', field: 'email' },
-        ]),
+        ])
       )
     })
-    mockUseLogin.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<typeof useLogin>)
+    mockUseLogin.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<
+      typeof useLogin
+    >)
 
     renderPage()
     await userEvent.type(screen.getByLabelText('Email'), 'wrong@example.com')
@@ -92,10 +110,12 @@ describe('LoginPage', () => {
       opts?.onError?.(
         new ApiClientError('Unauthorized', 401, [
           { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password.', field: null },
-        ]),
+        ])
       )
     })
-    mockUseLogin.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<typeof useLogin>)
+    mockUseLogin.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<
+      typeof useLogin
+    >)
 
     renderPage()
     await userEvent.type(screen.getByLabelText('Email'), 'user@example.com')
@@ -123,7 +143,9 @@ describe('LoginPage', () => {
   })
 
   it('disables the submit button with a spinner while the mutation is pending', () => {
-    mockUseLogin.mockReturnValue({ mutate: vi.fn(), isPending: true } as unknown as ReturnType<typeof useLogin>)
+    mockUseLogin.mockReturnValue({ mutate: vi.fn(), isPending: true } as unknown as ReturnType<
+      typeof useLogin
+    >)
 
     renderPage()
     const button = screen.getByRole('button', { name: /sign in/i })

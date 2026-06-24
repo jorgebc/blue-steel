@@ -14,8 +14,7 @@ import type {
 export const sessionKeys = {
   all: (campaignId: string) => ['sessions', campaignId] as const,
   lists: (campaignId: string) => [...sessionKeys.all(campaignId), 'list'] as const,
-  list: (campaignId: string, page: number) =>
-    [...sessionKeys.lists(campaignId), page] as const,
+  list: (campaignId: string, page: number) => [...sessionKeys.lists(campaignId), page] as const,
   status: (campaignId: string, sessionId: string) =>
     [...sessionKeys.all(campaignId), sessionId, 'status'] as const,
   diff: (campaignId: string, sessionId: string) =>
@@ -149,10 +148,7 @@ export function useDiscardSession(campaignId: string, sessionId: string) {
 }
 
 /** Fetches a page of session summaries for a campaign (offset pagination, D-055, page size 20). */
-export async function getSessions(
-  campaignId: string,
-  page: number
-): Promise<SessionSummary[]> {
+export async function getSessions(campaignId: string, page: number): Promise<SessionSummary[]> {
   const res = await apiClient.get<SessionSummary[]>(
     `/api/v1/campaigns/${campaignId}/sessions?page=${page}&size=20`
   )

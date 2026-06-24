@@ -59,7 +59,7 @@ describe('StatusPage', () => {
     render(<StatusPage />)
     expect(screen.getByRole('alert')).toBeInTheDocument()
     expect(
-      screen.getByText('Unable to reach the server. Please try again later.'),
+      screen.getByText('Unable to reach the server. Please try again later.')
     ).toBeInTheDocument()
   })
 

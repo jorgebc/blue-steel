@@ -103,7 +103,10 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
     const target = removeTarget
     remove.mutate(target.userId, {
       onSuccess: () => {
-        setBanner({ variant: 'success', message: t('campaigns.memberRemoved', { email: target.email }) })
+        setBanner({
+          variant: 'success',
+          message: t('campaigns.memberRemoved', { email: target.email }),
+        })
         setRemoveTarget(null)
       },
       onError: (err) => {

@@ -42,7 +42,10 @@ beforeEach(() => {
 
 describe('ChangePasswordPage', () => {
   it('has no accessibility violations', async () => {
-    mockUseChangePassword.mockReturnValue({ mutate: vi.fn(), isPending: false } as unknown as ReturnType<typeof useChangePassword>)
+    mockUseChangePassword.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useChangePassword>)
     const { container } = renderPage()
     expect(await axe(container)).toHaveNoViolations()
   })
@@ -51,7 +54,9 @@ describe('ChangePasswordPage', () => {
     const mutate = vi.fn((_vars: unknown, opts?: { onSuccess?: () => void }) => {
       opts?.onSuccess?.()
     })
-    mockUseChangePassword.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<typeof useChangePassword>)
+    mockUseChangePassword.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<
+      typeof useChangePassword
+    >)
 
     renderPage()
     await userEvent.type(screen.getByLabelText('Current password'), 'temppass')
@@ -69,10 +74,12 @@ describe('ChangePasswordPage', () => {
       opts?.onError?.(
         new ApiClientError('Validation failed', 400, [
           { code: 'INVALID', message: 'Current password is incorrect', field: 'currentPassword' },
-        ]),
+        ])
       )
     })
-    mockUseChangePassword.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<typeof useChangePassword>)
+    mockUseChangePassword.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<
+      typeof useChangePassword
+    >)
 
     renderPage()
     await userEvent.type(screen.getByLabelText('Current password'), 'wrongpass')
@@ -90,10 +97,12 @@ describe('ChangePasswordPage', () => {
       opts?.onError?.(
         new ApiClientError('Forbidden', 403, [
           { code: 'FORBIDDEN', message: 'Session expired. Please log in again.', field: null },
-        ]),
+        ])
       )
     })
-    mockUseChangePassword.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<typeof useChangePassword>)
+    mockUseChangePassword.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<
+      typeof useChangePassword
+    >)
 
     renderPage()
     await userEvent.type(screen.getByLabelText('Current password'), 'temppass')
@@ -107,7 +116,10 @@ describe('ChangePasswordPage', () => {
   })
 
   it('disables the submit button with a spinner while the mutation is pending', () => {
-    mockUseChangePassword.mockReturnValue({ mutate: vi.fn(), isPending: true } as unknown as ReturnType<typeof useChangePassword>)
+    mockUseChangePassword.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: true,
+    } as unknown as ReturnType<typeof useChangePassword>)
 
     renderPage()
     const button = screen.getByRole('button', { name: /change password/i })

@@ -66,7 +66,9 @@ describe('ProposalReviewQueuePage', () => {
 
   it('redirects a non-GM member away from the queue', () => {
     setup('player')
-    expect(screen.queryByRole('heading', { name: /proposal review queue/i })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: /proposal review queue/i })
+    ).not.toBeInTheDocument()
   })
 
   it('shows a skeleton while loading', () => {
