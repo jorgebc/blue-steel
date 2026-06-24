@@ -55,10 +55,15 @@ public class ConflictDetectionService {
    * @param campaignId scopes the pgvector search to this campaign's existing entities
    * @param extraction the structured output from the extraction stage
    * @param resolved the resolution outcomes from {@link EntityResolutionService}
+   * @param contentLanguage the campaign's content-language code, injected into the LLM prompt
+   *     (D-103)
    * @return non-blocking {@link ConflictWarning}s to surface in the diff (possibly empty)
    */
   public List<ConflictWarning> run(
-      UUID campaignId, ExtractionResult extraction, List<ResolvedEntity> resolved) {
+      UUID campaignId,
+      ExtractionResult extraction,
+      List<ResolvedEntity> resolved,
+      String contentLanguage) {
     log.info("Starting conflict detection stage campaignId={}", campaignId);
 
     boolean hasMatch = resolved.stream().anyMatch(r -> r.outcome() == ResolutionOutcome.MATCH);
@@ -85,7 +90,8 @@ public class ConflictDetectionService {
       }
     }
 
-    List<ConflictWarning> warnings = conflictDetectionPort.detect(extraction, relevantContext);
+    List<ConflictWarning> warnings =
+        conflictDetectionPort.detect(extraction, relevantContext, contentLanguage);
     log.info("Conflict detection complete campaignId={} warnings={}", campaignId, warnings.size());
     return warnings;
   }

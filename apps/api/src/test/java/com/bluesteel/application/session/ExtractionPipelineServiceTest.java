@@ -19,7 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -45,14 +44,29 @@ class ExtractionPipelineServiceTest {
     ExtractionResult result =
         new ExtractionResult("Header.", List.of(), List.of(), List.of(), List.of());
 
-    ArgumentCaptor<String> textCaptor = ArgumentCaptor.forClass(String.class);
-    when(narrativeExtractionPort.extract(textCaptor.capture())).thenReturn(result);
-
     String rawText = "Some summary text.";
-    sut.run(session, rawText);
+    when(narrativeExtractionPort.extract(rawText, "en")).thenReturn(result);
+
+    sut.run(session, rawText, "en");
 
     assertThat(session.status()).isEqualTo(SessionStatus.PROCESSING);
-    assertThat(textCaptor.getValue()).isEqualTo(rawText);
+    verify(narrativeExtractionPort).extract(rawText, "en");
+  }
+
+  @Test
+  @DisplayName("should forward the campaign content language to the extraction port")
+  void run_forwardsContentLanguageToPort() {
+    Session session =
+        Session.create(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Instant.now());
+    ExtractionResult result =
+        new ExtractionResult("Header.", List.of(), List.of(), List.of(), List.of());
+
+    String rawText = "Una sesión de prueba.";
+    when(narrativeExtractionPort.extract(rawText, "es")).thenReturn(result);
+
+    sut.run(session, rawText, "es");
+
+    verify(narrativeExtractionPort).extract(rawText, "es");
   }
 
   @Test
@@ -63,14 +77,13 @@ class ExtractionPipelineServiceTest {
     RuntimeException portError = new RuntimeException("LLM error");
     String rawText = "Some summary text.";
 
-    ArgumentCaptor<String> textCaptor = ArgumentCaptor.forClass(String.class);
-    when(narrativeExtractionPort.extract(textCaptor.capture())).thenThrow(portError);
+    when(narrativeExtractionPort.extract(rawText, "en")).thenThrow(portError);
 
-    assertThatThrownBy(() -> sut.run(session, rawText)).isSameAs(portError);
+    assertThatThrownBy(() -> sut.run(session, rawText, "en")).isSameAs(portError);
 
     assertThat(session.status()).isEqualTo(SessionStatus.FAILED);
     assertThat(session.failureReason()).isEqualTo("EXTRACTION_FAILED");
-    assertThat(textCaptor.getValue()).isEqualTo(rawText);
+    verify(narrativeExtractionPort).extract(rawText, "en");
     // Session was saved twice: once after startProcessing, once after markFailed
     verify(sessionRepository, org.mockito.Mockito.times(2)).save(session);
   }
@@ -89,12 +102,11 @@ class ExtractionPipelineServiceTest {
             List.of());
     String rawText = "The heroes entered the dungeon.";
 
-    ArgumentCaptor<String> textCaptor = ArgumentCaptor.forClass(String.class);
-    when(narrativeExtractionPort.extract(textCaptor.capture())).thenReturn(expected);
+    when(narrativeExtractionPort.extract(rawText, "en")).thenReturn(expected);
 
-    ExtractionResult result = sut.run(session, rawText);
+    ExtractionResult result = sut.run(session, rawText, "en");
 
     assertThat(result).isEqualTo(expected);
-    assertThat(textCaptor.getValue()).isEqualTo(rawText);
+    verify(narrativeExtractionPort).extract(rawText, "en");
   }
 }

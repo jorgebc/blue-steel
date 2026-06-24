@@ -4,8 +4,10 @@ import com.bluesteel.application.event.SessionSubmittedEvent;
 import com.bluesteel.application.model.ingestion.ConflictWarning;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.application.model.ingestion.ResolvedEntity;
+import com.bluesteel.application.port.out.campaign.CampaignRepository;
 import com.bluesteel.application.port.out.session.NarrativeBlockRepository;
 import com.bluesteel.application.port.out.session.SessionRepository;
+import com.bluesteel.domain.campaign.Campaign;
 import com.bluesteel.domain.session.NarrativeBlock;
 import com.bluesteel.domain.session.Session;
 import java.util.List;
@@ -27,6 +29,7 @@ public class SessionIngestionEventListener {
 
   private final SessionRepository sessionRepository;
   private final NarrativeBlockRepository narrativeBlockRepository;
+  private final CampaignRepository campaignRepository;
   private final ExtractionPipelineService extractionPipelineService;
   private final EntityResolutionService entityResolutionService;
   private final ConflictDetectionService conflictDetectionService;
@@ -36,6 +39,7 @@ public class SessionIngestionEventListener {
   public SessionIngestionEventListener(
       SessionRepository sessionRepository,
       NarrativeBlockRepository narrativeBlockRepository,
+      CampaignRepository campaignRepository,
       ExtractionPipelineService extractionPipelineService,
       EntityResolutionService entityResolutionService,
       ConflictDetectionService conflictDetectionService,
@@ -43,6 +47,7 @@ public class SessionIngestionEventListener {
       TaskExecutor applicationTaskExecutor) {
     this.sessionRepository = sessionRepository;
     this.narrativeBlockRepository = narrativeBlockRepository;
+    this.campaignRepository = campaignRepository;
     this.extractionPipelineService = extractionPipelineService;
     this.entityResolutionService = entityResolutionService;
     this.conflictDetectionService = conflictDetectionService;
@@ -82,14 +87,24 @@ public class SessionIngestionEventListener {
                     new IllegalStateException(
                         "NarrativeBlock not found for session: " + event.sessionId()));
 
+    Campaign campaign =
+        campaignRepository
+            .findById(session.campaignId())
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "Campaign not found for session: " + event.sessionId()));
+    String contentLanguage = campaign.contentLanguage();
+
     ExtractionResult extractionResult =
-        extractionPipelineService.run(session, block.rawSummaryText());
+        extractionPipelineService.run(session, block.rawSummaryText(), contentLanguage);
 
     List<ResolvedEntity> resolved =
         entityResolutionService.run(session.campaignId(), extractionResult);
 
     List<ConflictWarning> conflicts =
-        conflictDetectionService.run(session.campaignId(), extractionResult, resolved);
+        conflictDetectionService.run(
+            session.campaignId(), extractionResult, resolved, contentLanguage);
 
     diffGenerationService.run(session, extractionResult, resolved, conflicts);
   }

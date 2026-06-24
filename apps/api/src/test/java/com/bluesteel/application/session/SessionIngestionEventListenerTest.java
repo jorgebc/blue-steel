@@ -9,6 +9,7 @@ import com.bluesteel.application.model.ingestion.ConflictWarning;
 import com.bluesteel.application.model.ingestion.ExtractionResult;
 import com.bluesteel.application.model.ingestion.ResolutionOutcome;
 import com.bluesteel.application.model.ingestion.ResolvedEntity;
+import com.bluesteel.application.port.out.campaign.CampaignRepository;
 import com.bluesteel.application.port.out.session.NarrativeBlockRepository;
 import com.bluesteel.application.port.out.session.SessionRepository;
 import com.bluesteel.application.service.session.ConflictDetectionService;
@@ -16,6 +17,7 @@ import com.bluesteel.application.service.session.DiffGenerationService;
 import com.bluesteel.application.service.session.EntityResolutionService;
 import com.bluesteel.application.service.session.ExtractionPipelineService;
 import com.bluesteel.application.service.session.SessionIngestionEventListener;
+import com.bluesteel.domain.campaign.Campaign;
 import com.bluesteel.domain.session.NarrativeBlock;
 import com.bluesteel.domain.session.Session;
 import java.time.Instant;
@@ -34,8 +36,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("SessionIngestionEventListener")
 class SessionIngestionEventListenerTest {
 
+  private static final String CONTENT_LANGUAGE = "es";
+
   @Mock private SessionRepository sessionRepository;
   @Mock private NarrativeBlockRepository narrativeBlockRepository;
+  @Mock private CampaignRepository campaignRepository;
   @Mock private ExtractionPipelineService extractionPipelineService;
   @Mock private EntityResolutionService entityResolutionService;
   @Mock private ConflictDetectionService conflictDetectionService;
@@ -49,6 +54,7 @@ class SessionIngestionEventListenerTest {
         new SessionIngestionEventListener(
             sessionRepository,
             narrativeBlockRepository,
+            campaignRepository,
             extractionPipelineService,
             entityResolutionService,
             conflictDetectionService,
@@ -56,9 +62,13 @@ class SessionIngestionEventListenerTest {
             Runnable::run);
   }
 
+  private Campaign campaign(UUID campaignId, UUID ownerId) {
+    return Campaign.create(campaignId, "Test Campaign", ownerId, Instant.now(), CONTENT_LANGUAGE);
+  }
+
   @Test
   @DisplayName(
-      "should load the session and its narrative block then delegate to ExtractionPipelineService")
+      "should load the session and its narrative block then delegate to ExtractionPipelineService with the campaign language")
   void onSessionSubmitted_delegatesToExtractionPipelineService() {
     UUID sessionId = UUID.randomUUID();
     UUID campaignId = UUID.randomUUID();
@@ -73,19 +83,25 @@ class SessionIngestionEventListenerTest {
 
     when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
     when(narrativeBlockRepository.findBySessionId(sessionId)).thenReturn(Optional.of(block));
-    when(extractionPipelineService.run(session, rawText)).thenReturn(extractionResult);
+    when(campaignRepository.findById(campaignId))
+        .thenReturn(Optional.of(campaign(campaignId, ownerId)));
+    when(extractionPipelineService.run(session, rawText, CONTENT_LANGUAGE))
+        .thenReturn(extractionResult);
     when(entityResolutionService.run(campaignId, extractionResult)).thenReturn(List.of());
-    when(conflictDetectionService.run(campaignId, extractionResult, List.of()))
+    when(conflictDetectionService.run(campaignId, extractionResult, List.of(), CONTENT_LANGUAGE))
         .thenReturn(List.of());
 
     sut.onSessionSubmitted(new SessionSubmittedEvent(sessionId, campaignId));
 
     ArgumentCaptor<Session> sessionCaptor = ArgumentCaptor.forClass(Session.class);
     ArgumentCaptor<String> textCaptor = ArgumentCaptor.forClass(String.class);
-    verify(extractionPipelineService).run(sessionCaptor.capture(), textCaptor.capture());
+    ArgumentCaptor<String> languageCaptor = ArgumentCaptor.forClass(String.class);
+    verify(extractionPipelineService)
+        .run(sessionCaptor.capture(), textCaptor.capture(), languageCaptor.capture());
 
     assertThat(sessionCaptor.getValue()).isSameAs(session);
     assertThat(textCaptor.getValue()).isEqualTo(rawText);
+    assertThat(languageCaptor.getValue()).isEqualTo(CONTENT_LANGUAGE);
   }
 
   @Test
@@ -105,9 +121,12 @@ class SessionIngestionEventListenerTest {
 
     when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
     when(narrativeBlockRepository.findBySessionId(sessionId)).thenReturn(Optional.of(block));
-    when(extractionPipelineService.run(session, rawText)).thenReturn(extractionResult);
+    when(campaignRepository.findById(campaignId))
+        .thenReturn(Optional.of(campaign(campaignId, ownerId)));
+    when(extractionPipelineService.run(session, rawText, CONTENT_LANGUAGE))
+        .thenReturn(extractionResult);
     when(entityResolutionService.run(campaignId, extractionResult)).thenReturn(List.of());
-    when(conflictDetectionService.run(campaignId, extractionResult, List.of()))
+    when(conflictDetectionService.run(campaignId, extractionResult, List.of(), CONTENT_LANGUAGE))
         .thenReturn(List.of());
 
     sut.onSessionSubmitted(new SessionSubmittedEvent(sessionId, campaignId));
@@ -123,7 +142,7 @@ class SessionIngestionEventListenerTest {
 
   @Test
   @DisplayName(
-      "should invoke ConflictDetectionService with campaignId, extraction output, and resolved entities after resolution")
+      "should invoke ConflictDetectionService with campaignId, extraction output, resolved entities, and campaign language after resolution")
   void onSessionSubmitted_delegatesToConflictDetectionServiceAfterResolution() {
     UUID sessionId = UUID.randomUUID();
     UUID campaignId = UUID.randomUUID();
@@ -139,9 +158,13 @@ class SessionIngestionEventListenerTest {
 
     when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
     when(narrativeBlockRepository.findBySessionId(sessionId)).thenReturn(Optional.of(block));
-    when(extractionPipelineService.run(session, rawText)).thenReturn(extractionResult);
+    when(campaignRepository.findById(campaignId))
+        .thenReturn(Optional.of(campaign(campaignId, ownerId)));
+    when(extractionPipelineService.run(session, rawText, CONTENT_LANGUAGE))
+        .thenReturn(extractionResult);
     when(entityResolutionService.run(campaignId, extractionResult)).thenReturn(List.of(resolved));
-    when(conflictDetectionService.run(campaignId, extractionResult, List.of(resolved)))
+    when(conflictDetectionService.run(
+            campaignId, extractionResult, List.of(resolved), CONTENT_LANGUAGE))
         .thenReturn(List.of(new ConflictWarning("Mira", "Contradiction found.")));
 
     sut.onSessionSubmitted(new SessionSubmittedEvent(sessionId, campaignId));
@@ -151,12 +174,18 @@ class SessionIngestionEventListenerTest {
         ArgumentCaptor.forClass(ExtractionResult.class);
     ArgumentCaptor<List<ResolvedEntity>> resolvedCaptor =
         ArgumentCaptor.forClass((Class<List<ResolvedEntity>>) (Class<?>) List.class);
+    ArgumentCaptor<String> languageCaptor = ArgumentCaptor.forClass(String.class);
     verify(conflictDetectionService)
-        .run(campaignIdCaptor.capture(), extractionCaptor.capture(), resolvedCaptor.capture());
+        .run(
+            campaignIdCaptor.capture(),
+            extractionCaptor.capture(),
+            resolvedCaptor.capture(),
+            languageCaptor.capture());
 
     assertThat(campaignIdCaptor.getValue()).isEqualTo(campaignId);
     assertThat(extractionCaptor.getValue()).isSameAs(extractionResult);
     assertThat(resolvedCaptor.getValue()).containsExactly(resolved);
+    assertThat(languageCaptor.getValue()).isEqualTo(CONTENT_LANGUAGE);
   }
 
   @Test
@@ -178,9 +207,13 @@ class SessionIngestionEventListenerTest {
 
     when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
     when(narrativeBlockRepository.findBySessionId(sessionId)).thenReturn(Optional.of(block));
-    when(extractionPipelineService.run(session, rawText)).thenReturn(extractionResult);
+    when(campaignRepository.findById(campaignId))
+        .thenReturn(Optional.of(campaign(campaignId, ownerId)));
+    when(extractionPipelineService.run(session, rawText, CONTENT_LANGUAGE))
+        .thenReturn(extractionResult);
     when(entityResolutionService.run(campaignId, extractionResult)).thenReturn(List.of(resolved));
-    when(conflictDetectionService.run(campaignId, extractionResult, List.of(resolved)))
+    when(conflictDetectionService.run(
+            campaignId, extractionResult, List.of(resolved), CONTENT_LANGUAGE))
         .thenReturn(List.of(conflict));
 
     sut.onSessionSubmitted(new SessionSubmittedEvent(sessionId, campaignId));

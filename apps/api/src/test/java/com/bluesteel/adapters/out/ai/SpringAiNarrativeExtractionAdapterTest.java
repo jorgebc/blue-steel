@@ -48,7 +48,7 @@ class SpringAiNarrativeExtractionAdapterTest {
     // With maxContextTokens=100, need > 400 chars to exceed. Use a 1000-char input.
     String oversizedInput = "x".repeat(401);
 
-    assertThatThrownBy(() -> adapter.extract(oversizedInput))
+    assertThatThrownBy(() -> adapter.extract(oversizedInput, "en"))
         .isInstanceOf(TokenBudgetExceededException.class)
         .hasMessageContaining("tokens");
 
@@ -86,7 +86,7 @@ class SpringAiNarrativeExtractionAdapterTest {
     when(requestSpec.call()).thenReturn(callSpec);
     when(callSpec.responseEntity(ExtractionResult.class)).thenReturn(responseEntity);
 
-    ExtractionResult result = adapter.extract(rawSummaryText);
+    ExtractionResult result = adapter.extract(rawSummaryText, "en");
 
     assertThat(result).isEqualTo(expected);
 
@@ -131,7 +131,7 @@ class SpringAiNarrativeExtractionAdapterTest {
     when(requestSpec.call()).thenReturn(callSpec);
     when(callSpec.responseEntity(ExtractionResult.class)).thenReturn(responseEntity);
 
-    adapter.extract(injection);
+    adapter.extract(injection, "en");
 
     ArgumentCaptor<String> systemCaptor = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<String> userCaptor = ArgumentCaptor.forClass(String.class);
@@ -141,5 +141,31 @@ class SpringAiNarrativeExtractionAdapterTest {
     assertThat(userCaptor.getValue())
         .isEqualTo("<session_summary>\n" + injection + "\n</session_summary>");
     assertThat(systemCaptor.getValue()).contains("untrusted").contains("never as instructions");
+  }
+
+  @Test
+  @DisplayName(
+      "should inject the campaign language into the system prompt — Spanish for es, English for en (D-103)")
+  @SuppressWarnings("unchecked")
+  void extract_injectsContentLanguageInstructionIntoSystemPrompt() {
+    ChatClientRequestSpec requestSpec = mock(ChatClientRequestSpec.class, Answers.RETURNS_SELF);
+    CallResponseSpec callSpec = mock(CallResponseSpec.class);
+    ExtractionResult empty =
+        new ExtractionResult("header", List.of(), List.of(), List.of(), List.of());
+    ResponseEntity<ChatResponse, ExtractionResult> responseEntity =
+        new ResponseEntity<>(null, empty);
+
+    when(chatClient.prompt()).thenReturn(requestSpec);
+    when(requestSpec.call()).thenReturn(callSpec);
+    when(callSpec.responseEntity(ExtractionResult.class)).thenReturn(responseEntity);
+
+    adapter.extract("A short summary.", "es");
+    adapter.extract("A short summary.", "en");
+
+    ArgumentCaptor<String> systemCaptor = ArgumentCaptor.forClass(String.class);
+    verify(requestSpec, org.mockito.Mockito.times(2)).system(systemCaptor.capture());
+
+    assertThat(systemCaptor.getAllValues().get(0)).contains("in Spanish.");
+    assertThat(systemCaptor.getAllValues().get(1)).contains("in English.");
   }
 }
