@@ -9,4 +9,9 @@ import java.util.UUID;
  * a campaign they are not a member of.
  */
 public record CampaignView(
-    UUID id, String name, UUID createdBy, Instant createdAt, CampaignRole role) {}
+    UUID id,
+    String name,
+    UUID createdBy,
+    Instant createdAt,
+    String contentLanguage,
+    CampaignRole role) {}

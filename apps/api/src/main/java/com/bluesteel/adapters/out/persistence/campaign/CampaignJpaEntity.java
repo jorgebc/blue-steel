@@ -24,13 +24,18 @@ class CampaignJpaEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @Column(name = "content_language", nullable = false)
+  private String contentLanguage;
+
   protected CampaignJpaEntity() {}
 
-  CampaignJpaEntity(UUID id, String name, UUID createdBy, Instant createdAt) {
+  CampaignJpaEntity(
+      UUID id, String name, UUID createdBy, Instant createdAt, String contentLanguage) {
     this.id = id;
     this.name = name;
     this.createdBy = createdBy;
     this.createdAt = createdAt;
+    this.contentLanguage = contentLanguage;
   }
 
   UUID getId() {
@@ -47,5 +52,9 @@ class CampaignJpaEntity {
 
   Instant getCreatedAt() {
     return createdAt;
+  }
+
+  String getContentLanguage() {
+    return contentLanguage;
   }
 }

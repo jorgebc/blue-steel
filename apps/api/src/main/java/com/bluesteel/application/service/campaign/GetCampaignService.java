@@ -43,6 +43,7 @@ public class GetCampaignService implements GetCampaignUseCase {
         campaign.name(),
         campaign.createdBy(),
         campaign.createdAt(),
+        campaign.contentLanguage(),
         role.orElse(null));
   }
 }

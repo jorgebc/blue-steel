@@ -49,7 +49,9 @@ public class CreateCampaignService implements CreateCampaignUseCase {
         .orElseThrow(() -> new UserNotFoundException("GM user not found: " + command.gmUserId()));
 
     Instant now = Instant.now();
-    Campaign campaign = Campaign.create(UUID.randomUUID(), command.name(), command.callerId(), now);
+    Campaign campaign =
+        Campaign.create(
+            UUID.randomUUID(), command.name(), command.callerId(), now, command.contentLanguage());
     campaignRepository.save(campaign);
 
     CampaignMember gm =
@@ -68,6 +70,7 @@ public class CreateCampaignService implements CreateCampaignUseCase {
         campaign.name(),
         campaign.createdBy(),
         campaign.createdAt(),
+        campaign.contentLanguage(),
         CampaignRole.GM);
   }
 }

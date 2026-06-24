@@ -34,7 +34,7 @@ class ListCampaignsServiceTest {
   private static final UUID CAMPAIGN_ID_2 = UUID.randomUUID();
 
   private final Campaign campaign1 =
-      Campaign.create(CAMPAIGN_ID_1, "Dragon Keep", UUID.randomUUID(), Instant.now());
+      Campaign.create(CAMPAIGN_ID_1, "Dragon Keep", UUID.randomUUID(), Instant.now(), "es");
   private final Campaign campaign2 =
       Campaign.create(CAMPAIGN_ID_2, "Sea of Storms", UUID.randomUUID(), Instant.now());
 
@@ -55,6 +55,7 @@ class ListCampaignsServiceTest {
 
     assertThat(result).hasSize(2);
     assertThat(result.get(0).role()).isEqualTo(CampaignRole.GM);
+    assertThat(result.get(0).contentLanguage()).isEqualTo("es");
     assertThat(result.get(1).role()).isNull();
   }
 

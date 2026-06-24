@@ -73,4 +73,7 @@
   <!-- F8.1.1: per-user profile + settings columns on users (D-100, D-101) -->
   <include file="db/changelog/0029_add_user_profile_settings.xml"/>
 
+  <!-- F9.1: per-campaign content language fixed at creation (immutable, D-103) -->
+  <include file="db/changelog/0030_add_campaign_content_language.xml"/>
+
 </databaseChangeLog>

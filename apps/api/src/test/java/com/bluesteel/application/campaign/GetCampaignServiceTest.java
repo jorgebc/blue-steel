@@ -34,7 +34,7 @@ class GetCampaignServiceTest {
   private static final UUID CAMPAIGN_ID = UUID.randomUUID();
   private static final UUID CALLER_ID = UUID.randomUUID();
   private static final Campaign CAMPAIGN =
-      Campaign.create(CAMPAIGN_ID, "Dragon Keep", UUID.randomUUID(), Instant.now());
+      Campaign.create(CAMPAIGN_ID, "Dragon Keep", UUID.randomUUID(), Instant.now(), "es");
 
   @BeforeEach
   void setUp() {
@@ -71,6 +71,7 @@ class GetCampaignServiceTest {
 
     assertThat(view.id()).isEqualTo(CAMPAIGN_ID);
     assertThat(view.role()).isEqualTo(CampaignRole.GM);
+    assertThat(view.contentLanguage()).isEqualTo("es");
   }
 
   @Test

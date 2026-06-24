@@ -1237,7 +1237,7 @@ settled at sub-task decomposition.)
 | F8.7.3 | Frontend: no-flash pre-paint script in `index.html` | ✅ |
 | F8.8 | Frontend: migrate raw color utilities → semantic tokens for full dark-mode coverage (non-blocking follow-on) | ✅ |
 | F8.9 | Frontend: i18n per-page string extraction — remaining write/admin/overlay surfaces (F8.6 follow-on) | ✅ |
-| F8.10 | Repo: decide + enforce repo-wide Prettier formatting (CI `--check`) | 🔲 |
+| F8.10 | Repo: decide + enforce repo-wide Prettier formatting (CI `--check`) | ✅ |
 
 #### F8.1 — Backend: user profile/settings persistence + domain
 
@@ -1703,7 +1703,7 @@ single-language. This is the per-*campaign* axis (D-099), independent of the per
 
 | # | Feature | Status |
 |---|---|---|
-| F9.1 | Backend: campaign `content_language` schema + domain + create API | 🔲 |
+| F9.1 | Backend: campaign `content_language` schema + domain + create API | ✅ |
 | F9.2 | Backend: thread language into extraction + conflict-detection prompts | 🔲 |
 | F9.3 | Backend: language in query-answering prompt | 🔲 |
 | F9.4 | Frontend: content-language picker on create + read-only display | 🔲 |
