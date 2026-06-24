@@ -52,7 +52,7 @@ class SpringAiConflictDetectionAdapterTest {
     ExtractionResult extraction =
         new ExtractionResult("Header.", List.of(bigMention), List.of(), List.of(), List.of());
 
-    assertThatThrownBy(() -> adapter.detect(extraction, List.of()))
+    assertThatThrownBy(() -> adapter.detect(extraction, List.of(), "en"))
         .isInstanceOf(TokenBudgetExceededException.class)
         .hasMessageContaining("tokens");
 
@@ -103,7 +103,7 @@ class SpringAiConflictDetectionAdapterTest {
     when(requestSpec.call()).thenReturn(callSpec);
     when(callSpec.responseEntity(ConflictDetectionResponse.class)).thenReturn(responseEntity);
 
-    adapter.detect(extraction, List.of(ctx));
+    adapter.detect(extraction, List.of(ctx), "en");
 
     ArgumentCaptor<String> userCaptor = ArgumentCaptor.forClass(String.class);
     verify(requestSpec).user(userCaptor.capture());
@@ -132,7 +132,7 @@ class SpringAiConflictDetectionAdapterTest {
     when(requestSpec.call()).thenReturn(callSpec);
     when(callSpec.responseEntity(ConflictDetectionResponse.class)).thenReturn(responseEntity);
 
-    adapter.detect(extraction, List.of());
+    adapter.detect(extraction, List.of(), "en");
 
     ArgumentCaptor<String> systemCaptor = ArgumentCaptor.forClass(String.class);
     ArgumentCaptor<String> userCaptor = ArgumentCaptor.forClass(String.class);
@@ -141,6 +141,33 @@ class SpringAiConflictDetectionAdapterTest {
 
     assertThat(systemCaptor.getValue()).contains("untrusted").contains("never as instructions");
     assertThat(userCaptor.getValue()).contains("<data>\nActors: " + injection);
+  }
+
+  @Test
+  @DisplayName(
+      "should inject the campaign language into the system prompt — Spanish for es, English for en (D-103)")
+  @SuppressWarnings("unchecked")
+  void detect_injectsContentLanguageInstructionIntoSystemPrompt() {
+    ExtractionResult extraction =
+        new ExtractionResult("Header.", List.of(), List.of(), List.of(), List.of());
+
+    ChatClientRequestSpec requestSpec = mock(ChatClientRequestSpec.class, Answers.RETURNS_SELF);
+    CallResponseSpec callSpec = mock(CallResponseSpec.class);
+    ResponseEntity<ChatResponse, ConflictDetectionResponse> responseEntity =
+        new ResponseEntity<>(null, new ConflictDetectionResponse(List.of()));
+
+    when(chatClient.prompt()).thenReturn(requestSpec);
+    when(requestSpec.call()).thenReturn(callSpec);
+    when(callSpec.responseEntity(ConflictDetectionResponse.class)).thenReturn(responseEntity);
+
+    adapter.detect(extraction, List.of(), "es");
+    adapter.detect(extraction, List.of(), "en");
+
+    ArgumentCaptor<String> systemCaptor = ArgumentCaptor.forClass(String.class);
+    verify(requestSpec, org.mockito.Mockito.times(2)).system(systemCaptor.capture());
+
+    assertThat(systemCaptor.getAllValues().get(0)).contains("in Spanish.");
+    assertThat(systemCaptor.getAllValues().get(1)).contains("in English.");
   }
 
   // -------------------------------------------------------------------------
@@ -161,6 +188,6 @@ class SpringAiConflictDetectionAdapterTest {
     when(requestSpec.call()).thenReturn(callSpec);
     when(callSpec.responseEntity(ConflictDetectionResponse.class)).thenReturn(responseEntity);
 
-    return adapter.detect(extraction, context);
+    return adapter.detect(extraction, context, "en");
   }
 }

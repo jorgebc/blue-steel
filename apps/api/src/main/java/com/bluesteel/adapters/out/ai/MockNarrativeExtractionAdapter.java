@@ -18,7 +18,34 @@ import org.springframework.stereotype.Component;
 public class MockNarrativeExtractionAdapter implements NarrativeExtractionPort {
 
   @Override
-  public ExtractionResult extract(String rawSummaryText) {
+  public ExtractionResult extract(String rawSummaryText, String contentLanguage) {
+    if ("es".equalsIgnoreCase(contentLanguage)) {
+      return new ExtractionResult(
+          "El grupo se encontró con Mira y se adentró en Thornwick.",
+          List.of(
+              new ExtractedMention(
+                  "Mira", "Una sanadora errante conocida por el grupo", rawSummaryText),
+              new ExtractedMention("Aldric", "Un misterioso forastero nuevo", rawSummaryText)),
+          List.of(
+              new ExtractedMention(
+                  "Thornwick", "Una aldea en ruinas en las marismas orientales", rawSummaryText)),
+          List.of(
+              new ExtractedEvent(
+                  "La Llegada",
+                  "El grupo llega a Thornwick al anochecer",
+                  "arrival",
+                  "Thornwick",
+                  List.of("Mira", "Aldric"),
+                  rawSummaryText)),
+          List.of(
+              new ExtractedRelation(
+                  "Mira guía al grupo",
+                  "Mira conduce al grupo hasta un refugio",
+                  "alliance",
+                  "Mira",
+                  "Thornwick",
+                  rawSummaryText)));
+    }
     return new ExtractionResult(
         "The party encountered Mira and ventured into Thornwick.",
         List.of(

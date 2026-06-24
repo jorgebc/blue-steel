@@ -63,7 +63,7 @@ public class SpringAiConflictDetectionAdapter implements ConflictDetectionPort {
 
   @Override
   public List<ConflictWarning> detect(
-      ExtractionResult extraction, List<EntityContext> relevantContext) {
+      ExtractionResult extraction, List<EntityContext> relevantContext, String contentLanguage) {
     String userPrompt = buildUserPrompt(extraction, relevantContext);
     int estimated = TokenEstimator.estimate(userPrompt);
     if (estimated > maxContextTokens) {
@@ -72,7 +72,12 @@ public class SpringAiConflictDetectionAdapter implements ConflictDetectionPort {
 
     Instant start = Instant.now();
 
-    CallResponseSpec callSpec = chatClient.prompt().system(SYSTEM_PROMPT).user(userPrompt).call();
+    String systemPrompt =
+        SYSTEM_PROMPT
+            + "\nWrite every conflict description in "
+            + PromptLanguage.displayName(contentLanguage)
+            + ".";
+    CallResponseSpec callSpec = chatClient.prompt().system(systemPrompt).user(userPrompt).call();
 
     ResponseEntity<ChatResponse, ConflictDetectionResponse> responseEntity =
         callSpec.responseEntity(ConflictDetectionResponse.class);

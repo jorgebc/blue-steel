@@ -62,7 +62,7 @@ public class SpringAiNarrativeExtractionAdapter implements NarrativeExtractionPo
   }
 
   @Override
-  public ExtractionResult extract(String rawSummaryText) {
+  public ExtractionResult extract(String rawSummaryText, String contentLanguage) {
     int estimated = TokenEstimator.estimate(rawSummaryText);
     if (estimated > maxContextTokens) {
       throw new TokenBudgetExceededException(estimated, maxContextTokens);
@@ -70,8 +70,13 @@ public class SpringAiNarrativeExtractionAdapter implements NarrativeExtractionPo
 
     Instant start = Instant.now();
 
+    String systemPrompt =
+        SYSTEM_PROMPT
+            + "\nWrite the narrative summary header and every extracted name and description in "
+            + PromptLanguage.displayName(contentLanguage)
+            + ".";
     String userMessage = "<session_summary>\n" + rawSummaryText + "\n</session_summary>";
-    CallResponseSpec callSpec = chatClient.prompt().system(SYSTEM_PROMPT).user(userMessage).call();
+    CallResponseSpec callSpec = chatClient.prompt().system(systemPrompt).user(userMessage).call();
 
     ResponseEntity<ChatResponse, ExtractionResult> responseEntity =
         callSpec.responseEntity(ExtractionResult.class);

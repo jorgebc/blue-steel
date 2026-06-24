@@ -21,12 +21,13 @@ public class MockConflictDetectionAdapter implements ConflictDetectionPort {
 
   @Override
   public List<ConflictWarning> detect(
-      ExtractionResult extraction, List<EntityContext> relevantContext) {
+      ExtractionResult extraction, List<EntityContext> relevantContext, String contentLanguage) {
     if (callCount.getAndIncrement() == 0) {
-      return List.of(
-          new ConflictWarning(
-              "Mira",
-              "Previously described as a healer; now referred to as a warrior — possible continuity conflict."));
+      String description =
+          "es".equalsIgnoreCase(contentLanguage)
+              ? "Antes descrita como sanadora; ahora se la menciona como guerrera — posible conflicto de continuidad."
+              : "Previously described as a healer; now referred to as a warrior — possible continuity conflict.";
+      return List.of(new ConflictWarning("Mira", description));
     }
     return List.of();
   }

@@ -54,7 +54,7 @@ class ConflictDetectionServiceTest {
         new ExtractionResult("A quiet session.", List.of(mention), List.of(), List.of(), List.of());
     ResolvedEntity newEntity = new ResolvedEntity(mention, ResolutionOutcome.NEW, null);
 
-    List<ConflictWarning> result = sut.run(campaignId, extraction, List.of(newEntity));
+    List<ConflictWarning> result = sut.run(campaignId, extraction, List.of(newEntity), "en");
 
     assertThat(result).isEmpty();
     verifyNoInteractions(embeddingPort, entitySimilaritySearchPort, conflictDetectionPort);
@@ -67,7 +67,7 @@ class ConflictDetectionServiceTest {
     ExtractionResult extraction =
         new ExtractionResult("No entities.", List.of(), List.of(), List.of(), List.of());
 
-    List<ConflictWarning> result = sut.run(campaignId, extraction, List.of());
+    List<ConflictWarning> result = sut.run(campaignId, extraction, List.of(), "en");
 
     assertThat(result).isEmpty();
     verifyNoInteractions(embeddingPort, entitySimilaritySearchPort, conflictDetectionPort);
@@ -84,7 +84,7 @@ class ConflictDetectionServiceTest {
             "Stranger appeared.", List.of(mention), List.of(), List.of(), List.of());
     ResolvedEntity uncertain = new ResolvedEntity(mention, ResolutionOutcome.UNCERTAIN, null);
 
-    List<ConflictWarning> result = sut.run(campaignId, extraction, List.of(uncertain));
+    List<ConflictWarning> result = sut.run(campaignId, extraction, List.of(uncertain), "en");
 
     assertThat(result).isEmpty();
     verifyNoInteractions(embeddingPort, entitySimilaritySearchPort, conflictDetectionPort);
@@ -118,14 +118,17 @@ class ConflictDetectionServiceTest {
         ArgumentCaptor.forClass(ExtractionResult.class);
     ArgumentCaptor<List<EntityContext>> contextCaptor =
         ArgumentCaptor.forClass((Class<List<EntityContext>>) (Class<?>) List.class);
-    when(conflictDetectionPort.detect(extractionCaptor.capture(), contextCaptor.capture()))
+    ArgumentCaptor<String> languageCaptor = ArgumentCaptor.forClass(String.class);
+    when(conflictDetectionPort.detect(
+            extractionCaptor.capture(), contextCaptor.capture(), languageCaptor.capture()))
         .thenReturn(List.of());
 
-    List<ConflictWarning> result = sut.run(campaignId, extraction, List.of(matchEntity));
+    List<ConflictWarning> result = sut.run(campaignId, extraction, List.of(matchEntity), "es");
 
     assertThat(result).isEmpty();
     assertThat(extractionCaptor.getValue()).isSameAs(extraction);
     assertThat(contextCaptor.getValue()).isEmpty();
+    assertThat(languageCaptor.getValue()).isEqualTo("es");
   }
 
   @Test
@@ -166,13 +169,16 @@ class ConflictDetectionServiceTest {
         ArgumentCaptor.forClass(ExtractionResult.class);
     ArgumentCaptor<List<EntityContext>> contextCaptor =
         ArgumentCaptor.forClass((Class<List<EntityContext>>) (Class<?>) List.class);
+    ArgumentCaptor<String> languageCaptor = ArgumentCaptor.forClass(String.class);
     ConflictWarning warning = new ConflictWarning("Aldric", "Described as fallen but was alive.");
-    when(conflictDetectionPort.detect(extractionCaptor.capture(), contextCaptor.capture()))
+    when(conflictDetectionPort.detect(
+            extractionCaptor.capture(), contextCaptor.capture(), languageCaptor.capture()))
         .thenReturn(List.of(warning));
 
-    List<ConflictWarning> result = sut.run(campaignId, extraction, List.of(matchEntity));
+    List<ConflictWarning> result = sut.run(campaignId, extraction, List.of(matchEntity), "es");
 
     assertThat(result).containsExactly(warning);
+    assertThat(languageCaptor.getValue()).isEqualTo("es");
 
     List<EntityContext> capturedContext = contextCaptor.getValue();
     assertThat(capturedContext).hasSize(1);

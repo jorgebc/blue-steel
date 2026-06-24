@@ -33,7 +33,7 @@ public class ExtractionPipelineService {
    * the {@link ExtractionResult} on success. On any exception, transitions the session to {@code
    * FAILED} with reason {@code EXTRACTION_FAILED} and rethrows.
    */
-  public ExtractionResult run(Session session, String rawSummaryText) {
+  public ExtractionResult run(Session session, String rawSummaryText, String contentLanguage) {
     log.info("Starting extraction stage session_id={}", session.id());
     session.startProcessing();
     sessionRepository.save(session);
@@ -41,7 +41,7 @@ public class ExtractionPipelineService {
     MDC.put("session_id", session.id().toString());
     MDC.put("user_id", session.ownerId().toString());
     try {
-      ExtractionResult result = narrativeExtractionPort.extract(rawSummaryText);
+      ExtractionResult result = narrativeExtractionPort.extract(rawSummaryText, contentLanguage);
       log.info("Extraction complete session_id={}", session.id());
       return result;
     } catch (Exception e) {
