@@ -51,7 +51,11 @@ export function EditCardOverlay({ card, open, onClose, onSave }: Props) {
   }
 
   return (
-    <FocusedOverlay open={open} onClose={onClose} ariaLabel={t('input.editCard', { name: card.name })}>
+    <FocusedOverlay
+      open={open}
+      onClose={onClose}
+      ariaLabel={t('input.editCard', { name: card.name })}
+    >
       <div className="w-[28rem] max-w-[90vw] bg-surface p-6">
         <h3 className="mb-4 text-base font-medium text-foreground">
           {t('input.editCard', { name: card.name })}

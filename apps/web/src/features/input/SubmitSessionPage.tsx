@@ -125,11 +125,7 @@ export function SubmitSessionPage() {
                 <FormItem>
                   <FormLabel>{t('input.sessionSummary')}</FormLabel>
                   <FormControl>
-                    <Textarea
-                      rows={12}
-                      placeholder={t('input.summaryPlaceholder')}
-                      {...field}
-                    />
+                    <Textarea rows={12} placeholder={t('input.summaryPlaceholder')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

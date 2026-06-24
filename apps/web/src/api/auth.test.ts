@@ -102,8 +102,7 @@ describe('auth API', () => {
     )
 
     await expect(login({ email: '', password: '' })).rejects.toSatisfy(
-      (err: unknown) =>
-        err instanceof ApiClientError && err.errors[0].code === 'MISSING_FIELDS'
+      (err: unknown) => err instanceof ApiClientError && err.errors[0].code === 'MISSING_FIELDS'
     )
   })
 
@@ -136,7 +135,7 @@ describe('auth API', () => {
   it('useLogin on success: stores accessToken, fetches /users/me, and stores currentUser', async () => {
     fetchSpy
       .mockResolvedValueOnce(envelopeResponse(mockLoginResponse)) // POST /auth/login
-      .mockResolvedValueOnce(envelopeResponse(mockUser))          // GET /users/me
+      .mockResolvedValueOnce(envelopeResponse(mockUser)) // GET /users/me
 
     const { result } = renderHook(() => useLogin(), { wrapper: createWrapper() })
 
@@ -188,7 +187,7 @@ describe('auth API', () => {
     const refreshResponse: RefreshResponse = { accessToken: 'refreshed-token' }
     fetchSpy
       .mockResolvedValueOnce(envelopeResponse(refreshResponse)) // POST /auth/refresh
-      .mockResolvedValueOnce(envelopeResponse(mockUser))        // GET /users/me
+      .mockResolvedValueOnce(envelopeResponse(mockUser)) // GET /users/me
 
     await initAuth()
 

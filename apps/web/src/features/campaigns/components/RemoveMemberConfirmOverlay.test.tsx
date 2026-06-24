@@ -30,7 +30,9 @@ describe('RemoveMemberConfirmOverlay', () => {
     setup(null)
 
     expect(
-      screen.getByText('This member will lose access to the campaign. They can be invited again later.')
+      screen.getByText(
+        'This member will lose access to the campaign. They can be invited again later.'
+      )
     ).toBeInTheDocument()
   })
 

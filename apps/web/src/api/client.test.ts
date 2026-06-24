@@ -19,11 +19,7 @@ function unauthorizedResponse(): Response {
 }
 
 // Helper: build a response whose envelope carries errors
-function errorEnvelopeResponse(
-  code: string,
-  message: string,
-  status = 422
-): Response {
+function errorEnvelopeResponse(code: string, message: string, status = 422): Response {
   const body: ApiEnvelope<null> = {
     data: null,
     meta: null,
@@ -37,10 +33,10 @@ function errorEnvelopeResponse(
 
 // Helper: build a refresh-success response
 function refreshSuccessResponse(newToken: string): Response {
-  return new Response(
-    JSON.stringify({ data: { accessToken: newToken }, meta: null, errors: [] }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } }
-  )
+  return new Response(JSON.stringify({ data: { accessToken: newToken }, meta: null, errors: [] }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 describe('apiClient', () => {
@@ -162,7 +158,7 @@ describe('apiClient', () => {
   it('on 401, refreshes the token silently and retries the original request', async () => {
     useAuthStore.setState({ accessToken: 'old-token' })
     fetchSpy
-      .mockResolvedValueOnce(unauthorizedResponse())         // original request → 401
+      .mockResolvedValueOnce(unauthorizedResponse()) // original request → 401
       .mockResolvedValueOnce(refreshSuccessResponse('new-token')) // refresh → 200
       .mockResolvedValueOnce(envelopeResponse({ id: '1' })) // retry → 200
 
@@ -183,7 +179,7 @@ describe('apiClient', () => {
   it('when refresh returns non-200, clears auth state, redirects to /login, and throws', async () => {
     useAuthStore.setState({ accessToken: 'tok-stale' })
     fetchSpy
-      .mockResolvedValueOnce(unauthorizedResponse())               // original → 401
+      .mockResolvedValueOnce(unauthorizedResponse()) // original → 401
       .mockResolvedValueOnce(new Response(null, { status: 400 })) // refresh → failure
 
     await expect(apiClient.get('/api/v1/test')).rejects.toBeInstanceOf(ApiClientError)
@@ -195,9 +191,9 @@ describe('apiClient', () => {
   it('when the retried request also returns 401, clears auth state, redirects, and throws', async () => {
     useAuthStore.setState({ accessToken: 'old-token' })
     fetchSpy
-      .mockResolvedValueOnce(unauthorizedResponse())               // original → 401
-      .mockResolvedValueOnce(refreshSuccessResponse('new-token'))  // refresh → 200
-      .mockResolvedValueOnce(unauthorizedResponse())               // retry → 401 again
+      .mockResolvedValueOnce(unauthorizedResponse()) // original → 401
+      .mockResolvedValueOnce(refreshSuccessResponse('new-token')) // refresh → 200
+      .mockResolvedValueOnce(unauthorizedResponse()) // retry → 401 again
 
     await expect(apiClient.get('/api/v1/test')).rejects.toBeInstanceOf(ApiClientError)
     // logout clears the token even though a new token was briefly set during refresh
@@ -210,16 +206,13 @@ describe('apiClient', () => {
   it('deduplicates concurrent 401 responses to a single refresh call', async () => {
     useAuthStore.setState({ accessToken: 'old-token' })
     fetchSpy
-      .mockResolvedValueOnce(unauthorizedResponse())               // req A → 401
-      .mockResolvedValueOnce(unauthorizedResponse())               // req B → 401
-      .mockResolvedValueOnce(refreshSuccessResponse('new-token'))  // one refresh call
-      .mockResolvedValueOnce(envelopeResponse({ n: 1 }))           // req A retry
-      .mockResolvedValueOnce(envelopeResponse({ n: 2 }))           // req B retry
+      .mockResolvedValueOnce(unauthorizedResponse()) // req A → 401
+      .mockResolvedValueOnce(unauthorizedResponse()) // req B → 401
+      .mockResolvedValueOnce(refreshSuccessResponse('new-token')) // one refresh call
+      .mockResolvedValueOnce(envelopeResponse({ n: 1 })) // req A retry
+      .mockResolvedValueOnce(envelopeResponse({ n: 2 })) // req B retry
 
-    const [a, b] = await Promise.all([
-      apiClient.get('/api/v1/test'),
-      apiClient.get('/api/v1/test'),
-    ])
+    const [a, b] = await Promise.all([apiClient.get('/api/v1/test'), apiClient.get('/api/v1/test')])
 
     expect(a.data).toEqual({ n: 1 })
     expect(b.data).toEqual({ n: 2 })

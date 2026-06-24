@@ -14,7 +14,10 @@ const LONG_TEXT_KEYS = new Set(['description', 'summary', 'backstory', 'notes', 
 /** Chooses the edit control for a field from its key and original value. */
 export function fieldControl(key: string, value: unknown): FieldControl {
   if (Array.isArray(value)) return 'array'
-  if (typeof value === 'string' && (LONG_TEXT_KEYS.has(key) || value.includes('\n') || value.length > 120)) {
+  if (
+    typeof value === 'string' &&
+    (LONG_TEXT_KEYS.has(key) || value.includes('\n') || value.length > 120)
+  ) {
     return 'textarea'
   }
   return 'input'

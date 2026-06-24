@@ -35,22 +35,20 @@ const coSignMutate = vi.fn()
 
 function setStores(currentUserId: string | null, role: CampaignRole | null = 'player') {
   useCampaignStore.getState().setCampaign('c1', role)
-  useAuthStore
-    .getState()
-    .setCurrentUser(
-      currentUserId
-        ? {
-            id: currentUserId,
-            email: 'x@y.z',
-            isAdmin: false,
-            forcePasswordChange: false,
-            displayName: null,
-            avatarAccentColor: null,
-            uiLocale: 'en',
-            theme: 'system',
-          }
-        : null
-    )
+  useAuthStore.getState().setCurrentUser(
+    currentUserId
+      ? {
+          id: currentUserId,
+          email: 'x@y.z',
+          isAdmin: false,
+          forcePasswordChange: false,
+          displayName: null,
+          avatarAccentColor: null,
+          uiLocale: 'en',
+          theme: 'system',
+        }
+      : null
+  )
 }
 
 function mockList(over: Partial<ReturnType<typeof useProposalsForTarget>> = {}) {

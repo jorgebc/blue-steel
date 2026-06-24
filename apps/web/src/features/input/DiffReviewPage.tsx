@@ -193,7 +193,11 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
         </Button>
       </div>
 
-      <FocusedOverlay open={addOpen} onClose={() => setAddOpen(false)} ariaLabel={t('input.addEntity')}>
+      <FocusedOverlay
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        ariaLabel={t('input.addEntity')}
+      >
         <AddEntityForm
           onAdd={(entity) => {
             addEntity(entity)

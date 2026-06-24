@@ -87,9 +87,7 @@ describe('getTimelinePage', () => {
 describe('useTimeline', () => {
   it('returns the first page once a campaign is active', async () => {
     useCampaignStore.getState().setCampaign('c1', 'player')
-    vi.mocked(apiClient.get).mockResolvedValue(
-      envelope({ events: [event] }, { nextCursor: null })
-    )
+    vi.mocked(apiClient.get).mockResolvedValue(envelope({ events: [event] }, { nextCursor: null }))
 
     const { result } = renderHook(() => useTimeline(), { wrapper })
 

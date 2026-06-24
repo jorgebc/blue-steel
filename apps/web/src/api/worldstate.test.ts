@@ -99,7 +99,9 @@ describe('getEntities', () => {
   })
 
   it('passes a custom size when provided', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue(envelope([summary], { page: 0, size: 100, totalCount: 1 }))
+    vi.mocked(apiClient.get).mockResolvedValue(
+      envelope([summary], { page: 0, size: 100, totalCount: 1 })
+    )
 
     await getEntities('c1', 'actor', 0, 100)
 
