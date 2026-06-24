@@ -43,8 +43,9 @@ public class SpringAiQueryAnsweringAdapter implements QueryAnsweringPort {
   }
 
   @Override
-  public QueryResponse answer(String question, List<EntityContext> relevantContext) {
-    String systemPrompt = promptAssembler.assemble(question, relevantContext);
+  public QueryResponse answer(
+      String question, List<EntityContext> relevantContext, String contentLanguage) {
+    String systemPrompt = promptAssembler.assemble(question, relevantContext, contentLanguage);
 
     Instant start = Instant.now();
     ChatResponse chatResponse =

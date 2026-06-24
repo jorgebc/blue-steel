@@ -19,7 +19,13 @@ public class MockQueryAnsweringAdapter implements QueryAnsweringPort {
   static final UUID CITATION_SESSION_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
 
   @Override
-  public QueryResponse answer(String question, List<EntityContext> relevantContext) {
+  public QueryResponse answer(
+      String question, List<EntityContext> relevantContext, String contentLanguage) {
+    if ("es".equalsIgnoreCase(contentLanguage)) {
+      var citation =
+          new Citation(CITATION_SESSION_ID, 1, "Mira apareció por primera vez en la sesión 1.");
+      return new QueryResponse("Esta es una respuesta simulada a: " + question, List.of(citation));
+    }
     var citation = new Citation(CITATION_SESSION_ID, 1, "Mira was first introduced in session 1.");
     return new QueryResponse("This is a mock answer to: " + question, List.of(citation));
   }

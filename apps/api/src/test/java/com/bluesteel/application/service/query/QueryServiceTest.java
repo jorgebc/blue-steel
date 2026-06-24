@@ -17,15 +17,18 @@ import com.bluesteel.application.model.query.Citation;
 import com.bluesteel.application.model.query.QueryLogEntry;
 import com.bluesteel.application.model.query.QueryResponse;
 import com.bluesteel.application.port.out.campaign.CampaignMembershipPort;
+import com.bluesteel.application.port.out.campaign.CampaignRepository;
 import com.bluesteel.application.port.out.cost.LlmCostAccountingPort;
 import com.bluesteel.application.port.out.embedding.EmbeddingPort;
 import com.bluesteel.application.port.out.query.QueryAnsweringPort;
 import com.bluesteel.application.port.out.query.QueryContextRetrievalPort;
 import com.bluesteel.application.port.out.query.QueryLogRepository;
+import com.bluesteel.domain.campaign.Campaign;
 import com.bluesteel.domain.campaign.CampaignRole;
 import com.bluesteel.domain.exception.CostCapExceededException;
 import com.bluesteel.domain.exception.QueryTimeoutException;
 import com.bluesteel.domain.exception.UnauthorizedException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +51,7 @@ import org.slf4j.MDC;
 class QueryServiceTest {
 
   @Mock private CampaignMembershipPort membershipPort;
+  @Mock private CampaignRepository campaignRepository;
   @Mock private EmbeddingPort embeddingPort;
   @Mock private QueryContextRetrievalPort retrievalPort;
   @Mock private QueryAnsweringPort queryAnsweringPort;
@@ -67,6 +71,8 @@ class QueryServiceTest {
       List.of(
           new EntityContext(
               UUID.randomUUID(), "actor", "Mira", "{\"name\":\"Mira\"}", CONTEXT_SESSION, 1));
+  private static final Campaign CAMPAIGN_EN =
+      Campaign.create(CAMPAIGN_ID, "Test Campaign", UUID.randomUUID(), Instant.now(), "en");
 
   @BeforeEach
   void setUp() {
@@ -76,6 +82,7 @@ class QueryServiceTest {
   private QueryService serviceWithExecutor(Executor executor) {
     return new QueryService(
         membershipPort,
+        campaignRepository,
         embeddingPort,
         retrievalPort,
         queryAnsweringPort,
@@ -104,13 +111,32 @@ class QueryServiceTest {
             "Mira is a rogue.", List.of(new Citation(CONTEXT_SESSION, 1, "Mira appears.")));
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(CAMPAIGN_EN));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
     when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
-    when(queryAnsweringPort.answer(QUESTION, CONTEXT)).thenReturn(expected);
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT, "en")).thenReturn(expected);
 
     QueryResponse actual = sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
 
     assertThat(actual).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("should forward the campaign content language to the answering port (D-103)")
+  void answer_forwardsContentLanguageToAnsweringPort() {
+    Campaign spanishCampaign =
+        Campaign.create(CAMPAIGN_ID, "Campaña", UUID.randomUUID(), Instant.now(), "es");
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(spanishCampaign));
+    when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
+    when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT, "es"))
+        .thenReturn(new QueryResponse("Mira es una pícara.", List.of()));
+
+    sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
+
+    verify(queryAnsweringPort).answer(QUESTION, CONTEXT, "es");
   }
 
   @Test
@@ -120,9 +146,10 @@ class QueryServiceTest {
     Citation hallucinated = new Citation(UUID.randomUUID(), 2, "Invented.");
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(CAMPAIGN_EN));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
     when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
-    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT, "en"))
         .thenReturn(new QueryResponse("Answer.", List.of(grounded, hallucinated)));
 
     QueryResponse actual = sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
@@ -141,7 +168,7 @@ class QueryServiceTest {
         .isInstanceOf(CostCapExceededException.class);
 
     verify(embeddingPort, never()).embed(QUESTION);
-    verify(queryAnsweringPort, never()).answer(QUESTION, CONTEXT);
+    verify(queryAnsweringPort, never()).answer(QUESTION, CONTEXT, "en");
     verify(queryLogRepository, never()).save(any(QueryLogEntry.class));
   }
 
@@ -183,9 +210,10 @@ class QueryServiceTest {
     AtomicReference<String> campaignIdInMdc = new AtomicReference<>();
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(CAMPAIGN_EN));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
     when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
-    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT, "en"))
         .thenAnswer(
             invocation -> {
               userIdInMdc.set(MDC.get("user_id"));
@@ -207,9 +235,10 @@ class QueryServiceTest {
     QueryResponse expected = new QueryResponse("Answer.", List.of());
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.GM));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(CAMPAIGN_EN));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
     when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
-    when(queryAnsweringPort.answer(QUESTION, CONTEXT)).thenReturn(expected);
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT, "en")).thenReturn(expected);
 
     QueryResponse actual = sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
 
@@ -217,7 +246,7 @@ class QueryServiceTest {
     InOrder inOrder = inOrder(embeddingPort, retrievalPort, queryAnsweringPort);
     inOrder.verify(embeddingPort).embed(QUESTION);
     inOrder.verify(retrievalPort).retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N);
-    inOrder.verify(queryAnsweringPort).answer(QUESTION, CONTEXT);
+    inOrder.verify(queryAnsweringPort).answer(QUESTION, CONTEXT, "en");
   }
 
   @Test
@@ -226,10 +255,11 @@ class QueryServiceTest {
     QueryResponse expected = new QueryResponse("I don't have information on that.", List.of());
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.EDITOR));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(CAMPAIGN_EN));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
     when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N))
         .thenReturn(List.of());
-    when(queryAnsweringPort.answer(QUESTION, List.of())).thenReturn(expected);
+    when(queryAnsweringPort.answer(QUESTION, List.of(), "en")).thenReturn(expected);
 
     QueryResponse actual = sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
 
@@ -244,9 +274,10 @@ class QueryServiceTest {
     sut = serviceWithExecutor(namedThreadExecutor);
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(CAMPAIGN_EN));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
     when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
-    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT, "en"))
         .thenAnswer(
             invocation -> {
               answeringThreadName.set(Thread.currentThread().getName());
@@ -263,9 +294,10 @@ class QueryServiceTest {
   void answer_slowPort_throwsQueryTimeout() {
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.EDITOR));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(CAMPAIGN_EN));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
     when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
-    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT, "en"))
         .thenAnswer(
             invocation -> {
               Thread.sleep(2_000);
@@ -284,9 +316,10 @@ class QueryServiceTest {
     Citation grounded = new Citation(CONTEXT_SESSION, 1, "Mira appears.");
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(CAMPAIGN_EN));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
     when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
-    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT, "en"))
         .thenReturn(new QueryResponse("Mira is a rogue.", List.of(grounded)));
 
     sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
@@ -310,9 +343,10 @@ class QueryServiceTest {
     Citation hallucinated = new Citation(UUID.randomUUID(), 2, "Invented.");
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(CAMPAIGN_EN));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
     when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
-    when(queryAnsweringPort.answer(QUESTION, CONTEXT))
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT, "en"))
         .thenReturn(new QueryResponse("Answer.", List.of(grounded, hallucinated)));
 
     sut.answer(CAMPAIGN_ID, CALLER_ID, QUESTION);
@@ -330,9 +364,10 @@ class QueryServiceTest {
             "Mira is a rogue.", List.of(new Citation(CONTEXT_SESSION, 1, "Mira appears.")));
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(campaignRepository.findById(CAMPAIGN_ID)).thenReturn(Optional.of(CAMPAIGN_EN));
     when(embeddingPort.embed(QUESTION)).thenReturn(EMBEDDING);
     when(retrievalPort.retrieveRelevantContext(CAMPAIGN_ID, EMBEDDING, TOP_N)).thenReturn(CONTEXT);
-    when(queryAnsweringPort.answer(QUESTION, CONTEXT)).thenReturn(expected);
+    when(queryAnsweringPort.answer(QUESTION, CONTEXT, "en")).thenReturn(expected);
     doThrow(new RuntimeException("db down"))
         .when(queryLogRepository)
         .save(any(QueryLogEntry.class));
