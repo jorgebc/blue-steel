@@ -52,7 +52,9 @@ export function CreateCampaignPage() {
       z.object({
         name: z.string().min(1, t('campaigns.nameRequired')),
         gmUserId: z.string().min(1, t('campaigns.gmRequired')),
-        contentLanguage: z.enum(['en', 'es']),
+        contentLanguage: z.enum(['en', 'es'], {
+          message: t('campaigns.contentLanguageRequired'),
+        }),
       })
     ),
     defaultValues: { name: '', gmUserId: '', contentLanguage: 'en' },

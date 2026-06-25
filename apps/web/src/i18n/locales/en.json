@@ -139,6 +139,7 @@
     "nameRequired": "Campaign name is required",
     "gmRequired": "Select a GM for this campaign",
     "contentLanguageLabel": "Content language",
+    "contentLanguageRequired": "Choose a content language",
     "gameMaster": "Game master",
     "change": "Change",
     "searchUsers": "Search users by email",

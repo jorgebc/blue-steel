@@ -1,3 +1,5 @@
+import type { UiLocale } from '@/types/auth'
+
 export type CampaignRole = 'gm' | 'editor' | 'player'
 
 /**
@@ -11,7 +13,7 @@ export interface CampaignResponse {
   name: string
   createdBy: string
   createdAt: string
-  contentLanguage: string
+  contentLanguage: UiLocale
   role: CampaignRole | null
 }
 
