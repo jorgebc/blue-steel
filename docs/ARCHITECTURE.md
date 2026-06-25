@@ -558,6 +558,8 @@ Session Summary (raw text)
 
 **Three bounded LLM calls maximum per session ingestion.** LLM call 2 (entity resolution) is bounded by the pgvector similarity floor — mentions that score below the floor are classified without an LLM call. The pipeline never passes unbounded world state to the LLM.
 
+**Content language:** All LLM-generated text — the narrative summary header and extracted entity names/descriptions (call 1) and conflict descriptions (call 3) — is produced in the campaign's immutable content language (EN/ES), appended as a language instruction to the system prompts (`PromptLanguage` → `SpringAiNarrativeExtractionAdapter` / `SpringAiConflictDetectionAdapter`). Entity resolution (call 2) and embeddings are language-independent: the stored world state stays single-language per campaign, and consistency is guaranteed by that constraint rather than by tagging data (D-099, D-103).
+
 **Oversized input:** If the token budget check rejects the summary, the API returns `400` with error code `SUMMARY_TOO_LARGE` and a `max_tokens` field indicating the configured limit. No partial processing occurs. The client surfaces a user-facing message with the token count and the limit, and suggests splitting the summary into multiple sessions.
 
 **Entity resolution outcomes in the diff:**
@@ -610,6 +612,8 @@ Query (user question, free text)
 **Citation grounding:** The LLM is instructed to attribute each factual claim to a specific `sessionId` from the provided context. Claims it cannot attribute to provided context are suppressed — consistent with D-003. The response envelope carries a `citations` field mapping claim spans to session references.
 
 **Cost note:** Query Mode makes exactly one LLM call per query. Context is bounded by the pgvector retrieval result set (top-N chunks, configurable) and a token envelope applied before the call.
+
+**Content language:** The answer is produced in the campaign's immutable content language (EN/ES), loaded from the campaign and appended as a language instruction to the answering prompt (`PromptLanguage` → `QueryPromptAssembler`). Embedding and pgvector retrieval are language-independent — the embedding models are multilingual and consistency is guaranteed by the per-campaign constraint, not by tagging vectors (D-099, D-103).
 
 ### 6.5 Cost Governance
 

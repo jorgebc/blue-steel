@@ -27,6 +27,13 @@ This register consolidates everything that exists in the repository only as sche
 
 ---
 
+- **Use Case / Action:** Export a campaign as a portable archive — 🚧 Planned (v2, Phase 7, D-112)
+- **Actor:** GM or Admin
+- **Functional Description:** Not yet implemented — the only remaining planned v2 phase. Will download a campaign's full data (members, actors/spaces/events/relations with complete version history, annotations, sessions) as a single **structured JSON archive**, served as a raw file attachment (`Content-Disposition: attachment`) rather than the `{data,meta,errors}` envelope, gated to **GM or admin** (D-112). Primary purpose is a guard rail before campaign deletion. PRD §7 "public sharing / sharable links" stays post-v2 (D-112).
+- **Technical Reference / Source Files:** Planned: `ExportCampaignUseCase` / `ExportCampaignService` + `CampaignExportController` (raw-JSON attachment, GM/admin authz, size cap); frontend `exportCampaign`/`useExportCampaign` + `CampaignExportButton` wired into the `CampaignHomePage` danger zone. See `docs/roadmap/ROADMAP_V2.md` Phase 7.
+
+---
+
 - **Use Case / Action:** Streamed query answers (SSE) — 🚧 Planned (revisit in v2 only if latency targets require it, D-052)
 - **Actor:** Any campaign member
 - **Functional Description:** Answers are returned in one synchronous response; no token streaming.
@@ -48,10 +55,10 @@ This register consolidates everything that exists in the repository only as sche
 
 ---
 
-- **Use Case / Action:** Per-campaign content language (multilingual LLM output) — 🚧 Planned (v2, D-099/D-103, Phase 9)
+- **Use Case / Action:** Per-campaign content language (multilingual LLM output) — ✅ Implemented (v2, Phase 9)
 - **Actor:** GM (chooses at campaign creation)
-- **Functional Description:** Each campaign fixes one **content language** at creation (immutable thereafter); narrative extraction, conflict detection, and query answers are all produced in it, keeping the stored world state single-language. This is the per-*campaign* language axis, independent of a user's UI locale (D-099). Embeddings are unchanged — the embedding models are multilingual and consistency is guaranteed by the per-campaign constraint, not by tagging data.
-- **Technical Reference / Source Files:** Planned: `campaigns.content_language` (migration `0027`), language injected into the hardcoded prompts in `apps/api/.../adapters/out/ai/SpringAiNarrativeExtractionAdapter.java`, `SpringAiConflictDetectionAdapter.java`, and `QueryPromptAssembler.java`.
+- **Functional Description:** Shipped in Phase 9 (F9.1–F9.4). Each campaign fixes one **content language** at creation (immutable thereafter); narrative extraction, conflict detection, and query answers are all produced in it, keeping the stored world state single-language. This is the per-*campaign* language axis, independent of a user's UI locale (D-099). Embeddings are unchanged — the embedding models are multilingual and consistency is guaranteed by the per-campaign constraint, not by tagging data. See [campaign_management.md](campaign_management.md) for the capability inventory.
+- **Technical Reference / Source Files:** [campaign_management.md](campaign_management.md); schema `apps/api/src/main/resources/db/changelog/0030_add_campaign_content_language.xml`; domain `apps/api/.../domain/campaign/Campaign.java` (`contentLanguage`, default `en`); create API `CreateCampaignRequest.java` (`@Pattern("^(en|es)$")`) → `CampaignController.java`. Language injected into the hardcoded prompts via `apps/api/.../adapters/out/ai/PromptLanguage.java` in `SpringAiNarrativeExtractionAdapter.java`, `SpringAiConflictDetectionAdapter.java`, and `QueryPromptAssembler.java`. Frontend picker `apps/web/src/features/campaigns/CreateCampaignPage.tsx` + read-only display on `CampaignHomePage.tsx` (options in `apps/web/src/i18n/localeOptions.ts`).
 
 ---
 

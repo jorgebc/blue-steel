@@ -19,7 +19,7 @@ Session lifecycle: `PENDING → PROCESSING → DRAFT → COMMITTED` (or `FAILED`
 
 - **Use Case / Action:** Run the 4-stage extraction pipeline — ✅ Implemented
 - **Actor:** System (async event listener)
-- **Functional Description:** A post-commit `SessionSubmittedEvent` triggers the pipeline on a dedicated executor, running four sequential stages. Any stage failure marks the session `FAILED` with a machine-readable reason that the UI surfaces.
+- **Functional Description:** A post-commit `SessionSubmittedEvent` triggers the pipeline on a dedicated executor, running four sequential stages. Any stage failure marks the session `FAILED` with a machine-readable reason that the UI surfaces. All LLM-generated text — the narrative header, extracted entity names/descriptions, and conflict descriptions — is produced in the **campaign's content language** (EN/ES, D-099/D-103); see [campaign_management.md](campaign_management.md).
   1. **Extraction** — one LLM call turns the narrative into candidate actors, spaces, events, relations, and entity mentions; the session moves to `PROCESSING`.
   2. **Entity resolution** — two-stage and cost-aware (D-041): each mention is embedded and compared to existing entities via pgvector similarity; mentions below the similarity floor (0.75) are classified NEW with no LLM call, while close candidates go to a second LLM call that returns MATCH / NEW / UNCERTAIN.
   3. **Conflict detection** — retrieves bounded world-state context via pgvector and asks the LLM for contradictions between the new narrative and established facts; skipped entirely when no MATCH-resolved entities exist (D-033/D-034). Warnings are non-blocking.

@@ -16,7 +16,7 @@ The application exposes **three interaction modes**, all shipped in v1:
 | **Query Mode** | Ask free-form questions → receive grounded answers with session citations | All campaign members |
 | **Exploration Mode** | Browse world state through four visual views (Timeline, Entities, Spaces, Relations) | All campaign members |
 
-Roadmap status: Phases 0–4 of the v1 roadmap (infrastructure, auth, campaigns, session ingestion, Query Mode, Exploration Mode) are **complete**, and v2 **Phase 5 — Proposals & Approval Pipeline** has shipped (see [proposals.md](proposals.md)). Remaining gaps are explicitly deferred v2 features (Phases 6–9) — see [Deferred & Planned Features](deferred_and_planned.md).
+Roadmap status: Phases 0–4 of the v1 roadmap (infrastructure, auth, campaigns, session ingestion, Query Mode, Exploration Mode) are **complete**. In v2, **Phase 5** (Proposals & Approval Pipeline — see [proposals.md](proposals.md)), **Phase 6** (Input & Query enhancements: commit `add` action + Q&A history log), **Phase 8** (User Profile, Settings, Theme & UI i18n — see [system_platform.md](system_platform.md)), and **Phase 9** (Per-Campaign Content Language — see [campaign_management.md](campaign_management.md)) have all shipped. The only remaining deferred v2 phase is **Phase 7 — Campaign Export** — see [Deferred & Planned Features](deferred_and_planned.md).
 
 ---
 
