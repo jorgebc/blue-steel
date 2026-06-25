@@ -22,8 +22,17 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { LOCALE_OPTIONS } from '@/i18n/localeOptions'
+import type { UiLocale } from '@/types/auth'
 
-type FormValues = { name: string; gmUserId: string }
+type FormValues = { name: string; gmUserId: string; contentLanguage: UiLocale }
 
 /**
  * Admin-only campaign creation: name the campaign, pick its GM by email, and
@@ -43,9 +52,10 @@ export function CreateCampaignPage() {
       z.object({
         name: z.string().min(1, t('campaigns.nameRequired')),
         gmUserId: z.string().min(1, t('campaigns.gmRequired')),
+        contentLanguage: z.enum(['en', 'es']),
       })
     ),
-    defaultValues: { name: '', gmUserId: '' },
+    defaultValues: { name: '', gmUserId: '', contentLanguage: 'en' },
   })
 
   const debouncedGmQuery = useDebouncedValue(gmQuery.trim())
@@ -104,6 +114,31 @@ export function CreateCampaignPage() {
                 <FormControl>
                   <Input placeholder={t('campaigns.namePlaceholder')} {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="contentLanguage"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('campaigns.contentLanguageLabel')}</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {LOCALE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}

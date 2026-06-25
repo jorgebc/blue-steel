@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from './client'
 import type { CampaignResponse } from '@/types/campaign'
+import type { UiLocale } from '@/types/auth'
 
 /** Query-key factory for campaign queries. */
 export const campaignKeys = {
@@ -40,10 +41,11 @@ export function useCampaign(id: string | undefined) {
   })
 }
 
-/** Creates a campaign with its GM (admin-only on the backend). */
+/** Creates a campaign with its GM and immutable content language (admin-only on the backend). */
 export async function createCampaign(body: {
   name: string
   gmUserId: string
+  contentLanguage: UiLocale
 }): Promise<CampaignResponse> {
   const res = await apiClient.post<CampaignResponse>('/api/v1/campaigns', body)
   return res.data

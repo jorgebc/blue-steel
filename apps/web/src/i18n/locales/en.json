@@ -138,6 +138,7 @@
     "namePlaceholder": "Curse of Strahd",
     "nameRequired": "Campaign name is required",
     "gmRequired": "Select a GM for this campaign",
+    "contentLanguageLabel": "Content language",
     "gameMaster": "Game master",
     "change": "Change",
     "searchUsers": "Search users by email",

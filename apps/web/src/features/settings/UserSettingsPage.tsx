@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { LOCALE_OPTIONS } from '@/i18n/localeOptions'
 import type { Theme, UiLocale } from '@/types/auth'
 import { AccentColorPicker } from './components/AccentColorPicker'
 import { DEFAULT_ACCENT } from './accentPalette'
@@ -36,12 +37,6 @@ const THEME_OPTIONS: { value: Theme; labelKey: string }[] = [
   { value: 'light', labelKey: 'userMenu.themeLight' },
   { value: 'dark', labelKey: 'userMenu.themeDark' },
   { value: 'system', labelKey: 'userMenu.themeSystem' },
-]
-
-// Language names are intentionally shown in their own language, never translated (matches UserMenu).
-const LOCALE_OPTIONS: { value: UiLocale; label: string }[] = [
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Español' },
 ]
 
 type FormValues = {
