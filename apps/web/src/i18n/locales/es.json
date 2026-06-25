@@ -139,6 +139,7 @@
     "nameRequired": "El nombre de la campaña es obligatorio",
     "gmRequired": "Selecciona un GM para esta campaña",
     "contentLanguageLabel": "Idioma del contenido",
+    "contentLanguageRequired": "Elige un idioma de contenido",
     "gameMaster": "Game master",
     "change": "Cambiar",
     "searchUsers": "Buscar usuarios por correo electrónico",

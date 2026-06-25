@@ -13,6 +13,13 @@ A campaign is the top-level container of Blue Steel: all sessions, world state, 
 
 ---
 
+- **Use Case / Action:** Admin fixes the campaign's content language at creation — ✅ Implemented (v2, Phase 9, D-099/D-103)
+- **Actor:** Admin (at creation; chosen on behalf of the GM)
+- **Functional Description:** At creation the campaign is assigned one **content language** (EN/ES, default EN), which is **immutable thereafter** — there is no API path to change it (an invalid value returns `400`; pre-existing campaigns read back as `en`). This single language drives all LLM output for the campaign — narrative extraction, conflict-detection descriptions, and query answers are all produced in it — keeping the stored world state single-language. It is the per-*campaign* language axis, deliberately independent of a user's per-*user* UI locale (D-099). Embeddings are byte-for-byte unchanged: the embedding models are multilingual and consistency is guaranteed by the per-campaign constraint, not by tagging vectors (D-103). The create form offers the EN/ES choice; the campaign home page displays the chosen language read-only with no affordance to edit it.
+- **Technical Reference / Source Files:** schema `apps/api/src/main/resources/db/changelog/0030_add_campaign_content_language.xml`; domain `apps/api/src/main/java/com/bluesteel/domain/campaign/Campaign.java` (`contentLanguage`, default `en`); `CreateCampaignRequest.java` (`@Pattern("^(en|es)$")`) → `CampaignController.java`; language injected into prompts via `apps/api/src/main/java/com/bluesteel/adapters/out/ai/PromptLanguage.java` (`SpringAiNarrativeExtractionAdapter.java`, `SpringAiConflictDetectionAdapter.java`, `QueryPromptAssembler.java`); query path reads it from the campaign in `QueryService.java`; frontend `apps/web/src/features/campaigns/CreateCampaignPage.tsx` + read-only display in `CampaignHomePage.tsx` (options in `apps/web/src/i18n/localeOptions.ts`)
+
+---
+
 - **Use Case / Action:** User lists and opens their campaigns — ✅ Implemented
 - **Actor:** Authenticated User (any role; Admin sees all campaigns)
 - **Functional Description:** The home page (`/`) lists every campaign the caller belongs to, with a role badge (GM/Editor/Player). Selecting a campaign loads its context (active campaign + caller's role) and lands on the campaign home page, which offers navigation into the three modes and, for GMs, member management.

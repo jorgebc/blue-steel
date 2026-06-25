@@ -1713,7 +1713,7 @@ single-language. This is the per-*campaign* axis (D-099), independent of the per
 **Goal:** Persist and expose an immutable per-campaign content language, set at creation.
 
 **Scope (in):**
-- append-only migration `0027_add_campaign_content_language.xml` (`content_language TEXT NOT NULL DEFAULT 'en'`); registered in the master changelog
+- append-only migration `0030_add_campaign_content_language.xml` (`content_language TEXT NOT NULL DEFAULT 'en'`); registered in the master changelog
 - extend `CampaignJpaEntity` + the `Campaign` domain + `CreateCampaignRequest` (`contentLanguage ∈ {en,es}`) + campaign read DTOs; **no** update path (immutable)
 
 **Scope (out):** Prompt wiring (F9.2/F9.3); UI (F9.4).
