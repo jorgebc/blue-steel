@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useCampaignStore } from '@/store/campaignStore'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Button } from '@/components/ui/button'
+import { LOCALE_OPTIONS } from '@/i18n/localeOptions'
 import { MemberManagementPanel } from './components/MemberManagementPanel'
 import { DeleteCampaignConfirmOverlay } from './components/DeleteCampaignConfirmOverlay'
 
@@ -53,6 +54,15 @@ export function CampaignHomePage() {
           <p className="mt-2 max-w-prose text-sm text-muted-foreground">
             {t('campaigns.welcomeBack')}
           </p>
+          {campaign?.contentLanguage && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t('campaigns.contentLanguageLabel')}:{' '}
+              <span className="text-foreground">
+                {LOCALE_OPTIONS.find((o) => o.value === campaign.contentLanguage)?.label ??
+                  campaign.contentLanguage}
+              </span>
+            </p>
+          )}
         </div>
       </div>
 

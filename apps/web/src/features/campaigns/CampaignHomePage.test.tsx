@@ -43,6 +43,7 @@ const campaign: CampaignResponse = {
   name: 'Curse of Strahd',
   createdBy: 'u1',
   createdAt: '2026-01-01T00:00:00Z',
+  contentLanguage: 'es',
   role: 'gm',
 }
 
@@ -80,6 +81,14 @@ describe('CampaignHomePage', () => {
     renderPage()
 
     expect(screen.getByText(/use the sidebar/i)).toBeInTheDocument()
+  })
+
+  it('shows the content language read-only with no edit control', () => {
+    renderPage()
+
+    expect(screen.getByText(/content language/i)).toBeInTheDocument()
+    expect(screen.getByText('Español')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /content language/i })).not.toBeInTheDocument()
   })
 
   it('renders a Session history link pointing to the campaign sessions page', () => {

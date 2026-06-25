@@ -14,6 +14,7 @@ import {
 import { useAuthStore } from '@/store/authStore'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useUpdateProfile } from '@/api/users'
+import { LOCALE_OPTIONS } from '@/i18n/localeOptions'
 import type { Theme, UiLocale } from '@/types/auth'
 import { InitialsAvatar } from './InitialsAvatar'
 
@@ -21,13 +22,6 @@ const THEME_OPTIONS: { value: Theme; labelKey: string }[] = [
   { value: 'light', labelKey: 'userMenu.themeLight' },
   { value: 'dark', labelKey: 'userMenu.themeDark' },
   { value: 'system', labelKey: 'userMenu.themeSystem' },
-]
-
-// Language names are conventionally shown in their own language regardless of the
-// active UI locale, so these labels stay literal (not translated).
-const LOCALE_OPTIONS: { value: UiLocale; label: string }[] = [
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Español' },
 ]
 
 /** Selecting a quick toggle persists the preference but keeps the menu open for further tweaks. */

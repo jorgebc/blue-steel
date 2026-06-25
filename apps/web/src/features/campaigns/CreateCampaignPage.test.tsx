@@ -103,11 +103,35 @@ describe('CreateCampaignPage', () => {
 
     await waitFor(() =>
       expect(mutate).toHaveBeenCalledWith(
-        { name: 'Curse of Strahd', gmUserId: 'gm1' },
+        { name: 'Curse of Strahd', gmUserId: 'gm1', contentLanguage: 'en' },
         expect.anything()
       )
     )
     expect(mockNavigate).toHaveBeenCalledWith('/campaigns/new-campaign')
+  })
+
+  it('submits the chosen content language when Spanish is selected', async () => {
+    const mutate = vi.fn((_vars: unknown, opts?: { onSuccess?: (c: { id: string }) => void }) => {
+      opts?.onSuccess?.({ id: 'new-campaign' })
+    })
+    mockUseCreateCampaign.mockReturnValue({ mutate, isPending: false } as unknown as ReturnType<
+      typeof useCreateCampaign
+    >)
+
+    renderPage()
+    await userEvent.type(screen.getByLabelText(/campaign name/i), 'Curse of Strahd')
+    await userEvent.click(screen.getByRole('combobox', { name: /content language/i }))
+    await userEvent.click(await screen.findByRole('option', { name: 'Español' }))
+    await userEvent.type(screen.getByLabelText(/game master/i), 'gm')
+    await userEvent.click(screen.getByRole('button', { name: 'gm@example.com' }))
+    await userEvent.click(screen.getByRole('button', { name: /create campaign/i }))
+
+    await waitFor(() =>
+      expect(mutate).toHaveBeenCalledWith(
+        { name: 'Curse of Strahd', gmUserId: 'gm1', contentLanguage: 'es' },
+        expect.anything()
+      )
+    )
   })
 
   it('maps a 400 field error to the corresponding form field', async () => {

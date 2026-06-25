@@ -24,6 +24,7 @@ const campaign: CampaignResponse = {
   name: 'Curse of Strahd',
   createdBy: 'u1',
   createdAt: '2026-01-01T00:00:00Z',
+  contentLanguage: 'en',
   role: 'gm',
 }
 
@@ -116,14 +117,19 @@ describe('createCampaign', () => {
     vi.clearAllMocks()
   })
 
-  it('POSTs name and gmUserId to the campaigns endpoint and unwraps the envelope', async () => {
+  it('POSTs name, gmUserId, and contentLanguage to the campaigns endpoint and unwraps the envelope', async () => {
     vi.mocked(apiClient.post).mockResolvedValue(envelope(campaign))
 
-    const result = await createCampaign({ name: 'Curse of Strahd', gmUserId: 'u1' })
+    const result = await createCampaign({
+      name: 'Curse of Strahd',
+      gmUserId: 'u1',
+      contentLanguage: 'es',
+    })
 
     expect(apiClient.post).toHaveBeenCalledWith('/api/v1/campaigns', {
       name: 'Curse of Strahd',
       gmUserId: 'u1',
+      contentLanguage: 'es',
     })
     expect(result).toEqual(campaign)
   })
@@ -142,7 +148,7 @@ describe('useCreateCampaign', () => {
       createElement(QueryClientProvider, { client: queryClient }, children)
 
     const { result } = renderHook(() => useCreateCampaign(), { wrapper: localWrapper })
-    result.current.mutate({ name: 'Curse of Strahd', gmUserId: 'u1' })
+    result.current.mutate({ name: 'Curse of Strahd', gmUserId: 'u1', contentLanguage: 'en' })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: campaignKeys.all })

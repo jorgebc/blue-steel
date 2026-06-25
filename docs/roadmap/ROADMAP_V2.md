@@ -1706,7 +1706,7 @@ single-language. This is the per-*campaign* axis (D-099), independent of the per
 | F9.1 | Backend: campaign `content_language` schema + domain + create API | ✅ |
 | F9.2 | Backend: thread language into extraction + conflict-detection prompts | ✅ |
 | F9.3 | Backend: language in query-answering prompt | ✅ |
-| F9.4 | Frontend: content-language picker on create + read-only display | 🔲 |
+| F9.4 | Frontend: content-language picker on create + read-only display | ✅ |
 
 #### F9.1 — Backend: campaign `content_language` schema + domain + create API
 
