@@ -2285,6 +2285,8 @@ Phase 5 (Proposals) is the v2 headline feature and unlocks the social approval l
 - Phase 8/9 before Phase 7 — considered; user personalization is more broadly useful than export. Rejected in favour of numerical order; campaign export is a safety feature (pre-deletion guard) that logically precedes personalization in the product value hierarchy.
 - Resequence Phase 6 after Phase 8/9 — rejected; Phase 6 closes the most visible v1 UX gaps (add entity in diff review, Q&A history) and should ship while Phase 5's workflow is fresh in users' minds.
 
+**Amendment (2026-06-26):** Delivery diverged from the planned order — Phase 7 (Campaign Export) shipped **last**, after Phases 8 and 9. Consequently the minor bumps tracked the actual completion order rather than this mapping: `1.3.0`/`1.4.0` landed with Phase 8 work and `1.5.0` with Phase 9, so the original `1.3.0` = Phase 7 row was overtaken by events. Phase 7's completion is therefore released as **`1.6.0`**, which marks the v2 feature set (Phases 5–9) complete. Future post-1.0 bumps continue from `1.6.0`; the phase→version rows above are historical, not prescriptive.
+
 ---
 
 ### D-112 — Campaign export: structured JSON archive, raw-file download, GM-or-admin authorization
