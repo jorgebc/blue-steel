@@ -14,6 +14,7 @@ import com.bluesteel.domain.exception.DuplicateVoteException;
 import com.bluesteel.domain.exception.EmailDeliveryException;
 import com.bluesteel.domain.exception.EmptyDeltaException;
 import com.bluesteel.domain.exception.EntityNotFoundException;
+import com.bluesteel.domain.exception.ExportTooLargeException;
 import com.bluesteel.domain.exception.GmCannotCoSignException;
 import com.bluesteel.domain.exception.InvalidCredentialsException;
 import com.bluesteel.domain.exception.InvalidPasswordException;
@@ -98,6 +99,12 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
   public ApiResponse<Void> handleCannotRemoveGm(CannotRemoveGmException ex) {
     return ApiResponse.error(ApiError.of("CANNOT_REMOVE_GM", ex.getMessage()));
+  }
+
+  @ExceptionHandler(ExportTooLargeException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
+  public ApiResponse<Void> handleExportTooLarge(ExportTooLargeException ex) {
+    return ApiResponse.error(ApiError.of("EXPORT_TOO_LARGE", ex.getMessage()));
   }
 
   @ExceptionHandler(InvalidPasswordException.class)

@@ -976,11 +976,11 @@ rail before campaign deletion.
 | # | Feature | Status |
 |---|---|---|
 | F7-GATE | 👤 Human: record export format + GM/admin authz as D-112 in DECISIONS.md | ✅ |
-| F7.1 | Backend: campaign export endpoint | 🔲 |
-| F7.1.1 | Archive model records for the campaign export tree | 🔲 |
-| F7.1.2 | CampaignExportReadPort + native-SQL bulk-read adapter (+IT) | 🔲 |
-| F7.1.3 | ExportCampaignUseCase + ExportCampaignService (GM/admin authz, size cap) | 🔲 |
-| F7.1.4 | CampaignExportController — raw-JSON attachment download (+WebMvc test) | 🔲 |
+| F7.1 | Backend: campaign export endpoint | ✅ |
+| F7.1.1 | Archive model records for the campaign export tree | ✅ |
+| F7.1.2 | CampaignExportReadPort + native-SQL bulk-read adapter (+IT) | ✅ |
+| F7.1.3 | ExportCampaignUseCase + ExportCampaignService (GM/admin authz, size cap) | ✅ |
+| F7.1.4 | CampaignExportController — raw-JSON attachment download (+WebMvc test) | ✅ |
 | F7.2 | Frontend: export affordance in campaign danger zone | 🔲 |
 | F7.2.1 | apiClient.download() — blob + Content-Disposition filename (+test) | 🔲 |
 | F7.2.2 | api/campaigns.ts exportCampaign + useExportCampaign (+test) | 🔲 |
