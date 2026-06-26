@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { LOCALE_OPTIONS } from '@/i18n/localeOptions'
 import { MemberManagementPanel } from './components/MemberManagementPanel'
 import { DeleteCampaignConfirmOverlay } from './components/DeleteCampaignConfirmOverlay'
+import { CampaignExportButton } from './components/CampaignExportButton'
 
 /**
  * Per-campaign landing page reached on entering a campaign (and after a
@@ -87,34 +88,43 @@ export function CampaignHomePage() {
 
       {campaignId && campaign?.role === 'gm' && <MemberManagementPanel campaignId={campaignId} />}
 
-      {isAdmin && campaignId && (
+      {(isAdmin || campaign?.role === 'gm') && campaignId && (
         <div className="mt-10 border-t border-red-100 pt-6">
-          <h2 className="mb-1 text-sm font-medium text-red-700">{t('campaigns.dangerZone')}</h2>
-          <p className="mb-4 text-sm text-muted-foreground">{t('campaigns.deleteDescription')}</p>
-          {deleteError && (
-            <div className="mb-4">
-              <InlineBanner
-                variant="error"
-                message={t('campaigns.deleteError')}
-                onDismiss={() => setDeleteError(false)}
+          <h2 className="mb-4 text-sm font-medium text-red-700">{t('campaigns.dangerZone')}</h2>
+
+          <CampaignExportButton campaignId={campaignId} />
+
+          {isAdmin && (
+            <div className="mt-6">
+              <p className="mb-4 text-sm text-muted-foreground">
+                {t('campaigns.deleteDescription')}
+              </p>
+              {deleteError && (
+                <div className="mb-4">
+                  <InlineBanner
+                    variant="error"
+                    message={t('campaigns.deleteError')}
+                    onDismiss={() => setDeleteError(false)}
+                  />
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-50"
+                onClick={() => setDeleteOpen(true)}
+              >
+                {t('campaigns.deleteCampaign')}
+              </Button>
+              <DeleteCampaignConfirmOverlay
+                open={deleteOpen}
+                campaignName={campaign?.name ?? ''}
+                onClose={() => setDeleteOpen(false)}
+                onConfirm={handleDeleteConfirm}
+                isPending={isPending}
               />
             </div>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            className="border-red-300 text-red-700 hover:bg-red-50"
-            onClick={() => setDeleteOpen(true)}
-          >
-            {t('campaigns.deleteCampaign')}
-          </Button>
-          <DeleteCampaignConfirmOverlay
-            open={deleteOpen}
-            campaignName={campaign?.name ?? ''}
-            onClose={() => setDeleteOpen(false)}
-            onConfirm={handleDeleteConfirm}
-            isPending={isPending}
-          />
         </div>
       )}
     </main>

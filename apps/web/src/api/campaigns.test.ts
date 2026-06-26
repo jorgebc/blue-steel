@@ -6,17 +6,19 @@ import { apiClient } from './client'
 import {
   campaignKeys,
   createCampaign,
+  exportCampaign,
   getCampaign,
   getCampaigns,
   useCampaign,
   useCampaigns,
   useCreateCampaign,
+  useExportCampaign,
 } from './campaigns'
 import { createTestQueryClient } from '@/test/createTestQueryClient'
 import type { CampaignResponse } from '@/types/campaign'
 
 vi.mock('./client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn() },
+  apiClient: { get: vi.fn(), post: vi.fn(), download: vi.fn() },
 }))
 
 const campaign: CampaignResponse = {
@@ -152,5 +154,47 @@ describe('useCreateCampaign', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: campaignKeys.all })
+  })
+})
+
+describe('exportCampaign', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('downloads the campaign export endpoint and returns the blob + filename', async () => {
+    const payload = { blob: new Blob(['{}']), filename: 'curse-of-strahd-export.json' }
+    vi.mocked(apiClient.download).mockResolvedValue(payload)
+
+    const result = await exportCampaign('c1')
+
+    expect(apiClient.download).toHaveBeenCalledWith('/api/v1/campaigns/c1/export')
+    expect(result).toEqual(payload)
+  })
+})
+
+describe('useExportCampaign', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('resolves with the blob + filename on success', async () => {
+    const payload = { blob: new Blob(['{}']), filename: 'curse-of-strahd-export.json' }
+    vi.mocked(apiClient.download).mockResolvedValue(payload)
+
+    const { result } = renderHook(() => useExportCampaign(), { wrapper })
+    result.current.mutate('c1')
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual(payload)
+  })
+
+  it('surfaces the error state when the export request rejects', async () => {
+    vi.mocked(apiClient.download).mockRejectedValue(new Error('too large'))
+
+    const { result } = renderHook(() => useExportCampaign(), { wrapper })
+    result.current.mutate('c1')
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
   })
 })

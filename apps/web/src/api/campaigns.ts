@@ -73,3 +73,13 @@ export function useDeleteCampaign() {
     onSuccess: () => queryClient.removeQueries({ queryKey: campaignKeys.all }),
   })
 }
+
+/** Downloads the full campaign archive as a JSON attachment (GM/admin-only on the backend). */
+export async function exportCampaign(id: string): Promise<{ blob: Blob; filename: string }> {
+  return apiClient.download(`/api/v1/campaigns/${id}/export`)
+}
+
+/** Triggers a campaign export download. Read-only, so it invalidates no cache. */
+export function useExportCampaign() {
+  return useMutation({ mutationFn: exportCampaign })
+}
