@@ -102,6 +102,55 @@ async function request<T>(
   return envelope
 }
 
+const DEFAULT_DOWNLOAD_FILENAME = 'download'
+
+// Parse the filename from a Content-Disposition header, falling back to a
+// default. Handles the quoted form the backend emits (filename="…").
+function parseContentDispositionFilename(header: string | null): string {
+  if (!header) return DEFAULT_DOWNLOAD_FILENAME
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header)
+  return match ? decodeURIComponent(match[1].trim()) : DEFAULT_DOWNLOAD_FILENAME
+}
+
+// Like request(), but for binary/file responses: reads the body as a Blob and
+// extracts the download filename instead of parsing a JSON envelope. Shares the
+// same auth header + 401 silent-refresh+retry machinery.
+async function downloadRequest(
+  path: string,
+  retried = false
+): Promise<{ blob: Blob; filename: string }> {
+  const token = useAuthStore.getState().accessToken
+  const response = await fetch(`${apiBaseUrl()}${path}`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+
+  if (response.status === 401) {
+    if (!retried) {
+      const refreshed = await attemptTokenRefresh()
+      if (refreshed) return downloadRequest(path, true)
+    }
+    useAuthStore.getState().logout()
+    window.location.href = '/login'
+    throw new ApiClientError('Session expired', 401, [])
+  }
+
+  if (!response.ok) {
+    // A failed download (e.g. 422 size cap) still emits the error envelope.
+    const envelope = (await response.json()) as ApiEnvelope<null>
+    throw new ApiClientError(
+      envelope.errors?.[0]?.message ?? 'Download failed.',
+      response.status,
+      envelope.errors ?? []
+    )
+  }
+
+  const blob = await response.blob()
+  const filename = parseContentDispositionFilename(response.headers.get('Content-Disposition'))
+  return { blob, filename }
+}
+
 export const apiClient = {
   get: <T>(path: string): Promise<ApiEnvelope<T>> => request<T>('GET', path),
   post: <T>(path: string, body?: unknown): Promise<ApiEnvelope<T>> =>
@@ -109,4 +158,5 @@ export const apiClient = {
   patch: <T>(path: string, body?: unknown): Promise<ApiEnvelope<T>> =>
     request<T>('PATCH', path, body),
   delete: <T>(path: string): Promise<ApiEnvelope<T>> => request<T>('DELETE', path),
+  download: (path: string): Promise<{ blob: Blob; filename: string }> => downloadRequest(path),
 }

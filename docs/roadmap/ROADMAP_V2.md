@@ -981,11 +981,11 @@ rail before campaign deletion.
 | F7.1.2 | CampaignExportReadPort + native-SQL bulk-read adapter (+IT) | ✅ |
 | F7.1.3 | ExportCampaignUseCase + ExportCampaignService (GM/admin authz, size cap) | ✅ |
 | F7.1.4 | CampaignExportController — raw-JSON attachment download (+WebMvc test) | ✅ |
-| F7.2 | Frontend: export affordance in campaign danger zone | 🔲 |
-| F7.2.1 | apiClient.download() — blob + Content-Disposition filename (+test) | 🔲 |
-| F7.2.2 | api/campaigns.ts exportCampaign + useExportCampaign (+test) | 🔲 |
-| F7.2.3 | CampaignExportButton — pending state, file save, InlineBanner (+test) | 🔲 |
-| F7.2.4 | Wire export into CampaignHomePage danger zone (GM+admin gating) | 🔲 |
+| F7.2 | Frontend: export affordance in campaign danger zone | ✅ |
+| F7.2.1 | apiClient.download() — blob + Content-Disposition filename (+test) | ✅ |
+| F7.2.2 | api/campaigns.ts exportCampaign + useExportCampaign (+test) | ✅ |
+| F7.2.3 | CampaignExportButton — pending state, file save, InlineBanner (+test) | ✅ |
+| F7.2.4 | Wire export into CampaignHomePage danger zone (GM+admin gating) | ✅ |
 
 #### F7-GATE — Human: record the Phase 7 Gate decision (run once before F7.1.1)
 

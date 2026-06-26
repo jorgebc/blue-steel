@@ -33,6 +33,12 @@ vi.mock('./components/DeleteCampaignConfirmOverlay', () => ({
     open ? <div data-testid="delete-overlay" /> : null,
 }))
 
+vi.mock('./components/CampaignExportButton', () => ({
+  CampaignExportButton: ({ campaignId }: { campaignId: string }) => (
+    <div data-testid="export-button">export for {campaignId}</div>
+  ),
+}))
+
 const mockedUseCampaign = vi.mocked(useCampaign)
 const mockedUseDeleteCampaign = vi.mocked(useDeleteCampaign)
 const mockedUseAuthStore = vi.mocked(useAuthStore)
@@ -114,21 +120,36 @@ describe('CampaignHomePage', () => {
     expect(screen.queryByTestId('member-panel')).not.toBeInTheDocument()
   })
 
-  it('shows the danger zone section for admins', () => {
+  it('shows the danger zone with both export and delete for admins', () => {
     mockedUseAuthStore.mockReturnValue(true)
 
     renderPage()
 
     expect(screen.getByText('Danger zone')).toBeInTheDocument()
+    expect(screen.getByTestId('export-button')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /delete campaign/i })).toBeInTheDocument()
   })
 
-  it('hides the danger zone section for non-admins', () => {
+  it('shows the danger zone with export but not delete for a non-admin GM', () => {
     mockedUseAuthStore.mockReturnValue(false)
 
     renderPage()
 
+    expect(screen.getByText('Danger zone')).toBeInTheDocument()
+    expect(screen.getByTestId('export-button')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /delete campaign/i })).not.toBeInTheDocument()
+  })
+
+  it('hides the danger zone for a non-admin, non-GM member', () => {
+    mockedUseAuthStore.mockReturnValue(false)
+    mockedUseCampaign.mockReturnValue({
+      data: { ...campaign, role: 'player' },
+    } as ReturnType<typeof useCampaign>)
+
+    renderPage()
+
     expect(screen.queryByText('Danger zone')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('export-button')).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

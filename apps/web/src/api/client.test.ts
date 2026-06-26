@@ -39,6 +39,13 @@ function refreshSuccessResponse(newToken: string): Response {
   })
 }
 
+// Helper: build a binary attachment response with a Content-Disposition header
+function attachmentResponse(body: string, filename?: string): Response {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (filename) headers['Content-Disposition'] = `attachment; filename="${filename}"`
+  return new Response(body, { status: 200, headers })
+}
+
 describe('apiClient', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>
   let mockLocation: { href: string }
@@ -221,5 +228,57 @@ describe('apiClient', () => {
       (args[0] as string).includes('/auth/refresh')
     )
     expect(refreshCalls).toHaveLength(1)
+  })
+
+  // ── download() ───────────────────────────────────────────────────────────────
+
+  it('download() returns the blob and parses the Content-Disposition filename', async () => {
+    fetchSpy.mockResolvedValueOnce(attachmentResponse('{"a":1}', 'curse-of-strahd-export.json'))
+
+    const { blob, filename } = await apiClient.download('/api/v1/campaigns/c1/export')
+
+    expect(filename).toBe('curse-of-strahd-export.json')
+    expect(await blob.text()).toBe('{"a":1}')
+    const [url, init] = fetchSpy.mock.calls[0]
+    expect(url).toBe(`${BASE}/api/v1/campaigns/c1/export`)
+    expect((init as RequestInit).method).toBe('GET')
+  })
+
+  it('download() falls back to a default filename when Content-Disposition is absent', async () => {
+    fetchSpy.mockResolvedValueOnce(attachmentResponse('{}'))
+
+    const { filename } = await apiClient.download('/api/v1/campaigns/c1/export')
+
+    expect(filename).toBe('download')
+  })
+
+  it('download() on 401 refreshes the token silently and retries once', async () => {
+    useAuthStore.setState({ accessToken: 'old-token' })
+    fetchSpy
+      .mockResolvedValueOnce(unauthorizedResponse()) // original → 401
+      .mockResolvedValueOnce(refreshSuccessResponse('new-token')) // refresh → 200
+      .mockResolvedValueOnce(attachmentResponse('{}', 'export.json')) // retry → 200
+
+    const { filename } = await apiClient.download('/api/v1/campaigns/c1/export')
+
+    expect(filename).toBe('export.json')
+    expect(useAuthStore.getState().accessToken).toBe('new-token')
+    const [, retryInit] = fetchSpy.mock.calls[2]
+    expect((retryInit as RequestInit).headers).toMatchObject({
+      Authorization: 'Bearer new-token',
+    })
+  })
+
+  it('download() surfaces the error envelope when the response is not ok (e.g. 422 size cap)', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      errorEnvelopeResponse('EXPORT_TOO_LARGE', 'Campaign too large to export', 422)
+    )
+
+    await expect(apiClient.download('/api/v1/campaigns/c1/export')).rejects.toSatisfy(
+      (err: unknown) =>
+        err instanceof ApiClientError &&
+        err.status === 422 &&
+        err.errors[0].code === 'EXPORT_TOO_LARGE'
+    )
   })
 })
