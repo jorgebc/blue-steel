@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Download } from 'lucide-react'
 import { useExportCampaign } from '@/api/campaigns'
+import { ApiClientError } from '@/api/client'
 import { downloadBlob } from '@/lib/downloadBlob'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Button } from '@/components/ui/button'
@@ -29,8 +30,13 @@ export function CampaignExportButton({ campaignId }: Props) {
         downloadBlob(blob, filename)
         setBanner({ variant: 'success', message: t('campaigns.exportSuccess') })
       },
-      onError() {
-        setBanner({ variant: 'error', message: t('campaigns.exportError') })
+      onError(error) {
+        const tooLarge =
+          error instanceof ApiClientError && error.errors[0]?.code === 'EXPORT_TOO_LARGE'
+        setBanner({
+          variant: 'error',
+          message: t(tooLarge ? 'campaigns.exportTooLarge' : 'campaigns.exportError'),
+        })
       },
     })
   }

@@ -5,6 +5,7 @@ import { axe } from 'vitest-axe'
 import i18n from '@/i18n'
 import { CampaignExportButton } from './CampaignExportButton'
 import { useExportCampaign } from '@/api/campaigns'
+import { ApiClientError } from '@/api/client'
 import { downloadBlob } from '@/lib/downloadBlob'
 
 vi.mock('@/api/campaigns', () => ({ useExportCampaign: vi.fn() }))
@@ -14,7 +15,7 @@ const mockedUseExportCampaign = vi.mocked(useExportCampaign)
 
 type MutateOptions = {
   onSuccess?: (payload: { blob: Blob; filename: string }) => void
-  onError?: () => void
+  onError?: (error: unknown) => void
 }
 
 // Build a mock hook return whose mutate immediately invokes the success or error
@@ -23,9 +24,11 @@ function mockHook(opts: {
   isPending?: boolean
   resolveWith?: { blob: Blob; filename: string }
   reject?: boolean
+  rejectWith?: unknown
 }) {
   const mutate = vi.fn((_id: string, options?: MutateOptions) => {
-    if (opts.reject) options?.onError?.()
+    if (opts.rejectWith !== undefined) options?.onError?.(opts.rejectWith)
+    else if (opts.reject) options?.onError?.(new Error('failed'))
     else if (opts.resolveWith) options?.onSuccess?.(opts.resolveWith)
   })
   mockedUseExportCampaign.mockReturnValue({
@@ -60,6 +63,24 @@ describe('CampaignExportButton', () => {
 
     expect(downloadBlob).not.toHaveBeenCalled()
     expect(screen.getByText('Failed to export the campaign. Please try again.')).toBeInTheDocument()
+  })
+
+  it('shows a specific banner when the campaign exceeds the export size cap', async () => {
+    mockHook({
+      rejectWith: new ApiClientError('too large', 422, [
+        { code: 'EXPORT_TOO_LARGE', message: 'too large', field: null },
+      ]),
+    })
+
+    render(<CampaignExportButton campaignId="c1" />)
+    await userEvent.click(screen.getByRole('button', { name: 'Export campaign' }))
+
+    expect(downloadBlob).not.toHaveBeenCalled()
+    expect(
+      screen.getByText(
+        'This campaign is too large to export. Ask an admin to raise the export limit.'
+      )
+    ).toBeInTheDocument()
   })
 
   it('disables the button and shows the pending label while exporting', () => {
