@@ -27,10 +27,10 @@ This register consolidates everything that exists in the repository only as sche
 
 ---
 
-- **Use Case / Action:** Export a campaign as a portable archive — 🚧 Planned (v2, Phase 7, D-112)
+- **Use Case / Action:** Export a campaign as a portable archive — ✅ Implemented (v2, Phase 7, D-112)
 - **Actor:** GM or Admin
-- **Functional Description:** Not yet implemented — the only remaining planned v2 phase. Will download a campaign's full data (members, actors/spaces/events/relations with complete version history, annotations, sessions) as a single **structured JSON archive**, served as a raw file attachment (`Content-Disposition: attachment`) rather than the `{data,meta,errors}` envelope, gated to **GM or admin** (D-112). Primary purpose is a guard rail before campaign deletion. PRD §7 "public sharing / sharable links" stays post-v2 (D-112).
-- **Technical Reference / Source Files:** Planned: `ExportCampaignUseCase` / `ExportCampaignService` + `CampaignExportController` (raw-JSON attachment, GM/admin authz, size cap); frontend `exportCampaign`/`useExportCampaign` + `CampaignExportButton` wired into the `CampaignHomePage` danger zone. See `docs/roadmap/ROADMAP_V2.md` Phase 7.
+- **Functional Description:** Shipped in Phase 7 (F7.1–F7.2) — the final v2 phase, completing the v2 feature set. Downloads a campaign's full data (members, actors/spaces/events/relations with complete version history, annotations, sessions) as a single **structured JSON archive**, served as a raw file attachment (`Content-Disposition: attachment`) rather than the `{data,meta,errors}` envelope, gated to **GM or admin** (authz resolved from `campaign_members` per request, D-043). Authorization (404 unknown → 403 non-GM) and a cheap `COUNT` cap precede any row load; an oversized campaign is rejected with `422 EXPORT_TOO_LARGE` (env-overridable `CAMPAIGN_EXPORT_MAX_ENTITIES`, default 2000), surfaced as a specific message in the UI. The archive is streamed (`StreamingResponseBody`) so no full copy is buffered in heap. Primary purpose is a guard rail before campaign deletion. PRD §7 "public sharing / sharable links" stays post-v2 (D-112).
+- **Technical Reference / Source Files:** Backend `ExportCampaignService` / `ExportCampaignUseCase`, `CampaignExportController` (raw-JSON attachment, GM/admin authz, size cap), `CampaignExportReadAdapter` + `CampaignExportReadPort`, `Archived*` model records; frontend `exportCampaign` / `useExportCampaign` (`api/campaigns.ts`), `apiClient.download` (`api/client.ts`), `CampaignExportButton` + `lib/downloadBlob.ts` wired into the `CampaignHomePage` danger zone. See `docs/roadmap/ROADMAP_V2.md` Phase 7.
 
 ---
 
@@ -71,7 +71,7 @@ This register consolidates everything that exists in the repository only as sche
 
 - **Use Case / Action:** Other explicit v1 exclusions — ❌ Out of scope
 - **Actor:** —
-- **Functional Description:** Also intentionally absent from v1 (do not implement): E2E test suite (D-056), staging environment (D-044), Spring AI `VectorStore` (D-062 — native pgvector SQL is used instead), real-time collaborative editing (one-active-draft polling model suffices, D-054), audio/image ingestion (text summaries only), public sharing/export, and a native mobile app (responsive web only).
+- **Functional Description:** Also intentionally absent from v1 (do not implement): E2E test suite (D-056), staging environment (D-044), Spring AI `VectorStore` (D-062 — native pgvector SQL is used instead), real-time collaborative editing (one-active-draft polling model suffices, D-054), audio/image ingestion (text summaries only), public sharing / sharable links (the narrower pre-deletion campaign export shipped in Phase 7, D-112), and a native mobile app (responsive web only).
 - **Technical Reference / Source Files:** `CLAUDE.md` §8, `docs/DECISIONS.md`, `docs/PRD.md` §7
 
 ## 3. Core User Journeys (Workflows)

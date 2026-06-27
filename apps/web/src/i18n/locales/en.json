@@ -138,6 +138,7 @@
     "exporting": "Exporting…",
     "exportSuccess": "Export downloaded.",
     "exportError": "Failed to export the campaign. Please try again.",
+    "exportTooLarge": "This campaign is too large to export. Ask an admin to raise the export limit.",
     "newCampaign": "New campaign",
     "nameLabel": "Campaign name",
     "namePlaceholder": "Curse of Strahd",

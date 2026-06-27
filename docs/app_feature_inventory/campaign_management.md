@@ -34,6 +34,13 @@ A campaign is the top-level container of Blue Steel: all sessions, world state, 
 
 ---
 
+- **Use Case / Action:** GM or admin exports a campaign as a portable archive — ✅ Implemented (v2, Phase 7, D-112)
+- **Actor:** GM or Admin
+- **Functional Description:** Downloads the campaign's full data (metadata, members, the four world-state entity types each with complete version history, annotations, sessions) as a single structured JSON archive, served as a raw file attachment (`Content-Disposition: attachment`) rather than the `{data,meta,errors}` envelope. The pre-deletion guard rail to the delete above: visible to GM **and** admin in the campaign home "danger zone" (delete stays admin-only). Authorization (resolved from `campaign_members` per request, D-043) and a cheap `COUNT` cap run before any rows load; an oversized campaign returns `422 EXPORT_TOO_LARGE` (env-overridable `CAMPAIGN_EXPORT_MAX_ENTITIES`), shown as a specific message in the UI. The archive is streamed (`StreamingResponseBody`) so no full copy is buffered in heap.
+- **Technical Reference / Source Files:** `GET /api/v1/campaigns/{id}/export` — `CampaignExportController.java`, `apps/api/src/main/java/com/bluesteel/application/service/campaign/ExportCampaignService.java`, `apps/api/src/main/java/com/bluesteel/adapters/out/persistence/campaign/CampaignExportReadAdapter.java`, `Archived*` records under `application/model/campaign/`; `apps/web/src/features/campaigns/components/CampaignExportButton.tsx`, `apps/web/src/lib/downloadBlob.ts`, `apps/web/src/api/campaigns.ts` (`exportCampaign`/`useExportCampaign`), `apps/web/src/api/client.ts` (`apiClient.download`)
+
+---
+
 - **Use Case / Action:** Member views the campaign roster — ✅ Implemented
 - **Actor:** Any campaign member, Admin
 - **Functional Description:** Lists all members of the campaign with their roles. Rendered in the member-management panel on the campaign home page.
