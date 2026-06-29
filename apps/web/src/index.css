@@ -32,7 +32,8 @@
   --color-popover: #ffffff;
   --color-popover-foreground: #0f172a;
 
-  --color-primary: #3b82f6; /* blue-500 (matches accent) */
+  --color-primary: #2563eb; /* blue-600 — filled primary; white text clears AA (5.2:1) */
+  --color-primary-hover: #1d4ed8; /* blue-700 — filled-primary hover (darkens in both themes) */
   --color-primary-foreground: #ffffff;
   --color-secondary: #f1f5f9; /* slate-100 */
   --color-secondary-foreground: #0f172a;
@@ -42,6 +43,25 @@
 
   --color-destructive: #ef4444; /* red-500 */
   --color-destructive-foreground: #ffffff;
+
+  /*
+   * Semantic feedback colours — three parts per role:
+   *   base       → coloured text/icon/border on a NEUTRAL surface
+   *   subtle     → tinted background fill
+   *   foreground → text ON the subtle fill (AA-safe; base is too light for this)
+   */
+  --color-success: #16a34a; /* green-600 */
+  --color-success-subtle: #f0fdf4; /* green-50 */
+  --color-success-foreground: #166534; /* green-800 — text on success-subtle */
+  --color-warning: #d97706; /* amber-600 */
+  --color-warning-subtle: #fffbeb; /* amber-50 */
+  --color-warning-foreground: #92400e; /* amber-800 */
+  --color-error: #dc2626; /* red-600 */
+  --color-error-subtle: #fef2f2; /* red-50 */
+  --color-error-foreground: #991b1b; /* red-800 */
+  --color-info: #2563eb; /* blue-600 */
+  --color-info-subtle: #eff6ff; /* blue-50 */
+  --color-info-foreground: #1e40af; /* blue-800 */
 
   --color-input: #cbd5e1; /* slate-300 (matches border-strong) */
   --color-ring: #3b82f6; /* blue-500 focus ring */
@@ -86,7 +106,8 @@
   --color-popover: #0f172a;
   --color-popover-foreground: #f8fafc;
 
-  --color-primary: #3b82f6; /* blue-500 (matches accent) */
+  --color-primary: #2563eb; /* blue-600 — filled primary; white text clears AA (5.2:1) */
+  --color-primary-hover: #1d4ed8; /* blue-700 — filled-primary hover */
   --color-primary-foreground: #ffffff;
   --color-secondary: #1e293b; /* slate-800 */
   --color-secondary-foreground: #f8fafc;
@@ -95,6 +116,20 @@
 
   --color-destructive: #ef4444; /* red-500 */
   --color-destructive-foreground: #ffffff;
+
+  /* Semantic feedback — base ~*-400 (text/icon on slate), deep *-950 subtle bg, *-300 on-subtle text */
+  --color-success: #4ade80; /* green-400 */
+  --color-success-subtle: #052e16; /* green-950 */
+  --color-success-foreground: #86efac; /* green-300 — text on success-subtle */
+  --color-warning: #fbbf24; /* amber-400 */
+  --color-warning-subtle: #451a03; /* amber-950 */
+  --color-warning-foreground: #fcd34d; /* amber-300 */
+  --color-error: #f87171; /* red-400 */
+  --color-error-subtle: #450a0a; /* red-950 */
+  --color-error-foreground: #fca5a5; /* red-300 */
+  --color-info: #60a5fa; /* blue-400 */
+  --color-info-subtle: #172554; /* blue-950 */
+  --color-info-foreground: #93c5fd; /* blue-300 */
 
   --color-input: #334155; /* slate-700 (matches border-strong) */
   --color-ring: #3b82f6; /* blue-500 focus ring */
@@ -109,6 +144,8 @@
   --xy-edge-stroke-default: #cbd5e1; /* slate-300 */
   --xy-edge-stroke-width-default: 1.5;
   --xy-attribution-background-color: transparent;
+  /* Dot-grid colour — themed here (not via the <Background color> prop) so it follows the toggle. */
+  --xy-background-pattern-color: #e2e8f0; /* slate-200 */
 }
 
 /* Drag-to-connect is disabled, so the connection handles are dead affordances — hide them while
@@ -152,6 +189,7 @@
  */
 .dark .react-flow {
   --xy-edge-stroke-default: #334155; /* slate-700 */
+  --xy-background-pattern-color: #1e293b; /* slate-800 — subtle dots on the dark canvas */
 }
 
 .dark .react-flow__controls {

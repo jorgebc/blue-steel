@@ -61,13 +61,14 @@ Elevation communicates interaction priority and navigation depth. Higher elevati
 | 0 — Flat | Background canvas, page background | `shadow-none` | — |
 | 1 — Tonal | Cards, list items, static surfaces | `shadow-sm` | — |
 | 2 — Elevated | Hover state, active list item, inline edit | `shadow-md` | — |
-| 3 — Overlay | Focused Overlays, dropdown menus | `shadow-lg` | `ring-1 ring-slate-200` |
+| 3 — Overlay | Focused Overlays, dropdown menus | `shadow-md`/`shadow-lg` | `ring-1 ring-foreground/10` |
 | 4 — Navigation | Sidebar (floating), top bar | `shadow-xl` | — |
 
 **Rules:**
-- Every interactive surface starts at elevation 1 minimum (`shadow-sm`). `shadow-none` is reserved for background regions only.
-- Apply `transition-shadow duration-200` to all interactive elements so elevation transitions are smooth.
-- When an element receives focus via a Focused Overlay, its shadow jumps to `shadow-xl ring-2 ring-blue-500/50`.
+- Every interactive surface carries an elevation cue — a `shadow-*` **or** a theme-adaptive hairline ring (`ring-1 ring-foreground/10`). A surface with neither (`shadow-none` and no ring) is reserved for background regions only.
+- The shadcn primitives (read-only, §9.10) realise card/popover elevation with `ring-1 ring-foreground/10` rather than a shadow, because shadows are near-invisible on the dark canvas — the ring is the source of truth there and shadows are a light-mode enhancement. Filled buttons are intentionally flat at rest and signal affordance through colour + hover/active/focus state.
+- Apply `transition-shadow duration-200` (or `transition-all`) to interactive elements so elevation transitions are smooth.
+- shadcn focus-visible rings are `ring-3 ring-ring/50` (3px, blue-500) — the radix-nova default; treat 3px as the standard focus width. When an element is promoted inside a Focused Overlay it jumps to `shadow-xl ring-2 ring-blue-500/50`.
 
 ---
 
@@ -190,13 +191,18 @@ Toast notifications are **forbidden** (D-083). System feedback is delivered via 
 
 ### Accent — Electric Blue
 
-| Role | Tailwind Token | Hex |
+`blue-500` is the **accent** (rings, active-route highlights, borders, accent text on a neutral
+surface). A **filled** primary surface (`bg-primary` + white text) instead uses `blue-600`, because
+white on `blue-500` is only **3.7:1** — below WCAG AA for text. White on `blue-600` is **5.2:1**.
+The two roles are separate tokens (`--color-accent` = blue-500, `--color-primary` = blue-600).
+
+| Role | Token | Hex |
 |---|---|---|
-| Primary action, active state | `bg-blue-500` / `text-blue-500` | `#3b82f6` |
-| Primary action hover | `bg-blue-600` | `#2563eb` |
-| Primary action pressed | `bg-blue-700` | `#1d4ed8` |
-| Subtle accent background | `bg-blue-50` | `#eff6ff` |
-| Accent border / ring | `ring-blue-500` / `border-blue-500` | `#3b82f6` |
+| Filled primary action (bg) | `bg-primary` | `#2563eb` (blue-600) |
+| Filled primary hover | `bg-primary-hover` | `#1d4ed8` (blue-700) |
+| Accent — active state, accent text/border | `text-accent` / `border-accent` | `#3b82f6` (blue-500) |
+| Focus ring | `ring-ring` | `#3b82f6` (blue-500) |
+| Subtle accent background | `bg-accent-subtle` | `#eff6ff` (light) / `#172554` (dark) |
 
 ### Semantic Colours
 
@@ -211,9 +217,70 @@ Toast notifications are **forbidden** (D-083). System feedback is delivered via 
 | Info | `text-blue-600` | `#2563eb` |
 
 **Rules:**
-- `blue-500` is used **only** for primary actions and active/focus states. Secondary actions use `slate-700` text on transparent backgrounds.
+- Blue is reserved for primary actions and active/focus states — `blue-600` when filled, `blue-500` as the accent (ring/active/border/text). Secondary actions use `slate-700` text on transparent backgrounds.
 - Never use raw hex values in JSX — always use Tailwind tokens.
 - "Brushed metal" borders (`slate-200`/`slate-300`) replace harsh black borders throughout.
+
+### Dark Mode
+
+Dark mode is **class-based** (`.dark` on `<html>`, toggled by `useApplyTheme`). Most surface and
+text colours are driven by semantic CSS-variable tokens in `src/index.css`, which are re-coloured
+under `.dark` — so `bg-card`, `text-foreground`, `border-input`, `ring-ring` etc. adapt
+automatically. **Raw palette classes (`bg-green-50`, `text-red-700`, …) do NOT adapt** and are the
+main source of dark-mode bugs: always pair them with a `dark:` counterpart (same hue, inverted
+lightness) or use the semantic feedback tokens below.
+
+**Dark palette (what `.dark` ships — document, don't diverge):**
+
+| Role | Hex | Light counterpart |
+|---|---|---|
+| Page background | `#020617` (slate-950) | `#f8fafc` |
+| Surface / card | `#0f172a` (slate-900) | `#ffffff` |
+| Surface variant / muted | `#1e293b` (slate-800) | `#f1f5f9` |
+| Border | `#1e293b` (slate-800) | `#e2e8f0` |
+| Border strong / input | `#334155` (slate-700) | `#cbd5e1` |
+| Text primary | `#f8fafc` (slate-50) | `#0f172a` |
+| Text secondary | `#94a3b8` (slate-400) | `#64748b` |
+
+**Contrast targets:** body text ≥ **4.5:1** (WCAG AA); AAA ≥ 7:1 is encouraged for primary text
+(our `#f8fafc` on `#020617` ≈ 19:1). Large text (≥18.66px bold / 24px) and non-text UI affordances
+≥ **3:1**. Secondary text `#94a3b8` on `muted #1e293b` is ≈ 5.7:1 — the **thin floor**; never place
+text on a background lighter than `muted` without re-checking, and never use a body-text colour
+darker than `#94a3b8` on dark surfaces.
+
+**Elevation in dark mode:** depth comes from **lighter tonal surfaces + hairline rings**
+(`ring-1 ring-foreground/10`, theme-adaptive), **not** drop shadows — `shadow-*` is near-invisible
+on `#020617`. Cards and dropdowns already use this ring approach; prefer it over `shadow-sm` in
+dark contexts (this is the dark-mode reading of §3's "minimum elevation" rule).
+
+**Accent ramp inverts in dark:** hover/pressed go **lighter**, not darker — `blue-400 #60a5fa`
+(hover) and `blue-300 #93c5fd` (pressed) — because a darker blue recedes into a dark surface. The
+focus ring stays `blue-500 #3b82f6` in both themes.
+
+**Semantic feedback colours (token-backed, dark-aware):** use the `--color-{success,warning,error,info}`
+tokens in `src/index.css` instead of raw `green-*/amber-*/red-*/blue-*` classes — they flip under
+`.dark` automatically, so **no `dark:` variant is needed**. Each role has **three** parts:
+
+| Part | Utility | Use for | Light → Dark |
+|---|---|---|---|
+| **base** | `text-{role}` / `border-{role}` | coloured text/icon/border on a **neutral** surface | `*-600` → `*-400` |
+| **subtle** | `bg-{role}-subtle` | tinted background fill | `*-50` → `*-950` |
+| **foreground** | `text-{role}-foreground` | text placed **on** `-subtle` (AA-safe; base is too light here) | `*-800` → `*-300` |
+
+| Role | base | subtle | foreground |
+|---|---|---|---|
+| Success | `#16a34a` → `#4ade80` | `#f0fdf4` → `#052e16` | `#166534` → `#86efac` |
+| Warning | `#d97706` → `#fbbf24` | `#fffbeb` → `#451a03` | `#92400e` → `#fcd34d` |
+| Error | `#dc2626` → `#f87171` | `#fef2f2` → `#450a0a` | `#991b1b` → `#fca5a5` |
+| Info | `#2563eb` → `#60a5fa` | `#eff6ff` → `#172554` | `#1e40af` → `#93c5fd` |
+
+- **Status chip / banner** (text on a tint): `bg-{role}-subtle text-{role}-foreground border-{role}/30`.
+- **Coloured text on the page/card** (e.g. an error message, a counter at the limit): `text-{role}`.
+- Pairing `text-{role}` with `bg-{role}-subtle` is **wrong** — the base is too light on the tint
+  (e.g. green-600 on green-50 ≈ 3.2:1, fails AA). Always use `-foreground` on `-subtle`.
+- Raw `*-50`/`*-700` palette pairs with no `dark:` variant are forbidden on a dark page (glaring,
+  eye-straining, borders vanish). Reserve raw palette classes for cases the token roles don't model
+  (e.g. the annotation theme, the destructive-action token).
 
 ---
 
@@ -280,8 +347,8 @@ These rules are **never optional**. Any deviation is a bug.
 4. **Every skeleton must match final rendered height within ±2px.** Measure both and align.
 5. **Grid spacing must be multiples of 4px.** Use `p-1` (4px), `p-2` (8px), `p-3` (12px), `p-4` (16px), `p-6` (24px), `p-8` (32px) only.
 6. **Radius rules are fixed:** cards → `rounded-2xl`, buttons → `rounded-lg`, badges/icon-buttons → `rounded-full`.
-7. **`blue-500` is the only accent colour.** It appears exclusively on primary actions and active route highlights. All other interactive elements use slate tones.
-8. **No interactive surface uses `shadow-none`.** Minimum is `shadow-sm`.
+7. **Blue is the only accent.** Filled primary actions use `blue-600` (AA-safe white text); `blue-500` is the accent for active-route highlights, focus rings, and accent text/borders. All other interactive elements use slate tones.
+8. **Every interactive surface carries an elevation cue** — a `shadow-*` or a theme-adaptive `ring-1 ring-foreground/10`. Never both absent (see §3).
 9. **All text must pass WCAG AA (≥4.5:1)** contrast against its direct background.
 10. **`components/ui/` is read-only.** Wrap or extend in `components/domain/` only.
 11. **No inline `style={{}}` props.** Use Tailwind utility classes or CSS custom properties via `@theme`.

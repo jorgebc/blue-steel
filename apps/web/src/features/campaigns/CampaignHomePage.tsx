@@ -89,8 +89,10 @@ export function CampaignHomePage() {
       {campaignId && campaign?.role === 'gm' && <MemberManagementPanel campaignId={campaignId} />}
 
       {(isAdmin || campaign?.role === 'gm') && campaignId && (
-        <div className="mt-10 border-t border-red-100 pt-6">
-          <h2 className="mb-4 text-sm font-medium text-red-700">{t('campaigns.dangerZone')}</h2>
+        <div className="mt-10 border-t border-red-100 pt-6 dark:border-red-950">
+          <h2 className="mb-4 text-sm font-medium text-red-700 dark:text-red-400">
+            {t('campaigns.dangerZone')}
+          </h2>
 
           <CampaignExportButton campaignId={campaignId} />
 
@@ -111,7 +113,7 @@ export function CampaignHomePage() {
               <Button
                 type="button"
                 variant="outline"
-                className="border-red-300 text-red-700 hover:bg-red-50"
+                className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
                 onClick={() => setDeleteOpen(true)}
               >
                 {t('campaigns.deleteCampaign')}

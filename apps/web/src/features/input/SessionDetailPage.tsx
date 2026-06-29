@@ -16,10 +16,10 @@ const STATUS_LABEL: Record<SessionStatus, string> = {
 
 const STATUS_CLASS: Record<SessionStatus, string> = {
   PENDING: 'bg-muted text-muted-foreground',
-  PROCESSING: 'bg-blue-50 text-blue-600',
-  DRAFT: 'bg-amber-50 text-amber-700',
-  COMMITTED: 'bg-green-50 text-green-700',
-  FAILED: 'bg-red-50 text-red-700',
+  PROCESSING: 'bg-info-subtle text-info-foreground',
+  DRAFT: 'bg-warning-subtle text-warning-foreground',
+  COMMITTED: 'bg-success-subtle text-success-foreground',
+  FAILED: 'bg-error-subtle text-error-foreground',
   DISCARDED: 'bg-muted text-muted-foreground',
 }
 

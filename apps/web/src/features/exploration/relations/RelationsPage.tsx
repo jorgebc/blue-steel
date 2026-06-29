@@ -157,7 +157,7 @@ export function RelationsPage() {
               maxZoom={1.75}
               panOnScroll
             >
-              <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e2e8f0" />
+              <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
               <Controls showInteractive={false} />
             </ReactFlow>
           </div>

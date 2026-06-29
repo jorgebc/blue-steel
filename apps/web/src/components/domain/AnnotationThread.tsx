@@ -20,9 +20,12 @@ function ThreadSkeleton() {
   return (
     <div role="status" aria-label="Loading annotations" className="space-y-3">
       {[0, 1].map((i) => (
-        <div key={i} className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-          <div className="mb-2 h-3 w-32 animate-pulse rounded bg-amber-200/70" />
-          <div className="h-4 w-3/4 animate-pulse rounded bg-amber-200/70" />
+        <div
+          key={i}
+          className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/30"
+        >
+          <div className="mb-2 h-3 w-32 animate-pulse rounded bg-amber-200/70 dark:bg-amber-900/70" />
+          <div className="h-4 w-3/4 animate-pulse rounded bg-amber-200/70 dark:bg-amber-900/70" />
         </div>
       ))}
     </div>
@@ -93,11 +96,11 @@ export function AnnotationThread({ entityType, entityId }: Props) {
   return (
     <section
       aria-label="Annotations"
-      className="mt-8 border-t-2 border-dashed border-amber-300 pt-6"
+      className="mt-8 border-t-2 border-dashed border-amber-300 pt-6 dark:border-amber-800"
     >
       <header className="mb-4">
-        <h2 className="text-sm font-semibold text-amber-900">Annotations</h2>
-        <p className="text-xs text-amber-700">
+        <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Annotations</h2>
+        <p className="text-xs text-amber-700 dark:text-amber-300">
           Player commentary — not canonical world state. Any member can post; the author or a GM can
           delete.
         </p>

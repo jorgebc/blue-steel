@@ -96,7 +96,7 @@ export function SubmitSessionPage() {
         {recoverySessionId && (
           <div
             role="alert"
-            className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+            className="mb-4 rounded-lg border border-warning/30 bg-warning-subtle p-4 text-sm text-warning-foreground"
           >
             <p>{t('input.recoveryNotice')}</p>
             <Link

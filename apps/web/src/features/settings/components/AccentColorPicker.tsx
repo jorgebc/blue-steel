@@ -25,7 +25,7 @@ export function AccentColorPicker({ value, onChange }: Props) {
           value={color.hex}
           aria-label={color.name}
           style={{ backgroundColor: color.hex }}
-          className="size-8 rounded-full border-0 shadow-sm data-[state=checked]:ring-2 data-[state=checked]:ring-slate-900 data-[state=checked]:ring-offset-2"
+          className="size-8 rounded-full border-0 shadow-sm data-[state=checked]:ring-2 data-[state=checked]:ring-foreground data-[state=checked]:ring-offset-2 data-[state=checked]:ring-offset-background"
         />
       ))}
     </RadioGroup>

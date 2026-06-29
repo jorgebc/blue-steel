@@ -22,10 +22,10 @@ const STATUS_LABEL: Record<SessionSummary['status'], string> = {
 
 const STATUS_CLASS: Record<SessionSummary['status'], string> = {
   PENDING: 'bg-muted text-muted-foreground',
-  PROCESSING: 'bg-blue-50 text-blue-600',
-  DRAFT: 'bg-amber-50 text-amber-700',
-  COMMITTED: 'bg-green-50 text-green-700',
-  FAILED: 'bg-red-50 text-red-700',
+  PROCESSING: 'bg-info-subtle text-info-foreground',
+  DRAFT: 'bg-warning-subtle text-warning-foreground',
+  COMMITTED: 'bg-success-subtle text-success-foreground',
+  FAILED: 'bg-error-subtle text-error-foreground',
   DISCARDED: 'bg-muted text-muted-foreground',
 }
 
@@ -94,7 +94,7 @@ function SessionRow({ session, campaignId, activeRole, onDiscard }: RowProps) {
         {canEditDraft && (
           <Link
             to={`/campaigns/${campaignId}/sessions/${session.sessionId}/diff`}
-            className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-accent-hover transition-colors duration-200"
+            className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors duration-200"
           >
             Resume
           </Link>
@@ -103,7 +103,7 @@ function SessionRow({ session, campaignId, activeRole, onDiscard }: RowProps) {
           <Button
             type="button"
             variant="outline"
-            className="border-red-300 text-red-700 hover:bg-red-50"
+            className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
             onClick={() => onDiscard(session.sessionId)}
           >
             Discard

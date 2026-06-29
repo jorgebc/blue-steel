@@ -4,10 +4,10 @@ import { useEffect } from 'react'
 type Variant = 'success' | 'warning' | 'error' | 'info'
 
 const STYLES: Record<Variant, string> = {
-  success: 'bg-green-50 border-green-200 text-green-800',
-  warning: 'bg-amber-50 border-amber-200 text-amber-800',
-  error: 'bg-red-50 border-red-200 text-red-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800',
+  success: 'bg-success-subtle border-success/30 text-success-foreground',
+  warning: 'bg-warning-subtle border-warning/30 text-warning-foreground',
+  error: 'bg-error-subtle border-error/30 text-error-foreground',
+  info: 'bg-info-subtle border-info/30 text-info-foreground',
 }
 
 interface Props {

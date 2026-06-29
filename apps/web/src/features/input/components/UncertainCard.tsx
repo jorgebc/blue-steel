@@ -33,9 +33,12 @@ export function UncertainCard({ card, resolution, onResolve }: Props) {
   }
 
   return (
-    <article className="rounded-2xl border border-amber-200 bg-surface p-6 shadow-sm">
+    <article className="rounded-2xl border border-amber-200 bg-surface p-6 shadow-sm dark:border-amber-900">
       <header className="mb-3">
-        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">
+        <Badge
+          variant="outline"
+          className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+        >
           {t('input.requiresResolution')}
         </Badge>
       </header>

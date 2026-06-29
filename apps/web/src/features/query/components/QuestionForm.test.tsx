@@ -58,20 +58,20 @@ describe('QuestionForm', () => {
     expect(screen.getByRole('button', { name: /ask/i })).toBeDisabled()
   })
 
-  it('shows amber counter colour when the question approaches the limit', () => {
+  it('shows the warning counter colour when the question approaches the limit', () => {
     render(<QuestionForm onSubmit={vi.fn()} isPending={false} />)
 
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a'.repeat(1900) } })
 
-    expect(screen.getByText('1900/2000')).toHaveClass('text-amber-600')
+    expect(screen.getByText('1900/2000')).toHaveClass('text-warning')
   })
 
-  it('shows red counter colour when the question is at the limit', () => {
+  it('shows the error counter colour when the question is at the limit', () => {
     render(<QuestionForm onSubmit={vi.fn()} isPending={false} />)
 
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a'.repeat(2000) } })
 
-    expect(screen.getByText('2000/2000')).toHaveClass('text-red-600')
+    expect(screen.getByText('2000/2000')).toHaveClass('text-error')
   })
 
   it('clears the textarea after the question is submitted', async () => {
