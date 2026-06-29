@@ -142,6 +142,8 @@
   --xy-edge-stroke-default: #cbd5e1; /* slate-300 */
   --xy-edge-stroke-width-default: 1.5;
   --xy-attribution-background-color: transparent;
+  /* Dot-grid colour — themed here (not via the <Background color> prop) so it follows the toggle. */
+  --xy-background-pattern-color: #e2e8f0; /* slate-200 */
 }
 
 /* Drag-to-connect is disabled, so the connection handles are dead affordances — hide them while
@@ -185,6 +187,7 @@
  */
 .dark .react-flow {
   --xy-edge-stroke-default: #334155; /* slate-700 */
+  --xy-background-pattern-color: #1e293b; /* slate-800 — subtle dots on the dark canvas */
 }
 
 .dark .react-flow__controls {
