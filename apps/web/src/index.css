@@ -43,6 +43,16 @@
   --color-destructive: #ef4444; /* red-500 */
   --color-destructive-foreground: #ffffff;
 
+  /* Semantic feedback colours — text + subtle background per role */
+  --color-success: #16a34a; /* green-600 */
+  --color-success-subtle: #f0fdf4; /* green-50 */
+  --color-warning: #d97706; /* amber-600 */
+  --color-warning-subtle: #fffbeb; /* amber-50 */
+  --color-error: #dc2626; /* red-600 */
+  --color-error-subtle: #fef2f2; /* red-50 */
+  --color-info: #2563eb; /* blue-600 */
+  --color-info-subtle: #eff6ff; /* blue-50 */
+
   --color-input: #cbd5e1; /* slate-300 (matches border-strong) */
   --color-ring: #3b82f6; /* blue-500 focus ring */
 
@@ -95,6 +105,16 @@
 
   --color-destructive: #ef4444; /* red-500 */
   --color-destructive-foreground: #ffffff;
+
+  /* Semantic feedback — lighter text (~*-400 ramp) for AA on slate, deep *-950 subtle bg */
+  --color-success: #4ade80; /* green-400 */
+  --color-success-subtle: #052e16; /* green-950 */
+  --color-warning: #fbbf24; /* amber-400 */
+  --color-warning-subtle: #451a03; /* amber-950 */
+  --color-error: #f87171; /* red-400 */
+  --color-error-subtle: #450a0a; /* red-950 */
+  --color-info: #60a5fa; /* blue-400 */
+  --color-info-subtle: #172554; /* blue-950 */
 
   --color-input: #334155; /* slate-700 (matches border-strong) */
   --color-ring: #3b82f6; /* blue-500 focus ring */

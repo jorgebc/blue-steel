@@ -22,10 +22,10 @@ const STATUS_LABEL: Record<SessionSummary['status'], string> = {
 
 const STATUS_CLASS: Record<SessionSummary['status'], string> = {
   PENDING: 'bg-muted text-muted-foreground',
-  PROCESSING: 'bg-blue-50 text-blue-600',
-  DRAFT: 'bg-amber-50 text-amber-700',
-  COMMITTED: 'bg-green-50 text-green-700',
-  FAILED: 'bg-red-50 text-red-700',
+  PROCESSING: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300',
+  DRAFT: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+  COMMITTED: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300',
+  FAILED: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300',
   DISCARDED: 'bg-muted text-muted-foreground',
 }
 
@@ -103,7 +103,7 @@ function SessionRow({ session, campaignId, activeRole, onDiscard }: RowProps) {
           <Button
             type="button"
             variant="outline"
-            className="border-red-300 text-red-700 hover:bg-red-50"
+            className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
             onClick={() => onDiscard(session.sessionId)}
           >
             Discard

@@ -140,7 +140,9 @@ export function ProposalSubmitForm({
               onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
               idPrefix="propose"
             />
-            {deltaError && <p className="mt-2 text-sm text-red-600">{deltaError}</p>}
+            {deltaError && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{deltaError}</p>
+            )}
           </div>
 
           <div className="flex justify-end gap-3">

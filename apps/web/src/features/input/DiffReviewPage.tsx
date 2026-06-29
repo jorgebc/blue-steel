@@ -251,7 +251,7 @@ function DiffReviewContent({ campaignId, sessionId, diff }: ContentProps) {
             type="button"
             variant="outline"
             onClick={() => setDiscardOpen(true)}
-            className="border-red-200 text-red-600 hover:bg-red-50"
+            className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
           >
             {t('input.discardDraft')}
           </Button>

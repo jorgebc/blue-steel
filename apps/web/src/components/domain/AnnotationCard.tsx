@@ -25,7 +25,7 @@ function formatTimestamp(iso: string): string {
  */
 export function AnnotationCard({ annotation, canDelete, onDelete }: Props) {
   return (
-    <article className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+    <article className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/30">
       <div className="flex items-start justify-between gap-3">
         <div className="text-xs text-muted-foreground">
           <span className="font-medium text-foreground">{authorLabel(annotation.authorId)}</span>

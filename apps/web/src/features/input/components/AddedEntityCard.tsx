@@ -40,7 +40,7 @@ export function AddedEntityCard({ entity, onRemove }: Props) {
         variant="outline"
         size="sm"
         onClick={onRemove}
-        className="border-red-200 text-red-600 hover:bg-red-50"
+        className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
       >
         <Trash2 className="mr-2 h-4 w-4" aria-hidden />
         {t('common.remove')}

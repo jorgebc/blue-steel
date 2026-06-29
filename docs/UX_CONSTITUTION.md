@@ -215,6 +215,57 @@ Toast notifications are **forbidden** (D-083). System feedback is delivered via 
 - Never use raw hex values in JSX — always use Tailwind tokens.
 - "Brushed metal" borders (`slate-200`/`slate-300`) replace harsh black borders throughout.
 
+### Dark Mode
+
+Dark mode is **class-based** (`.dark` on `<html>`, toggled by `useApplyTheme`). Most surface and
+text colours are driven by semantic CSS-variable tokens in `src/index.css`, which are re-coloured
+under `.dark` — so `bg-card`, `text-foreground`, `border-input`, `ring-ring` etc. adapt
+automatically. **Raw palette classes (`bg-green-50`, `text-red-700`, …) do NOT adapt** and are the
+main source of dark-mode bugs: always pair them with a `dark:` counterpart (same hue, inverted
+lightness) or use the semantic feedback tokens below.
+
+**Dark palette (what `.dark` ships — document, don't diverge):**
+
+| Role | Hex | Light counterpart |
+|---|---|---|
+| Page background | `#020617` (slate-950) | `#f8fafc` |
+| Surface / card | `#0f172a` (slate-900) | `#ffffff` |
+| Surface variant / muted | `#1e293b` (slate-800) | `#f1f5f9` |
+| Border | `#1e293b` (slate-800) | `#e2e8f0` |
+| Border strong / input | `#334155` (slate-700) | `#cbd5e1` |
+| Text primary | `#f8fafc` (slate-50) | `#0f172a` |
+| Text secondary | `#94a3b8` (slate-400) | `#64748b` |
+
+**Contrast targets:** body text ≥ **4.5:1** (WCAG AA); AAA ≥ 7:1 is encouraged for primary text
+(our `#f8fafc` on `#020617` ≈ 19:1). Large text (≥18.66px bold / 24px) and non-text UI affordances
+≥ **3:1**. Secondary text `#94a3b8` on `muted #1e293b` is ≈ 5.7:1 — the **thin floor**; never place
+text on a background lighter than `muted` without re-checking, and never use a body-text colour
+darker than `#94a3b8` on dark surfaces.
+
+**Elevation in dark mode:** depth comes from **lighter tonal surfaces + hairline rings**
+(`ring-1 ring-foreground/10`, theme-adaptive), **not** drop shadows — `shadow-*` is near-invisible
+on `#020617`. Cards and dropdowns already use this ring approach; prefer it over `shadow-sm` in
+dark contexts (this is the dark-mode reading of §3's "minimum elevation" rule).
+
+**Accent ramp inverts in dark:** hover/pressed go **lighter**, not darker — `blue-400 #60a5fa`
+(hover) and `blue-300 #93c5fd` (pressed) — because a darker blue recedes into a dark surface. The
+focus ring stays `blue-500 #3b82f6` in both themes.
+
+**Semantic feedback colours (token-backed, dark-aware):** prefer the `--color-{success,warning,error,info}`
+(+ `-subtle`) tokens in `src/index.css` so feedback adapts to the theme automatically.
+
+| Role | Light text / subtle bg | Dark text / subtle bg |
+|---|---|---|
+| Destructive / Error | `#dc2626` / `bg-red-50 #fef2f2` | `#f87171` (red-400) / `#450a0a` (red-950) |
+| Warning | `#d97706` / `bg-amber-50 #fffbeb` | `#fbbf24` (amber-400) / `#451a03` (amber-950) |
+| Success | `#16a34a` / `bg-green-50 #f0fdf4` | `#4ade80` (green-400) / `#052e16` (green-950) |
+| Info | `#2563eb` / `bg-blue-50 #eff6ff` | `#60a5fa` (blue-400) / `#172554` (blue-950) |
+
+When a raw palette class must stay (e.g. a status chip), pair it: `bg-green-50 text-green-700
+dark:bg-green-950 dark:text-green-300` — light pastel bg + mid text in light, deep tint + light
+text in dark. The light `*-50`/`*-700` pair on a dark page is forbidden (glaring, eye-straining,
+borders vanish).
+
 ---
 
 ## §8 Tailwind v4 Configuration

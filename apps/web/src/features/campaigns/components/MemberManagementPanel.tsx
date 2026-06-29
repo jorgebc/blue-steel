@@ -215,7 +215,7 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
                     <button
                       type="button"
                       onClick={() => setRemoveTarget(member)}
-                      className="rounded-lg px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-50"
+                      className="rounded-lg px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
                     >
                       {t('common.remove')}
                     </button>
