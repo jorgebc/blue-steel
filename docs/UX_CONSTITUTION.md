@@ -251,20 +251,30 @@ dark contexts (this is the dark-mode reading of §3's "minimum elevation" rule).
 (hover) and `blue-300 #93c5fd` (pressed) — because a darker blue recedes into a dark surface. The
 focus ring stays `blue-500 #3b82f6` in both themes.
 
-**Semantic feedback colours (token-backed, dark-aware):** prefer the `--color-{success,warning,error,info}`
-(+ `-subtle`) tokens in `src/index.css` so feedback adapts to the theme automatically.
+**Semantic feedback colours (token-backed, dark-aware):** use the `--color-{success,warning,error,info}`
+tokens in `src/index.css` instead of raw `green-*/amber-*/red-*/blue-*` classes — they flip under
+`.dark` automatically, so **no `dark:` variant is needed**. Each role has **three** parts:
 
-| Role | Light text / subtle bg | Dark text / subtle bg |
-|---|---|---|
-| Destructive / Error | `#dc2626` / `bg-red-50 #fef2f2` | `#f87171` (red-400) / `#450a0a` (red-950) |
-| Warning | `#d97706` / `bg-amber-50 #fffbeb` | `#fbbf24` (amber-400) / `#451a03` (amber-950) |
-| Success | `#16a34a` / `bg-green-50 #f0fdf4` | `#4ade80` (green-400) / `#052e16` (green-950) |
-| Info | `#2563eb` / `bg-blue-50 #eff6ff` | `#60a5fa` (blue-400) / `#172554` (blue-950) |
+| Part | Utility | Use for | Light → Dark |
+|---|---|---|---|
+| **base** | `text-{role}` / `border-{role}` | coloured text/icon/border on a **neutral** surface | `*-600` → `*-400` |
+| **subtle** | `bg-{role}-subtle` | tinted background fill | `*-50` → `*-950` |
+| **foreground** | `text-{role}-foreground` | text placed **on** `-subtle` (AA-safe; base is too light here) | `*-800` → `*-300` |
 
-When a raw palette class must stay (e.g. a status chip), pair it: `bg-green-50 text-green-700
-dark:bg-green-950 dark:text-green-300` — light pastel bg + mid text in light, deep tint + light
-text in dark. The light `*-50`/`*-700` pair on a dark page is forbidden (glaring, eye-straining,
-borders vanish).
+| Role | base | subtle | foreground |
+|---|---|---|---|
+| Success | `#16a34a` → `#4ade80` | `#f0fdf4` → `#052e16` | `#166534` → `#86efac` |
+| Warning | `#d97706` → `#fbbf24` | `#fffbeb` → `#451a03` | `#92400e` → `#fcd34d` |
+| Error | `#dc2626` → `#f87171` | `#fef2f2` → `#450a0a` | `#991b1b` → `#fca5a5` |
+| Info | `#2563eb` → `#60a5fa` | `#eff6ff` → `#172554` | `#1e40af` → `#93c5fd` |
+
+- **Status chip / banner** (text on a tint): `bg-{role}-subtle text-{role}-foreground border-{role}/30`.
+- **Coloured text on the page/card** (e.g. an error message, a counter at the limit): `text-{role}`.
+- Pairing `text-{role}` with `bg-{role}-subtle` is **wrong** — the base is too light on the tint
+  (e.g. green-600 on green-50 ≈ 3.2:1, fails AA). Always use `-foreground` on `-subtle`.
+- Raw `*-50`/`*-700` palette pairs with no `dark:` variant are forbidden on a dark page (glaring,
+  eye-straining, borders vanish). Reserve raw palette classes for cases the token roles don't model
+  (e.g. the annotation theme, the destructive-action token).
 
 ---
 

@@ -21,14 +21,14 @@ export function QueryUsageNotice({ usage }: Props) {
   return (
     <div
       role="note"
-      className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200"
+      className="rounded-2xl border border-info/30 bg-info-subtle p-4 text-sm text-info-foreground"
     >
       <p>
         Query Mode runs on Google's free AI tier, with daily limits shared across everyone. Please
         use it in moderation.
       </p>
       {usage && budgetUsed !== null && (
-        <p className="mt-1 text-blue-700 dark:text-blue-300">
+        <p className="mt-1 text-info-foreground/80">
           Shared daily budget: {budgetUsed}% used
           {usage.requestsRemaining <= LOW_REQUESTS_THRESHOLD &&
             ` · ${usage.requestsRemaining} questions left this minute`}
