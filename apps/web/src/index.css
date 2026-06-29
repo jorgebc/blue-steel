@@ -32,7 +32,8 @@
   --color-popover: #ffffff;
   --color-popover-foreground: #0f172a;
 
-  --color-primary: #3b82f6; /* blue-500 (matches accent) */
+  --color-primary: #2563eb; /* blue-600 — filled primary; white text clears AA (5.2:1) */
+  --color-primary-hover: #1d4ed8; /* blue-700 — filled-primary hover (darkens in both themes) */
   --color-primary-foreground: #ffffff;
   --color-secondary: #f1f5f9; /* slate-100 */
   --color-secondary-foreground: #0f172a;
@@ -105,7 +106,8 @@
   --color-popover: #0f172a;
   --color-popover-foreground: #f8fafc;
 
-  --color-primary: #3b82f6; /* blue-500 (matches accent) */
+  --color-primary: #2563eb; /* blue-600 — filled primary; white text clears AA (5.2:1) */
+  --color-primary-hover: #1d4ed8; /* blue-700 — filled-primary hover */
   --color-primary-foreground: #ffffff;
   --color-secondary: #1e293b; /* slate-800 */
   --color-secondary-foreground: #f8fafc;

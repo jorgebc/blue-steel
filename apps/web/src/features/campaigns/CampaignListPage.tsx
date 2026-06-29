@@ -49,7 +49,7 @@ export function CampaignListPage() {
             {campaigns && campaigns.length > 0 && (
               <Link
                 to="/campaigns/new"
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-accent-hover"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
               >
                 New campaign
               </Link>
@@ -101,7 +101,7 @@ export function CampaignListPage() {
               </p>
               <Link
                 to="/campaigns/new"
-                className="mt-6 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-accent-hover"
+                className="mt-6 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
               >
                 New campaign
               </Link>

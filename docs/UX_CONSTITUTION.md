@@ -61,13 +61,14 @@ Elevation communicates interaction priority and navigation depth. Higher elevati
 | 0 — Flat | Background canvas, page background | `shadow-none` | — |
 | 1 — Tonal | Cards, list items, static surfaces | `shadow-sm` | — |
 | 2 — Elevated | Hover state, active list item, inline edit | `shadow-md` | — |
-| 3 — Overlay | Focused Overlays, dropdown menus | `shadow-lg` | `ring-1 ring-slate-200` |
+| 3 — Overlay | Focused Overlays, dropdown menus | `shadow-md`/`shadow-lg` | `ring-1 ring-foreground/10` |
 | 4 — Navigation | Sidebar (floating), top bar | `shadow-xl` | — |
 
 **Rules:**
-- Every interactive surface starts at elevation 1 minimum (`shadow-sm`). `shadow-none` is reserved for background regions only.
-- Apply `transition-shadow duration-200` to all interactive elements so elevation transitions are smooth.
-- When an element receives focus via a Focused Overlay, its shadow jumps to `shadow-xl ring-2 ring-blue-500/50`.
+- Every interactive surface carries an elevation cue — a `shadow-*` **or** a theme-adaptive hairline ring (`ring-1 ring-foreground/10`). A surface with neither (`shadow-none` and no ring) is reserved for background regions only.
+- The shadcn primitives (read-only, §9.10) realise card/popover elevation with `ring-1 ring-foreground/10` rather than a shadow, because shadows are near-invisible on the dark canvas — the ring is the source of truth there and shadows are a light-mode enhancement. Filled buttons are intentionally flat at rest and signal affordance through colour + hover/active/focus state.
+- Apply `transition-shadow duration-200` (or `transition-all`) to interactive elements so elevation transitions are smooth.
+- shadcn focus-visible rings are `ring-3 ring-ring/50` (3px, blue-500) — the radix-nova default; treat 3px as the standard focus width. When an element is promoted inside a Focused Overlay it jumps to `shadow-xl ring-2 ring-blue-500/50`.
 
 ---
 
@@ -190,13 +191,18 @@ Toast notifications are **forbidden** (D-083). System feedback is delivered via 
 
 ### Accent — Electric Blue
 
-| Role | Tailwind Token | Hex |
+`blue-500` is the **accent** (rings, active-route highlights, borders, accent text on a neutral
+surface). A **filled** primary surface (`bg-primary` + white text) instead uses `blue-600`, because
+white on `blue-500` is only **3.7:1** — below WCAG AA for text. White on `blue-600` is **5.2:1**.
+The two roles are separate tokens (`--color-accent` = blue-500, `--color-primary` = blue-600).
+
+| Role | Token | Hex |
 |---|---|---|
-| Primary action, active state | `bg-blue-500` / `text-blue-500` | `#3b82f6` |
-| Primary action hover | `bg-blue-600` | `#2563eb` |
-| Primary action pressed | `bg-blue-700` | `#1d4ed8` |
-| Subtle accent background | `bg-blue-50` | `#eff6ff` |
-| Accent border / ring | `ring-blue-500` / `border-blue-500` | `#3b82f6` |
+| Filled primary action (bg) | `bg-primary` | `#2563eb` (blue-600) |
+| Filled primary hover | `bg-primary-hover` | `#1d4ed8` (blue-700) |
+| Accent — active state, accent text/border | `text-accent` / `border-accent` | `#3b82f6` (blue-500) |
+| Focus ring | `ring-ring` | `#3b82f6` (blue-500) |
+| Subtle accent background | `bg-accent-subtle` | `#eff6ff` (light) / `#172554` (dark) |
 
 ### Semantic Colours
 
@@ -211,7 +217,7 @@ Toast notifications are **forbidden** (D-083). System feedback is delivered via 
 | Info | `text-blue-600` | `#2563eb` |
 
 **Rules:**
-- `blue-500` is used **only** for primary actions and active/focus states. Secondary actions use `slate-700` text on transparent backgrounds.
+- Blue is reserved for primary actions and active/focus states — `blue-600` when filled, `blue-500` as the accent (ring/active/border/text). Secondary actions use `slate-700` text on transparent backgrounds.
 - Never use raw hex values in JSX — always use Tailwind tokens.
 - "Brushed metal" borders (`slate-200`/`slate-300`) replace harsh black borders throughout.
 
@@ -341,8 +347,8 @@ These rules are **never optional**. Any deviation is a bug.
 4. **Every skeleton must match final rendered height within ±2px.** Measure both and align.
 5. **Grid spacing must be multiples of 4px.** Use `p-1` (4px), `p-2` (8px), `p-3` (12px), `p-4` (16px), `p-6` (24px), `p-8` (32px) only.
 6. **Radius rules are fixed:** cards → `rounded-2xl`, buttons → `rounded-lg`, badges/icon-buttons → `rounded-full`.
-7. **`blue-500` is the only accent colour.** It appears exclusively on primary actions and active route highlights. All other interactive elements use slate tones.
-8. **No interactive surface uses `shadow-none`.** Minimum is `shadow-sm`.
+7. **Blue is the only accent.** Filled primary actions use `blue-600` (AA-safe white text); `blue-500` is the accent for active-route highlights, focus rings, and accent text/borders. All other interactive elements use slate tones.
+8. **Every interactive surface carries an elevation cue** — a `shadow-*` or a theme-adaptive `ring-1 ring-foreground/10`. Never both absent (see §3).
 9. **All text must pass WCAG AA (≥4.5:1)** contrast against its direct background.
 10. **`components/ui/` is read-only.** Wrap or extend in `components/domain/` only.
 11. **No inline `style={{}}` props.** Use Tailwind utility classes or CSS custom properties via `@theme`.

@@ -94,7 +94,7 @@ function SessionRow({ session, campaignId, activeRole, onDiscard }: RowProps) {
         {canEditDraft && (
           <Link
             to={`/campaigns/${campaignId}/sessions/${session.sessionId}/diff`}
-            className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-accent-hover transition-colors duration-200"
+            className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors duration-200"
           >
             Resume
           </Link>
