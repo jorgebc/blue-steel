@@ -46,6 +46,7 @@ public class DiscardSessionService implements DiscardSessionUseCase {
     Session session =
         sessionRepository
             .findById(sessionId)
+            .filter(s -> s.campaignId().equals(campaignId))
             .orElseThrow(() -> new SessionNotFoundException("Session not found: " + sessionId));
 
     session.discard();

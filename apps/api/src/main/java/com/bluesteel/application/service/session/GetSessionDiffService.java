@@ -51,6 +51,7 @@ public class GetSessionDiffService implements GetSessionDiffUseCase {
     Session session =
         sessionRepository
             .findById(sessionId)
+            .filter(s -> s.campaignId().equals(campaignId))
             .orElseThrow(() -> new SessionNotFoundException("Session not found: " + sessionId));
 
     if (session.status() != SessionStatus.DRAFT) {

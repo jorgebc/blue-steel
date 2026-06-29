@@ -147,6 +147,29 @@ class GetSessionDiffServiceTest {
   }
 
   @Test
+  @DisplayName("should throw SessionNotFoundException when session belongs to another campaign")
+  void getDiff_sessionInOtherCampaign_throwsSessionNotFound() throws Exception {
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.GM));
+    Session otherCampaignSession =
+        Session.reconstitute(
+            SESSION_ID,
+            UUID.fromString("99999999-9999-9999-9999-999999999999"),
+            CALLER_ID,
+            SessionStatus.DRAFT,
+            null,
+            null,
+            minimalDiffPayloadJson(),
+            null,
+            Instant.now(),
+            Instant.now());
+    when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(otherCampaignSession));
+
+    assertThatThrownBy(() -> sut.getDiff(CALLER_ID, CAMPAIGN_ID, SESSION_ID))
+        .isInstanceOf(SessionNotFoundException.class);
+  }
+
+  @Test
   @DisplayName("should throw SessionNotFoundException when session is not in DRAFT status")
   void getDiff_sessionNotDraft_throwsSessionNotFound() {
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))

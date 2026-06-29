@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -46,5 +47,7 @@ public record CommitSessionRequest(
 
   /** A reviewer-added entity the extraction missed (F6.1, D-053). */
   public record AddedEntityRequest(
-      @NotBlank String entityType, @NotBlank String name, Map<String, Object> fields) {}
+      @NotBlank @Size(max = 200) String entityType,
+      @NotBlank @Size(max = 200) String name,
+      Map<String, Object> fields) {}
 }

@@ -3,6 +3,7 @@ package com.bluesteel.adapters.in.web;
 import com.bluesteel.domain.exception.ActiveSessionExistsException;
 import com.bluesteel.domain.exception.AlreadyCampaignMemberException;
 import com.bluesteel.domain.exception.AnnotationNotFoundException;
+import com.bluesteel.domain.exception.AuthRateLimitExceededException;
 import com.bluesteel.domain.exception.AuthorCannotCoSignException;
 import com.bluesteel.domain.exception.CampaignNotFoundException;
 import com.bluesteel.domain.exception.CannotRemoveGmException;
@@ -196,6 +197,13 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
   public ApiResponse<Void> handleRateLimitExceeded(RateLimitExceededException ex) {
     return ApiResponse.error(ApiError.of("QUERY_RATE_LIMITED", ex.getMessage()));
+  }
+
+  /** Client exceeded the per-IP request rate limit on the auth endpoints (login/refresh). */
+  @ExceptionHandler(AuthRateLimitExceededException.class)
+  @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+  public ApiResponse<Void> handleAuthRateLimitExceeded(AuthRateLimitExceededException ex) {
+    return ApiResponse.error(ApiError.of("AUTH_RATE_LIMITED", ex.getMessage()));
   }
 
   /** Daily LLM cost cap reached — Query Mode is temporarily unavailable (D-096). */

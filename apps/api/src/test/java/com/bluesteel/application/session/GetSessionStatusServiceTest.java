@@ -62,6 +62,19 @@ class GetSessionStatusServiceTest {
   }
 
   @Test
+  @DisplayName("should throw SessionNotFoundException when session belongs to another campaign")
+  void getStatus_sessionInOtherCampaign_throwsNotFound() {
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    Session otherCampaignSession =
+        Session.create(SESSION_ID, UUID.randomUUID(), CALLER_ID, Instant.now());
+    when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(otherCampaignSession));
+
+    assertThatThrownBy(() -> sut.getStatus(SESSION_ID, CALLER_ID, CAMPAIGN_ID))
+        .isInstanceOf(SessionNotFoundException.class);
+  }
+
+  @Test
   @DisplayName("should return session status view for any campaign member")
   void getStatus_memberWithSession_returnsStatusView() {
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
