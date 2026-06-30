@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { z } from 'zod'
 import './index.css'
 import './i18n'
 import { initAuth } from '@/api/auth'
@@ -35,6 +36,12 @@ import { RequireAuth } from '@/components/domain/RequireAuth'
 import { ErrorBoundary } from '@/components/domain/ErrorBoundary'
 import { useAuthStore } from '@/store/authStore'
 import { useApplyTheme } from '@/hooks/useApplyTheme'
+
+// Disable Zod's JIT validator so it never probes `new Function`, which the
+// production Content-Security-Policy blocks (no 'unsafe-eval'). Without this,
+// Zod still works via its interpreted fallback but the browser reports a CSP
+// eval violation on every probe. Must run before any schema is parsed.
+z.config({ jitless: true })
 
 const queryClient = new QueryClient()
 
