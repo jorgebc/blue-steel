@@ -191,7 +191,7 @@ export function MemberManagementPanel({ campaignId }: { campaignId: string }) {
               >
                 <span className="text-sm text-foreground">{member.email}</span>
                 {member.role === 'gm' ? (
-                  <span className="rounded-full bg-accent-subtle px-3 py-1 text-xs font-medium uppercase text-accent">
+                  <span className="rounded-full bg-info-subtle px-3 py-1 text-xs font-medium uppercase text-info-foreground">
                     {t('campaigns.gm')}
                   </span>
                 ) : (
