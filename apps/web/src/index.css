@@ -91,7 +91,7 @@
 .dark {
   --color-surface: #0f172a; /* slate-900 */
   --color-background: #020617; /* slate-950 */
-  --color-border: #1e293b; /* slate-800 */
+  --color-border: #334155; /* slate-700 — lifted for visible hairlines/dividers on dark */
   --color-border-strong: #334155; /* slate-700 */
 
   --color-accent: #3b82f6; /* blue-500 — accent stays electric blue */
@@ -109,7 +109,7 @@
   --color-primary: #2563eb; /* blue-600 — filled primary; white text clears AA (5.2:1) */
   --color-primary-hover: #1d4ed8; /* blue-700 — filled-primary hover */
   --color-primary-foreground: #ffffff;
-  --color-secondary: #1e293b; /* slate-800 */
+  --color-secondary: #334155; /* slate-700 — lifted for surface contrast on dark */
   --color-secondary-foreground: #f8fafc;
   --color-muted: #1e293b; /* slate-800 */
   --color-muted-foreground: #94a3b8; /* slate-400 — secondary text */
@@ -131,7 +131,7 @@
   --color-info-subtle: #172554; /* blue-950 */
   --color-info-foreground: #93c5fd; /* blue-300 */
 
-  --color-input: #334155; /* slate-700 (matches border-strong) */
+  --color-input: #64748b; /* slate-500 — input/outline borders clear 3:1 on dark surfaces */
   --color-ring: #3b82f6; /* blue-500 focus ring */
 }
 
