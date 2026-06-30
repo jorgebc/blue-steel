@@ -80,6 +80,21 @@ class DiscardSessionServiceTest {
   }
 
   @Test
+  @DisplayName("should throw SessionNotFoundException when session belongs to another campaign")
+  void discard_sessionInOtherCampaign_throwsNotFound() {
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.GM));
+    Session otherCampaignSession =
+        Session.create(SESSION_ID, UUID.randomUUID(), CALLER_ID, Instant.now());
+    when(sessionRepository.findById(SESSION_ID)).thenReturn(Optional.of(otherCampaignSession));
+
+    assertThatThrownBy(() -> sut.discard(SESSION_ID, CALLER_ID, CAMPAIGN_ID))
+        .isInstanceOf(SessionNotFoundException.class);
+
+    verify(sessionRepository, never()).save(any(Session.class));
+  }
+
+  @Test
   @DisplayName("should throw InvalidSessionStateTransitionException when session is not in DRAFT")
   void discard_sessionNotDraft_throwsInvalidTransition() {
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))

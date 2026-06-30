@@ -88,6 +88,7 @@ public class CommitService implements CommitSessionUseCase {
     Session session =
         sessionRepository
             .findById(command.sessionId())
+            .filter(s -> s.campaignId().equals(command.campaignId()))
             .orElseThrow(
                 () -> new SessionNotFoundException("Session not found: " + command.sessionId()));
 

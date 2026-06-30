@@ -159,6 +159,40 @@ class AuthControllerTest {
   }
 
   @Test
+  @DisplayName("should return 429 AUTH_RATE_LIMITED after exceeding the per-IP login rate limit")
+  void login_exceedsRateLimit_returns429() throws Exception {
+    when(loginUseCase.login(new LoginCommand("user@example.com", "Password1!")))
+        .thenReturn(new LoginResult("access-token", "raw-refresh-token", USER_ID, false, false));
+
+    // Isolated key via X-Forwarded-For so this does not consume other tests' limiter budget.
+    // Default limit is auth.rate-limit.max-requests=10; the 11th request from one IP trips.
+    for (int i = 0; i < 10; i++) {
+      mockMvc
+          .perform(
+              post("/api/v1/auth/login")
+                  .header("X-Forwarded-For", "198.51.100.42")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      """
+                      { "email": "user@example.com", "password": "Password1!" }
+                      """))
+          .andExpect(status().isOk());
+    }
+
+    mockMvc
+        .perform(
+            post("/api/v1/auth/login")
+                .header("X-Forwarded-For", "198.51.100.42")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    { "email": "user@example.com", "password": "Password1!" }
+                    """))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.errors[0].code").value("AUTH_RATE_LIMITED"));
+  }
+
+  @Test
   @DisplayName("should return 400 when login request is missing email")
   void login_missingEmail_returns400() throws Exception {
     mockMvc

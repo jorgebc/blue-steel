@@ -38,6 +38,7 @@ public class GetSessionStatusService implements GetSessionStatusUseCase {
     Session session =
         sessionRepository
             .findById(sessionId)
+            .filter(s -> s.campaignId().equals(campaignId))
             .orElseThrow(() -> new SessionNotFoundException("Session not found: " + sessionId));
 
     return new SessionStatusView(session.id(), session.status(), session.failureReason(), null);

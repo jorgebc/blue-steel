@@ -29,21 +29,27 @@ public class AuthController {
   private final LoginUseCase loginUseCase;
   private final RefreshTokenUseCase refreshTokenUseCase;
   private final LogoutUseCase logoutUseCase;
+  private final AuthRateLimiter rateLimiter;
   private final String cookiePath;
 
   public AuthController(
       LoginUseCase loginUseCase,
       RefreshTokenUseCase refreshTokenUseCase,
-      LogoutUseCase logoutUseCase) {
+      LogoutUseCase logoutUseCase,
+      AuthRateLimiter rateLimiter) {
     this.loginUseCase = loginUseCase;
     this.refreshTokenUseCase = refreshTokenUseCase;
     this.logoutUseCase = logoutUseCase;
+    this.rateLimiter = rateLimiter;
     this.cookiePath = AuthController.class.getAnnotation(RequestMapping.class).value()[0];
   }
 
   @PostMapping("/login")
   public ResponseEntity<ApiResponse<LoginResponse>> login(
-      @Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+      @Valid @RequestBody LoginRequest request,
+      HttpServletRequest httpRequest,
+      HttpServletResponse response) {
+    rateLimiter.check(clientIp(httpRequest));
     LoginResult result = loginUseCase.login(new LoginCommand(request.email(), request.password()));
     setRefreshTokenCookie(response, result.rawRefreshToken(), THIRTY_DAYS_SECONDS);
     return ResponseEntity.ok(
@@ -53,6 +59,7 @@ public class AuthController {
   @PostMapping("/refresh")
   public ResponseEntity<ApiResponse<RefreshResponse>> refresh(
       HttpServletRequest request, HttpServletResponse response) {
+    rateLimiter.check(clientIp(request));
     String rawToken = extractRefreshTokenCookie(request);
     if (rawToken == null) {
       throw new RefreshTokenException("REFRESH_TOKEN_MISSING", "Refresh token cookie required");
@@ -71,6 +78,19 @@ public class AuthController {
     }
     setRefreshTokenCookie(response, "", 0);
     return ResponseEntity.ok(ApiResponse.success(null));
+  }
+
+  /**
+   * Resolves the client IP for rate limiting. Behind the reverse proxy the original client is the
+   * first hop of {@code X-Forwarded-For}; falls back to the socket address when the header is
+   * absent.
+   */
+  private String clientIp(HttpServletRequest request) {
+    String forwarded = request.getHeader("X-Forwarded-For");
+    if (forwarded != null && !forwarded.isBlank()) {
+      return forwarded.split(",", 2)[0].trim();
+    }
+    return request.getRemoteAddr();
   }
 
   private String extractRefreshTokenCookie(HttpServletRequest request) {

@@ -205,6 +205,31 @@ class CommitServiceTest {
   }
 
   @Test
+  @DisplayName("should throw SessionNotFoundException when session belongs to another campaign")
+  void commit_sessionInOtherCampaign_throwsNotFound() throws Exception {
+    Session otherCampaignSession =
+        Session.reconstitute(
+            sessionId,
+            UUID.randomUUID(),
+            callerId,
+            com.bluesteel.domain.session.SessionStatus.DRAFT,
+            null,
+            null,
+            objectMapper.writeValueAsString(diff),
+            null,
+            Instant.now(),
+            Instant.now());
+    when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(otherCampaignSession));
+
+    assertThatThrownBy(
+            () ->
+                service.commit(new CommitSessionCommand(callerId, campaignId, sessionId, payload)))
+        .isInstanceOf(SessionNotFoundException.class);
+
+    verify(worldStatePort, never()).writeEntity(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
   @DisplayName("should throw InvalidSessionStateTransitionException when session is not DRAFT")
   void commit_nonDraftSession_throwsInvalidTransition() {
     Session processingSession =
