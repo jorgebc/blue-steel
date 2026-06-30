@@ -32,6 +32,7 @@ import { CampaignContextGuard } from '@/components/domain/CampaignContextGuard'
 import { AppShell } from '@/components/domain/AppShell'
 import { AuthenticatedLayout } from '@/components/domain/AuthenticatedLayout'
 import { RequireAuth } from '@/components/domain/RequireAuth'
+import { ErrorBoundary } from '@/components/domain/ErrorBoundary'
 import { useAuthStore } from '@/store/authStore'
 import { useApplyTheme } from '@/hooks/useApplyTheme'
 
@@ -47,57 +48,59 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppInitializer>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/status" element={<StatusPage />} />
-            <Route
-              path="/change-password"
-              element={
-                <RequireAuth>
-                  <ChangePasswordPage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              element={
-                <RequireAuth>
-                  <AuthenticatedLayout />
-                </RequireAuth>
-              }
-            >
-              <Route path="/" element={<CampaignListPage />} />
-              <Route path="/settings" element={<UserSettingsPage />} />
-              <Route path="/invite" element={<InvitePlatformUserPage />} />
-              <Route path="/campaigns/new" element={<CreateCampaignPage />} />
-              <Route path="/campaigns/:campaignId" element={<CampaignContextGuard />}>
-                <Route element={<AppShell />}>
-                  <Route index element={<CampaignHomePage />} />
-                  <Route path="sessions" element={<SessionsListPage />} />
-                  <Route path="sessions/new" element={<SubmitSessionPage />} />
-                  <Route path="sessions/:sessionId" element={<SessionDetailPage />} />
-                  <Route path="sessions/:sessionId/diff" element={<DiffReviewPage />} />
-                  <Route path="query" element={<QueryPage />} />
-                  <Route path="proposals" element={<ProposalReviewQueuePage />} />
-                  <Route path="explore" element={<ExplorationLayout />}>
-                    <Route index element={<Navigate to="timeline" replace />} />
-                    <Route path="timeline" element={<TimelinePage />} />
-                    <Route path="events/:eventId" element={<EventDetailPage />} />
-                    <Route path="entities" element={<EntitiesPage />} />
-                    <Route path="entities/:entityId" element={<EntityProfilePage />} />
-                    <Route path="spaces" element={<SpacesPage />} />
-                    <Route path="spaces/:spaceId" element={<SpaceProfilePage />} />
-                    <Route path="relations" element={<RelationsPage />} />
-                    <Route path="relations/:relationId" element={<RelationDetailPage />} />
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AppInitializer>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/status" element={<StatusPage />} />
+              <Route
+                path="/change-password"
+                element={
+                  <RequireAuth>
+                    <ChangePasswordPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                element={
+                  <RequireAuth>
+                    <AuthenticatedLayout />
+                  </RequireAuth>
+                }
+              >
+                <Route path="/" element={<CampaignListPage />} />
+                <Route path="/settings" element={<UserSettingsPage />} />
+                <Route path="/invite" element={<InvitePlatformUserPage />} />
+                <Route path="/campaigns/new" element={<CreateCampaignPage />} />
+                <Route path="/campaigns/:campaignId" element={<CampaignContextGuard />}>
+                  <Route element={<AppShell />}>
+                    <Route index element={<CampaignHomePage />} />
+                    <Route path="sessions" element={<SessionsListPage />} />
+                    <Route path="sessions/new" element={<SubmitSessionPage />} />
+                    <Route path="sessions/:sessionId" element={<SessionDetailPage />} />
+                    <Route path="sessions/:sessionId/diff" element={<DiffReviewPage />} />
+                    <Route path="query" element={<QueryPage />} />
+                    <Route path="proposals" element={<ProposalReviewQueuePage />} />
+                    <Route path="explore" element={<ExplorationLayout />}>
+                      <Route index element={<Navigate to="timeline" replace />} />
+                      <Route path="timeline" element={<TimelinePage />} />
+                      <Route path="events/:eventId" element={<EventDetailPage />} />
+                      <Route path="entities" element={<EntitiesPage />} />
+                      <Route path="entities/:entityId" element={<EntityProfilePage />} />
+                      <Route path="spaces" element={<SpacesPage />} />
+                      <Route path="spaces/:spaceId" element={<SpaceProfilePage />} />
+                      <Route path="relations" element={<RelationsPage />} />
+                      <Route path="relations/:relationId" element={<RelationDetailPage />} />
+                    </Route>
                   </Route>
                 </Route>
               </Route>
-            </Route>
-          </Routes>
-        </AppInitializer>
-      </BrowserRouter>
-    </QueryClientProvider>
+            </Routes>
+          </AppInitializer>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 )
