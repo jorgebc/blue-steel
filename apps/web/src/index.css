@@ -136,6 +136,16 @@
 }
 
 /*
+ * Base document colour. Without this, any element that sets no `text-*` class inherits the UA
+ * default black — invisible on dark surfaces. Low specificity, so per-element text utilities
+ * still override; var() resolves per theme via the .dark token overrides above.
+ */
+body {
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+}
+
+/*
  * React Flow (Relations graph) theming — aligns the library's chrome with the Blue Steel palette.
  * Styling lives here (not inline) per UX Constitution rule #11. Slate tones only; blue is reserved
  * for the selected-state emphasis applied in the node/edge components.
