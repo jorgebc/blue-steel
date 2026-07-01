@@ -26,6 +26,14 @@ function latestVersion(versions: EntityVersion[]): EntityVersion | null {
   )
 }
 
+/** Renders a freeform snapshot value readably — arrays and nested objects instead of "[object Object]". */
+function formatSnapshotValue(value: unknown): string {
+  if (value === null || value === undefined) return '—'
+  if (Array.isArray(value)) return value.map(formatSnapshotValue).join(', ')
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
 /**
  * Read-only entity profile: current state (latest `fullSnapshot`) + version history (D-001). Hosts
  * comment-marked slots for the annotation thread (F4.4) and a disabled propose-change stub (D-012).
@@ -82,7 +90,7 @@ export function EntityProfileView({ entityType, entityId, backTo, backLabel }: P
                 {Object.entries(latest.fullSnapshot).map(([key, value]) => (
                   <div key={key} className="flex gap-4">
                     <dt className="w-40 shrink-0 font-medium text-muted-foreground">{key}</dt>
-                    <dd className="text-foreground">{String(value)}</dd>
+                    <dd className="text-foreground">{formatSnapshotValue(value)}</dd>
                   </div>
                 ))}
               </dl>

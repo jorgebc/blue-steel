@@ -45,9 +45,10 @@ public class WorldStateExplorationController {
   @GetMapping("/actors")
   public ResponseEntity<ApiResponse<List<EntitySummaryResponse>>> listActors(
       @PathVariable UUID id,
+      @RequestParam(required = false) String q,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
-    return listResponse("actor", id, page, size);
+    return listResponse("actor", id, q, page, size);
   }
 
   @GetMapping("/actors/{aid}")
@@ -65,9 +66,10 @@ public class WorldStateExplorationController {
   @GetMapping("/spaces")
   public ResponseEntity<ApiResponse<List<EntitySummaryResponse>>> listSpaces(
       @PathVariable UUID id,
+      @RequestParam(required = false) String q,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
-    return listResponse("space", id, page, size);
+    return listResponse("space", id, q, page, size);
   }
 
   @GetMapping("/spaces/{sid}")
@@ -85,9 +87,10 @@ public class WorldStateExplorationController {
   @GetMapping("/events")
   public ResponseEntity<ApiResponse<List<EntitySummaryResponse>>> listEvents(
       @PathVariable UUID id,
+      @RequestParam(required = false) String q,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
-    return listResponse("event", id, page, size);
+    return listResponse("event", id, q, page, size);
   }
 
   @GetMapping("/events/{eid}")
@@ -97,9 +100,10 @@ public class WorldStateExplorationController {
   }
 
   private ResponseEntity<ApiResponse<List<EntitySummaryResponse>>> listResponse(
-      String entityType, UUID campaignId, int page, int size) {
+      String entityType, UUID campaignId, String search, int page, int size) {
     UUID callerId = resolveCallerId();
-    EntityListPage view = listEntitiesUseCase.list(entityType, campaignId, callerId, page, size);
+    EntityListPage view =
+        listEntitiesUseCase.list(entityType, campaignId, callerId, search, page, size);
     List<EntitySummaryResponse> items =
         view.items().stream().map(EntitySummaryResponse::from).toList();
     Map<String, Object> meta =

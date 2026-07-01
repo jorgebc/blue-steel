@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { axe } from 'vitest-axe'
@@ -83,6 +83,23 @@ describe('EntitiesPage', () => {
     expect(screen.getByText(/nothing here yet/i)).toBeInTheDocument()
   })
 
+  it('passes the debounced search term to the query', async () => {
+    renderPage()
+
+    await userEvent.type(screen.getByRole('searchbox', { name: /search entities by name/i }), 'ald')
+
+    await waitFor(() => expect(mockUseEntityList).toHaveBeenLastCalledWith('actor', 0, 'ald'))
+  })
+
+  it('shows a no-match message when a search returns nothing', async () => {
+    mockResult({ data: { items: [], page: 0, size: 20, totalCount: 0 } })
+    renderPage()
+
+    await userEvent.type(screen.getByRole('searchbox'), 'zzz')
+
+    await waitFor(() => expect(screen.getByText(/no entities match/i)).toBeInTheDocument())
+  })
+
   it('disables Previous on the first page and Next when there is a single page', () => {
     renderPage()
 
@@ -98,7 +115,7 @@ describe('EntitiesPage', () => {
     expect(next).toBeEnabled()
     await userEvent.click(next)
 
-    expect(mockUseEntityList).toHaveBeenLastCalledWith('actor', 1)
+    expect(mockUseEntityList).toHaveBeenLastCalledWith('actor', 1, '')
   })
 
   it('renders the localized title and description in English', () => {

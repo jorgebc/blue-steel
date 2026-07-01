@@ -50,7 +50,7 @@ describe('SpacesPage', () => {
   it('lists spaces via the space entity type, linking to space profiles', () => {
     renderPage()
 
-    expect(mockUseEntityList).toHaveBeenCalledWith('space', 0)
+    expect(mockUseEntityList).toHaveBeenCalledWith('space', 0, '')
     expect(screen.getByRole('link', { name: /Prancing Pony/i })).toHaveAttribute(
       'href',
       '/campaigns/c1/explore/spaces/x1'

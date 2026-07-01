@@ -37,21 +37,26 @@ describe('EventCard', () => {
     expect(link).toHaveAttribute('href', '/campaigns/c1/explore/events/e1')
   })
 
-  it('renders the event name, type badge, actors, space and session reference', () => {
+  it('renders the event name, type badge, actors and space', () => {
     renderCard()
 
     expect(screen.getByText('Ambush at the Pass')).toBeInTheDocument()
     expect(screen.getByText('battle')).toBeInTheDocument()
     expect(screen.getByText(/Aldric, Seraphine/)).toBeInTheDocument()
     expect(screen.getByText(/Mountain Pass/)).toBeInTheDocument()
-    expect(screen.getByText(/Session #2/)).toBeInTheDocument()
+  })
+
+  it('does not repeat the session reference (the timeline groups by session)', () => {
+    renderCard()
+
+    expect(screen.queryByText(/Session #/)).not.toBeInTheDocument()
   })
 
   it('omits the type badge when the event has no type', () => {
     renderCard({ eventType: null })
 
     expect(screen.queryByText('battle')).not.toBeInTheDocument()
-    expect(screen.getByText(/Session #2/)).toBeInTheDocument()
+    expect(screen.getByText('Ambush at the Pass')).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

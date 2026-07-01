@@ -49,19 +49,46 @@ class WorldStateExplorationServiceTest {
   void list_nonMember_throwsUnauthorized() {
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> sut.list("actor", CAMPAIGN_ID, CALLER_ID, 0, 20))
+    assertThatThrownBy(() -> sut.list("actor", CAMPAIGN_ID, CALLER_ID, null, 0, 20))
         .isInstanceOf(UnauthorizedException.class);
   }
 
   @Test
-  @DisplayName("should delegate to the read port and return its page for a member")
+  @DisplayName("should delegate to the read port with an unconstrained filter when no search given")
   void list_member_delegatesToReadPort() {
     EntityListPage page = new EntityListPage(List.of(), 0, 20, 0L);
     when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
         .thenReturn(Optional.of(CampaignRole.PLAYER));
     when(readPort.list("actor", CAMPAIGN_ID, EntityListFilter.none(), 0, 20)).thenReturn(page);
 
-    EntityListPage result = sut.list("actor", CAMPAIGN_ID, CALLER_ID, 0, 20);
+    EntityListPage result = sut.list("actor", CAMPAIGN_ID, CALLER_ID, null, 0, 20);
+
+    assertThat(result).isSameAs(page);
+  }
+
+  @Test
+  @DisplayName("should build a trimmed name-contains filter from a non-blank search term")
+  void list_search_buildsNameContainsFilter() {
+    EntityListPage page = new EntityListPage(List.of(), 0, 20, 0L);
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(readPort.list("actor", CAMPAIGN_ID, new EntityListFilter("Ald", null), 0, 20))
+        .thenReturn(page);
+
+    EntityListPage result = sut.list("actor", CAMPAIGN_ID, CALLER_ID, "  Ald  ", 0, 20);
+
+    assertThat(result).isSameAs(page);
+  }
+
+  @Test
+  @DisplayName("should treat a blank search term as no filter")
+  void list_blankSearch_usesNoFilter() {
+    EntityListPage page = new EntityListPage(List.of(), 0, 20, 0L);
+    when(membershipPort.resolveRole(CAMPAIGN_ID, CALLER_ID))
+        .thenReturn(Optional.of(CampaignRole.PLAYER));
+    when(readPort.list("actor", CAMPAIGN_ID, EntityListFilter.none(), 0, 20)).thenReturn(page);
+
+    EntityListPage result = sut.list("actor", CAMPAIGN_ID, CALLER_ID, "   ", 0, 20);
 
     assertThat(result).isSameAs(page);
   }
@@ -74,7 +101,7 @@ class WorldStateExplorationServiceTest {
         .thenReturn(Optional.of(CampaignRole.GM));
     when(readPort.list("actor", CAMPAIGN_ID, EntityListFilter.none(), 0, 100)).thenReturn(page);
 
-    EntityListPage result = sut.list("actor", CAMPAIGN_ID, CALLER_ID, -5, 5000);
+    EntityListPage result = sut.list("actor", CAMPAIGN_ID, CALLER_ID, null, -5, 5000);
 
     assertThat(result).isSameAs(page);
   }

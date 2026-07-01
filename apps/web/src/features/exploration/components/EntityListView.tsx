@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Search } from 'lucide-react'
 import { useEntityList } from '@/api/worldstate'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { EntityListSkeleton } from './EntityListSkeleton'
 import type { EntityType } from '@/types/worldstate'
 
@@ -29,7 +31,19 @@ export function EntityListView({ entityType, title, description }: Props) {
   const { campaignId } = useParams<{ campaignId: string }>()
   const navigate = useNavigate()
   const [page, setPage] = useState(0)
-  const { data, isLoading, isError } = useEntityList(entityType, page)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const { data, isLoading, isError } = useEntityList(entityType, page, search)
+
+  // Debounce keystrokes into the applied search term (server-side ILIKE) instead of querying per
+  // key; a new search restarts paging from the first page.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setSearch(searchInput.trim())
+      setPage(0)
+    }, 300)
+    return () => clearTimeout(id)
+  }, [searchInput])
 
   const segment = SEGMENT[entityType]
   const totalPages = data ? Math.max(1, Math.ceil(data.totalCount / data.size)) : 1
@@ -41,6 +55,21 @@ export function EntityListView({ entityType, title, description }: Props) {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
         <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+
+      <div className="relative mb-4 max-w-sm">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          type="search"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder={`Search ${title.toLowerCase()} by name…`}
+          aria-label={`Search ${title.toLowerCase()} by name`}
+          className="pl-9"
+        />
       </div>
 
       {isError && (
@@ -56,7 +85,9 @@ export function EntityListView({ entityType, title, description }: Props) {
       {isLoading && <EntityListSkeleton />}
 
       {!isLoading && !isError && data && data.items.length === 0 && (
-        <p className="text-sm text-muted-foreground">Nothing here yet.</p>
+        <p className="text-sm text-muted-foreground">
+          {search ? `No ${title.toLowerCase()} match “${search}”.` : 'Nothing here yet.'}
+        </p>
       )}
 
       {!isLoading && !isError && data && data.items.length > 0 && (

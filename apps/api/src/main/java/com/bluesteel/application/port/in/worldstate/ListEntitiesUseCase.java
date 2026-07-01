@@ -12,7 +12,9 @@ public interface ListEntitiesUseCase {
   /**
    * Returns the requested page of entities, each carrying its latest committed version. {@code
    * entityType} selects the entity family (actor, space, event); {@code page} is zero-based and
-   * {@code size} is clamped to a sane range by the implementation.
+   * {@code size} is clamped to a sane range by the implementation. When {@code search} is
+   * non-blank, results are restricted to entities whose name contains it (case-insensitive).
    */
-  EntityListPage list(String entityType, UUID campaignId, UUID callerId, int page, int size);
+  EntityListPage list(
+      String entityType, UUID campaignId, UUID callerId, String search, int page, int size);
 }

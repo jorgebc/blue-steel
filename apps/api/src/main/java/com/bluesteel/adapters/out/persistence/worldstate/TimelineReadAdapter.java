@@ -81,8 +81,8 @@ public class TimelineReadAdapter implements TimelineReadPort {
       args.add(decoded.eventId());
     }
     if (safeFilter.eventType() != null) {
-      sql.append(" AND e.event_type = ?\n");
-      args.add(safeFilter.eventType());
+      sql.append(" AND e.event_type ILIKE ?\n");
+      args.add("%" + safeFilter.eventType() + "%");
     }
     if (safeFilter.space() != null) {
       sql.append(" AND sp.name ILIKE ?\n");

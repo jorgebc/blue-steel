@@ -45,14 +45,18 @@ public class WorldStateExplorationService
 
   @Override
   public EntityListPage list(
-      String entityType, UUID campaignId, UUID callerId, int page, int size) {
+      String entityType, UUID campaignId, UUID callerId, String search, int page, int size) {
     log.info("Listing {} entities campaignId={} callerId={}", entityType, campaignId, callerId);
     requireMember(campaignId, callerId);
 
     int safePage = Math.max(page, 0);
     int safeSize = size < 1 ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
+    EntityListFilter filter =
+        search == null || search.isBlank()
+            ? EntityListFilter.none()
+            : new EntityListFilter(search.trim(), null);
 
-    return readPort.list(entityType, campaignId, EntityListFilter.none(), safePage, safeSize);
+    return readPort.list(entityType, campaignId, filter, safePage, safeSize);
   }
 
   @Override

@@ -102,6 +102,30 @@ describe('EntityProfilePage', () => {
     expect(screen.getByText('Champion of Light')).toBeInTheDocument()
   })
 
+  it('renders array and nested-object snapshot fields readably instead of "[object Object]"', () => {
+    mockResult({
+      data: {
+        ...detail,
+        versions: [
+          {
+            versionId: 'v1',
+            versionNumber: 1,
+            sessionId: 's1',
+            sessionSequenceNumber: 1,
+            changedFields: {},
+            fullSnapshot: { aliases: ['The Grey', 'Mithrandir'], stats: { level: 20 } },
+            createdAt: '2026-01-01T09:00:00Z',
+          },
+        ],
+      },
+    })
+    renderPage()
+
+    expect(screen.getByText('The Grey, Mithrandir')).toBeInTheDocument()
+    expect(screen.getByText('{"level":20}')).toBeInTheDocument()
+    expect(screen.queryByText('[object Object]')).not.toBeInTheDocument()
+  })
+
   it('renders the version history', () => {
     renderPage()
 

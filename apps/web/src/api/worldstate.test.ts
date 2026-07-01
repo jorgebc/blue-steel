@@ -67,7 +67,22 @@ beforeEach(() => {
 describe('worldstateKeys', () => {
   it('scopes list and detail keys under the campaign + entity type', () => {
     expect(worldstateKeys.all('c1')).toEqual(['worldstate', 'c1'])
-    expect(worldstateKeys.list('c1', 'actor', 0)).toEqual(['worldstate', 'c1', 'actor', 'list', 0])
+    expect(worldstateKeys.list('c1', 'actor', 0)).toEqual([
+      'worldstate',
+      'c1',
+      'actor',
+      'list',
+      0,
+      '',
+    ])
+    expect(worldstateKeys.list('c1', 'actor', 0, 'ald')).toEqual([
+      'worldstate',
+      'c1',
+      'actor',
+      'list',
+      0,
+      'ald',
+    ])
     expect(worldstateKeys.detail('c1', 'space', 'x1')).toEqual([
       'worldstate',
       'c1',
@@ -106,6 +121,16 @@ describe('getEntities', () => {
     await getEntities('c1', 'actor', 0, 100)
 
     expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/actors?page=0&size=100')
+  })
+
+  it('appends the q param when a search term is given', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(
+      envelope([summary], { page: 0, size: 20, totalCount: 1 })
+    )
+
+    await getEntities('c1', 'actor', 0, 20, 'ald')
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/campaigns/c1/actors?page=0&size=20&q=ald')
   })
 })
 
