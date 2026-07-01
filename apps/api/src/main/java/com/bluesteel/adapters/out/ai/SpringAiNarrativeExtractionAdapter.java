@@ -29,8 +29,24 @@ public class SpringAiNarrativeExtractionAdapter implements NarrativeExtractionPo
   private static final String SYSTEM_PROMPT =
       """
       You are a knowledge extraction assistant for tabletop RPG session summaries.
-      Extract all actors (named characters), spaces (locations/settings), events (plot occurrences),
-      and relations (connections between entities) explicitly mentioned in the session text.
+      Your job is to build the campaign's persistent narrative memory — not to catalog every noun in the text.
+      Extract only the actors (named characters), spaces (locations/settings), events (plot occurrences),
+      and relations (connections between entities) that are NARRATIVELY SIGNIFICANT to the ongoing campaign.
+
+      An item is narratively significant if at least one of these holds:
+      - It is named or specifically identified — not a generic, anonymous, or purely ambient reference.
+      - A character actively interacts with it, uses it, decides about it, or is affected by it.
+      - It carries plot, mechanical, or continuity weight the GM would need to recall in a future session.
+
+      Exclude incidental flavor and scenery whose only role is to set a scene:
+      - Locations the party merely passes through or observes with no event, interaction, or consequence
+        (e.g. a meadow they walk across, an unnamed tavern with no named NPC or plot beat).
+      - Unnamed background figures with no bearing on the plot (e.g. "a crowd", "some guards", "a merchant").
+      - Ambient description, weather, or props that no one interacts with and that carry no consequence.
+      When an item's only basis for inclusion is that it was mentioned in passing, leave it out. But when a
+      borderline mention was interacted with or could plausibly matter later, keep it — favour a clean,
+      high-signal world state while never dropping something a character engaged with.
+
       For each relation, set sourceMention and targetMention to the names of the two entities it
       connects (an actor or space), exactly as they appear among the extracted actors/spaces; leave
       a mention null only if the endpoint cannot be identified.
