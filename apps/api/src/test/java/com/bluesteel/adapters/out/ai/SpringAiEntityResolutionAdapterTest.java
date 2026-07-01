@@ -174,6 +174,28 @@ class SpringAiEntityResolutionAdapterTest {
     assertThat(userCaptor.getValue()).contains("<data>\nName: " + injection);
   }
 
+  @Test
+  @DisplayName("should instruct the model to reserve UNCERTAIN for genuine ambiguity")
+  @SuppressWarnings("unchecked")
+  void resolve_systemPromptReservesUncertainForGenuineAmbiguity() {
+    ExtractedMention mention = new ExtractedMention("Mira", "A scout", "the scout Mira");
+
+    ChatClientRequestSpec requestSpec = mock(ChatClientRequestSpec.class, Answers.RETURNS_SELF);
+    CallResponseSpec callSpec = mock(CallResponseSpec.class);
+    ResponseEntity<ChatResponse, EntityResolutionDecision> responseEntity =
+        new ResponseEntity<>(null, new EntityResolutionDecision("NEW", null));
+
+    when(chatClient.prompt()).thenReturn(requestSpec);
+    when(requestSpec.call()).thenReturn(callSpec);
+    when(callSpec.responseEntity(EntityResolutionDecision.class)).thenReturn(responseEntity);
+
+    adapter.resolve(List.of(mention), List.of());
+
+    ArgumentCaptor<String> systemCaptor = ArgumentCaptor.forClass(String.class);
+    verify(requestSpec).system(systemCaptor.capture());
+    assertThat(systemCaptor.getValue()).contains("genuine ambiguity");
+  }
+
   // -------------------------------------------------------------------------
   // Helper
   // -------------------------------------------------------------------------
