@@ -44,7 +44,15 @@
     "target": "Target",
     "versionHistory": "Version history",
     "unresolved": "Unresolved",
-    "relationLoadError": "Could not load this relation. Please refresh the page."
+    "relationLoadError": "Could not load this relation. Please refresh the page.",
+    "searchByName": "Search by name…",
+    "searchByNameAria": "Search by name",
+    "noMatch": "No matches for “{{query}}”.",
+    "nothingHere": "Nothing here yet.",
+    "previous": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{total}}",
+    "listLoadError": "Could not load this list. Please refresh the page."
   },
   "common": {
     "cancel": "Cancel",

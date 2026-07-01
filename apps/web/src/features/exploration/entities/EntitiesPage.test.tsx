@@ -86,7 +86,7 @@ describe('EntitiesPage', () => {
   it('passes the debounced search term to the query', async () => {
     renderPage()
 
-    await userEvent.type(screen.getByRole('searchbox', { name: /search entities by name/i }), 'ald')
+    await userEvent.type(screen.getByRole('searchbox', { name: /search by name/i }), 'ald')
 
     await waitFor(() => expect(mockUseEntityList).toHaveBeenLastCalledWith('actor', 0, 'ald'))
   })
@@ -97,7 +97,7 @@ describe('EntitiesPage', () => {
 
     await userEvent.type(screen.getByRole('searchbox'), 'zzz')
 
-    await waitFor(() => expect(screen.getByText(/no entities match/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/no matches for/i)).toBeInTheDocument())
   })
 
   it('disables Previous on the first page and Next when there is a single page', () => {
@@ -133,6 +133,10 @@ describe('EntitiesPage', () => {
     expect(
       screen.getByText('Actores registrados en las sesiones de esta campaña.')
     ).toBeInTheDocument()
+    // The search box localizes too — no half-translated "Search entidades…" mixing.
+    expect(screen.getByRole('searchbox', { name: /buscar por nombre/i })).toBeInTheDocument()
+
+    await i18n.changeLanguage('en')
   })
 
   it('has no accessibility violations', async () => {

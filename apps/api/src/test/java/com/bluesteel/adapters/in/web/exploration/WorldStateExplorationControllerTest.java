@@ -175,6 +175,21 @@ class WorldStateExplorationControllerTest {
   }
 
   @Test
+  @DisplayName("should forward the q search term to the list use case for events")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void listEvents_forwardsSearchTerm() throws Exception {
+    EntitySummaryView summary =
+        new EntitySummaryView(ACTOR_ID, "event", "Ambush", 1, Map.of(), SESSION_ID, Instant.now());
+    when(listEntitiesUseCase.list("event", CAMPAIGN_ID, CALLER_ID, "amb", 0, 20))
+        .thenReturn(new EntityListPage(List.of(summary), 0, 20, 1L));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/events", CAMPAIGN_ID).param("q", "amb"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].name").value("Ambush"));
+  }
+
+  @Test
   @DisplayName(
       "should return 200 with the actor's relations, related entities, events and sessions")
   @WithMockUser(username = CALLER, roles = "USER")

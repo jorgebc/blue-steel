@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Search } from 'lucide-react'
 import { useEntityList } from '@/api/worldstate'
 import { InlineBanner } from '@/components/domain/InlineBanner'
@@ -28,6 +29,7 @@ interface Props {
  * (D-055). Shared by the Entities (actor) and Spaces views.
  */
 export function EntityListView({ entityType, title, description }: Props) {
+  const { t } = useTranslation()
   const { campaignId } = useParams<{ campaignId: string }>()
   const navigate = useNavigate()
   const [page, setPage] = useState(0)
@@ -66,8 +68,8 @@ export function EntityListView({ entityType, title, description }: Props) {
           type="search"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder={`Search ${title.toLowerCase()} by name…`}
-          aria-label={`Search ${title.toLowerCase()} by name`}
+          placeholder={t('exploration.searchByName')}
+          aria-label={t('exploration.searchByNameAria')}
           className="pl-9"
         />
       </div>
@@ -76,7 +78,7 @@ export function EntityListView({ entityType, title, description }: Props) {
         <div className="mb-4">
           <InlineBanner
             variant="error"
-            message="Could not load this list. Please refresh the page."
+            message={t('exploration.listLoadError')}
             onDismiss={() => navigate(0)}
           />
         </div>
@@ -86,7 +88,7 @@ export function EntityListView({ entityType, title, description }: Props) {
 
       {!isLoading && !isError && data && data.items.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          {search ? `No ${title.toLowerCase()} match “${search}”.` : 'Nothing here yet.'}
+          {search ? t('exploration.noMatch', { query: search }) : t('exploration.nothingHere')}
         </p>
       )}
 
@@ -115,10 +117,10 @@ export function EntityListView({ entityType, title, description }: Props) {
               disabled={!hasPrev}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
             >
-              Previous
+              {t('exploration.previous')}
             </Button>
             <span className="text-sm text-muted-foreground">
-              Page {page + 1} of {totalPages}
+              {t('exploration.pageOf', { page: page + 1, total: totalPages })}
             </span>
             <Button
               type="button"
@@ -126,7 +128,7 @@ export function EntityListView({ entityType, title, description }: Props) {
               disabled={!hasNext}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next
+              {t('exploration.next')}
             </Button>
           </div>
         </>
