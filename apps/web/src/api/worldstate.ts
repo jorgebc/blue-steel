@@ -14,8 +14,8 @@ const PAGE_SIZE = 20
 /** Query-key factory for world-state reads, scoped per campaign and entity type. */
 export const worldstateKeys = {
   all: (campaignId: string) => ['worldstate', campaignId] as const,
-  list: (campaignId: string, entityType: EntityType, page: number) =>
-    [...worldstateKeys.all(campaignId), entityType, 'list', page] as const,
+  list: (campaignId: string, entityType: EntityType, page: number, search = '') =>
+    [...worldstateKeys.all(campaignId), entityType, 'list', page, search] as const,
   detail: (campaignId: string, entityType: EntityType, entityId: string) =>
     [...worldstateKeys.all(campaignId), entityType, 'detail', entityId] as const,
 }
@@ -34,10 +34,13 @@ export async function getEntities(
   campaignId: string,
   entityType: EntityType,
   page: number,
-  size: number = PAGE_SIZE
+  size: number = PAGE_SIZE,
+  search = ''
 ): Promise<EntityListPage> {
+  const params = new URLSearchParams({ page: String(page), size: String(size) })
+  if (search) params.set('q', search)
   const res = await apiClient.get<EntitySummary[]>(
-    `/api/v1/campaigns/${campaignId}/${entityType}s?page=${page}&size=${size}`
+    `/api/v1/campaigns/${campaignId}/${entityType}s?${params.toString()}`
   )
   const meta = (res.meta ?? {}) as { page?: number; size?: number; totalCount?: number }
   return {
@@ -60,12 +63,15 @@ export async function getEntityDetail(
   return res.data
 }
 
-/** Offset-paginated entity list for the active campaign. Page is zero-based. */
-export function useEntityList(entityType: EntityType, page: number) {
+/**
+ * Offset-paginated entity list for the active campaign. Page is zero-based. When `search` is
+ * non-empty the backend restricts results to names containing it (case-insensitive).
+ */
+export function useEntityList(entityType: EntityType, page: number, search = '') {
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
   return useQuery({
-    queryKey: worldstateKeys.list(campaignId ?? '', entityType, page),
-    queryFn: () => getEntities(campaignId ?? '', entityType, page),
+    queryKey: worldstateKeys.list(campaignId ?? '', entityType, page, search),
+    queryFn: () => getEntities(campaignId ?? '', entityType, page, PAGE_SIZE, search),
     enabled: campaignId !== null,
   })
 }

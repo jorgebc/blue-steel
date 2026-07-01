@@ -134,6 +134,16 @@ class TimelineReadAdapterIT extends TestcontainersPostgresBaseIT {
   }
 
   @Test
+  @DisplayName("should filter by event type as a case-insensitive substring")
+  void page_filtersByEventTypeSubstring() {
+    TimelinePage battles = sut.page(campaignId, null, 20, new TimelineFilter(null, null, "BATT"));
+
+    assertThat(battles.events())
+        .extracting(TimelineEntryView::eventId)
+        .containsExactlyInAnyOrder(ambushId, duelId);
+  }
+
+  @Test
   @DisplayName("should filter the feed by an involved actor substring via the join table")
   void page_filtersByActor() {
     TimelinePage seraphineEvents =

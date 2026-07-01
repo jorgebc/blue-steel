@@ -91,7 +91,7 @@ class WorldStateExplorationControllerTest {
     EntitySummaryView summary =
         new EntitySummaryView(
             ACTOR_ID, "actor", "Aldric", 2, Map.of("role", "knight"), SESSION_ID, Instant.now());
-    when(listEntitiesUseCase.list("actor", CAMPAIGN_ID, CALLER_ID, 0, 20))
+    when(listEntitiesUseCase.list("actor", CAMPAIGN_ID, CALLER_ID, null, 0, 20))
         .thenReturn(new EntityListPage(List.of(summary), 0, 20, 1L));
 
     mockMvc
@@ -149,7 +149,7 @@ class WorldStateExplorationControllerTest {
     EntitySummaryView summary =
         new EntitySummaryView(
             UUID.randomUUID(), "space", "The Tavern", 1, Map.of(), SESSION_ID, Instant.now());
-    when(listEntitiesUseCase.list("space", CAMPAIGN_ID, CALLER_ID, 0, 20))
+    when(listEntitiesUseCase.list("space", CAMPAIGN_ID, CALLER_ID, null, 0, 20))
         .thenReturn(new EntityListPage(List.of(summary), 0, 20, 1L));
 
     mockMvc
@@ -157,6 +157,36 @@ class WorldStateExplorationControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[0].entityType").value("space"))
         .andExpect(jsonPath("$.data[0].name").value("The Tavern"));
+  }
+
+  @Test
+  @DisplayName("should forward the q search term to the list use case")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void listActors_forwardsSearchTerm() throws Exception {
+    EntitySummaryView summary =
+        new EntitySummaryView(ACTOR_ID, "actor", "Aldric", 1, Map.of(), SESSION_ID, Instant.now());
+    when(listEntitiesUseCase.list("actor", CAMPAIGN_ID, CALLER_ID, "ald", 0, 20))
+        .thenReturn(new EntityListPage(List.of(summary), 0, 20, 1L));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/actors", CAMPAIGN_ID).param("q", "ald"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].name").value("Aldric"));
+  }
+
+  @Test
+  @DisplayName("should forward the q search term to the list use case for events")
+  @WithMockUser(username = CALLER, roles = "USER")
+  void listEvents_forwardsSearchTerm() throws Exception {
+    EntitySummaryView summary =
+        new EntitySummaryView(ACTOR_ID, "event", "Ambush", 1, Map.of(), SESSION_ID, Instant.now());
+    when(listEntitiesUseCase.list("event", CAMPAIGN_ID, CALLER_ID, "amb", 0, 20))
+        .thenReturn(new EntityListPage(List.of(summary), 0, 20, 1L));
+
+    mockMvc
+        .perform(get("/api/v1/campaigns/{id}/events", CAMPAIGN_ID).param("q", "amb"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].name").value("Ambush"));
   }
 
   @Test

@@ -44,7 +44,15 @@
     "target": "Destino",
     "versionHistory": "Historial de versiones",
     "unresolved": "Sin resolver",
-    "relationLoadError": "No se pudo cargar esta relación. Actualiza la página."
+    "relationLoadError": "No se pudo cargar esta relación. Actualiza la página.",
+    "searchByName": "Buscar por nombre…",
+    "searchByNameAria": "Buscar por nombre",
+    "noMatch": "Sin resultados para «{{query}}».",
+    "nothingHere": "Aún no hay nada aquí.",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "pageOf": "Página {{page}} de {{total}}",
+    "listLoadError": "No se pudo cargar esta lista. Actualiza la página."
   },
   "common": {
     "cancel": "Cancelar",

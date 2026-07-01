@@ -108,6 +108,44 @@ describe('TimelinePage', () => {
     expect(mockUseTimeline).toHaveBeenLastCalledWith({ eventType: 'battle' })
   })
 
+  it('groups events under a heading per session', () => {
+    const laterEvent: TimelineEvent = {
+      ...event,
+      eventId: 'e2',
+      name: 'Council at Rivendell',
+      sessionId: 's2',
+      sessionSequenceNumber: 2,
+    }
+    mockResult({ data: pageData([event, laterEvent]) })
+    renderPage()
+
+    expect(screen.getByRole('heading', { name: 'Session #1' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Session #2' })).toBeInTheDocument()
+  })
+
+  it('clears active filters when Clear is clicked', async () => {
+    renderPage()
+
+    await userEvent.type(screen.getByLabelText(/event type/i), 'battle')
+    await userEvent.click(screen.getByRole('button', { name: /apply/i }))
+    await userEvent.click(screen.getByRole('button', { name: /clear/i }))
+
+    expect(mockUseTimeline).toHaveBeenLastCalledWith({})
+    expect(screen.getByLabelText(/event type/i)).toHaveValue('')
+  })
+
+  it('distinguishes a filtered-empty feed from a truly empty one', async () => {
+    mockResult({ data: pageData([]) })
+    renderPage()
+
+    expect(screen.getByText(/no events yet/i)).toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText(/event type/i), 'ghost')
+    await userEvent.click(screen.getByRole('button', { name: /apply/i }))
+
+    expect(screen.getByText(/no events match these filters/i)).toBeInTheDocument()
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = renderPage()
     expect(await axe(container)).toHaveNoViolations()

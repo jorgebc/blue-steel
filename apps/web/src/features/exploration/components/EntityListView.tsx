@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { Search } from 'lucide-react'
 import { useEntityList } from '@/api/worldstate'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { EntityListSkeleton } from './EntityListSkeleton'
 import type { EntityType } from '@/types/worldstate'
 
@@ -26,10 +29,23 @@ interface Props {
  * (D-055). Shared by the Entities (actor) and Spaces views.
  */
 export function EntityListView({ entityType, title, description }: Props) {
+  const { t } = useTranslation()
   const { campaignId } = useParams<{ campaignId: string }>()
   const navigate = useNavigate()
   const [page, setPage] = useState(0)
-  const { data, isLoading, isError } = useEntityList(entityType, page)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const { data, isLoading, isError } = useEntityList(entityType, page, search)
+
+  // Debounce keystrokes into the applied search term (server-side ILIKE) instead of querying per
+  // key; a new search restarts paging from the first page.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setSearch(searchInput.trim())
+      setPage(0)
+    }, 300)
+    return () => clearTimeout(id)
+  }, [searchInput])
 
   const segment = SEGMENT[entityType]
   const totalPages = data ? Math.max(1, Math.ceil(data.totalCount / data.size)) : 1
@@ -43,11 +59,26 @@ export function EntityListView({ entityType, title, description }: Props) {
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
 
+      <div className="relative mb-4 max-w-sm">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          type="search"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder={t('exploration.searchByName')}
+          aria-label={t('exploration.searchByNameAria')}
+          className="pl-9"
+        />
+      </div>
+
       {isError && (
         <div className="mb-4">
           <InlineBanner
             variant="error"
-            message="Could not load this list. Please refresh the page."
+            message={t('exploration.listLoadError')}
             onDismiss={() => navigate(0)}
           />
         </div>
@@ -56,7 +87,9 @@ export function EntityListView({ entityType, title, description }: Props) {
       {isLoading && <EntityListSkeleton />}
 
       {!isLoading && !isError && data && data.items.length === 0 && (
-        <p className="text-sm text-muted-foreground">Nothing here yet.</p>
+        <p className="text-sm text-muted-foreground">
+          {search ? t('exploration.noMatch', { query: search }) : t('exploration.nothingHere')}
+        </p>
       )}
 
       {!isLoading && !isError && data && data.items.length > 0 && (
@@ -84,10 +117,10 @@ export function EntityListView({ entityType, title, description }: Props) {
               disabled={!hasPrev}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
             >
-              Previous
+              {t('exploration.previous')}
             </Button>
             <span className="text-sm text-muted-foreground">
-              Page {page + 1} of {totalPages}
+              {t('exploration.pageOf', { page: page + 1, total: totalPages })}
             </span>
             <Button
               type="button"
@@ -95,7 +128,7 @@ export function EntityListView({ entityType, title, description }: Props) {
               disabled={!hasNext}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next
+              {t('exploration.next')}
             </Button>
           </div>
         </>

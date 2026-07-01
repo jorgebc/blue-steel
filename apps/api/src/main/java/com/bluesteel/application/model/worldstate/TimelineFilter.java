@@ -1,9 +1,9 @@
 package com.bluesteel.application.model.worldstate;
 
 /**
- * Optional, all-nullable filters for the Timeline feed (F4.2). {@code eventType} matches the
- * event's {@code full_snapshot.eventType} exactly; {@code actor} and {@code space} are
- * case-insensitive substring matches against the snapshot's involved actors and space respectively.
+ * Optional, all-nullable filters for the Timeline feed (F4.2). All three are case-insensitive
+ * substring matches: {@code eventType} against the event's {@code event_type}, {@code actor}
+ * against the involved actors' names, and {@code space} against the space name.
  */
 public record TimelineFilter(String actor, String space, String eventType) {
 
