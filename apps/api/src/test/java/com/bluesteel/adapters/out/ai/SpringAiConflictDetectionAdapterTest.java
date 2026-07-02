@@ -170,6 +170,30 @@ class SpringAiConflictDetectionAdapterTest {
     assertThat(systemCaptor.getAllValues().get(1)).contains("in English.");
   }
 
+  @Test
+  @DisplayName(
+      "should instruct the model to distinguish continuity errors from legitimate narrative progression")
+  @SuppressWarnings("unchecked")
+  void detect_systemPromptDistinguishesLegitimateProgression() {
+    ExtractionResult extraction =
+        new ExtractionResult("Header.", List.of(), List.of(), List.of(), List.of());
+
+    ChatClientRequestSpec requestSpec = mock(ChatClientRequestSpec.class, Answers.RETURNS_SELF);
+    CallResponseSpec callSpec = mock(CallResponseSpec.class);
+    ResponseEntity<ChatResponse, ConflictDetectionResponse> responseEntity =
+        new ResponseEntity<>(null, new ConflictDetectionResponse(List.of()));
+
+    when(chatClient.prompt()).thenReturn(requestSpec);
+    when(requestSpec.call()).thenReturn(callSpec);
+    when(callSpec.responseEntity(ConflictDetectionResponse.class)).thenReturn(responseEntity);
+
+    adapter.detect(extraction, List.of(), "en");
+
+    ArgumentCaptor<String> systemCaptor = ArgumentCaptor.forClass(String.class);
+    verify(requestSpec).system(systemCaptor.capture());
+    assertThat(systemCaptor.getValue()).contains("legitimate narrative progression");
+  }
+
   // -------------------------------------------------------------------------
   // Helper
   // -------------------------------------------------------------------------
