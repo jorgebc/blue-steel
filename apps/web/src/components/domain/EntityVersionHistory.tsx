@@ -1,19 +1,21 @@
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type { EntityVersion } from '@/types/worldstate'
 
 interface Props {
   versions: EntityVersion[]
 }
 
-function changedSummary(changedFields: Record<string, unknown>): string {
+function changedSummary(changedFields: Record<string, unknown>, t: TFunction): string {
   const keys = Object.keys(changedFields)
-  if (keys.length === 0) return 'Initial version'
-  return `Changed: ${keys.join(', ')}`
+  if (keys.length === 0) return t('versionHistory.initial')
+  return t('versionHistory.changed', { fields: keys.join(', ') })
 }
 
-function sessionRef(version: EntityVersion): string {
+function sessionRef(version: EntityVersion, t: TFunction): string {
   return version.sessionSequenceNumber !== null
-    ? `Session #${version.sessionSequenceNumber}`
-    : 'Uncommitted session'
+    ? t('versionHistory.sessionRef', { sequence: version.sessionSequenceNumber })
+    : t('versionHistory.uncommitted')
 }
 
 /**
@@ -22,8 +24,10 @@ function sessionRef(version: EntityVersion): string {
  * one-line `changedFields` summary; expanding reveals the changed field values. Newest first.
  */
 export function EntityVersionHistory({ versions }: Props) {
+  const { t } = useTranslation()
+
   if (versions.length === 0) {
-    return <p className="text-sm text-muted-foreground">No version history yet.</p>
+    return <p className="text-sm text-muted-foreground">{t('versionHistory.empty')}</p>
   }
 
   const ordered = [...versions].sort((a, b) => b.versionNumber - a.versionNumber)
@@ -36,15 +40,15 @@ export function EntityVersionHistory({ versions }: Props) {
             <summary className="flex cursor-pointer items-center justify-between gap-4 px-4 py-3 text-sm">
               <span className="flex items-center gap-3">
                 <span className="font-medium text-foreground">v{version.versionNumber}</span>
-                <span className="text-muted-foreground">{sessionRef(version)}</span>
+                <span className="text-muted-foreground">{sessionRef(version, t)}</span>
               </span>
               <span className="text-xs text-muted-foreground">
-                {changedSummary(version.changedFields)}
+                {changedSummary(version.changedFields, t)}
               </span>
             </summary>
             <dl className="space-y-1 border-t border-border px-4 py-3 text-sm">
               {Object.keys(version.changedFields).length === 0 ? (
-                <p className="text-muted-foreground">Entity created at this version.</p>
+                <p className="text-muted-foreground">{t('versionHistory.createdAtVersion')}</p>
               ) : (
                 Object.entries(version.changedFields).map(([key, value]) => (
                   <div key={key} className="flex gap-3">

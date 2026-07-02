@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useEntityDetail } from '@/api/worldstate'
@@ -40,6 +41,7 @@ function formatSnapshotValue(value: unknown): string {
  * Shared by the actor and space profile pages.
  */
 export function EntityProfileView({ entityType, entityId, backTo, backLabel }: Props) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { data, isLoading, isError } = useEntityDetail(entityType, entityId)
   const latest = data ? latestVersion(data.versions) : null
@@ -60,7 +62,7 @@ export function EntityProfileView({ entityType, entityId, backTo, backLabel }: P
         <div className="mb-4">
           <InlineBanner
             variant="error"
-            message="Could not load this profile. Please refresh the page."
+            message={t('exploration.profileLoadError')}
             onDismiss={() => navigate(0)}
           />
         </div>
@@ -84,7 +86,9 @@ export function EntityProfileView({ entityType, entityId, backTo, backLabel }: P
           </div>
 
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-            <h2 className="mb-3 text-sm font-semibold text-foreground">Current state</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">
+              {t('exploration.currentState')}
+            </h2>
             {latest && Object.keys(latest.fullSnapshot).length > 0 ? (
               <dl className="space-y-2 text-sm">
                 {Object.entries(latest.fullSnapshot).map(([key, value]) => (
@@ -95,12 +99,14 @@ export function EntityProfileView({ entityType, entityId, backTo, backLabel }: P
                 ))}
               </dl>
             ) : (
-              <p className="text-sm text-muted-foreground">No recorded state.</p>
+              <p className="text-sm text-muted-foreground">{t('exploration.noRecordedState')}</p>
             )}
           </div>
 
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-foreground">Version history</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">
+              {t('exploration.versionHistory')}
+            </h2>
             <EntityVersionHistory versions={data.versions} />
           </div>
 

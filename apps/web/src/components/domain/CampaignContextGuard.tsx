@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, Outlet, useParams } from 'react-router-dom'
 import { useCampaign } from '@/api/campaigns'
 import { useCampaignStore } from '@/store/campaignStore'
@@ -28,6 +29,7 @@ function CampaignContextSkeleton() {
  * campaign is missing or forbidden (403/404).
  */
 export function CampaignContextGuard() {
+  const { t } = useTranslation()
   const { campaignId } = useParams<{ campaignId: string }>()
   const { data, isLoading, isError } = useCampaign(campaignId)
   const setCampaign = useCampaignStore((state) => state.setCampaign)
@@ -46,12 +48,12 @@ export function CampaignContextGuard() {
         {!dismissed && (
           <InlineBanner
             variant="error"
-            message="We couldn't load this campaign. It may not exist or you may not have access to it."
+            message={t('common.campaignLoadError')}
             onDismiss={() => setDismissed(true)}
           />
         )}
         <Link to="/" className="text-sm text-accent underline-offset-4 hover:underline">
-          Back to campaigns
+          {t('common.backToCampaigns')}
         </Link>
       </main>
     )

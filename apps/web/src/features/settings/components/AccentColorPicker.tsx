@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ACCENT_PALETTE } from '../accentPalette'
 
@@ -12,12 +13,13 @@ interface Props {
  * color's name as its accessible label.
  */
 export function AccentColorPicker({ value, onChange }: Props) {
+  const { t } = useTranslation()
   return (
     <RadioGroup
       value={value}
       onValueChange={onChange}
       className="flex flex-wrap gap-3"
-      aria-label="Avatar accent color"
+      aria-label={t('settings.avatarAccentColor')}
     >
       {ACCENT_PALETTE.map((color) => (
         <RadioGroupItem

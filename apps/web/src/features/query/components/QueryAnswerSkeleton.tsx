@@ -3,9 +3,12 @@
  * Mirrors the shape of {@link AnswerDisplay} — an answer paragraph plus a few citation
  * lines — so there is zero layout shift when the real answer arrives (D-086, no spinner).
  */
+import { useTranslation } from 'react-i18next'
+
 export function QueryAnswerSkeleton() {
+  const { t } = useTranslation()
   return (
-    <div role="status" aria-label="Searching the world state" className="space-y-6">
+    <div role="status" aria-label={t('query.answerSkeletonAria')} className="space-y-6">
       {/* Answer paragraph */}
       <div className="space-y-2">
         <div className="h-4 w-full animate-pulse rounded bg-muted" />

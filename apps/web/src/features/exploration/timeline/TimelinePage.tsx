@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useTimeline, type TimelineFilters } from '@/api/timeline'
 import type { TimelineEvent } from '@/types/timeline'
@@ -48,6 +49,7 @@ function groupBySession(events: TimelineEvent[]): SessionGroup[] {
  * keystroke); changing the applied filters swaps the query key so the feed resets to the first page.
  */
 export function TimelinePage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [inputs, setInputs] = useState({ actor: '', space: '', eventType: '' })
   const [appliedFilters, setAppliedFilters] = useState<TimelineFilters>(EMPTY_FILTERS)
@@ -71,48 +73,50 @@ export function TimelinePage() {
   return (
     <section>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground">Timeline</h1>
-        <p className="text-sm text-muted-foreground">
-          Events recorded across this campaign&apos;s committed sessions.
-        </p>
+        <h1 className="text-2xl font-semibold text-foreground">
+          {t('exploration.timeline.title')}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t('exploration.timeline.description')}</p>
       </div>
 
       <form onSubmit={onApply} className="mb-6 space-y-3">
-        <p className="text-xs font-medium text-muted-foreground">Filter events</p>
+        <p className="text-xs font-medium text-muted-foreground">
+          {t('exploration.timeline.filterEvents')}
+        </p>
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <Label htmlFor="timeline-actor">Actor</Label>
+            <Label htmlFor="timeline-actor">{t('exploration.timeline.actorLabel')}</Label>
             <Input
               id="timeline-actor"
-              placeholder="e.g. Gandalf"
+              placeholder={t('exploration.timeline.actorPlaceholder')}
               value={inputs.actor}
               onChange={(e) => setInputs((s) => ({ ...s, actor: e.target.value }))}
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="timeline-space">Space</Label>
+            <Label htmlFor="timeline-space">{t('exploration.timeline.spaceLabel')}</Label>
             <Input
               id="timeline-space"
-              placeholder="e.g. Rivendell"
+              placeholder={t('exploration.timeline.spacePlaceholder')}
               value={inputs.space}
               onChange={(e) => setInputs((s) => ({ ...s, space: e.target.value }))}
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="timeline-event-type">Event type</Label>
+            <Label htmlFor="timeline-event-type">{t('exploration.timeline.eventTypeLabel')}</Label>
             <Input
               id="timeline-event-type"
-              placeholder="e.g. battle"
+              placeholder={t('exploration.timeline.eventTypePlaceholder')}
               value={inputs.eventType}
               onChange={(e) => setInputs((s) => ({ ...s, eventType: e.target.value }))}
             />
           </div>
           <Button type="submit" variant="outline">
-            Apply
+            {t('exploration.timeline.apply')}
           </Button>
           {hasActiveFilters && (
             <Button type="button" variant="ghost" onClick={onClear}>
-              Clear
+              {t('exploration.timeline.clear')}
             </Button>
           )}
         </div>
@@ -122,7 +126,7 @@ export function TimelinePage() {
         <div className="mb-4">
           <InlineBanner
             variant="error"
-            message="Could not load the timeline. Please refresh the page."
+            message={t('exploration.timeline.loadError')}
             onDismiss={() => navigate(0)}
           />
         </div>
@@ -132,7 +136,7 @@ export function TimelinePage() {
 
       {!isLoading && !isError && events.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          {hasActiveFilters ? 'No events match these filters.' : 'No events yet.'}
+          {hasActiveFilters ? t('exploration.timeline.noMatch') : t('exploration.timeline.empty')}
         </p>
       )}
 
@@ -142,7 +146,9 @@ export function TimelinePage() {
             {groupBySession(events).map((group) => (
               <div key={group.sessionSequenceNumber}>
                 <h2 className="mb-2 text-sm font-semibold text-foreground">
-                  Session #{group.sessionSequenceNumber}
+                  {t('exploration.timeline.sessionHeading', {
+                    sequence: group.sessionSequenceNumber,
+                  })}
                 </h2>
                 <ul className="space-y-3">
                   {group.events.map((event) => (
@@ -162,7 +168,9 @@ export function TimelinePage() {
               disabled={!hasNextPage || isFetchingNextPage}
               onClick={() => fetchNextPage()}
             >
-              {isFetchingNextPage ? 'Loading…' : 'Load more'}
+              {isFetchingNextPage
+                ? t('exploration.timeline.loadingMore')
+                : t('exploration.timeline.loadMore')}
             </Button>
           </div>
         </>

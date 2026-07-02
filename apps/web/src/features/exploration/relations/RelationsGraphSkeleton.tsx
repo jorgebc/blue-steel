@@ -3,11 +3,14 @@
  * graph canvas area with a few pulsing node-sized blocks so swapping in the real React Flow surface
  * causes no jarring shift.
  */
+import { useTranslation } from 'react-i18next'
+
 export function RelationsGraphSkeleton() {
+  const { t } = useTranslation()
   return (
     <div
       role="status"
-      aria-label="Loading relations"
+      aria-label={t('exploration.relations.loadingAria')}
       className="relative h-[480px] w-full overflow-hidden rounded-2xl border border-border bg-background"
     >
       <div className="absolute left-8 top-10 h-12 w-40 rounded-xl bg-muted animate-pulse" />

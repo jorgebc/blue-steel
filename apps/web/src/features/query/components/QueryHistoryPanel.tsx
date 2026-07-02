@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQueryHistory } from '@/api/queries'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { AnswerDisplay } from './AnswerDisplay'
@@ -12,7 +13,6 @@ interface Props {
 }
 
 const PAGE_SIZE = 20
-const LOAD_ERROR_MESSAGE = 'Could not load the question history. Please try again.'
 
 /** Renders a logged Q&A entry's timestamp as a readable local string at the render boundary. */
 function formatAskedAt(createdAt: string): string {
@@ -27,6 +27,7 @@ function formatAskedAt(createdAt: string): string {
  * failures surface through `InlineBanner`, never a toast (D-083).
  */
 export function QueryHistoryPanel({ campaignId, refreshSignal }: Props) {
+  const { t } = useTranslation()
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<QueryHistoryEntry | null>(null)
   const [errorDismissed, setErrorDismissed] = useState(false)
@@ -53,7 +54,7 @@ export function QueryHistoryPanel({ campaignId, refreshSignal }: Props) {
     return (
       <InlineBanner
         variant="error"
-        message={LOAD_ERROR_MESSAGE}
+        message={t('query.history.loadError')}
         onDismiss={() => setErrorDismissed(true)}
       />
     )
@@ -65,12 +66,12 @@ export function QueryHistoryPanel({ campaignId, refreshSignal }: Props) {
   const hasNext = (page + 1) * PAGE_SIZE < totalCount
 
   if (items.length === 0) {
-    return <p className="text-sm text-muted-foreground">No questions have been asked yet.</p>
+    return <p className="text-sm text-muted-foreground">{t('query.history.empty')}</p>
   }
 
   return (
     <div className="space-y-4">
-      <ul aria-label="Past questions" className="space-y-2">
+      <ul aria-label={t('query.history.listAria')} className="space-y-2">
         {items.map((entry) => {
           const isSelected = selected?.id === entry.id
           return (
@@ -97,14 +98,17 @@ export function QueryHistoryPanel({ campaignId, refreshSignal }: Props) {
       </ul>
 
       {(hasPrev || hasNext) && (
-        <nav aria-label="History pages" className="flex items-center justify-between">
+        <nav
+          aria-label={t('query.history.pagesAria')}
+          className="flex items-center justify-between"
+        >
           <button
             type="button"
             onClick={() => goToPage(page - 1)}
             disabled={!hasPrev}
             className="rounded-lg border border-border px-3 py-1 text-sm text-foreground disabled:opacity-50"
           >
-            Previous
+            {t('query.history.previous')}
           </button>
           <button
             type="button"
@@ -112,7 +116,7 @@ export function QueryHistoryPanel({ campaignId, refreshSignal }: Props) {
             disabled={!hasNext}
             className="rounded-lg border border-border px-3 py-1 text-sm text-foreground disabled:opacity-50"
           >
-            Next
+            {t('query.history.next')}
           </button>
         </nav>
       )}

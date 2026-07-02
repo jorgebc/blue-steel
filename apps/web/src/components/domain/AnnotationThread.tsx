@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAnnotations, usePostAnnotation, useDeleteAnnotation } from '@/api/annotations'
 import { useAuthStore } from '@/store/authStore'
 import { useCampaignStore } from '@/store/campaignStore'
@@ -17,8 +18,9 @@ interface Props {
 type Feedback = { variant: 'success' | 'error'; message: string } | null
 
 function ThreadSkeleton() {
+  const { t } = useTranslation()
   return (
-    <div role="status" aria-label="Loading annotations" className="space-y-3">
+    <div role="status" aria-label={t('annotations.loadingAria')} className="space-y-3">
       {[0, 1].map((i) => (
         <div
           key={i}
@@ -39,6 +41,7 @@ function ThreadSkeleton() {
  * {@link InlineBanner} (no toasts). Campaign/role/user context is read from the Zustand stores.
  */
 export function AnnotationThread({ entityType, entityId }: Props) {
+  const { t } = useTranslation()
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
   const activeRole = useCampaignStore((s) => s.activeRole)
   const currentUserId = useAuthStore((s) => s.currentUser?.id)
@@ -59,10 +62,10 @@ export function AnnotationThread({ entityType, entityId }: Props) {
     post.mutate(
       { entityType, entityId, content },
       {
-        onSuccess: () => setFeedback({ variant: 'success', message: 'Annotation posted.' }),
+        onSuccess: () => setFeedback({ variant: 'success', message: t('annotations.posted') }),
         onError: (err) => {
           console.error('Annotation post failed', err)
-          setFeedback({ variant: 'error', message: "We couldn't post your annotation. Try again." })
+          setFeedback({ variant: 'error', message: t('annotations.postError') })
         },
       }
     )
@@ -77,14 +80,14 @@ export function AnnotationThread({ entityType, entityId }: Props) {
       {
         onSuccess: () => {
           setPendingDelete(null)
-          setFeedback({ variant: 'success', message: 'Annotation deleted.' })
+          setFeedback({ variant: 'success', message: t('annotations.deleted') })
         },
         onError: (err) => {
           console.error('Annotation delete failed', err)
           setPendingDelete(null)
           setFeedback({
             variant: 'error',
-            message: "We couldn't delete that annotation. Try again.",
+            message: t('annotations.deleteError'),
           })
         },
       }
@@ -95,15 +98,14 @@ export function AnnotationThread({ entityType, entityId }: Props) {
 
   return (
     <section
-      aria-label="Annotations"
+      aria-label={t('annotations.sectionAria')}
       className="mt-8 border-t-2 border-dashed border-amber-300 pt-6 dark:border-amber-800"
     >
       <header className="mb-4">
-        <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Annotations</h2>
-        <p className="text-xs text-amber-700 dark:text-amber-300">
-          Player commentary — not canonical world state. Any member can post; the author or a GM can
-          delete.
-        </p>
+        <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+          {t('annotations.heading')}
+        </h2>
+        <p className="text-xs text-amber-700 dark:text-amber-300">{t('annotations.subtitle')}</p>
       </header>
 
       {feedback && (
@@ -121,7 +123,7 @@ export function AnnotationThread({ entityType, entityId }: Props) {
       {isError && (
         <InlineBanner
           variant="error"
-          message="Could not load annotations. Please refresh the page."
+          message={t('annotations.loadError')}
           onDismiss={() => undefined}
         />
       )}
@@ -129,9 +131,7 @@ export function AnnotationThread({ entityType, entityId }: Props) {
       {!isLoading && !isError && (
         <div className="space-y-4">
           {annotations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No annotations yet. Be the first to add one.
-            </p>
+            <p className="text-sm text-muted-foreground">{t('annotations.empty')}</p>
           ) : (
             <div className="space-y-3">
               {annotations.map((annotation) => (
@@ -152,13 +152,13 @@ export function AnnotationThread({ entityType, entityId }: Props) {
       <FocusedOverlay
         open={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
-        ariaLabel="Delete annotation"
+        ariaLabel={t('annotations.deleteAria')}
       >
         <div className="w-[24rem] max-w-[90vw] bg-surface p-6">
-          <h3 className="mb-2 text-base font-medium text-foreground">Delete this annotation?</h3>
-          <p className="mb-6 text-sm text-muted-foreground">
-            This permanently removes the annotation. This cannot be undone.
-          </p>
+          <h3 className="mb-2 text-base font-medium text-foreground">
+            {t('annotations.deleteTitle')}
+          </h3>
+          <p className="mb-6 text-sm text-muted-foreground">{t('annotations.deleteBody')}</p>
           <div className="flex justify-end gap-3">
             <Button
               type="button"
@@ -166,7 +166,7 @@ export function AnnotationThread({ entityType, entityId }: Props) {
               onClick={() => setPendingDelete(null)}
               disabled={del.isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="button"
@@ -174,7 +174,7 @@ export function AnnotationThread({ entityType, entityId }: Props) {
               onClick={handleDeleteConfirm}
               disabled={del.isPending}
             >
-              Delete
+              {t('common.delete')}
             </Button>
           </div>
         </div>

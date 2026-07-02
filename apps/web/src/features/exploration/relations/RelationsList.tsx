@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { Relation } from '@/types/relation'
 
 interface Props {
@@ -17,15 +18,18 @@ interface Props {
  * Each relation is selectable to open its non-canonical annotation thread (F4.4.9).
  */
 export function RelationsList({ relations, nameById, selectedId, onSelect }: Props) {
+  const { t } = useTranslation()
+  const unknown = t('exploration.relations.unknown')
+
   if (relations.length === 0) {
-    return <p className="text-sm text-muted-foreground">No relations yet.</p>
+    return <p className="text-sm text-muted-foreground">{t('exploration.relations.listEmpty')}</p>
   }
 
   return (
-    <ul aria-label="Relations" className="space-y-2">
+    <ul aria-label={t('exploration.relations.listAria')} className="space-y-2">
       {relations.map((relation) => {
-        const source = endpointName(relation.sourceEntityId, nameById)
-        const target = endpointName(relation.targetEntityId, nameById)
+        const source = endpointName(relation.sourceEntityId, nameById, unknown)
+        const target = endpointName(relation.targetEntityId, nameById, unknown)
         const label = relation.kind ?? relation.name
         const selected = selectedId === relation.relationId
         return (
@@ -33,7 +37,7 @@ export function RelationsList({ relations, nameById, selectedId, onSelect }: Pro
             <button
               type="button"
               aria-pressed={selected}
-              aria-label={`${source} ${label} ${target} — show annotations`}
+              aria-label={t('exploration.relations.itemAria', { source, label, target })}
               onClick={() => onSelect?.(relation.relationId)}
               className={[
                 'w-full rounded-lg border px-3 py-2 text-left text-sm text-foreground transition-colors duration-200',
@@ -55,9 +59,13 @@ export function RelationsList({ relations, nameById, selectedId, onSelect }: Pro
   )
 }
 
-function endpointName(entityId: string | null, nameById: Record<string, string>): string {
+function endpointName(
+  entityId: string | null,
+  nameById: Record<string, string>,
+  unknown: string
+): string {
   if (entityId === null) {
-    return 'Unknown'
+    return unknown
   }
-  return nameById[entityId] ?? 'Unknown'
+  return nameById[entityId] ?? unknown
 }

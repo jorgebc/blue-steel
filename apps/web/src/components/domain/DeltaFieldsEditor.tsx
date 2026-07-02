@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { isEditablePrimitive } from '@/lib/proposalDelta'
@@ -18,12 +19,11 @@ interface Props {
  * submission form and the GM approve-with-edit overlay.
  */
 export function DeltaFieldsEditor({ baseline, values, onChange, idPrefix }: Props) {
+  const { t } = useTranslation()
   const entries = Object.entries(baseline)
 
   if (entries.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">This entity has no recorded fields to change.</p>
-    )
+    return <p className="text-sm text-muted-foreground">{t('common.noEditableFields')}</p>
   }
 
   return (
@@ -35,7 +35,7 @@ export function DeltaFieldsEditor({ baseline, values, onChange, idPrefix }: Prop
             <div key={key}>
               <Label className="text-muted-foreground">{key}</Label>
               <p className="mt-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
-                {JSON.stringify(value)} <span className="text-xs">(not editable)</span>
+                {JSON.stringify(value)} <span className="text-xs">{t('common.notEditable')}</span>
               </p>
             </div>
           )

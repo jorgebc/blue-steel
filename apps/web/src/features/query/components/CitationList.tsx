@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import type { Citation } from '@/types/query'
 
@@ -12,20 +13,24 @@ interface Props {
  * {@link SessionDetailPage}.
  */
 export function CitationList({ citations, campaignId }: Props) {
+  const { t } = useTranslation()
   return (
     <aside aria-labelledby="citations-heading" className="space-y-2">
       <h3 id="citations-heading" className="text-sm font-semibold text-foreground">
-        Sources
+        {t('query.citations.heading')}
       </h3>
       <ol className="space-y-2">
         {citations.map((c) => (
           <li key={`${c.sessionId}-${c.sequenceNumber}`} className="text-sm text-foreground">
             <Link
               to={`/campaigns/${campaignId}/sessions/${c.sessionId}`}
-              aria-label={`Session ${c.sequenceNumber}: ${c.snippet}`}
+              aria-label={t('query.citations.linkAria', {
+                sequence: c.sequenceNumber,
+                snippet: c.snippet,
+              })}
               className="font-medium text-accent underline-offset-4 hover:underline"
             >
-              Session {c.sequenceNumber}
+              {t('query.citations.sessionLink', { sequence: c.sequenceNumber })}
             </Link>
             {' — '}
             <span>{c.snippet}</span>

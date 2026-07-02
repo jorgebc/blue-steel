@@ -2,9 +2,12 @@
  * Loading placeholder for an entity profile, shaped to the header + current-state block + version
  * history rows so the real profile drops in without layout shift (D-086).
  */
+import { useTranslation } from 'react-i18next'
+
 export function EntityProfileSkeleton() {
+  const { t } = useTranslation()
   return (
-    <div role="status" aria-label="Loading profile" className="space-y-6">
+    <div role="status" aria-label={t('exploration.loadingProfileAria')} className="space-y-6">
       {/* header: name + type */}
       <div className="space-y-2">
         <div className="h-7 w-56 rounded bg-muted animate-pulse" />

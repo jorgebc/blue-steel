@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type Variant = 'success' | 'warning' | 'error' | 'info'
 
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function InlineBanner({ variant, message, onDismiss }: Props) {
+  const { t } = useTranslation()
   useEffect(() => {
     if (variant === 'error') return
     const id = setTimeout(onDismiss, 8000)
@@ -36,7 +38,7 @@ export function InlineBanner({ variant, message, onDismiss }: Props) {
       <span className="flex-1 text-sm">{message}</span>
       <button
         onClick={onDismiss}
-        aria-label="Dismiss"
+        aria-label={t('common.dismiss')}
         className="shrink-0 opacity-70 hover:opacity-100"
       >
         <X className="h-4 w-4" />

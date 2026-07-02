@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useEntityDetail } from '@/api/worldstate'
@@ -21,6 +22,7 @@ function latestVersion(versions: EntityVersion[]): EntityVersion | null {
  * reserves the annotation slot (F4.4).
  */
 export function EventDetailPage() {
+  const { t } = useTranslation()
   const { campaignId, eventId } = useParams<{ campaignId: string; eventId: string }>()
   const navigate = useNavigate()
   const { data, isLoading, isError } = useEntityDetail('event', eventId ?? '')
@@ -33,14 +35,14 @@ export function EventDetailPage() {
         className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
-        Back to timeline
+        {t('exploration.backToTimeline')}
       </Link>
 
       {isError && (
         <div className="mb-4">
           <InlineBanner
             variant="error"
-            message="Could not load this event. Please refresh the page."
+            message={t('exploration.eventLoadError')}
             onDismiss={() => navigate(0)}
           />
         </div>
@@ -60,14 +62,16 @@ export function EventDetailPage() {
               type="button"
               variant="outline"
               disabled
-              title="Proposing changes is coming soon"
+              title={t('exploration.eventDetail.proposeComingSoon')}
             >
-              Propose a change
+              {t('proposals.proposeChange')}
             </Button>
           </div>
 
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-            <h2 className="mb-3 text-sm font-semibold text-foreground">Current state</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">
+              {t('exploration.currentState')}
+            </h2>
             {latest && Object.keys(latest.fullSnapshot).length > 0 ? (
               <dl className="space-y-2 text-sm">
                 {Object.entries(latest.fullSnapshot).map(([key, value]) => (
@@ -78,12 +82,14 @@ export function EventDetailPage() {
                 ))}
               </dl>
             ) : (
-              <p className="text-sm text-muted-foreground">No recorded state.</p>
+              <p className="text-sm text-muted-foreground">{t('exploration.noRecordedState')}</p>
             )}
           </div>
 
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-foreground">Version history</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">
+              {t('exploration.versionHistory')}
+            </h2>
             <EntityVersionHistory versions={data.versions} />
           </div>
 

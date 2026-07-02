@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useEntityLinks } from '@/api/worldstate'
 import { InlineBanner } from '@/components/domain/InlineBanner'
@@ -23,16 +24,17 @@ interface Props {
  * read-only session detail page, labelled "Session #N" (F4.8).
  */
 export function EntityLinks({ entityType, entityId }: Props) {
+  const { t } = useTranslation()
   const { campaignId } = useParams<{ campaignId: string }>()
   const navigate = useNavigate()
   const { data, isLoading, isError } = useEntityLinks(entityType, entityId)
 
   if (isError) {
     return (
-      <section aria-label="Connections">
+      <section aria-label={t('exploration.entityLinks.connectionsAria')}>
         <InlineBanner
           variant="error"
-          message="Could not load connections. Please refresh the page."
+          message={t('exploration.entityLinks.loadError')}
           onDismiss={() => navigate(0)}
         />
       </section>
@@ -41,7 +43,11 @@ export function EntityLinks({ entityType, entityId }: Props) {
 
   if (isLoading || !data) {
     return (
-      <div role="status" aria-label="Loading connections" className="space-y-6">
+      <div
+        role="status"
+        aria-label={t('exploration.entityLinks.loadingAria')}
+        className="space-y-6"
+      >
         {[0, 1].map((i) => (
           <div key={i}>
             <div className="mb-3 h-4 w-32 animate-pulse rounded bg-muted" />
@@ -58,11 +64,15 @@ export function EntityLinks({ entityType, entityId }: Props) {
   const sessionCount = data.appearances.length
 
   return (
-    <section aria-label="Connections" className="space-y-6">
+    <section aria-label={t('exploration.entityLinks.connectionsAria')} className="space-y-6">
       <div>
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Relations</h2>
+        <h2 className="mb-3 text-sm font-semibold text-foreground">
+          {t('exploration.entityLinks.relations')}
+        </h2>
         {data.relations.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No relations.</p>
+          <p className="text-sm text-muted-foreground">
+            {t('exploration.entityLinks.noRelations')}
+          </p>
         ) : (
           <ul className="space-y-2">
             {data.relations.map((relation) => (
@@ -90,9 +100,13 @@ export function EntityLinks({ entityType, entityId }: Props) {
       </div>
 
       <div>
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Related entities</h2>
+        <h2 className="mb-3 text-sm font-semibold text-foreground">
+          {t('exploration.entityLinks.relatedEntities')}
+        </h2>
         {data.relatedEntities.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No related entities.</p>
+          <p className="text-sm text-muted-foreground">
+            {t('exploration.entityLinks.noRelatedEntities')}
+          </p>
         ) : (
           <ul className="space-y-2">
             {data.relatedEntities.map((entity) => (
@@ -116,9 +130,11 @@ export function EntityLinks({ entityType, entityId }: Props) {
       </div>
 
       <div>
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Events</h2>
+        <h2 className="mb-3 text-sm font-semibold text-foreground">
+          {t('exploration.entityLinks.events')}
+        </h2>
         {data.events.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No events.</p>
+          <p className="text-sm text-muted-foreground">{t('exploration.entityLinks.noEvents')}</p>
         ) : (
           <ul className="space-y-2">
             {data.events.map((event) => (
@@ -133,11 +149,13 @@ export function EntityLinks({ entityType, entityId }: Props) {
       <div>
         <h2 className="mb-3 text-sm font-semibold text-foreground">
           {sessionCount > 0
-            ? `Appears in ${sessionCount} session${sessionCount === 1 ? '' : 's'}`
-            : 'Appears in sessions'}
+            ? t('exploration.entityLinks.appearsInCount', { count: sessionCount })
+            : t('exploration.entityLinks.appearsIn')}
         </h2>
         {sessionCount === 0 ? (
-          <p className="text-sm text-muted-foreground">Does not appear in any sessions.</p>
+          <p className="text-sm text-muted-foreground">
+            {t('exploration.entityLinks.noAppearances')}
+          </p>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {data.appearances.map((appearance) => (
@@ -146,7 +164,9 @@ export function EntityLinks({ entityType, entityId }: Props) {
                   to={`/campaigns/${campaignId}/sessions/${appearance.sessionId}`}
                   className="inline-flex rounded-full border border-border bg-surface px-3 py-1 text-sm font-medium text-foreground shadow-sm transition-shadow duration-200 hover:shadow-md"
                 >
-                  Session #{appearance.sequenceNumber}
+                  {t('exploration.entityLinks.sessionLink', {
+                    sequence: appearance.sequenceNumber,
+                  })}
                 </Link>
               </li>
             ))}

@@ -1,4 +1,5 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
+import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 import { MapPin, User } from 'lucide-react'
 import type { NodeData } from '@/types/relation'
@@ -12,11 +13,14 @@ import type { NodeData } from '@/types/relation'
  * handles are visually hidden via global CSS.
  */
 export function RelationNode({ data }: NodeProps<Node<NodeData>>) {
+  const { t } = useTranslation()
   const { campaignId } = useParams<{ campaignId: string }>()
   const isSpace = data.entityType === 'space'
   const segment = isSpace ? 'spaces' : 'entities'
   const Icon = isSpace ? MapPin : User
-  const typeLabel = isSpace ? 'Space' : 'Actor'
+  const typeLabel = isSpace
+    ? t('exploration.relations.nodeSpace')
+    : t('exploration.relations.nodeActor')
 
   return (
     <>
