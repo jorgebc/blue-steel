@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Search } from 'lucide-react'
 import { useEntityList } from '@/api/worldstate'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,18 +35,18 @@ export function EntityListView({ entityType, title, description }: Props) {
   const navigate = useNavigate()
   const [page, setPage] = useState(0)
   const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  // Debounce keystrokes into the applied search term (server-side ILIKE) instead of querying per
+  // key; the query only refetches once typing pauses for 300ms.
+  const search = useDebouncedValue(searchInput.trim(), 300)
   const { data, isLoading, isError } = useEntityList(entityType, page, search)
 
-  // Debounce keystrokes into the applied search term (server-side ILIKE) instead of querying per
-  // key; a new search restarts paging from the first page.
-  useEffect(() => {
-    const id = setTimeout(() => {
-      setSearch(searchInput.trim())
-      setPage(0)
-    }, 300)
-    return () => clearTimeout(id)
-  }, [searchInput])
+  // A new applied search term restarts paging from the first page. Adjusting state during
+  // render (rather than in an effect) is React's recommended pattern for this.
+  const [prevSearch, setPrevSearch] = useState(search)
+  if (search !== prevSearch) {
+    setPrevSearch(search)
+    setPage(0)
+  }
 
   const segment = SEGMENT[entityType]
   const totalPages = data ? Math.max(1, Math.ceil(data.totalCount / data.size)) : 1
