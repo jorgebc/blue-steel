@@ -144,6 +144,28 @@ class SpringAiNarrativeExtractionAdapterTest {
   }
 
   @Test
+  @DisplayName("should instruct the model to extract only narratively significant entities")
+  @SuppressWarnings("unchecked")
+  void extract_systemPromptCarriesNarrativeSignificanceFilter() {
+    ChatClientRequestSpec requestSpec = mock(ChatClientRequestSpec.class, Answers.RETURNS_SELF);
+    CallResponseSpec callSpec = mock(CallResponseSpec.class);
+    ExtractionResult empty =
+        new ExtractionResult("header", List.of(), List.of(), List.of(), List.of());
+    ResponseEntity<ChatResponse, ExtractionResult> responseEntity =
+        new ResponseEntity<>(null, empty);
+
+    when(chatClient.prompt()).thenReturn(requestSpec);
+    when(requestSpec.call()).thenReturn(callSpec);
+    when(callSpec.responseEntity(ExtractionResult.class)).thenReturn(responseEntity);
+
+    adapter.extract("A short summary.", "en");
+
+    ArgumentCaptor<String> systemCaptor = ArgumentCaptor.forClass(String.class);
+    verify(requestSpec).system(systemCaptor.capture());
+    assertThat(systemCaptor.getValue()).contains("narratively significant");
+  }
+
+  @Test
   @DisplayName(
       "should inject the campaign language into the system prompt — Spanish for es, English for en (D-103)")
   @SuppressWarnings("unchecked")
