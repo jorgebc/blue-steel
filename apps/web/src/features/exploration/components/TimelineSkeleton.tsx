@@ -3,9 +3,12 @@
  * details line) so swapping in real events causes zero layout shift (D-086 — no spinners in primary
  * content).
  */
+import { useTranslation } from 'react-i18next'
+
 export function TimelineSkeleton() {
+  const { t } = useTranslation()
   return (
-    <div role="status" aria-label="Loading timeline" className="space-y-3">
+    <div role="status" aria-label={t('exploration.timeline.loadingAria')} className="space-y-3">
       {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -16,6 +17,7 @@ interface Props {
  * the parent owns the mutation and feedback. Blank input and over-length content cannot be submitted.
  */
 export function AnnotationInput({ onSubmit, isPending }: Props) {
+  const { t } = useTranslation()
   const [value, setValue] = useState('')
   const trimmed = value.trim()
   const canSubmit = trimmed.length > 0 && trimmed.length <= MAX_LENGTH && !isPending
@@ -30,8 +32,8 @@ export function AnnotationInput({ onSubmit, isPending }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
       <Textarea
-        aria-label="Add an annotation"
-        placeholder="Add a note, observation, or hypothesis…"
+        aria-label={t('annotations.inputAria')}
+        placeholder={t('annotations.inputPlaceholder')}
         value={value}
         maxLength={MAX_LENGTH}
         disabled={isPending}
@@ -39,7 +41,7 @@ export function AnnotationInput({ onSubmit, isPending }: Props) {
       />
       <div className="flex justify-end">
         <Button type="submit" disabled={!canSubmit}>
-          Post annotation
+          {t('annotations.post')}
         </Button>
       </div>
     </form>

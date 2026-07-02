@@ -2,9 +2,12 @@
  * Loading placeholder for an entity list, shaped to the `EntitySummary` row (name + version badge)
  * so swapping in real data causes zero layout shift (D-086 — no spinners in primary content).
  */
+import { useTranslation } from 'react-i18next'
+
 export function EntityListSkeleton() {
+  const { t } = useTranslation()
   return (
-    <div role="status" aria-label="Loading entities" className="space-y-3">
+    <div role="status" aria-label={t('exploration.loadingEntitiesAria')} className="space-y-3">
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}

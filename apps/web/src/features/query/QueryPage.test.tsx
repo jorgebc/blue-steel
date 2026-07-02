@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -84,6 +84,11 @@ beforeEach(() => {
     isLoading: false,
     isError: false,
   } as unknown as ReturnType<typeof useQueryHistory>)
+})
+
+afterEach(async () => {
+  // Some tests switch the UI locale; reset so later tests render in English.
+  await i18n.changeLanguage('en')
 })
 
 describe('QueryPage', () => {
@@ -281,7 +286,9 @@ describe('QueryPage', () => {
     await i18n.changeLanguage('es')
     stubMutation({ rejectWith: new ApiClientError('timeout', 504, []) })
     renderPage()
-    await ask()
+    // The submit button localizes too, so match its Spanish accessible name here.
+    await userEvent.type(screen.getByRole('textbox'), 'Where did Aldric go?')
+    await userEvent.click(screen.getByRole('button', { name: /preguntar/i }))
 
     expect(screen.getByRole('alert')).toHaveTextContent(/tardó demasiado en responderse/i)
   })

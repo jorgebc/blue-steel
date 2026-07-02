@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -28,11 +29,7 @@ import {
 import { computeDelta, editableSeed } from '@/lib/proposalDelta'
 import type { ProposalTargetType } from '@/types/proposal'
 
-const schema = z.object({
-  sessionId: z.string().min(1, 'Select the session this change relates to'),
-})
-
-type FormValues = z.infer<typeof schema>
+type FormValues = { sessionId: string }
 
 interface Props {
   targetType: ProposalTargetType
@@ -55,6 +52,7 @@ export function ProposalSubmitForm({
   onSubmitted,
   onCancel,
 }: Props) {
+  const { t } = useTranslation()
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
   const { data: sessions } = useSessions(campaignId ?? '', 0)
   const { mutate, isPending } = useCreateProposal(campaignId ?? '')
@@ -62,6 +60,14 @@ export function ProposalSubmitForm({
   const [values, setValues] = useState<Record<string, string>>(() => editableSeed(currentSnapshot))
   const [deltaError, setDeltaError] = useState<string | null>(null)
   const [banner, setBanner] = useState<string | null>(null)
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        sessionId: z.string().min(1, t('proposals.submitForm.sessionRequired')),
+      }),
+    [t]
+  )
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -73,7 +79,7 @@ export function ProposalSubmitForm({
     setDeltaError(null)
     const proposedDelta = computeDelta(currentSnapshot, values)
     if (Object.keys(proposedDelta).length === 0) {
-      setDeltaError('Change at least one field before proposing.')
+      setDeltaError(t('proposals.submitForm.emptyDelta'))
       return
     }
     mutate(
@@ -82,9 +88,9 @@ export function ProposalSubmitForm({
         onSuccess: () => onSubmitted(),
         onError: (err) => {
           if (err instanceof ApiClientError) {
-            setBanner(err.errors[0]?.message ?? 'Could not submit your proposal. Try again.')
+            setBanner(err.errors[0]?.message ?? t('proposals.submitForm.submitError'))
           } else {
-            setBanner('An unexpected error occurred. Please try again.')
+            setBanner(t('common.unexpectedError'))
           }
         },
       }
@@ -93,10 +99,13 @@ export function ProposalSubmitForm({
 
   return (
     <div className="max-h-[80vh] w-[32rem] max-w-[90vw] overflow-y-auto bg-surface p-6">
-      <h3 className="mb-1 text-base font-medium text-foreground">Propose a change</h3>
+      <h3 className="mb-1 text-base font-medium text-foreground">
+        {t('proposals.submitForm.title')}
+      </h3>
       <p className="mb-4 text-sm text-muted-foreground">
-        Suggest edits to this {targetType.toLowerCase()}. Other members can co-sign, then the GM
-        decides.
+        {targetType === 'ACTOR'
+          ? t('proposals.submitForm.descriptionActor')
+          : t('proposals.submitForm.descriptionSpace')}
       </p>
 
       {banner && (
@@ -112,17 +121,20 @@ export function ProposalSubmitForm({
             name="sessionId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Related session</FormLabel>
+                <FormLabel>{t('proposals.submitForm.relatedSession')}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Which session does this relate to?" />
+                      <SelectValue placeholder={t('proposals.submitForm.sessionPlaceholder')} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     {(sessions ?? []).map((s) => (
                       <SelectItem key={s.sessionId} value={s.sessionId}>
-                        Session #{s.sequenceNumber} ({s.status.toLowerCase()})
+                        {t('proposals.submitForm.sessionOption', {
+                          sequence: s.sequenceNumber,
+                          status: t(`sessions.status.${s.status.toLowerCase()}`).toLowerCase(),
+                        })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -133,7 +145,9 @@ export function ProposalSubmitForm({
           />
 
           <div>
-            <p className="mb-2 text-sm font-medium text-foreground">Proposed fields</p>
+            <p className="mb-2 text-sm font-medium text-foreground">
+              {t('proposals.submitForm.proposedFields')}
+            </p>
             <DeltaFieldsEditor
               baseline={currentSnapshot}
               values={values}
@@ -145,11 +159,11 @@ export function ProposalSubmitForm({
 
           <div className="flex justify-end gap-3">
             <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={isPending} aria-disabled={isPending}>
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-              Submit proposal
+              {t('proposals.submitForm.submit')}
             </Button>
           </div>
         </form>

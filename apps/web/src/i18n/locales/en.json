@@ -52,7 +52,72 @@
     "previous": "Previous",
     "next": "Next",
     "pageOf": "Page {{page}} of {{total}}",
-    "listLoadError": "Could not load this list. Please refresh the page."
+    "listLoadError": "Could not load this list. Please refresh the page.",
+    "viewsNavAria": "Exploration views",
+    "tabTimeline": "Timeline",
+    "tabEntities": "Entities",
+    "tabSpaces": "Spaces",
+    "tabRelations": "Relations",
+    "currentState": "Current state",
+    "noRecordedState": "No recorded state.",
+    "profileLoadError": "Could not load this profile. Please refresh the page.",
+    "eventLoadError": "Could not load this event. Please refresh the page.",
+    "backToTimeline": "Back to timeline",
+    "loadingEntitiesAria": "Loading entities",
+    "loadingProfileAria": "Loading profile",
+    "timeline": {
+      "title": "Timeline",
+      "description": "Events recorded across this campaign's committed sessions.",
+      "filterEvents": "Filter events",
+      "actorLabel": "Actor",
+      "spaceLabel": "Space",
+      "eventTypeLabel": "Event type",
+      "actorPlaceholder": "e.g. Gandalf",
+      "spacePlaceholder": "e.g. Rivendell",
+      "eventTypePlaceholder": "e.g. battle",
+      "apply": "Apply",
+      "clear": "Clear",
+      "loadError": "Could not load the timeline. Please refresh the page.",
+      "noMatch": "No events match these filters.",
+      "empty": "No events yet.",
+      "sessionHeading": "Session #{{sequence}}",
+      "loadingMore": "Loading…",
+      "loadMore": "Load more",
+      "loadingAria": "Loading timeline"
+    },
+    "eventDetail": {
+      "proposeComingSoon": "Proposing changes is coming soon"
+    },
+    "entityLinks": {
+      "connectionsAria": "Connections",
+      "loadError": "Could not load connections. Please refresh the page.",
+      "loadingAria": "Loading connections",
+      "relations": "Relations",
+      "noRelations": "No relations.",
+      "relatedEntities": "Related entities",
+      "noRelatedEntities": "No related entities.",
+      "events": "Events",
+      "noEvents": "No events.",
+      "appearsInCount_one": "Appears in {{count}} session",
+      "appearsInCount_other": "Appears in {{count}} sessions",
+      "appearsIn": "Appears in sessions",
+      "noAppearances": "Does not appear in any sessions.",
+      "sessionLink": "Session #{{sequence}}"
+    },
+    "relations": {
+      "title": "Relations",
+      "description": "How this campaign's actors and spaces are connected.",
+      "loadError": "Could not load the relations graph. Please refresh the page.",
+      "graphAria": "Relations graph",
+      "allRelations": "All relations",
+      "loadingAria": "Loading relations",
+      "unknown": "Unknown",
+      "listEmpty": "No relations yet.",
+      "listAria": "Relations",
+      "itemAria": "{{source}} {{label}} {{target}} — show annotations",
+      "nodeSpace": "Space",
+      "nodeActor": "Actor"
+    }
   },
   "common": {
     "cancel": "Cancel",
@@ -62,7 +127,15 @@
     "delete": "Delete",
     "remove": "Remove",
     "addField": "Add field",
-    "unexpectedError": "An unexpected error occurred. Please try again."
+    "unexpectedError": "An unexpected error occurred. Please try again.",
+    "dismiss": "Dismiss",
+    "backToCampaigns": "Back to campaigns",
+    "notEditable": "(not editable)",
+    "noEditableFields": "This entity has no recorded fields to change.",
+    "errorTitle": "Something went wrong",
+    "errorBody": "An unexpected error occurred. Reloading the page usually fixes it.",
+    "reload": "Reload",
+    "campaignLoadError": "We couldn't load this campaign. It may not exist or you may not have access to it."
   },
   "input": {
     "newSession": "New session",
@@ -179,7 +252,13 @@
     "removeMember": "Remove member",
     "removeMemberTitle": "Remove this member?",
     "removeMemberBody": "<strong>{{email}}</strong> will lose access to the campaign. They can be invited again later.",
-    "removeMemberBodyFallback": "This member will lose access to the campaign. They can be invited again later."
+    "removeMemberBodyFallback": "This member will lose access to the campaign. They can be invited again later.",
+    "yourCampaigns": "Your campaigns",
+    "inviteUser": "Invite user",
+    "listLoadError": "We couldn't load your campaigns. Please try again.",
+    "noCampaigns": "No campaigns yet",
+    "createFirst": "Create your first campaign to start building its world.",
+    "askGm": "Ask your GM or an admin to add you to a campaign."
   },
   "proposals": {
     "actorChange": "Actor change",
@@ -194,7 +273,52 @@
     "vetoProposalAria": "Veto proposal",
     "vetoTitle": "Veto this proposal?",
     "vetoBody": "The proposal is rejected and no version is written. This cannot be undone.",
-    "decisionError": "Could not record the decision. Try again."
+    "decisionError": "Could not record the decision. Try again.",
+    "proposeChange": "Propose a change",
+    "proposeChangeAria": "Propose a change to {{name}}",
+    "reviewQueue": {
+      "title": "Proposal review queue",
+      "description": "Co-signed proposals awaiting your decision. Approve (optionally editing the change) or veto.",
+      "approved": "Proposal approved — a new version was written.",
+      "vetoed": "Proposal vetoed.",
+      "viewUpdatedActor": "View the updated actor profile",
+      "viewUpdatedSpace": "View the updated space profile",
+      "loadError": "Could not load the review queue. Please refresh the page.",
+      "empty": "No proposals are awaiting review."
+    },
+    "thread": {
+      "sectionAria": "Proposals",
+      "heading": "Proposed changes",
+      "subtitle": "Member-submitted edits awaiting co-sign and GM review — not yet canonical world state.",
+      "coSignSuccess": "Proposal co-signed.",
+      "coSignError": "We couldn't co-sign this proposal. Try again.",
+      "loadError": "Could not load proposals. Please refresh the page.",
+      "emptyActor": "No proposals yet for this actor.",
+      "emptySpace": "No proposals yet for this space.",
+      "expires": "Expires {{date}}",
+      "coSign": "Co-sign",
+      "loadingAria": "Loading proposals"
+    },
+    "submitForm": {
+      "sessionRequired": "Select the session this change relates to",
+      "emptyDelta": "Change at least one field before proposing.",
+      "submitError": "Could not submit your proposal. Try again.",
+      "title": "Propose a change",
+      "descriptionActor": "Suggest edits to this actor. Other members can co-sign, then the GM decides.",
+      "descriptionSpace": "Suggest edits to this space. Other members can co-sign, then the GM decides.",
+      "relatedSession": "Related session",
+      "sessionPlaceholder": "Which session does this relate to?",
+      "sessionOption": "Session #{{sequence}} ({{status}})",
+      "proposedFields": "Proposed fields",
+      "submit": "Submit proposal"
+    },
+    "statusBadge": {
+      "open": "Open",
+      "cosigned": "Co-signed",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "expired": "Expired"
+    }
   },
   "auth": {
     "signIn": "Sign in",
@@ -241,6 +365,100 @@
     "timeoutMessage": "That query took too long to answer. Try rephrasing it or narrowing the scope, then ask again.",
     "rateLimitMessage": "You're sending questions too quickly. Wait a few seconds, then ask again.",
     "costCapMessage": "The daily question limit for this service has been reached. Please try again tomorrow.",
-    "genericMessage": "Something went wrong answering that question. Please try again."
+    "genericMessage": "Something went wrong answering that question. Please try again.",
+    "form": {
+      "label": "Ask a question about the campaign",
+      "placeholder": "What happened to Aldric after the Battle of Thornwall?",
+      "searching": "Searching…",
+      "ask": "Ask"
+    },
+    "answer": {
+      "articleAria": "Query answer",
+      "heading": "Answer"
+    },
+    "citations": {
+      "heading": "Sources",
+      "linkAria": "Session {{sequence}}: {{snippet}}",
+      "sessionLink": "Session {{sequence}}"
+    },
+    "history": {
+      "loadError": "Could not load the question history. Please try again.",
+      "empty": "No questions have been asked yet.",
+      "listAria": "Past questions",
+      "pagesAria": "History pages",
+      "previous": "Previous",
+      "next": "Next",
+      "loadingAria": "Loading question history"
+    },
+    "usageNotice": {
+      "body": "Query Mode runs on Google's free AI tier, with daily limits shared across everyone. Please use it in moderation.",
+      "budgetUsed": "Shared daily budget: {{percent}}% used",
+      "requestsRemaining": " · {{count}} questions left this minute"
+    },
+    "answerSkeletonAria": "Searching the world state"
+  },
+  "status": {
+    "title": "System status",
+    "api": "API",
+    "database": "Database",
+    "loadingAria": "Loading system status",
+    "unreachable": "Unable to reach the server. Please try again later."
+  },
+  "sessions": {
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "draft": "Draft",
+      "committed": "Committed",
+      "failed": "Failed",
+      "discarded": "Discarded"
+    },
+    "resume": "Resume",
+    "discard": "Discard",
+    "campaignHome": "Campaign home",
+    "historyTitle": "Session history",
+    "historySubtitle": "All sessions for this campaign.",
+    "discardError": "Failed to discard the draft. Please try again.",
+    "listLoadError": "Could not load sessions. Please refresh the page.",
+    "loadingListAria": "Loading sessions",
+    "empty": "No sessions yet.",
+    "backToSessions": "Back to sessions",
+    "detailLoadError": "Could not load this session. Please refresh the page.",
+    "loadingDetailAria": "Loading session",
+    "sessionNumber": "Session #{{sequence}}",
+    "sessionFallback": "Session",
+    "committedOn": "Committed {{date}}",
+    "narrativeSummary": "Narrative summary",
+    "noNarrative": "No narrative summary recorded.",
+    "processing": "Processing your session…",
+    "statusCheckError": "We couldn't check your session's status. Please try again.",
+    "processingFailed": "Processing failed"
+  },
+  "annotations": {
+    "loadingAria": "Loading annotations",
+    "sectionAria": "Annotations",
+    "heading": "Annotations",
+    "subtitle": "Player commentary — not canonical world state. Any member can post; the author or a GM can delete.",
+    "posted": "Annotation posted.",
+    "postError": "We couldn't post your annotation. Try again.",
+    "deleted": "Annotation deleted.",
+    "deleteError": "We couldn't delete that annotation. Try again.",
+    "loadError": "Could not load annotations. Please refresh the page.",
+    "empty": "No annotations yet. Be the first to add one.",
+    "deleteAria": "Delete annotation",
+    "deleteTitle": "Delete this annotation?",
+    "deleteBody": "This permanently removes the annotation. This cannot be undone.",
+    "authorLabel": "Member {{id}}",
+    "inputAria": "Add an annotation",
+    "inputPlaceholder": "Add a note, observation, or hypothesis…",
+    "post": "Post annotation"
+  },
+  "versionHistory": {
+    "initial": "Initial version",
+    "changed": "Changed: {{fields}}",
+    "sessionRef": "Session #{{sequence}}",
+    "uncommitted": "Uncommitted session",
+    "empty": "No version history yet.",
+    "createdAtVersion": "Entity created at this version."
   }
 }

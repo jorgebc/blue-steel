@@ -1,12 +1,14 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useHealth } from '@/api/health'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 
 function StatusSkeleton() {
+  const { t } = useTranslation()
   return (
     <div
       role="status"
-      aria-label="Loading system status"
+      aria-label={t('status.loadingAria')}
       className="rounded-2xl bg-surface p-8 shadow-sm"
     >
       <div className="mb-6 h-6 w-1/3 rounded bg-muted animate-pulse" />
@@ -25,6 +27,7 @@ function StatusSkeleton() {
 }
 
 export function StatusPage() {
+  const { t } = useTranslation()
   const { data, isLoading, error } = useHealth()
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
@@ -35,7 +38,7 @@ export function StatusPage() {
           <div className="mb-4">
             <InlineBanner
               variant="error"
-              message="Unable to reach the server. Please try again later."
+              message={t('status.unreachable')}
               onDismiss={() => setBannerDismissed(true)}
             />
           </div>
@@ -43,14 +46,14 @@ export function StatusPage() {
         {isLoading && <StatusSkeleton />}
         {data && (
           <div className="rounded-2xl bg-surface p-8 shadow-sm">
-            <h1 className="mb-6 text-2xl font-semibold text-foreground">System status</h1>
+            <h1 className="mb-6 text-2xl font-semibold text-foreground">{t('status.title')}</h1>
             <dl className="space-y-4">
               <div>
-                <dt className="text-sm text-muted-foreground">API</dt>
+                <dt className="text-sm text-muted-foreground">{t('status.api')}</dt>
                 <dd className="text-sm font-medium text-foreground">{data.status}</dd>
               </div>
               <div>
-                <dt className="text-sm text-muted-foreground">Database</dt>
+                <dt className="text-sm text-muted-foreground">{t('status.database')}</dt>
                 <dd className="text-sm font-medium text-foreground">{data.db}</dd>
               </div>
             </dl>

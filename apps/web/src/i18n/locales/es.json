@@ -52,7 +52,72 @@
     "previous": "Anterior",
     "next": "Siguiente",
     "pageOf": "Página {{page}} de {{total}}",
-    "listLoadError": "No se pudo cargar esta lista. Actualiza la página."
+    "listLoadError": "No se pudo cargar esta lista. Actualiza la página.",
+    "viewsNavAria": "Vistas de exploración",
+    "tabTimeline": "Cronología",
+    "tabEntities": "Entidades",
+    "tabSpaces": "Espacios",
+    "tabRelations": "Relaciones",
+    "currentState": "Estado actual",
+    "noRecordedState": "No hay estado registrado.",
+    "profileLoadError": "No se pudo cargar este perfil. Actualiza la página.",
+    "eventLoadError": "No se pudo cargar este evento. Actualiza la página.",
+    "backToTimeline": "Volver a la cronología",
+    "loadingEntitiesAria": "Cargando entidades",
+    "loadingProfileAria": "Cargando perfil",
+    "timeline": {
+      "title": "Cronología",
+      "description": "Eventos registrados en las sesiones confirmadas de esta campaña.",
+      "filterEvents": "Filtrar eventos",
+      "actorLabel": "Actor",
+      "spaceLabel": "Espacio",
+      "eventTypeLabel": "Tipo de evento",
+      "actorPlaceholder": "p. ej. Gandalf",
+      "spacePlaceholder": "p. ej. Rivendel",
+      "eventTypePlaceholder": "p. ej. batalla",
+      "apply": "Aplicar",
+      "clear": "Limpiar",
+      "loadError": "No se pudo cargar la cronología. Actualiza la página.",
+      "noMatch": "Ningún evento coincide con estos filtros.",
+      "empty": "Aún no hay eventos.",
+      "sessionHeading": "Sesión n.º {{sequence}}",
+      "loadingMore": "Cargando…",
+      "loadMore": "Cargar más",
+      "loadingAria": "Cargando cronología"
+    },
+    "eventDetail": {
+      "proposeComingSoon": "La propuesta de cambios estará disponible pronto"
+    },
+    "entityLinks": {
+      "connectionsAria": "Conexiones",
+      "loadError": "No se pudieron cargar las conexiones. Actualiza la página.",
+      "loadingAria": "Cargando conexiones",
+      "relations": "Relaciones",
+      "noRelations": "Sin relaciones.",
+      "relatedEntities": "Entidades relacionadas",
+      "noRelatedEntities": "Sin entidades relacionadas.",
+      "events": "Eventos",
+      "noEvents": "Sin eventos.",
+      "appearsInCount_one": "Aparece en {{count}} sesión",
+      "appearsInCount_other": "Aparece en {{count}} sesiones",
+      "appearsIn": "Aparece en sesiones",
+      "noAppearances": "No aparece en ninguna sesión.",
+      "sessionLink": "Sesión n.º {{sequence}}"
+    },
+    "relations": {
+      "title": "Relaciones",
+      "description": "Cómo están conectados los actores y espacios de esta campaña.",
+      "loadError": "No se pudo cargar el grafo de relaciones. Actualiza la página.",
+      "graphAria": "Grafo de relaciones",
+      "allRelations": "Todas las relaciones",
+      "loadingAria": "Cargando relaciones",
+      "unknown": "Desconocido",
+      "listEmpty": "Aún no hay relaciones.",
+      "listAria": "Relaciones",
+      "itemAria": "{{source}} {{label}} {{target}} — mostrar anotaciones",
+      "nodeSpace": "Espacio",
+      "nodeActor": "Actor"
+    }
   },
   "common": {
     "cancel": "Cancelar",
@@ -62,7 +127,15 @@
     "delete": "Eliminar",
     "remove": "Quitar",
     "addField": "Añadir campo",
-    "unexpectedError": "Ocurrió un error inesperado. Inténtalo de nuevo."
+    "unexpectedError": "Ocurrió un error inesperado. Inténtalo de nuevo.",
+    "dismiss": "Descartar",
+    "backToCampaigns": "Volver a campañas",
+    "notEditable": "(no editable)",
+    "noEditableFields": "Esta entidad no tiene campos registrados para cambiar.",
+    "errorTitle": "Algo salió mal",
+    "errorBody": "Ocurrió un error inesperado. Recargar la página suele solucionarlo.",
+    "reload": "Recargar",
+    "campaignLoadError": "No pudimos cargar esta campaña. Puede que no exista o que no tengas acceso a ella."
   },
   "input": {
     "newSession": "Nueva sesión",
@@ -179,7 +252,13 @@
     "removeMember": "Quitar miembro",
     "removeMemberTitle": "¿Quitar a este miembro?",
     "removeMemberBody": "<strong>{{email}}</strong> perderá el acceso a la campaña. Se le puede volver a invitar más adelante.",
-    "removeMemberBodyFallback": "Este miembro perderá el acceso a la campaña. Se le puede volver a invitar más adelante."
+    "removeMemberBodyFallback": "Este miembro perderá el acceso a la campaña. Se le puede volver a invitar más adelante.",
+    "yourCampaigns": "Tus campañas",
+    "inviteUser": "Invitar usuario",
+    "listLoadError": "No pudimos cargar tus campañas. Inténtalo de nuevo.",
+    "noCampaigns": "Aún no hay campañas",
+    "createFirst": "Crea tu primera campaña para empezar a construir su mundo.",
+    "askGm": "Pídele a tu GM o a un administrador que te añada a una campaña."
   },
   "proposals": {
     "actorChange": "Cambio de actor",
@@ -194,7 +273,52 @@
     "vetoProposalAria": "Vetar propuesta",
     "vetoTitle": "¿Vetar esta propuesta?",
     "vetoBody": "La propuesta se rechaza y no se escribe ninguna versión. Esto no se puede deshacer.",
-    "decisionError": "No se pudo registrar la decisión. Inténtalo de nuevo."
+    "decisionError": "No se pudo registrar la decisión. Inténtalo de nuevo.",
+    "proposeChange": "Proponer un cambio",
+    "proposeChangeAria": "Proponer un cambio a {{name}}",
+    "reviewQueue": {
+      "title": "Cola de revisión de propuestas",
+      "description": "Propuestas co-firmadas a la espera de tu decisión. Aprueba (editando el cambio si quieres) o veta.",
+      "approved": "Propuesta aprobada — se escribió una nueva versión.",
+      "vetoed": "Propuesta vetada.",
+      "viewUpdatedActor": "Ver el perfil del actor actualizado",
+      "viewUpdatedSpace": "Ver el perfil del espacio actualizado",
+      "loadError": "No se pudo cargar la cola de revisión. Actualiza la página.",
+      "empty": "No hay propuestas a la espera de revisión."
+    },
+    "thread": {
+      "sectionAria": "Propuestas",
+      "heading": "Cambios propuestos",
+      "subtitle": "Ediciones enviadas por miembros a la espera de co-firma y revisión del GM — aún no son estado del mundo canónico.",
+      "coSignSuccess": "Propuesta co-firmada.",
+      "coSignError": "No pudimos co-firmar esta propuesta. Inténtalo de nuevo.",
+      "loadError": "No se pudieron cargar las propuestas. Actualiza la página.",
+      "emptyActor": "Aún no hay propuestas para este actor.",
+      "emptySpace": "Aún no hay propuestas para este espacio.",
+      "expires": "Caduca {{date}}",
+      "coSign": "Co-firmar",
+      "loadingAria": "Cargando propuestas"
+    },
+    "submitForm": {
+      "sessionRequired": "Selecciona la sesión con la que se relaciona este cambio",
+      "emptyDelta": "Cambia al menos un campo antes de proponer.",
+      "submitError": "No se pudo enviar tu propuesta. Inténtalo de nuevo.",
+      "title": "Proponer un cambio",
+      "descriptionActor": "Sugiere ediciones para este actor. Otros miembros pueden co-firmar y luego el GM decide.",
+      "descriptionSpace": "Sugiere ediciones para este espacio. Otros miembros pueden co-firmar y luego el GM decide.",
+      "relatedSession": "Sesión relacionada",
+      "sessionPlaceholder": "¿Con qué sesión se relaciona esto?",
+      "sessionOption": "Sesión n.º {{sequence}} ({{status}})",
+      "proposedFields": "Campos propuestos",
+      "submit": "Enviar propuesta"
+    },
+    "statusBadge": {
+      "open": "Abierta",
+      "cosigned": "Co-firmada",
+      "approved": "Aprobada",
+      "rejected": "Rechazada",
+      "expired": "Caducada"
+    }
   },
   "auth": {
     "signIn": "Iniciar sesión",
@@ -241,6 +365,100 @@
     "timeoutMessage": "Esa consulta tardó demasiado en responderse. Intenta reformularla o acotar el alcance y vuelve a preguntar.",
     "rateLimitMessage": "Estás enviando preguntas demasiado rápido. Espera unos segundos y vuelve a preguntar.",
     "costCapMessage": "Se ha alcanzado el límite diario de preguntas de este servicio. Vuelve a intentarlo mañana.",
-    "genericMessage": "Algo salió mal al responder esa pregunta. Inténtalo de nuevo."
+    "genericMessage": "Algo salió mal al responder esa pregunta. Inténtalo de nuevo.",
+    "form": {
+      "label": "Haz una pregunta sobre la campaña",
+      "placeholder": "¿Qué le pasó a Aldric después de la Batalla de Thornwall?",
+      "searching": "Buscando…",
+      "ask": "Preguntar"
+    },
+    "answer": {
+      "articleAria": "Respuesta de la consulta",
+      "heading": "Respuesta"
+    },
+    "citations": {
+      "heading": "Fuentes",
+      "linkAria": "Sesión {{sequence}}: {{snippet}}",
+      "sessionLink": "Sesión {{sequence}}"
+    },
+    "history": {
+      "loadError": "No se pudo cargar el historial de preguntas. Inténtalo de nuevo.",
+      "empty": "Aún no se ha hecho ninguna pregunta.",
+      "listAria": "Preguntas anteriores",
+      "pagesAria": "Páginas del historial",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "loadingAria": "Cargando historial de preguntas"
+    },
+    "usageNotice": {
+      "body": "El modo Consulta funciona con la capa de IA gratuita de Google, con límites diarios compartidos por todos. Úsalo con moderación.",
+      "budgetUsed": "Presupuesto diario compartido: {{percent}} % usado",
+      "requestsRemaining": " · quedan {{count}} preguntas este minuto"
+    },
+    "answerSkeletonAria": "Buscando en el estado del mundo"
+  },
+  "status": {
+    "title": "Estado del sistema",
+    "api": "API",
+    "database": "Base de datos",
+    "loadingAria": "Cargando el estado del sistema",
+    "unreachable": "No se puede contactar con el servidor. Inténtalo de nuevo más tarde."
+  },
+  "sessions": {
+    "status": {
+      "pending": "Pendiente",
+      "processing": "Procesando",
+      "draft": "Borrador",
+      "committed": "Confirmada",
+      "failed": "Fallida",
+      "discarded": "Descartada"
+    },
+    "resume": "Retomar",
+    "discard": "Descartar",
+    "campaignHome": "Inicio de la campaña",
+    "historyTitle": "Historial de sesiones",
+    "historySubtitle": "Todas las sesiones de esta campaña.",
+    "discardError": "No se pudo descartar el borrador. Inténtalo de nuevo.",
+    "listLoadError": "No se pudieron cargar las sesiones. Actualiza la página.",
+    "loadingListAria": "Cargando sesiones",
+    "empty": "Aún no hay sesiones.",
+    "backToSessions": "Volver a sesiones",
+    "detailLoadError": "No se pudo cargar esta sesión. Actualiza la página.",
+    "loadingDetailAria": "Cargando sesión",
+    "sessionNumber": "Sesión n.º {{sequence}}",
+    "sessionFallback": "Sesión",
+    "committedOn": "Confirmada el {{date}}",
+    "narrativeSummary": "Resumen narrativo",
+    "noNarrative": "No se registró ningún resumen narrativo.",
+    "processing": "Procesando tu sesión…",
+    "statusCheckError": "No pudimos comprobar el estado de tu sesión. Inténtalo de nuevo.",
+    "processingFailed": "Error al procesar"
+  },
+  "annotations": {
+    "loadingAria": "Cargando anotaciones",
+    "sectionAria": "Anotaciones",
+    "heading": "Anotaciones",
+    "subtitle": "Comentarios de los jugadores — no son estado del mundo canónico. Cualquier miembro puede publicar; el autor o un GM puede eliminar.",
+    "posted": "Anotación publicada.",
+    "postError": "No pudimos publicar tu anotación. Inténtalo de nuevo.",
+    "deleted": "Anotación eliminada.",
+    "deleteError": "No pudimos eliminar esa anotación. Inténtalo de nuevo.",
+    "loadError": "No se pudieron cargar las anotaciones. Actualiza la página.",
+    "empty": "Aún no hay anotaciones. Sé el primero en añadir una.",
+    "deleteAria": "Eliminar anotación",
+    "deleteTitle": "¿Eliminar esta anotación?",
+    "deleteBody": "Esto elimina la anotación de forma permanente. Esto no se puede deshacer.",
+    "authorLabel": "Miembro {{id}}",
+    "inputAria": "Añadir una anotación",
+    "inputPlaceholder": "Añade una nota, observación o hipótesis…",
+    "post": "Publicar anotación"
+  },
+  "versionHistory": {
+    "initial": "Versión inicial",
+    "changed": "Cambiado: {{fields}}",
+    "sessionRef": "Sesión n.º {{sequence}}",
+    "uncommitted": "Sesión sin confirmar",
+    "empty": "Aún no hay historial de versiones.",
+    "createdAtVersion": "Entidad creada en esta versión."
   }
 }

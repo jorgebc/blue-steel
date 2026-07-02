@@ -1,18 +1,10 @@
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useSessionDetail } from '@/api/sessions'
 import { InlineBanner } from '@/components/domain/InlineBanner'
 import { Badge } from '@/components/ui/badge'
 import type { SessionStatus } from '@/types/session'
-
-const STATUS_LABEL: Record<SessionStatus, string> = {
-  PENDING: 'Pending',
-  PROCESSING: 'Processing',
-  DRAFT: 'Draft',
-  COMMITTED: 'Committed',
-  FAILED: 'Failed',
-  DISCARDED: 'Discarded',
-}
 
 const STATUS_CLASS: Record<SessionStatus, string> = {
   PENDING: 'bg-muted text-muted-foreground',
@@ -32,8 +24,9 @@ function formatDate(iso: string): string {
 }
 
 function SessionDetailSkeleton() {
+  const { t } = useTranslation()
   return (
-    <div role="status" aria-label="Loading session" className="space-y-6">
+    <div role="status" aria-label={t('sessions.loadingDetailAria')} className="space-y-6">
       <div className="space-y-2">
         <div className="h-7 w-40 animate-pulse rounded bg-muted" />
         <div className="h-5 w-24 animate-pulse rounded-full bg-muted" />
@@ -50,6 +43,7 @@ function SessionDetailSkeleton() {
  * `sessions/:sessionId/diff` review route (D-010).
  */
 export function SessionDetailPage() {
+  const { t } = useTranslation()
   const { campaignId, sessionId } = useParams<{ campaignId: string; sessionId: string }>()
   const navigate = useNavigate()
   const { data, isLoading, isError } = useSessionDetail(campaignId ?? '', sessionId ?? '')
@@ -61,14 +55,14 @@ export function SessionDetailPage() {
         className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
-        Back to sessions
+        {t('sessions.backToSessions')}
       </Link>
 
       {isError && (
         <div className="mb-4">
           <InlineBanner
             variant="error"
-            message="Could not load this session. Please refresh the page."
+            message={t('sessions.detailLoadError')}
             onDismiss={() => navigate(0)}
           />
         </div>
@@ -81,27 +75,31 @@ export function SessionDetailPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">
               <h1 className="text-2xl font-semibold text-foreground">
-                {data.sequenceNumber !== null ? `Session #${data.sequenceNumber}` : 'Session'}
+                {data.sequenceNumber !== null
+                  ? t('sessions.sessionNumber', { sequence: data.sequenceNumber })
+                  : t('sessions.sessionFallback')}
               </h1>
               <Badge className={STATUS_CLASS[data.status]} variant="outline">
-                {STATUS_LABEL[data.status]}
+                {t(`sessions.status.${data.status.toLowerCase()}`)}
               </Badge>
             </div>
             {data.committedAt && (
               <p className="shrink-0 text-sm text-muted-foreground">
-                Committed {formatDate(data.committedAt)}
+                {t('sessions.committedOn', { date: formatDate(data.committedAt) })}
               </p>
             )}
           </div>
 
           <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-            <h2 className="mb-3 text-sm font-semibold text-foreground">Narrative summary</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">
+              {t('sessions.narrativeSummary')}
+            </h2>
             {data.narrativeSummary ? (
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                 {data.narrativeSummary}
               </p>
             ) : (
-              <p className="text-sm text-muted-foreground">No narrative summary recorded.</p>
+              <p className="text-sm text-muted-foreground">{t('sessions.noNarrative')}</p>
             )}
           </div>
         </div>

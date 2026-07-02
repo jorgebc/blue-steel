@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import i18n from '@/i18n'
 import { Button } from '@/components/ui/button'
 
 interface Props {
@@ -35,11 +36,9 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div role="alert" className="flex min-h-screen items-center justify-center p-8">
         <div className="max-w-md space-y-4 text-center">
-          <h1 className="text-lg font-medium text-foreground">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">
-            An unexpected error occurred. Reloading the page usually fixes it.
-          </p>
-          <Button onClick={() => window.location.reload()}>Reload</Button>
+          <h1 className="text-lg font-medium text-foreground">{i18n.t('common.errorTitle')}</h1>
+          <p className="text-sm text-muted-foreground">{i18n.t('common.errorBody')}</p>
+          <Button onClick={() => window.location.reload()}>{i18n.t('common.reload')}</Button>
         </div>
       </div>
     )

@@ -3,9 +3,12 @@
  * badge, two delta lines, a co-sign button) to match the loaded layout within ±2px and avoid shift
  * (D-086 — no spinners in content).
  */
+import { useTranslation } from 'react-i18next'
+
 export function ProposalThreadSkeleton() {
+  const { t } = useTranslation()
   return (
-    <div role="status" aria-label="Loading proposals" className="space-y-3">
+    <div role="status" aria-label={t('proposals.thread.loadingAria')} className="space-y-3">
       {[0, 1].map((i) => (
         <div key={i} className="rounded-xl border border-border bg-surface p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useSessionStatus } from '@/api/sessions'
 import { InlineBanner } from '@/components/domain/InlineBanner'
@@ -10,6 +11,7 @@ interface Props {
 
 /** Skeleton mirroring the eventual diff-review header while extraction runs. */
 function ProcessingSkeleton() {
+  const { t } = useTranslation()
   return (
     <div className="rounded-2xl bg-surface p-6 shadow-sm">
       <div className="mb-6 h-6 w-1/3 rounded bg-muted animate-pulse" />
@@ -19,7 +21,7 @@ function ProcessingSkeleton() {
         <div className="h-3 w-2/3 rounded bg-muted animate-pulse" />
       </div>
       <p aria-live="polite" className="mt-6 text-sm text-muted-foreground">
-        Processing your session…
+        {t('sessions.processing')}
       </p>
     </div>
   )
@@ -31,6 +33,7 @@ function ProcessingSkeleton() {
  * `FAILED` session or a fetch failure.
  */
 export function ProcessingStatusView({ campaignId, sessionId }: Props) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { data, isError } = useSessionStatus(campaignId, sessionId, true)
   const [dismissed, setDismissed] = useState(false)
@@ -47,7 +50,7 @@ export function ProcessingStatusView({ campaignId, sessionId }: Props) {
     return (
       <InlineBanner
         variant="error"
-        message="We couldn't check your session's status. Please try again."
+        message={t('sessions.statusCheckError')}
         onDismiss={() => setDismissed(true)}
       />
     )
@@ -55,10 +58,11 @@ export function ProcessingStatusView({ campaignId, sessionId }: Props) {
 
   if (data?.status === 'FAILED') {
     const detail = [data.failureReason, data.message].filter(Boolean).join(' — ')
+    const base = t('sessions.processingFailed')
     return (
       <InlineBanner
         variant="error"
-        message={`Processing failed${detail ? `: ${detail}` : '.'}`}
+        message={detail ? `${base}: ${detail}` : `${base}.`}
         onDismiss={() => setDismissed(true)}
       />
     )

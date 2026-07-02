@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, Navigate } from 'react-router-dom'
 import { useCosignedProposals } from '@/api/proposals'
 import { useCampaignStore } from '@/store/campaignStore'
@@ -18,6 +19,7 @@ function targetProfilePath(campaignId: string, outcome: DecisionOutcome): string
  * home. After an approval, a banner links to the target profile showing the new version (D-107).
  */
 export function ProposalReviewQueuePage() {
+  const { t } = useTranslation()
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
   const activeRole = useCampaignStore((s) => s.activeRole)
   const { data, isLoading, isError } = useCosignedProposals(campaignId ?? '')
@@ -32,11 +34,9 @@ export function ProposalReviewQueuePage() {
   return (
     <section aria-labelledby="review-queue-heading" className="mx-auto max-w-3xl">
       <h1 id="review-queue-heading" className="mb-1 text-2xl font-semibold text-foreground">
-        Proposal review queue
+        {t('proposals.reviewQueue.title')}
       </h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        Co-signed proposals awaiting your decision. Approve (optionally editing the change) or veto.
-      </p>
+      <p className="mb-6 text-sm text-muted-foreground">{t('proposals.reviewQueue.description')}</p>
 
       {outcome && (
         <div className="mb-4">
@@ -44,8 +44,8 @@ export function ProposalReviewQueuePage() {
             variant="success"
             message={
               outcome.resultingEntityVersionId
-                ? 'Proposal approved — a new version was written.'
-                : 'Proposal vetoed.'
+                ? t('proposals.reviewQueue.approved')
+                : t('proposals.reviewQueue.vetoed')
             }
             onDismiss={() => setOutcome(null)}
           />
@@ -54,7 +54,9 @@ export function ProposalReviewQueuePage() {
               to={targetProfilePath(campaignId, outcome)}
               className="mt-2 inline-block text-sm text-accent underline-offset-4 hover:underline"
             >
-              View the updated {outcome.proposal.targetType.toLowerCase()} profile
+              {outcome.proposal.targetType === 'ACTOR'
+                ? t('proposals.reviewQueue.viewUpdatedActor')
+                : t('proposals.reviewQueue.viewUpdatedSpace')}
             </Link>
           )}
         </div>
@@ -65,7 +67,7 @@ export function ProposalReviewQueuePage() {
       {isError && (
         <InlineBanner
           variant="error"
-          message="Could not load the review queue. Please refresh the page."
+          message={t('proposals.reviewQueue.loadError')}
           onDismiss={() => undefined}
         />
       )}
@@ -73,7 +75,7 @@ export function ProposalReviewQueuePage() {
       {!isLoading && !isError && (
         <div className="space-y-4">
           {proposals.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No proposals are awaiting review.</p>
+            <p className="text-sm text-muted-foreground">{t('proposals.reviewQueue.empty')}</p>
           ) : (
             proposals.map((proposal) => (
               <ProposalReviewCard

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Annotation } from '@/types/annotation'
@@ -7,11 +8,6 @@ interface Props {
   /** Whether the current user may delete this annotation (author or GM). */
   canDelete: boolean
   onDelete: () => void
-}
-
-/** Shortens a raw author UUID for display — there is no user-name lookup endpoint in v1. */
-function authorLabel(authorId: string): string {
-  return `Member ${authorId.slice(0, 8)}`
 }
 
 function formatTimestamp(iso: string): string {
@@ -24,11 +20,14 @@ function formatTimestamp(iso: string): string {
  * the backend enforces the same rule as defence in depth.
  */
 export function AnnotationCard({ annotation, canDelete, onDelete }: Props) {
+  const { t } = useTranslation()
   return (
     <article className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/30">
       <div className="flex items-start justify-between gap-3">
         <div className="text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{authorLabel(annotation.authorId)}</span>
+          <span className="font-medium text-foreground">
+            {t('annotations.authorLabel', { id: annotation.authorId.slice(0, 8) })}
+          </span>
           <span aria-hidden> · </span>
           <time dateTime={annotation.createdAt}>{formatTimestamp(annotation.createdAt)}</time>
         </div>
@@ -37,7 +36,7 @@ export function AnnotationCard({ annotation, canDelete, onDelete }: Props) {
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label="Delete annotation"
+            aria-label={t('annotations.deleteAria')}
             onClick={onDelete}
           >
             <Trash2 className="h-4 w-4 text-muted-foreground" />

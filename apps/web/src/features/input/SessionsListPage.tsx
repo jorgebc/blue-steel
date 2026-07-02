@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, History } from 'lucide-react'
 import { useSessions, useDiscardSession } from '@/api/sessions'
@@ -11,15 +12,6 @@ import type { SessionSummary } from '@/types/session'
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
-const STATUS_LABEL: Record<SessionSummary['status'], string> = {
-  PENDING: 'Pending',
-  PROCESSING: 'Processing',
-  DRAFT: 'Draft',
-  COMMITTED: 'Committed',
-  FAILED: 'Failed',
-  DISCARDED: 'Discarded',
-}
-
 const STATUS_CLASS: Record<SessionSummary['status'], string> = {
   PENDING: 'bg-muted text-muted-foreground',
   PROCESSING: 'bg-info-subtle text-info-foreground',
@@ -30,9 +22,10 @@ const STATUS_CLASS: Record<SessionSummary['status'], string> = {
 }
 
 function StatusBadge({ status }: { status: SessionSummary['status'] }) {
+  const { t } = useTranslation()
   return (
     <Badge className={STATUS_CLASS[status]} variant="outline">
-      {STATUS_LABEL[status]}
+      {t(`sessions.status.${status.toLowerCase()}`)}
     </Badge>
   )
 }
@@ -66,6 +59,7 @@ interface RowProps {
 }
 
 function SessionRow({ session, campaignId, activeRole, onDiscard }: RowProps) {
+  const { t } = useTranslation()
   const date = session.committedAt ?? session.createdAt
   const formatted = new Date(date).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -96,7 +90,7 @@ function SessionRow({ session, campaignId, activeRole, onDiscard }: RowProps) {
             to={`/campaigns/${campaignId}/sessions/${session.sessionId}/diff`}
             className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors duration-200"
           >
-            Resume
+            {t('sessions.resume')}
           </Link>
         )}
         {canDiscard && (
@@ -106,7 +100,7 @@ function SessionRow({ session, campaignId, activeRole, onDiscard }: RowProps) {
             className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
             onClick={() => onDiscard(session.sessionId)}
           >
-            Discard
+            {t('sessions.discard')}
           </Button>
         )}
       </div>
@@ -121,6 +115,7 @@ function SessionRow({ session, campaignId, activeRole, onDiscard }: RowProps) {
  * editors can resume a draft directly and discard it from here (D-054).
  */
 export function SessionsListPage() {
+  const { t } = useTranslation()
   const { campaignId } = useParams<{ campaignId: string }>()
   const navigate = useNavigate()
   const activeRole = useCampaignStore((s) => s.activeRole)
@@ -153,7 +148,7 @@ export function SessionsListPage() {
         className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
-        Campaign home
+        {t('sessions.campaignHome')}
       </Link>
 
       <div className="mb-6 flex items-center gap-3">
@@ -161,8 +156,8 @@ export function SessionsListPage() {
           <History className="h-5 w-5" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Session history</h1>
-          <p className="text-sm text-muted-foreground">All sessions for this campaign.</p>
+          <h1 className="text-2xl font-semibold text-foreground">{t('sessions.historyTitle')}</h1>
+          <p className="text-sm text-muted-foreground">{t('sessions.historySubtitle')}</p>
         </div>
       </div>
 
@@ -170,7 +165,7 @@ export function SessionsListPage() {
         <div className="mb-4">
           <InlineBanner
             variant="error"
-            message="Failed to discard the draft. Please try again."
+            message={t('sessions.discardError')}
             onDismiss={() => setDiscardError(false)}
           />
         </div>
@@ -180,14 +175,14 @@ export function SessionsListPage() {
         <div className="mb-4">
           <InlineBanner
             variant="error"
-            message="Could not load sessions. Please refresh the page."
+            message={t('sessions.listLoadError')}
             onDismiss={() => navigate(0)}
           />
         </div>
       )}
 
       {isLoading && (
-        <div role="status" aria-label="Loading sessions" className="space-y-3">
+        <div role="status" aria-label={t('sessions.loadingListAria')} className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <SessionRowSkeleton key={i} />
           ))}
@@ -195,7 +190,7 @@ export function SessionsListPage() {
       )}
 
       {!isLoading && !isError && sessions?.length === 0 && (
-        <p className="text-sm text-muted-foreground">No sessions yet.</p>
+        <p className="text-sm text-muted-foreground">{t('sessions.empty')}</p>
       )}
 
       {!isLoading && !isError && sessions && sessions.length > 0 && (

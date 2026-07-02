@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Library } from 'lucide-react'
 import { useCampaigns } from '@/api/campaigns'
@@ -30,6 +31,7 @@ function RoleBadge({ role }: { role: CampaignRole | null }) {
  * failure, and an empty state when the user belongs to no campaigns.
  */
 export function CampaignListPage() {
+  const { t } = useTranslation()
   const { data: campaigns, isLoading, isError } = useCampaigns()
   const isAdmin = useAuthStore((s) => s.currentUser?.isAdmin)
   const [dismissed, setDismissed] = useState(false)
@@ -37,21 +39,21 @@ export function CampaignListPage() {
   return (
     <main className="mx-auto max-w-3xl p-6">
       <div className="mb-6 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Your campaigns</h1>
+        <h1 className="text-2xl font-semibold">{t('campaigns.yourCampaigns')}</h1>
         {isAdmin && (
           <div className="flex items-center gap-2">
             <Link
               to="/invite"
               className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
-              Invite user
+              {t('campaigns.inviteUser')}
             </Link>
             {campaigns && campaigns.length > 0 && (
               <Link
                 to="/campaigns/new"
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
               >
-                New campaign
+                {t('campaigns.newCampaign')}
               </Link>
             )}
           </div>
@@ -68,7 +70,7 @@ export function CampaignListPage() {
         !dismissed && (
           <InlineBanner
             variant="error"
-            message="We couldn't load your campaigns. Please try again."
+            message={t('campaigns.listLoadError')}
             onDismiss={() => setDismissed(true)}
           />
         )
@@ -93,23 +95,21 @@ export function CampaignListPage() {
       ) : (
         <div className="flex flex-col items-center rounded-2xl border border-border bg-surface p-8 text-center shadow-sm">
           <Library className="h-10 w-10 text-muted-foreground" aria-hidden />
-          <h2 className="mt-4 text-base font-medium text-foreground">No campaigns yet</h2>
+          <h2 className="mt-4 text-base font-medium text-foreground">
+            {t('campaigns.noCampaigns')}
+          </h2>
           {isAdmin ? (
             <>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Create your first campaign to start building its world.
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{t('campaigns.createFirst')}</p>
               <Link
                 to="/campaigns/new"
                 className="mt-6 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
               >
-                New campaign
+                {t('campaigns.newCampaign')}
               </Link>
             </>
           ) : (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Ask your GM or an admin to add you to a campaign.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{t('campaigns.askGm')}</p>
           )}
         </div>
       )}

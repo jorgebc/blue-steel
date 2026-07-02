@@ -1,13 +1,6 @@
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import type { ProposalStatus } from '@/types/proposal'
-
-const STATUS_LABEL: Record<ProposalStatus, string> = {
-  OPEN: 'Open',
-  COSIGNED: 'Co-signed',
-  APPROVED: 'Approved',
-  REJECTED: 'Rejected',
-  EXPIRED: 'Expired',
-}
 
 const STATUS_CLASS: Record<ProposalStatus, string> = {
   OPEN: 'bg-info-subtle text-info-foreground',
@@ -19,9 +12,10 @@ const STATUS_CLASS: Record<ProposalStatus, string> = {
 
 /** Coloured pill for a proposal's lifecycle state, mirroring the session status-badge pattern. */
 export function ProposalStatusBadge({ status }: { status: ProposalStatus }) {
+  const { t } = useTranslation()
   return (
     <Badge className={STATUS_CLASS[status]} variant="outline">
-      {STATUS_LABEL[status]}
+      {t(`proposals.statusBadge.${status.toLowerCase()}`)}
     </Badge>
   )
 }

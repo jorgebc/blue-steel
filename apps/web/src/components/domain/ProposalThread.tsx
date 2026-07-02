@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useProposalsForTarget, useCoSignProposal } from '@/api/proposals'
 import { ApiClientError } from '@/api/client'
 import { useAuthStore } from '@/store/authStore'
@@ -39,6 +40,7 @@ function DeltaList({ delta }: { delta: Record<string, unknown> }) {
  * Feedback via {@link InlineBanner} (no toasts); loading via {@link ProposalThreadSkeleton}.
  */
 export function ProposalThread({ targetType, targetId }: Props) {
+  const { t } = useTranslation()
   const campaignId = useCampaignStore((s) => s.activeCampaignId)
   const activeRole = useCampaignStore((s) => s.activeRole)
   const currentUserId = useAuthStore((s) => s.currentUser?.id)
@@ -58,12 +60,13 @@ export function ProposalThread({ targetType, targetId }: Props) {
   function handleCoSign(proposalId: string) {
     setFeedback(null)
     coSign.mutate(proposalId, {
-      onSuccess: () => setFeedback({ variant: 'success', message: 'Proposal co-signed.' }),
+      onSuccess: () =>
+        setFeedback({ variant: 'success', message: t('proposals.thread.coSignSuccess') }),
       onError: (err) => {
         const message =
           err instanceof ApiClientError
-            ? (err.errors[0]?.message ?? "We couldn't co-sign this proposal. Try again.")
-            : "We couldn't co-sign this proposal. Try again."
+            ? (err.errors[0]?.message ?? t('proposals.thread.coSignError'))
+            : t('proposals.thread.coSignError')
         setFeedback({ variant: 'error', message })
       },
     })
@@ -71,14 +74,14 @@ export function ProposalThread({ targetType, targetId }: Props) {
 
   return (
     <section
-      aria-label="Proposals"
+      aria-label={t('proposals.thread.sectionAria')}
       className="mt-8 border-t-2 border-dashed border-blue-300 pt-6 dark:border-blue-800"
     >
       <header className="mb-4">
-        <h2 className="text-sm font-semibold text-blue-900 dark:text-blue-200">Proposed changes</h2>
-        <p className="text-xs text-blue-700 dark:text-blue-300">
-          Member-submitted edits awaiting co-sign and GM review — not yet canonical world state.
-        </p>
+        <h2 className="text-sm font-semibold text-blue-900 dark:text-blue-200">
+          {t('proposals.thread.heading')}
+        </h2>
+        <p className="text-xs text-blue-700 dark:text-blue-300">{t('proposals.thread.subtitle')}</p>
       </header>
 
       {feedback && (
@@ -96,7 +99,7 @@ export function ProposalThread({ targetType, targetId }: Props) {
       {isError && (
         <InlineBanner
           variant="error"
-          message="Could not load proposals. Please refresh the page."
+          message={t('proposals.thread.loadError')}
           onDismiss={() => undefined}
         />
       )}
@@ -105,7 +108,9 @@ export function ProposalThread({ targetType, targetId }: Props) {
         <div className="space-y-3">
           {proposals.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No proposals yet for this {targetType.toLowerCase()}.
+              {targetType === 'ACTOR'
+                ? t('proposals.thread.emptyActor')
+                : t('proposals.thread.emptySpace')}
             </p>
           ) : (
             proposals.map((proposal) => (
@@ -116,7 +121,9 @@ export function ProposalThread({ targetType, targetId }: Props) {
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <ProposalStatusBadge status={proposal.status} />
                   <span className="text-xs text-muted-foreground">
-                    Expires {new Date(proposal.expiresAt).toLocaleDateString()}
+                    {t('proposals.thread.expires', {
+                      date: new Date(proposal.expiresAt).toLocaleDateString(),
+                    })}
                   </span>
                 </div>
                 <DeltaList delta={proposal.proposedDelta} />
@@ -128,7 +135,7 @@ export function ProposalThread({ targetType, targetId }: Props) {
                       onClick={() => handleCoSign(proposal.proposalId)}
                       disabled={coSign.isPending}
                     >
-                      Co-sign
+                      {t('proposals.thread.coSign')}
                     </Button>
                   </div>
                 )}

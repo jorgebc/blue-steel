@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
   Background,
@@ -32,6 +33,7 @@ const edgeTypes = { relationEdge: RelationEdge }
  * Node positions are derived deterministically; world state is never edited from the graph.
  */
 export function RelationsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const actorsQuery = useAllEntities('actor')
   const spacesQuery = useAllEntities('space')
@@ -98,14 +100,15 @@ export function RelationsPage() {
   const selectedRelationLabel = useMemo(() => {
     const relation = relations.find((r) => r.relationId === selectedRelationId)
     if (!relation) return ''
+    const unknown = t('exploration.relations.unknown')
     const source = relation.sourceEntityId
-      ? (nameById[relation.sourceEntityId] ?? 'Unknown')
-      : 'Unknown'
+      ? (nameById[relation.sourceEntityId] ?? unknown)
+      : unknown
     const target = relation.targetEntityId
-      ? (nameById[relation.targetEntityId] ?? 'Unknown')
-      : 'Unknown'
+      ? (nameById[relation.targetEntityId] ?? unknown)
+      : unknown
     return `${source} → ${relation.kind ?? relation.name} → ${target}`
-  }, [relations, selectedRelationId, nameById])
+  }, [relations, selectedRelationId, nameById, t])
 
   const isLoading = actorsQuery.isLoading || spacesQuery.isLoading || relationsQuery.isLoading
   const isError = actorsQuery.isError || spacesQuery.isError || relationsQuery.isError
@@ -113,17 +116,17 @@ export function RelationsPage() {
   return (
     <section>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground">Relations</h1>
-        <p className="text-sm text-muted-foreground">
-          How this campaign&apos;s actors and spaces are connected.
-        </p>
+        <h1 className="text-2xl font-semibold text-foreground">
+          {t('exploration.relations.title')}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t('exploration.relations.description')}</p>
       </div>
 
       {isError && (
         <div className="mb-4">
           <InlineBanner
             variant="error"
-            message="Could not load the relations graph. Please refresh the page."
+            message={t('exploration.relations.loadError')}
             onDismiss={() => navigate(0)}
           />
         </div>
@@ -135,7 +138,7 @@ export function RelationsPage() {
         <div className="space-y-4">
           <div
             role="group"
-            aria-label="Relations graph"
+            aria-label={t('exploration.relations.graphAria')}
             className="h-[70vh] min-h-[520px] w-full overflow-hidden rounded-2xl border border-border bg-background"
           >
             <ReactFlow
@@ -175,7 +178,7 @@ export function RelationsPage() {
               ) : (
                 <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
               )}
-              All relations
+              {t('exploration.relations.allRelations')}
               <span className="text-muted-foreground">({relations.length})</span>
             </button>
             {listOpen && (

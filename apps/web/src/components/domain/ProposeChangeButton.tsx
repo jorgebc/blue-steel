@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FocusedOverlay } from '@/components/domain/FocusedOverlay'
 import { ProposalSubmitForm } from '@/components/domain/ProposalSubmitForm'
 import { Button } from '@/components/ui/button'
@@ -18,17 +19,18 @@ interface Props {
  * decides.
  */
 export function ProposeChangeButton({ targetType, targetId, entityName, currentSnapshot }: Props) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   return (
     <>
       <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-        Propose a change
+        {t('proposals.proposeChange')}
       </Button>
       <FocusedOverlay
         open={open}
         onClose={() => setOpen(false)}
-        ariaLabel={`Propose a change to ${entityName}`}
+        ariaLabel={t('proposals.proposeChangeAria', { name: entityName })}
       >
         <ProposalSubmitForm
           targetType={targetType}

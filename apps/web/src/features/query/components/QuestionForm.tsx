@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -13,6 +14,7 @@ interface Props {
  * mutation call) lives in the {@link QueryPage} container.
  */
 export function QuestionForm({ onSubmit, isPending }: Props) {
+  const { t } = useTranslation()
   const [value, setValue] = useState('')
   const trimmed = value.trim()
 
@@ -33,14 +35,14 @@ export function QuestionForm({ onSubmit, isPending }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <label htmlFor="query-input" className="sr-only">
-        Ask a question about the campaign
+        {t('query.form.label')}
       </label>
       <div className="space-y-1">
         <Textarea
           id="query-input"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="What happened to Aldric after the Battle of Thornwall?"
+          placeholder={t('query.form.placeholder')}
           disabled={isPending}
           rows={3}
           maxLength={2000}
@@ -48,7 +50,7 @@ export function QuestionForm({ onSubmit, isPending }: Props) {
         <span className={`block text-right text-xs ${counterColor}`}>{trimmed.length}/2000</span>
       </div>
       <Button type="submit" disabled={isPending || trimmed === '' || trimmed.length > 2000}>
-        {isPending ? 'Searching…' : 'Ask'}
+        {isPending ? t('query.form.searching') : t('query.form.ask')}
       </Button>
     </form>
   )
