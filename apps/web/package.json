@@ -33,7 +33,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@cyclonedx/cyclonedx-npm": "^6.0.0",
+    "@cyclonedx/cyclonedx-npm": "^6.0.1",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.2",
     "@testing-library/jest-dom": "^6.4.6",
