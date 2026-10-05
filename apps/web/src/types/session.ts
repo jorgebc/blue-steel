@@ -3,12 +3,7 @@
  * emits the enum *name*, so these are UPPERCASE on the wire).
  */
 export type SessionStatus =
-  | 'PENDING'
-  | 'PROCESSING'
-  | 'DRAFT'
-  | 'COMMITTED'
-  | 'FAILED'
-  | 'DISCARDED'
+  'PENDING' | 'PROCESSING' | 'DRAFT' | 'COMMITTED' | 'FAILED' | 'DISCARDED'
 
 export interface SubmitSessionRequest {
   summaryText: string
