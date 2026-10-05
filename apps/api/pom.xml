@@ -36,8 +36,8 @@
     <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
 
     <!-- Code style -->
-    <google-java-format.version>1.28.0</google-java-format.version>
-    <spotless-maven-plugin.version>3.9.0</spotless-maven-plugin.version>
+    <google-java-format.version>1.30.0</google-java-format.version>
+    <spotless-maven-plugin.version>3.10.3</spotless-maven-plugin.version>
 
     <!-- Mutation testing -->
     <pitest-maven.version>1.30.0</pitest-maven.version>
